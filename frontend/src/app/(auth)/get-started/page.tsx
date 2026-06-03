@@ -25,88 +25,125 @@ function RoleCard({
   href: string;
 }) {
   return (
-    <Card className="w-80 rounded-2xl border-[0.5px] p-5 shadow-xs"
-      style={{ borderColor: "var(--brc-border)" }}>
-      <CardContent className="flex flex-col gap-4 p-0">
-        <div style={{
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          background: iconBg,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}>
-          <Icon name={iconName} size={20} stroke={iconFg} />
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 24, flex: 1 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <span style={{
-              fontFamily: "var(--brc-font-ui)",
-              fontWeight: 700,
-              fontSize: 18,
-              color: "var(--brc-text)",
-            }}>
-              {title}
-            </span>
-            <span style={{
-              fontFamily: "var(--brc-font-ui)",
-              fontSize: 16,
-              lineHeight: 1.5,
-              color: "var(--brc-text-muted)",
-            }}>
-              {body}
-            </span>
+    <Link href={href} className="block cursor-pointer">
+      <Card
+        className="w-80 rounded-2xl border-[0.5px] p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:-translate-y-1"
+        style={{ borderColor: "var(--brc-border)" }}
+      >
+        <CardContent className="flex flex-col gap-4 p-0">
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 24,
+              background: iconBg,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name={iconName} size={20} stroke={iconFg} />
           </div>
-          <Link href={href} style={{ marginTop: "auto" }}>
-            <AuthButton variant={variant} full>{cta}</AuthButton>
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: 24, flex: 1 }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <span
+                style={{
+                  fontFamily: "var(--brc-font-ui)",
+                  fontWeight: 700,
+                  fontSize: 18,
+                  color: "var(--brc-text)",
+                }}
+              >
+                {title}
+              </span>
+              <span
+                style={{
+                  fontFamily: "var(--brc-font-ui)",
+                  fontSize: 16,
+                  lineHeight: 1.5,
+                  color: "var(--brc-text-muted)",
+                }}
+              >
+                {body}
+              </span>
+            </div>
+            <div style={{ marginTop: "auto" }}>
+              <AuthButton variant={variant} full>
+                {cta}
+              </AuthButton>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 
 export default function GetStartedPage() {
   return (
     <AuthShell>
-      <div style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 64,
-        alignItems: "center",
-        maxWidth: 1232,
-      }}>
-        <div style={{
+      <div
+        style={{
           display: "flex",
           flexDirection: "column",
-          gap: 16,
+          gap: 64,
           alignItems: "center",
-          maxWidth: 572,
-          textAlign: "center",
-        }}>
-          <h1 style={{
-            fontFamily: "var(--brc-font-ui)",
-            fontWeight: 700,
-            fontSize: 32,
-            lineHeight: 1.2,
-            color: "var(--brc-text)",
-            margin: 0,
-          }}>
+          maxWidth: 1232,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            alignItems: "center",
+            maxWidth: 572,
+            textAlign: "center",
+          }}
+        >
+          <h1
+            style={{
+              fontFamily: "var(--brc-font-ui)",
+              fontWeight: 700,
+              fontSize: 32,
+              lineHeight: 1.2,
+              color: "var(--brc-text)",
+              margin: 0,
+            }}
+          >
             Choose How You Want to Get Started
           </h1>
-          <p style={{
-            fontFamily: "var(--brc-font-ui)",
-            fontSize: 16,
-            lineHeight: 1.5,
-            color: "var(--brc-text-muted)",
-            margin: 0,
-          }}>
-            Select your role to personalize your experience on Buy &amp; Rent Cars.
+          <p
+            style={{
+              fontFamily: "var(--brc-font-ui)",
+              fontSize: 16,
+              lineHeight: 1.5,
+              color: "var(--brc-text-muted)",
+              margin: 0,
+            }}
+          >
+            Select your role to personalize your experience on Buy &amp; Rent
+            Cars.
           </p>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 32, alignItems: "center" }}>
-          <div style={{ display: "flex", gap: 24, justifyContent: "center", alignItems: "stretch" }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 32,
+            alignItems: "center",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              gap: 24,
+              justifyContent: "center",
+              alignItems: "stretch",
+            }}
+          >
             <RoleCard
               iconName="user"
               iconBg="var(--brc-primary-tint)"
@@ -128,14 +165,16 @@ export default function GetStartedPage() {
               href="/owner-sign-up"
             />
           </div>
-          <div style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: 8,
-            fontFamily: "var(--brc-font-ui)",
-            fontSize: 16,
-            color: "var(--brc-text)",
-          }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 8,
+              fontFamily: "var(--brc-font-ui)",
+              fontSize: 16,
+              color: "var(--brc-text)",
+            }}
+          >
             <span>Already have an account?</span>
             <Link
               href="/sign-in"
