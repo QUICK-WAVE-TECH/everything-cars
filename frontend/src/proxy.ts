@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const protectedPaths = [
-  "/customer",
-  "/owner",
+  "/customer/",
+  "/owner/",
 ];
 
 const authPaths = ["/sign-in", "/sign-up", "/get-started", "/verify"];
