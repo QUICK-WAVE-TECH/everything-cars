@@ -33,10 +33,10 @@ export function CarRow({ title, cars, onAction }: CarRowProps) {
           {title}
         </span>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => scroll(-1)} style={navBtnStyle}>
+          <button className="brc-button-motion brc-button-motion-icon" onClick={() => scroll(-1)} style={navBtnStyle}>
             <Icon name="chevleft" size={18} stroke="var(--brc-text)" />
           </button>
-          <button onClick={() => scroll(1)} style={navBtnStyle}>
+          <button className="brc-button-motion brc-button-motion-icon" onClick={() => scroll(1)} style={navBtnStyle}>
             <Icon name="chevright" size={18} stroke="var(--brc-text)" />
           </button>
         </div>

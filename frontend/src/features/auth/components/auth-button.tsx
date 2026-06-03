@@ -41,7 +41,7 @@ export function AuthButton({
     neutral: "outline",
   };
   const authButtonClasses = cn(
-    "h-12 gap-2 rounded-lg px-6 text-sm font-bold focus-visible:ring-2 focus-visible:ring-offset-2",
+    "brc-button-motion h-12 gap-2 rounded-lg px-6 text-sm font-bold focus-visible:ring-2 focus-visible:ring-offset-2",
     variant === "primary" && "bg-(--brc-primary) text-(--brc-text-on-primary) hover:bg-(--brc-primary-hover) focus-visible:ring-(--brc-primary)",
     variant === "secondary" && "bg-(--brc-secondary) text-[#FAFAFA] hover:bg-black focus-visible:ring-(--brc-secondary)",
     variant === "neutral" && "border-(--brc-border) bg-white text-(--brc-text) hover:bg-white hover:text-(--brc-text) hover:brightness-95 focus-visible:ring-(--brc-border)",

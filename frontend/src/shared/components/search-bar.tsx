@@ -62,6 +62,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
         </select>
       </div>
       <button
+        className="brc-button-motion"
         onClick={() => onSearch?.({ loc, type, price })}
         style={{
           width: 150, height: 48, borderRadius: 8, border: "none",

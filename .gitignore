@@ -9,6 +9,7 @@ venv/
 .env
 .env.local
 .env.production.local
+.env.example
 
 # Build
 .next/
@@ -39,3 +40,9 @@ htmlcov/
 
 # Superpowers
 .superpowers/
+
+#superdesign
+superdesign/
+
+docs/
+__tests__/

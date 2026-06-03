@@ -17,6 +17,7 @@ export function UploadField({ label, hint, value, onPick }: UploadFieldProps) {
       </span>
       <button
         type="button"
+        className="brc-button-motion brc-button-motion-subtle"
         onClick={onPick}
         style={{
           minHeight: 150,

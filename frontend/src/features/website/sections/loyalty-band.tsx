@@ -34,7 +34,7 @@ export function LoyaltyBand() {
         }}>
           Experience the best of ride on your journey. Available for purchase or hire processes.
         </p>
-        <button style={{
+        <button className="brc-button-motion" style={{
           marginTop: 8, background: "var(--brc-accent)", color: "#fff",
           border: "none", borderRadius: 8, height: 56, padding: "0 28px",
           fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14,
@@ -92,7 +92,7 @@ export function LoyaltyBand() {
               </div>
             ))}
           </div>
-          <button style={{
+          <button className="brc-button-motion" style={{
             background: "#fff", color: "var(--brc-accent-deep)", border: "none",
             borderRadius: 8, height: 60, fontFamily: "var(--brc-font-ui)",
             fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex",

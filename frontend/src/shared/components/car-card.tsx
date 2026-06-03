@@ -71,12 +71,13 @@ export function CarCard({ car, onAction }: CarCardProps) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: "clamp(18px, 5vw, 22px)" }}>{car.price}</span>
         <button
+          className="brc-button-motion"
           onClick={() => onAction?.(car)}
           style={{
             height: 44, borderRadius: 8, border: "none", padding: "0 18px",
             background: "var(--brc-secondary)", color: "#FAFAFA",
             fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14,
-            cursor: "pointer", transition: "background .18s ease",
+            cursor: "pointer",
           }}
         >
           {cta}

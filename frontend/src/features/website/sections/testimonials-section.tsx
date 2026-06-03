@@ -66,10 +66,10 @@ export function TestimonialsSection() {
             {TESTIMONIALS[idx]!.text}
           </p>
           <div style={{ display: "flex", gap: 8, marginTop: 28 }}>
-            <button onClick={prev} style={navBtnStyle}>
+            <button className="brc-button-motion brc-button-motion-icon" onClick={prev} style={navBtnStyle}>
               <Icon name="chevleft" size={18} stroke="#fff" />
             </button>
-            <button onClick={next} style={navBtnStyle}>
+            <button className="brc-button-motion brc-button-motion-icon" onClick={next} style={navBtnStyle}>
               <Icon name="chevright" size={18} stroke="#fff" />
             </button>
           </div>
