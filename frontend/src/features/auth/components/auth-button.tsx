@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type CSSProperties, type ReactNode } from "react";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Icon } from "./icon";
 import type { IconName } from "./icon";
@@ -79,13 +79,14 @@ export function AuthButton({
   }
 
   return (
-    <button
+    <Button
       type={type}
+      variant={shadcnVariantByAuthVariant[variant]}
       onClick={onClick}
       className={authButtonClasses}
       style={buttonStyle}
     >
       {content}
-    </button>
+    </Button>
   );
 }
