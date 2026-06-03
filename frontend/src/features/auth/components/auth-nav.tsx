@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Icon } from "./icon";
 import { AuthButton } from "./auth-button";
@@ -9,8 +8,6 @@ import { AuthButton } from "./auth-button";
 const NAV_LINKS = ["About Us", "Services", "Contact Us"];
 
 export function AuthNav() {
-  const router = useRouter();
-
   return (
     <header style={{
       height: 84, background: "#fff",
@@ -41,7 +38,7 @@ export function AuthNav() {
         ))}
       </nav>
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
-        <AuthButton onClick={() => router.push("/get-started")} style={{ width: 140 }}>Sign Up</AuthButton>
+        <AuthButton href="/get-started" style={{ width: 140 }}>Sign Up</AuthButton>
       </div>
     </header>
   );

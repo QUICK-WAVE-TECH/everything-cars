@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Icon, AuthButton, AuthShell } from "@/features/auth/components";
 import type { IconName } from "@/features/auth/components";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,8 +24,6 @@ function RoleCard({
   variant: "primary" | "neutral";
   href: string;
 }) {
-  const router = useRouter();
-
   return (
     <Card
       className="group w-80 rounded-2xl border-[0.5px] p-5 transition-all duration-300 ease-out hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] hover:-translate-y-1 hover:border-(--brc-border-strong)"
@@ -70,7 +68,7 @@ function RoleCard({
             </span>
           </div>
           <div className="mt-auto">
-            <AuthButton variant={variant} full onClick={() => router.push(href)}>
+            <AuthButton variant={variant} full href={href}>
               {cta}
             </AuthButton>
           </div>
@@ -81,8 +79,6 @@ function RoleCard({
 }
 
 export default function GetStartedPage() {
-  const router = useRouter();
-
   return (
     <AuthShell>
       <div
@@ -177,8 +173,8 @@ export default function GetStartedPage() {
             }}
           >
             <span>Already have an account?</span>
-            <button
-              onClick={() => router.push("/sign-in")}
+            <Link
+              href="/sign-in"
               style={{
                 border: "none", background: "transparent", cursor: "pointer",
                 fontFamily: "var(--brc-font-link)", fontSize: 16,
@@ -186,7 +182,7 @@ export default function GetStartedPage() {
               }}
             >
               Log In
-            </button>
+            </Link>
           </div>
         </div>
       </div>

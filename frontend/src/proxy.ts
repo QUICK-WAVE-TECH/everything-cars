@@ -6,7 +6,13 @@ const protectedPaths = [
   "/owner/",
 ];
 
-const authPaths = ["/sign-in", "/sign-up", "/get-started", "/verify"];
+const authPaths = [
+  "/sign-in",
+  "/sign-up",
+  "/owner-sign-up",
+  "/get-started",
+  "/verify",
+];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { AuthField, AuthButton, Checkbox, AuthShell } from "@/features/auth/components";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function SignUpPage() {
-  const router = useRouter();
   const [step, setStep] = useState(1);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [agree, setAgree] = useState(false);
@@ -148,7 +147,7 @@ export default function SignUpPage() {
                 <AuthButton variant="neutral" onClick={() => setStep(1)} style={{ width: 120 }}>
                   Back
                 </AuthButton>
-                <AuthButton full onClick={() => {}}>Create Account</AuthButton>
+                <AuthButton full href="/verify">Create Account</AuthButton>
               </div>
             )}
 
@@ -161,8 +160,8 @@ export default function SignUpPage() {
               color: "var(--brc-text)",
             }}>
               <span>Already have an account?</span>
-              <button
-                onClick={() => router.push("/sign-in")}
+              <Link
+                href="/sign-in"
                 style={{
                   border: "none", background: "transparent", cursor: "pointer",
                   fontFamily: "var(--brc-font-link)", fontSize: 16,
@@ -170,7 +169,7 @@ export default function SignUpPage() {
                 }}
               >
                 Log In
-              </button>
+              </Link>
             </div>
           </CardContent>
         </Card>

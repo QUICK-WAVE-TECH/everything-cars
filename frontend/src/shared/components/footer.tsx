@@ -28,7 +28,7 @@ export function Footer() {
           <div>
             <h4 className="text-sm font-semibold">For Owners</h4>
             <ul className="mt-2 space-y-2">
-              <li><Link href="/sign-up" className="text-sm text-muted-foreground hover:text-foreground">List Your Car</Link></li>
+              <li><Link href="/owner-sign-up" className="text-sm text-muted-foreground hover:text-foreground">List Your Car</Link></li>
             </ul>
           </div>
         </div>

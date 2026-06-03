@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import { AuthField, AuthButton, AuthShell } from "@/features/auth/components";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function SignInPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -65,8 +64,8 @@ export default function SignInPage() {
               color: "var(--brc-text)",
             }}>
               <span>Don&apos;t have an account?</span>
-              <button
-                onClick={() => router.push("/get-started")}
+              <Link
+                href="/get-started"
                 style={{
                   border: "none", background: "transparent", cursor: "pointer",
                   fontFamily: "var(--brc-font-link)", fontSize: 16,
@@ -74,7 +73,7 @@ export default function SignInPage() {
                 }}
               >
                 Sign Up
-              </button>
+              </Link>
             </div>
           </CardContent>
         </Card>
