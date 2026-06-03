@@ -54,7 +54,7 @@ export default function SignInPage() {
                 onChange={setPassword}
               />
             </div>
-            <AuthButton full onClick={() => {}}>Continue</AuthButton>
+            <AuthButton full href="/verify">Continue</AuthButton>
             <div style={{
               display: "flex",
               justifyContent: "center",

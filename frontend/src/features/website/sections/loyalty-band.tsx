@@ -1,0 +1,102 @@
+import { Icon } from "@/features/auth/components/icon";
+
+const PERKS = [
+  { icon: "gift" as const, title: "Earn Points on Every Rental", desc: "Accumulate points with each booking and watch your rewards grow." },
+  { icon: "trophy" as const, title: "Unlock Premium Benefits", desc: "Access free upgrades, priority support, and exclusive discounts." },
+  { icon: "clock" as const, title: "Redeem Anytime", desc: "Use your points for discounts, free rental days, or special perks." },
+];
+
+export function LoyaltyBand() {
+  return (
+    <section style={{ display: "grid", gridTemplateColumns: "1.28fr 1fr", minHeight: 560, width: "100%" }}>
+      {/* Left — Road CTA */}
+      <div style={{
+        position: "relative", display: "flex", flexDirection: "column", justifyContent: "center", gap: 24,
+        padding: "100px clamp(40px, 7vw, 145px)", overflow: "hidden",
+        background: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(/road-cta.jpg) center/cover no-repeat`,
+        backgroundColor: "rgba(0,0,0,0.4)",
+      }}>
+        <h2 style={{
+          fontFamily: "var(--brc-font-ui)", fontWeight: 700,
+          fontSize: "clamp(32px,3.5vw,48px)", lineHeight: 1.2,
+          color: "#fff", maxWidth: 483, margin: 0,
+        }}>
+          Ready to hit the road?
+        </h2>
+        <p style={{
+          fontFamily: "var(--brc-font-ui)", fontSize: 20, lineHeight: 1.5,
+          color: "var(--brc-border)", maxWidth: 483, margin: 0,
+        }}>
+          Experience the best of ride on your journey. Available for purchase or hire processes.
+        </p>
+        <button style={{
+          marginTop: 8, background: "var(--brc-accent)", color: "#fff",
+          border: "none", borderRadius: 8, height: 56, padding: "0 28px",
+          fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14,
+          cursor: "pointer", display: "inline-flex", alignItems: "center",
+          gap: 10, width: "fit-content",
+        }}>
+          Browse Cars <Icon name="arrow" size={18} />
+        </button>
+      </div>
+
+      {/* Right — Loyalty panel */}
+      <div style={{
+        position: "relative", background: "var(--brc-accent-deep)", color: "#fff",
+        overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "72px clamp(32px,4vw,80px)",
+      }}>
+        {/* Concentric ring texture */}
+        <div aria-hidden="true" style={{
+          position: "absolute", top: "-55%", right: "-30%", width: "160%",
+          aspectRatio: "1", borderRadius: "50%", opacity: 0.16,
+          background: "repeating-radial-gradient(circle, transparent 0 34px, #fff 34px 36px)",
+          pointerEvents: "none",
+        }} />
+        <div style={{ position: "relative", width: "100%", maxWidth: 470, display: "flex", flexDirection: "column", gap: 40 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <Icon name="gift" size={34} stroke="#fff" />
+              <h3 style={{
+                fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 34,
+                lineHeight: 1.2, margin: 0,
+              }}>
+                Loyalty Rewards Program
+              </h3>
+            </div>
+            <p style={{
+              fontFamily: "var(--brc-font-ui)", fontSize: 18, lineHeight: 1.5,
+              color: "#fff", margin: 0,
+            }}>
+              Join our rewards program and unlock amazing perks that make every journey more rewarding.
+            </p>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+            {PERKS.map((perk) => (
+              <div key={perk.title} style={{ display: "flex", gap: 18, alignItems: "center" }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: "50%", background: "#fff",
+                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                }}>
+                  <Icon name={perk.icon} size={24} stroke="var(--brc-accent-deep)" />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 21, lineHeight: 1.2 }}>{perk.title}</span>
+                  <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 15, lineHeight: 1.45, color: "rgba(255,255,255,.92)" }}>{perk.desc}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button style={{
+            background: "#fff", color: "var(--brc-accent-deep)", border: "none",
+            borderRadius: 8, height: 60, fontFamily: "var(--brc-font-ui)",
+            fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex",
+            alignItems: "center", justifyContent: "center", gap: 10, width: "100%",
+          }}>
+            Join the Program <Icon name="arrow" size={18} />
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}

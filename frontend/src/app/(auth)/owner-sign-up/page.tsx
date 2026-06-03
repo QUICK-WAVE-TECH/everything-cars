@@ -108,12 +108,16 @@ export default function OwnerSignUpPage() {
                     <Radio
                       checked={ownerType === "private"}
                       label="Private Car"
-                      onClick={() => setOwnerType("private")}
+                      name="owner-type"
+                      value="private"
+                      onChange={() => setOwnerType("private")}
                     />
                     <Radio
                       checked={ownerType === "company"}
                       label="Company"
-                      onClick={() => setOwnerType("company")}
+                      name="owner-type"
+                      value="company"
+                      onChange={() => setOwnerType("company")}
                     />
                   </div>
                 </div>

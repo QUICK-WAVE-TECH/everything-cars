@@ -1,3 +1,12 @@
 export { Header } from "./header";
 export { Footer } from "./footer";
 export { Sidebar } from "./sidebar";
+export { Pill } from "./pill";
+export { Chip } from "./chip";
+export { Star } from "./star";
+export { SectionHead } from "./section-head";
+export { CarCard } from "./car-card";
+export type { Car } from "./car-card";
+export { CarRow } from "./car-row";
+export { SearchBar } from "./search-bar";
+export { WebsiteNavbar } from "./website-navbar";

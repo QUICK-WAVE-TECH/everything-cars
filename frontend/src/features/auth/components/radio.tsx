@@ -1,16 +1,21 @@
 "use client";
 
+import { useId } from "react";
+
 type RadioProps = {
   checked: boolean;
   label: string;
-  onClick: () => void;
+  name: string;
+  value: string;
+  onChange: () => void;
 };
 
-export function Radio({ checked, label, onClick }: RadioProps) {
+export function Radio({ checked, label, name, value, onChange }: RadioProps) {
+  const id = useId();
+
   return (
-    <button
-      onClick={onClick}
-      type="button"
+    <label
+      htmlFor={id}
       style={{
         display: "flex",
         alignItems: "center",
@@ -21,29 +26,22 @@ export function Radio({ checked, label, onClick }: RadioProps) {
         padding: 0,
       }}
     >
-      <span
+      <input
+        id={id}
+        type="radio"
+        name={name}
+        value={value}
+        checked={checked}
+        onChange={onChange}
         style={{
           width: 20,
           height: 20,
-          borderRadius: "50%",
-          border: `1.5px solid ${checked ? "var(--brc-primary)" : "var(--brc-border-strong)"}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          margin: 0,
+          accentColor: "var(--brc-primary)",
+          cursor: "pointer",
           flexShrink: 0,
         }}
-      >
-        {checked && (
-          <span
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: "50%",
-              background: "var(--brc-primary)",
-            }}
-          />
-        )}
-      </span>
+      />
       <span
         style={{
           fontFamily: "var(--brc-font-ui)",
@@ -53,6 +51,6 @@ export function Radio({ checked, label, onClick }: RadioProps) {
       >
         {label}
       </span>
-    </button>
+    </label>
   );
 }

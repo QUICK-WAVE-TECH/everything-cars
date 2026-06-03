@@ -1,0 +1,46 @@
+"use client";
+
+import { SectionHead } from "@/shared/components/section-head";
+import { CarRow } from "@/shared/components/car-row";
+
+const RENTED = [
+  { id: 1, name: "Lexus NX 300h", type: "Sedan", location: "Lagos, Nigeria", price: "₦35,000/day", rating: 4, mode: "rent" as const },
+  { id: 2, name: "Toyota RAV4", type: "SUV", location: "Abuja, Nigeria", price: "₦42,000/day", rating: 5, mode: "rent" as const },
+  { id: 3, name: "Mercedes C300", type: "Luxury", location: "Lagos, Nigeria", price: "₦80,000/day", rating: 4, mode: "rent" as const },
+  { id: 4, name: "Honda Accord", type: "Sedan", location: "Port Harcourt", price: "₦30,000/day", rating: 4, mode: "rent" as const },
+  { id: 5, name: "Range Rover Velar", type: "Luxury", location: "Lagos, Nigeria", price: "₦150,000/day", rating: 5, mode: "rent" as const },
+];
+
+const PURCHASED = [
+  { id: 11, name: "Lexus NX 300h", type: "Sedan", location: "Lagos, Nigeria", price: "₦20,000,000", rating: 4, mode: "buy" as const },
+  { id: 12, name: "BMW X5", type: "SUV", location: "Abuja, Nigeria", price: "₦54,000,000", rating: 5, mode: "buy" as const },
+  { id: 13, name: "Toyota Corolla", type: "Sedan", location: "Ibadan, Nigeria", price: "₦13,000,000", rating: 4, mode: "buy" as const },
+  { id: 14, name: "Audi Q7", type: "SUV", location: "Lagos, Nigeria", price: "₦62,000,000", rating: 5, mode: "buy" as const },
+];
+
+const LISTED = [
+  { id: 21, name: "Lexus NX 300h", type: "Sedan", location: "Lagos, Nigeria", price: "₦35,000/day", rating: 4, mode: "list" as const },
+  { id: 22, name: "Kia Sportage", type: "SUV", location: "Abuja, Nigeria", price: "₦38,000/day", rating: 4, mode: "list" as const },
+  { id: 23, name: "Ford Ranger", type: "Pickup", location: "Kano, Nigeria", price: "₦45,000/day", rating: 4, mode: "list" as const },
+  { id: 24, name: "Hyundai Elantra", type: "Sedan", location: "Lagos, Nigeria", price: "₦28,000/day", rating: 5, mode: "list" as const },
+];
+
+export function ServicesSection() {
+  return (
+    <section style={{ background: "#fff", padding: "104px var(--brc-space-10, 104px)" }}>
+      <div style={{ maxWidth: 1232, margin: "0 auto", display: "flex", flexDirection: "column", gap: 80 }}>
+        <div style={{ alignSelf: "center" }}>
+          <SectionHead
+            pill="Our Services"
+            title="Find the Perfect Car for Every Journey"
+            sub="Choose from our premium collection of vehicles for rent, buy, or sell."
+            center
+          />
+        </div>
+        <CarRow title="MOST RENTED CARS" cars={RENTED} />
+        <CarRow title="MOST PURCHASED CARS" cars={PURCHASED} />
+        <CarRow title="MOST LISTED CARS" cars={LISTED} />
+      </div>
+    </section>
+  );
+}

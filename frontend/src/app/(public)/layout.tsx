@@ -1,12 +1,12 @@
-import { Header } from "@/shared/components";
-import { Footer } from "@/shared/components";
+import { WebsiteNavbar } from "@/shared/components";
+import { AuthFooter } from "@/features/auth/components";
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col">
-      <Header variant="public" />
-      <main className="flex-1">{children}</main>
-      <Footer />
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <WebsiteNavbar />
+      <main style={{ flex: 1 }}>{children}</main>
+      <AuthFooter />
     </div>
   );
 }
