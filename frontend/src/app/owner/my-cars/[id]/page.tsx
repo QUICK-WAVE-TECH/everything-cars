@@ -1,8 +1,4 @@
-export default function CarDetailPage({
-  params: _params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function CarDetailPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold">Car Details</h1>

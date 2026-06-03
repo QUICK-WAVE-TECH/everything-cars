@@ -1,8 +1,4 @@
-export default function RequestDetailPage({
-  params: _params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function RequestDetailPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold">Request Details</h1>

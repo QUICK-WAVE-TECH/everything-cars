@@ -1,8 +1,4 @@
-export default function ListingDetailPage({
-  params: _params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function ListingDetailPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold">Car Details</h1>
