@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Icon } from "./icon";
 import type { IconName } from "./icon";
 
@@ -16,38 +16,7 @@ type AuthButtonProps = {
   full?: boolean;
   style?: React.CSSProperties;
   className?: string;
-};
-
-const VARIANT_MAP: Record<
-  ButtonVariant,
-  {
-    shadcnVariant: "default" | "secondary" | "outline";
-    styles: React.CSSProperties;
-    hoverStyles: React.CSSProperties;
-  }
-> = {
-  primary: {
-    shadcnVariant: "default",
-    styles: {
-      background: "var(--brc-primary)",
-      color: "var(--brc-text-on-primary)",
-    },
-    hoverStyles: { background: "var(--brc-primary-hover)" },
-  },
-  secondary: {
-    shadcnVariant: "secondary",
-    styles: { background: "var(--brc-secondary)", color: "#FAFAFA" },
-    hoverStyles: { background: "#000" },
-  },
-  neutral: {
-    shadcnVariant: "outline",
-    styles: {
-      background: "#fff",
-      color: "var(--brc-text)",
-      border: "1px solid var(--brc-border)",
-    },
-    hoverStyles: { filter: "brightness(0.96)" },
-  },
+  type?: "button" | "submit";
 };
 
 export function AuthButton({
@@ -59,25 +28,31 @@ export function AuthButton({
   full,
   style,
   className,
+  type = "button",
 }: AuthButtonProps) {
-  const { shadcnVariant, styles: variantStyles } = VARIANT_MAP[variant];
-
   return (
-    <Button
-      variant={shadcnVariant}
-      size="lg"
+    <button
+      type={type}
       onClick={onClick}
-      className={`h-12 cursor-pointer gap-2 rounded-lg text-sm font-bold ${full ? "w-full" : ""} ${className ?? ""}`}
+      className={cn(
+        "inline-flex h-12 cursor-pointer items-center justify-center gap-2 rounded-lg px-6 text-sm font-bold transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        variant === "primary" &&
+          "bg-(--brc-primary) text-(--brc-text-on-primary) hover:bg-(--brc-primary-hover) focus-visible:ring-(--brc-primary)",
+        variant === "secondary" &&
+          "bg-(--brc-secondary) text-[#FAFAFA] hover:bg-black focus-visible:ring-(--brc-secondary)",
+        variant === "neutral" &&
+          "border border-(--brc-border) bg-white text-(--brc-text) hover:brightness-95 focus-visible:ring-(--brc-border)",
+        full && "w-full",
+        className,
+      )}
       style={{
         fontFamily: "var(--brc-font-ui)",
-        transition: "background .18s ease, filter .18s ease",
-        ...variantStyles,
         ...style,
       }}
     >
       {icon && <Icon name={icon} size={18} />}
       {children}
       {iconEnd && <Icon name={iconEnd} size={18} />}
-    </Button>
+    </button>
   );
 }
