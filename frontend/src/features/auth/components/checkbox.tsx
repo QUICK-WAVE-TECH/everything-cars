@@ -1,54 +1,33 @@
 "use client";
 
 import { type ReactNode } from "react";
-import { Icon } from "./icon";
+import { Checkbox as ShadcnCheckbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
-type CheckboxProps = {
+type AuthCheckboxProps = {
   checked: boolean;
   onChange: () => void;
   children: ReactNode;
 };
 
-export function Checkbox({ checked, onChange, children }: CheckboxProps) {
+export function Checkbox({ checked, onChange, children }: AuthCheckboxProps) {
   return (
-    <button
-      onClick={onChange}
-      type="button"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        border: "none",
-        background: "transparent",
-        cursor: "pointer",
-        padding: 0,
-      }}
-    >
-      <span
+    <div className="flex items-center gap-2">
+      <ShadcnCheckbox
+        checked={checked}
+        onCheckedChange={onChange}
+        className="size-6 rounded-md data-checked:border-[var(--brc-primary)] data-checked:bg-[var(--brc-primary)]"
         style={{
-          width: 24,
-          height: 24,
-          borderRadius: 6,
-          border: `1.5px solid ${checked ? "var(--brc-primary)" : "var(--brc-border-strong)"}`,
-          background: checked ? "var(--brc-primary)" : "#fff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
+          borderColor: checked ? "var(--brc-primary)" : "var(--brc-border-strong)",
         }}
-      >
-        {checked && <Icon name="check" size={15} stroke="#fff" />}
-      </span>
-      <span
-        style={{
-          fontFamily: "var(--brc-font-ui)",
-          fontSize: 16,
-          color: "var(--brc-text)",
-          textAlign: "left",
-        }}
+      />
+      <Label
+        className="text-base font-normal cursor-pointer"
+        style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text)" }}
+        onClick={onChange}
       >
         {children}
-      </span>
-    </button>
+      </Label>
+    </div>
   );
 }

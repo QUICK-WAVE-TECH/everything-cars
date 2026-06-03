@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Icon, AuthButton, AuthShell } from "@/features/auth/components";
 import type { IconName } from "@/features/auth/components";
+import { Card, CardContent } from "@/components/ui/card";
 
 function RoleCard({
   iconName,
@@ -24,52 +25,45 @@ function RoleCard({
   href: string;
 }) {
   return (
-    <div style={{
-      width: 320,
-      borderRadius: 16,
-      background: "#fff",
-      border: "0.5px solid var(--brc-border)",
-      padding: 20,
-      display: "flex",
-      flexDirection: "column",
-      gap: 16,
-      boxShadow: "var(--brc-shadow-xs)",
-    }}>
-      <div style={{
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        background: iconBg,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}>
-        <Icon name={iconName} size={20} stroke={iconFg} />
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 24, flex: 1 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <span style={{
-            fontFamily: "var(--brc-font-ui)",
-            fontWeight: 700,
-            fontSize: 18,
-            color: "var(--brc-text)",
-          }}>
-            {title}
-          </span>
-          <span style={{
-            fontFamily: "var(--brc-font-ui)",
-            fontSize: 16,
-            lineHeight: 1.5,
-            color: "var(--brc-text-muted)",
-          }}>
-            {body}
-          </span>
+    <Card className="w-80 rounded-2xl border-[0.5px] p-5 shadow-xs"
+      style={{ borderColor: "var(--brc-border)" }}>
+      <CardContent className="flex flex-col gap-4 p-0">
+        <div style={{
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          background: iconBg,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}>
+          <Icon name={iconName} size={20} stroke={iconFg} />
         </div>
-        <Link href={href} style={{ marginTop: "auto" }}>
-          <AuthButton variant={variant} full>{cta}</AuthButton>
-        </Link>
-      </div>
-    </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 24, flex: 1 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <span style={{
+              fontFamily: "var(--brc-font-ui)",
+              fontWeight: 700,
+              fontSize: 18,
+              color: "var(--brc-text)",
+            }}>
+              {title}
+            </span>
+            <span style={{
+              fontFamily: "var(--brc-font-ui)",
+              fontSize: 16,
+              lineHeight: 1.5,
+              color: "var(--brc-text-muted)",
+            }}>
+              {body}
+            </span>
+          </div>
+          <Link href={href} style={{ marginTop: "auto" }}>
+            <AuthButton variant={variant} full>{cta}</AuthButton>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

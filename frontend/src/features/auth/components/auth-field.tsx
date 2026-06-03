@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Icon } from "./icon";
 
 type AuthFieldProps = {
@@ -17,35 +19,29 @@ export function AuthField({ label, placeholder, value, onChange, type = "text" }
   const isSelect = type === "select";
 
   return (
-    <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text)" }}>
+    <div className="flex flex-col gap-2">
+      <Label
+        className="text-base font-normal"
+        style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text)" }}
+      >
         {label}
-      </span>
+      </Label>
       <div
+        className="flex h-14 items-center gap-2 rounded-lg px-6"
         style={{
-          height: 56,
-          borderRadius: 8,
           background: "var(--brc-bg-subtle)",
           border: "1px solid var(--brc-border)",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "0 24px",
         }}
       >
-        <input
+        <Input
           type={isPw && !show ? "password" : "text"}
           value={value}
           placeholder={placeholder}
           readOnly={isSelect}
           onChange={(e) => onChange?.(e.target.value)}
+          className="h-full border-0 bg-transparent px-0 text-sm shadow-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
           style={{
-            border: "none",
-            outline: "none",
-            background: "transparent",
-            flex: 1,
             fontFamily: "var(--brc-font-ui)",
-            fontSize: 14,
             color: "var(--brc-text)",
             cursor: isSelect ? "pointer" : "text",
           }}
@@ -57,19 +53,13 @@ export function AuthField({ label, placeholder, value, onChange, type = "text" }
               e.preventDefault();
               setShow(!show);
             }}
-            style={{
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-              padding: 0,
-              display: "flex",
-            }}
+            className="flex shrink-0 border-0 bg-transparent p-0 cursor-pointer"
           >
             <Icon name="eye" size={22} stroke="var(--brc-text)" />
           </button>
         )}
         {isSelect && <Icon name="chevdown" size={20} stroke="var(--brc-text-muted)" />}
       </div>
-    </label>
+    </div>
   );
 }

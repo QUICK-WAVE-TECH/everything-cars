@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { Icon } from "./icon";
 import type { IconName } from "./icon";
 
@@ -14,18 +15,32 @@ type AuthButtonProps = {
   onClick?: () => void;
   full?: boolean;
   style?: React.CSSProperties;
+  className?: string;
 };
 
-const VARIANT_STYLES: Record<ButtonVariant, React.CSSProperties> = {
-  primary: { background: "var(--brc-primary)", color: "var(--brc-text-on-primary)" },
-  secondary: { background: "var(--brc-secondary)", color: "#FAFAFA" },
-  neutral: { background: "#fff", color: "var(--brc-text)", border: "1px solid var(--brc-border)" },
-};
-
-const HOVER_BG: Record<ButtonVariant, string> = {
-  primary: "var(--brc-primary-hover)",
-  secondary: "#000",
-  neutral: "",
+const VARIANT_MAP: Record<
+  ButtonVariant,
+  {
+    shadcnVariant: "default" | "secondary" | "outline";
+    styles: React.CSSProperties;
+    hoverStyles: React.CSSProperties;
+  }
+> = {
+  primary: {
+    shadcnVariant: "default",
+    styles: { background: "var(--brc-primary)", color: "var(--brc-text-on-primary)" },
+    hoverStyles: { background: "var(--brc-primary-hover)" },
+  },
+  secondary: {
+    shadcnVariant: "secondary",
+    styles: { background: "var(--brc-secondary)", color: "#FAFAFA" },
+    hoverStyles: { background: "#000" },
+  },
+  neutral: {
+    shadcnVariant: "outline",
+    styles: { background: "#fff", color: "var(--brc-text)", border: "1px solid var(--brc-border)" },
+    hoverStyles: { filter: "brightness(0.96)" },
+  },
 };
 
 export function AuthButton({
@@ -36,40 +51,26 @@ export function AuthButton({
   onClick,
   full,
   style,
+  className,
 }: AuthButtonProps) {
-  const [hover, setHover] = useState(false);
-  const base = VARIANT_STYLES[variant];
-  const hoverBg = HOVER_BG[variant];
+  const { shadcnVariant, styles: variantStyles } = VARIANT_MAP[variant];
 
   return (
-    <button
+    <Button
+      variant={shadcnVariant}
+      size="lg"
       onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className={`h-12 gap-2 rounded-lg text-sm font-bold ${full ? "w-full" : ""} ${className ?? ""}`}
       style={{
-        height: 48,
-        border: "none",
-        borderRadius: 8,
-        padding: "0 22px",
         fontFamily: "var(--brc-font-ui)",
-        fontWeight: 700,
-        fontSize: 14,
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-        width: full ? "100%" : "auto",
         transition: "background .18s ease, filter .18s ease",
-        ...base,
-        ...(hover && hoverBg ? { background: hoverBg } : {}),
-        ...(hover && variant === "neutral" ? { filter: "brightness(0.96)" } : {}),
+        ...variantStyles,
         ...style,
       }}
     >
       {icon && <Icon name={icon} size={18} />}
       {children}
       {iconEnd && <Icon name={iconEnd} size={18} />}
-    </button>
+    </Button>
   );
 }
