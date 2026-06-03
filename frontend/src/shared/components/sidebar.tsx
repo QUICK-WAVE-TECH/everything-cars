@@ -11,19 +11,19 @@ type SidebarLink = {
 };
 
 const customerLinks: SidebarLink[] = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/listings", label: "Browse Cars" },
-  { href: "/requests", label: "My Requests" },
-  { href: "/payments", label: "Payments" },
-  { href: "/transactions", label: "Transactions" },
+  { href: "/customer/dashboard", label: "Dashboard" },
+  { href: "/customer/listings", label: "Browse Cars" },
+  { href: "/customer/requests", label: "My Requests" },
+  { href: "/customer/payments", label: "Payments" },
+  { href: "/customer/transactions", label: "Transactions" },
 ];
 
 const ownerLinks: SidebarLink[] = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/my-cars", label: "My Cars" },
-  { href: "/requests", label: "Requests" },
-  { href: "/payments", label: "Payments" },
-  { href: "/transactions", label: "Transactions" },
+  { href: "/owner/dashboard", label: "Dashboard" },
+  { href: "/owner/my-cars", label: "My Cars" },
+  { href: "/owner/requests", label: "Requests" },
+  { href: "/owner/payments", label: "Payments" },
+  { href: "/owner/transactions", label: "Transactions" },
 ];
 
 type SidebarProps = {
