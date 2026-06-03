@@ -28,12 +28,12 @@ function RoleCard({
 
   return (
     <Card
-      className="w-80 cursor-pointer rounded-2xl border-[0.5px] p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:-translate-y-1"
-      style={{ borderColor: "var(--brc-border)" }}
-      onClick={() => router.push(href)}
+      className="group w-80 rounded-2xl border-[0.5px] p-5 transition-all duration-300 ease-out hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] hover:-translate-y-1 hover:border-(--brc-border-strong)"
+      style={{ borderColor: "var(--brc-border)", boxShadow: "var(--brc-shadow-xs)" }}
     >
       <CardContent className="flex flex-col gap-4 p-0">
         <div
+          className="transition-transform duration-300 ease-out group-hover:scale-110"
           style={{
             width: 48,
             height: 48,
@@ -46,10 +46,8 @@ function RoleCard({
         >
           <Icon name={iconName} size={20} stroke={iconFg} />
         </div>
-        <div
-          style={{ display: "flex", flexDirection: "column", gap: 24, flex: 1 }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="flex flex-1 flex-col gap-6">
+          <div className="flex flex-col gap-2.5">
             <span
               style={{
                 fontFamily: "var(--brc-font-ui)",
@@ -71,8 +69,8 @@ function RoleCard({
               {body}
             </span>
           </div>
-          <div style={{ marginTop: "auto" }}>
-            <AuthButton variant={variant} full>
+          <div className="mt-auto">
+            <AuthButton variant={variant} full onClick={() => router.push(href)}>
               {cta}
             </AuthButton>
           </div>

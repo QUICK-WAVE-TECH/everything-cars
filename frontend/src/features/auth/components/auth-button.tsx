@@ -28,7 +28,10 @@ const VARIANT_MAP: Record<
 > = {
   primary: {
     shadcnVariant: "default",
-    styles: { background: "var(--brc-primary)", color: "var(--brc-text-on-primary)" },
+    styles: {
+      background: "var(--brc-primary)",
+      color: "var(--brc-text-on-primary)",
+    },
     hoverStyles: { background: "var(--brc-primary-hover)" },
   },
   secondary: {
@@ -38,7 +41,11 @@ const VARIANT_MAP: Record<
   },
   neutral: {
     shadcnVariant: "outline",
-    styles: { background: "#fff", color: "var(--brc-text)", border: "1px solid var(--brc-border)" },
+    styles: {
+      background: "#fff",
+      color: "var(--brc-text)",
+      border: "1px solid var(--brc-border)",
+    },
     hoverStyles: { filter: "brightness(0.96)" },
   },
 };
@@ -60,7 +67,7 @@ export function AuthButton({
       variant={shadcnVariant}
       size="lg"
       onClick={onClick}
-      className={`h-12 gap-2 rounded-lg text-sm font-bold ${full ? "w-full" : ""} ${className ?? ""}`}
+      className={`h-12 cursor-pointer gap-2 rounded-lg text-sm font-bold ${full ? "w-full" : ""} ${className ?? ""}`}
       style={{
         fontFamily: "var(--brc-font-ui)",
         transition: "background .18s ease, filter .18s ease",
