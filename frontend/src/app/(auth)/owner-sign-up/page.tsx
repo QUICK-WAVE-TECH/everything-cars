@@ -2,15 +2,20 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AuthField, AuthButton, Checkbox, AuthShell } from "@/features/auth/components";
+import { AuthField, AuthButton, Radio, Checkbox, UploadField, AuthShell } from "@/features/auth/components";
 
-export default function SignUpPage() {
+type OwnerType = "private" | "company" | null;
+
+export default function OwnerSignUpPage() {
   const [step, setStep] = useState(1);
+  const [ownerType, setOwnerType] = useState<OwnerType>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [agree, setAgree] = useState(false);
 
   const set = (key: string) => (value: string) =>
     setFields((prev) => ({ ...prev, [key]: value }));
+
+  const isCompany = ownerType === "company";
 
   return (
     <AuthShell>
@@ -43,7 +48,7 @@ export default function SignUpPage() {
                 color: "var(--brc-text)",
                 margin: 0,
               }}>
-                Customer Sign Up
+                Owner Sign Up
               </h1>
               <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text-muted)" }}>
                 Step {step} of 2
@@ -102,43 +107,101 @@ export default function SignUpPage() {
                 value={fields.pw2 || ""}
                 onChange={set("pw2")}
               />
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text)" }}>
+                  Type of Ownership
+                </span>
+                <div style={{ display: "flex", gap: 64, padding: "8px 0" }}>
+                  <Radio
+                    checked={ownerType === "private"}
+                    label="Private Car"
+                    onClick={() => setOwnerType("private")}
+                  />
+                  <Radio
+                    checked={ownerType === "company"}
+                    label="Company"
+                    onClick={() => setOwnerType("company")}
+                  />
+                </div>
+              </div>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <AuthField
-                label="Driver's License"
-                placeholder="Enter license number"
-                value={fields.dl || ""}
-                onChange={set("dl")}
-              />
-              <AuthField
-                label="Date of Birth"
-                placeholder="dd/mm/yyyy"
-                value={fields.dob || ""}
-                onChange={set("dob")}
-              />
-              <AuthField
-                label="Address"
-                placeholder="Enter your address"
-                value={fields.addr || ""}
-                onChange={set("addr")}
-              />
-              <AuthField
-                label="State"
-                placeholder="Select state"
-                type="select"
-                value={fields.state || ""}
-              />
-              <AuthField
-                label="City"
-                placeholder="Select city"
-                type="select"
-                value={fields.city || ""}
-              />
+              {isCompany ? (
+                <>
+                  <AuthField
+                    label="Company Name"
+                    placeholder="Enter company name"
+                    value={fields.coName || ""}
+                    onChange={set("coName")}
+                  />
+                  <AuthField
+                    label="Company Registration Number (RC Number)"
+                    placeholder="Enter your RC Number"
+                    value={fields.rc || ""}
+                    onChange={set("rc")}
+                  />
+                  <UploadField
+                    label="Upload CAC Document"
+                    hint="PDF, DOC, or DOCX (Max 9MB)"
+                    value={fields.cac}
+                    onPick={() => set("cac")("CAC-document.pdf")}
+                  />
+                  <AuthField
+                    label="Company Bank Account Number"
+                    placeholder="Enter company account number"
+                    value={fields.acct || ""}
+                    onChange={set("acct")}
+                  />
+                  <AuthField
+                    label="Bank Name"
+                    placeholder="Enter bank name"
+                    value={fields.bank || ""}
+                    onChange={set("bank")}
+                  />
+                </>
+              ) : (
+                <>
+                  <AuthField
+                    label="Location"
+                    placeholder="Enter location"
+                    value={fields.loc || ""}
+                    onChange={set("loc")}
+                  />
+                  <AuthField
+                    label="National ID"
+                    placeholder="Enter your ID number"
+                    value={fields.nid || ""}
+                    onChange={set("nid")}
+                  />
+                  <UploadField
+                    label="Upload Car Ownership Document"
+                    hint="PDF, DOC, or DOCX (Max 9MB)"
+                    value={fields.doc}
+                    onPick={() => set("doc")("car-ownership.pdf")}
+                  />
+                  <AuthField
+                    label="Bank Account Number"
+                    placeholder="Enter bank account number"
+                    value={fields.acct || ""}
+                    onChange={set("acct")}
+                  />
+                  <AuthField
+                    label="Bank Name"
+                    placeholder="Enter bank name"
+                    value={fields.bank || ""}
+                    onChange={set("bank")}
+                  />
+                </>
+              )}
               <Checkbox checked={agree} onChange={() => setAgree(!agree)}>
                 I agree to the{" "}
                 <span style={{ color: "var(--brc-accent)", textDecoration: "underline" }}>
-                  Terms &amp; Conditions
+                  Terms of Service
+                </span>{" "}
+                and{" "}
+                <span style={{ color: "var(--brc-accent)", textDecoration: "underline" }}>
+                  Privacy Policy
                 </span>
               </Checkbox>
             </div>

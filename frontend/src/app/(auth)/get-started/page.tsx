@@ -1,21 +1,162 @@
-import Link from "next/link";
+"use client";
 
-export default function GetStartedPage() {
+import Link from "next/link";
+import { Icon, AuthButton, AuthShell } from "@/features/auth/components";
+import type { IconName } from "@/features/auth/components";
+
+function RoleCard({
+  iconName,
+  iconBg,
+  iconFg,
+  title,
+  body,
+  cta,
+  variant,
+  href,
+}: {
+  iconName: IconName;
+  iconBg: string;
+  iconFg: string;
+  title: string;
+  body: string;
+  cta: string;
+  variant: "primary" | "neutral";
+  href: string;
+}) {
   return (
-    <div className="space-y-6 text-center">
-      <h1 className="text-3xl font-bold">Get Started</h1>
-      <p className="text-muted-foreground">Join EverythingCars today.</p>
-      <div className="flex flex-col gap-3">
-        <Link
-          href="/sign-up"
-          className="rounded-md bg-primary px-4 py-2 text-primary-foreground"
-        >
-          Create Account
-        </Link>
-        <Link href="/sign-in" className="rounded-md border px-4 py-2">
-          Sign In
+    <div style={{
+      width: 320,
+      borderRadius: 16,
+      background: "#fff",
+      border: "0.5px solid var(--brc-border)",
+      padding: 20,
+      display: "flex",
+      flexDirection: "column",
+      gap: 16,
+      boxShadow: "var(--brc-shadow-xs)",
+    }}>
+      <div style={{
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        background: iconBg,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}>
+        <Icon name={iconName} size={20} stroke={iconFg} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 24, flex: 1 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <span style={{
+            fontFamily: "var(--brc-font-ui)",
+            fontWeight: 700,
+            fontSize: 18,
+            color: "var(--brc-text)",
+          }}>
+            {title}
+          </span>
+          <span style={{
+            fontFamily: "var(--brc-font-ui)",
+            fontSize: 16,
+            lineHeight: 1.5,
+            color: "var(--brc-text-muted)",
+          }}>
+            {body}
+          </span>
+        </div>
+        <Link href={href} style={{ marginTop: "auto" }}>
+          <AuthButton variant={variant} full>{cta}</AuthButton>
         </Link>
       </div>
     </div>
+  );
+}
+
+export default function GetStartedPage() {
+  return (
+    <AuthShell>
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 64,
+        alignItems: "center",
+        maxWidth: 1232,
+      }}>
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+          alignItems: "center",
+          maxWidth: 572,
+          textAlign: "center",
+        }}>
+          <h1 style={{
+            fontFamily: "var(--brc-font-ui)",
+            fontWeight: 700,
+            fontSize: 32,
+            lineHeight: 1.2,
+            color: "var(--brc-text)",
+            margin: 0,
+          }}>
+            Choose How You Want to Get Started
+          </h1>
+          <p style={{
+            fontFamily: "var(--brc-font-ui)",
+            fontSize: 16,
+            lineHeight: 1.5,
+            color: "var(--brc-text-muted)",
+            margin: 0,
+          }}>
+            Select your role to personalize your experience on Buy &amp; Rent Cars.
+          </p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 32, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 24, justifyContent: "center", alignItems: "stretch" }}>
+            <RoleCard
+              iconName="user"
+              iconBg="var(--brc-primary-tint)"
+              iconFg="var(--brc-primary-hover)"
+              title="I'm a Customer"
+              body="Looking to rent or buy a car? Sign up as a customer to browse our extensive collection of premium vehicles."
+              cta="Continue as Customer"
+              variant="primary"
+              href="/sign-up"
+            />
+            <RoleCard
+              iconName="car"
+              iconBg="var(--brc-accent-bg)"
+              iconFg="var(--brc-accent-brown)"
+              title="I'm an Owner"
+              body="Have cars to rent or sell? Join as an owner to list your vehicles either for rent or sale and reach thousands of customers."
+              cta="Continue as Owner"
+              variant="neutral"
+              href="/owner-sign-up"
+            />
+          </div>
+          <div style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: 8,
+            fontFamily: "var(--brc-font-ui)",
+            fontSize: 16,
+            color: "var(--brc-text)",
+          }}>
+            <span>Already have an account?</span>
+            <Link
+              href="/sign-in"
+              style={{
+                fontFamily: "var(--brc-font-link)",
+                fontSize: 16,
+                color: "var(--brc-accent)",
+                textDecoration: "underline",
+              }}
+            >
+              Log In
+            </Link>
+          </div>
+        </div>
+      </div>
+    </AuthShell>
   );
 }

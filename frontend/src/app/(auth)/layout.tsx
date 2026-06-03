@@ -1,7 +1,11 @@
+import { AuthNav, AuthFooter } from "@/features/auth/components";
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/50">
-      <div className="w-full max-w-md px-4">{children}</div>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <AuthNav />
+      {children}
+      <AuthFooter />
     </div>
   );
 }
