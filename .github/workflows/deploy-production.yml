@@ -1,0 +1,40 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type 'deploy' to confirm production deployment"
+        required: true
+        type: string
+
+jobs:
+  validate:
+    name: Validate Approval
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation
+        if: github.event.inputs.confirm != 'deploy'
+        run: |
+          echo "Deployment not confirmed. Type 'deploy' to proceed."
+          exit 1
+
+  deploy:
+    name: Deploy to Production
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker images
+        run: |
+          docker build -f docker/frontend.Dockerfile -t everythingcars-frontend:${{ github.sha }} .
+          docker build -f docker/backend.Dockerfile -t everythingcars-backend:${{ github.sha }} .
+
+      - name: Deploy
+        run: echo "Production deployment placeholder — configure for your hosting provider"
+
+      - name: Health check
+        run: echo "Health check placeholder — configure for your hosting provider"

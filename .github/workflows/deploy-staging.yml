@@ -1,0 +1,23 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build frontend Docker image
+        run: docker build -f docker/frontend.Dockerfile -t everythingcars-frontend:${{ github.sha }} .
+
+      - name: Build backend Docker image
+        run: docker build -f docker/backend.Dockerfile -t everythingcars-backend:${{ github.sha }} .
+
+      - name: Verify deployment
+        run: echo "Staging deployment placeholder — configure for your hosting provider"
