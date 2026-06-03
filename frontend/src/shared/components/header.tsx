@@ -8,11 +8,11 @@ type HeaderProps = {
 export function Header({ variant = "public" }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between">
-        <Link href="/" className="text-xl font-bold">
+      <div className="container flex min-h-16 flex-wrap items-center justify-between gap-3 py-3">
+        <Link href="/" className="text-lg font-bold sm:text-xl">
           {config.appName}
         </Link>
-        <nav className="flex items-center gap-6">
+        <nav className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
           {variant === "public" && (
             <>
               <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground transition-colors">About Us</Link>

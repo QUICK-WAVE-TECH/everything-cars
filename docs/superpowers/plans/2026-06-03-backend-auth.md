@@ -648,7 +648,7 @@ git commit -m "feat: add custom User model with passwordless UserManager"
 
 ---
 
-## Task 3: OwnerProfile and AccessCode Models
+## Task 3: CustomerProfile, OwnerProfile, and AccessCode Models
 
 **Files:**
 - Modify: `backend/apps/users/models.py`
@@ -656,14 +656,41 @@ git commit -m "feat: add custom User model with passwordless UserManager"
 - Modify: `backend/apps/users/tests/test_models.py`
 - Modify: `backend/apps/users/tests/factories.py`
 
-- [ ] **Step 1: Write failing tests for OwnerProfile and AccessCode**
+- [ ] **Step 1: Write failing tests for CustomerProfile, OwnerProfile, and AccessCode**
 
 Add to `backend/apps/users/tests/test_models.py`:
 
 ```python
 from django.utils import timezone
 from datetime import timedelta
-from apps.users.models import User, OwnerProfile, AccessCode
+from apps.users.models import User, CustomerProfile, OwnerProfile, AccessCode
+
+
+@pytest.mark.django_db
+class TestCustomerProfile:
+    def test_create_customer_profile(self):
+        user = User.objects.create_user(
+            email="customer1@example.com", name="Customer One", role="customer"
+        )
+        profile = CustomerProfile.objects.create(
+            user=user,
+            drivers_license="DL12345",
+            date_of_birth="1995-06-15",
+            address="123 Main St",
+            state="Lagos",
+            city="Ikeja",
+        )
+        assert profile.drivers_license == "DL12345"
+        assert profile.state == "Lagos"
+        assert str(profile) == "Customer One — customer profile"
+
+    def test_create_customer_profile_minimal(self):
+        user = User.objects.create_user(
+            email="customer2@example.com", name="Customer Two", role="customer"
+        )
+        profile = CustomerProfile.objects.create(user=user)
+        assert profile.drivers_license == ""
+        assert profile.date_of_birth is None
 
 
 @pytest.mark.django_db
@@ -767,15 +794,31 @@ class TestAccessCode:
 pytest apps/users/tests/test_models.py -v
 ```
 
-Expected: FAIL — `OwnerProfile` and `AccessCode` not found.
+Expected: FAIL — `CustomerProfile`, `OwnerProfile`, and `AccessCode` not found.
 
-- [ ] **Step 3: Add OwnerProfile and AccessCode to models.py**
+- [ ] **Step 3: Add CustomerProfile, OwnerProfile, and AccessCode to models.py**
 
 Add to `backend/apps/users/models.py`:
 
 ```python
 import hashlib
 import secrets
+
+
+class CustomerProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="customer_profile")
+    drivers_license = models.CharField(max_length=50, blank=True, default="")
+    date_of_birth = models.DateField(null=True, blank=True)
+    address = models.CharField(max_length=300, blank=True, default="")
+    state = models.CharField(max_length=100, blank=True, default="")
+    city = models.CharField(max_length=100, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "customer_profiles"
+
+    def __str__(self):
+        return f"{self.user.name} — customer profile"
 
 
 def owner_document_path(instance, filename):
@@ -874,7 +917,13 @@ Add `from datetime import timedelta` to the top of the file.
 Add to `backend/apps/users/admin.py`:
 
 ```python
-from .models import OwnerProfile, AccessCode
+from .models import CustomerProfile, OwnerProfile, AccessCode
+
+
+@admin.register(CustomerProfile)
+class CustomerProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "state", "city", "created_at")
+    search_fields = ("user__email", "user__name")
 
 
 @admin.register(OwnerProfile)
@@ -904,14 +953,14 @@ python manage.py migrate
 pytest apps/users/tests/test_models.py -v
 ```
 
-Expected: All 12 tests pass (5 User + 2 OwnerProfile + 5 AccessCode).
+Expected: All 14 tests pass (5 User + 2 CustomerProfile + 2 OwnerProfile + 5 AccessCode).
 
 - [ ] **Step 7: Commit**
 
 ```bash
 cd /Users/namy/Work/EverythingCars
 git add backend/
-git commit -m "feat: add OwnerProfile, AccessCode, and RefreshTokenBlacklist models"
+git commit -m "feat: add CustomerProfile, OwnerProfile, AccessCode, and RefreshTokenBlacklist models"
 ```
 
 ---
@@ -1192,7 +1241,7 @@ git commit -m "feat: add JWT service (RS256), authentication class, permissions,
 
 ```python
 from rest_framework import serializers
-from .models import User, OwnerProfile
+from .models import User, CustomerProfile, OwnerProfile
 
 
 class SignUpSerializer(serializers.Serializer):
@@ -1200,6 +1249,13 @@ class SignUpSerializer(serializers.Serializer):
     name = serializers.CharField(min_length=2, max_length=150)
     phone = serializers.CharField(max_length=20, required=False, default="")
     role = serializers.ChoiceField(choices=User.Role.choices)
+
+    # Customer-specific fields (optional, validated in validate())
+    drivers_license = serializers.CharField(max_length=50, required=False, default="")
+    date_of_birth = serializers.DateField(required=False, allow_null=True, default=None)
+    address = serializers.CharField(max_length=300, required=False, default="")
+    state = serializers.CharField(max_length=100, required=False, default="")
+    city = serializers.CharField(max_length=100, required=False, default="")
 
     # Owner-specific fields (optional, validated in validate())
     owner_type = serializers.ChoiceField(
@@ -1262,6 +1318,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "email", "role", "date_joined"]
 
 
+class CustomerProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomerProfile
+        fields = ["drivers_license", "date_of_birth", "address", "state", "city"]
+
+
 class OwnerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = OwnerProfile
@@ -1273,11 +1335,15 @@ class OwnerProfileSerializer(serializers.ModelSerializer):
 
 
 class MeSerializer(serializers.ModelSerializer):
+    customer_profile = CustomerProfileSerializer(read_only=True)
     owner_profile = OwnerProfileSerializer(read_only=True)
 
     class Meta:
         model = User
-        fields = ["id", "email", "name", "phone", "role", "date_joined", "owner_profile"]
+        fields = [
+            "id", "email", "name", "phone", "role", "date_joined",
+            "customer_profile", "owner_profile",
+        ]
         read_only_fields = ["id", "email", "role", "date_joined"]
 ```
 
@@ -1309,7 +1375,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import User, OwnerProfile, AccessCode
+from .models import User, CustomerProfile, OwnerProfile, AccessCode
 from .serializers import (
     SignUpSerializer,
     SignInSerializer,
@@ -1336,8 +1402,17 @@ class SignUpView(APIView):
             role=data["role"],
         )
 
-        # Create owner profile if owner
-        if data["role"] == "owner":
+        # Create role-specific profile
+        if data["role"] == "customer":
+            CustomerProfile.objects.create(
+                user=user,
+                drivers_license=data.get("drivers_license", ""),
+                date_of_birth=data.get("date_of_birth"),
+                address=data.get("address", ""),
+                state=data.get("state", ""),
+                city=data.get("city", ""),
+            )
+        elif data["role"] == "owner":
             OwnerProfile.objects.create(
                 user=user,
                 owner_type=data["owner_type"],
@@ -1581,11 +1656,19 @@ class TestSignUp:
             "email": "new@example.com",
             "name": "New User",
             "role": "customer",
+            "drivers_license": "DL12345",
+            "date_of_birth": "1995-06-15",
+            "address": "123 Main St",
+            "state": "Lagos",
+            "city": "Ikeja",
         })
         assert response.status_code == 201
         assert response.data["email"] == "new@example.com"
         user = User.objects.get(email="new@example.com")
         assert user.is_active is False
+        assert hasattr(user, "customer_profile")
+        assert user.customer_profile.drivers_license == "DL12345"
+        assert user.customer_profile.state == "Lagos"
         assert AccessCode.objects.filter(email="new@example.com").exists()
 
     def test_owner_sign_up(self, api_client):

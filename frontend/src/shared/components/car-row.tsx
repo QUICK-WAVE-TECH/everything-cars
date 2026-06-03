@@ -18,11 +18,14 @@ const navBtnStyle: React.CSSProperties = {
 
 export function CarRow({ title, cars, onAction }: CarRowProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const scroll = (d: number) => ref.current?.scrollBy({ left: d * 340, behavior: "smooth" });
+  const scroll = (d: number) => ref.current?.scrollBy({
+    left: d * Math.min(340, window.innerWidth - 48),
+    behavior: "smooth",
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
         <span style={{
           fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 13,
           letterSpacing: ".06em", color: "var(--brc-text-secondary)",

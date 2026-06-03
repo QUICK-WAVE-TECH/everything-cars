@@ -23,23 +23,30 @@ export function TestimonialsSection() {
   const next = () => setIdx((idx + 1) % TESTIMONIALS.length);
 
   return (
-    <section style={{ padding: "104px var(--brc-space-10, 104px)", background: "#fff" }}>
-      <div style={{ maxWidth: 1232, margin: "0 auto", display: "grid", gridTemplateColumns: "360px 1fr", gap: 48, alignItems: "center" }}>
+    <section style={{ padding: "var(--brc-section-y, 104px) var(--brc-space-10, 104px)", background: "#fff" }}>
+      <div style={{
+        maxWidth: 1232,
+        margin: "0 auto",
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
+        gap: "clamp(28px, 5vw, 48px)",
+        alignItems: "center",
+      }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <Pill>Testimonials</Pill>
           <h2 style={{
-            fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 48,
+            fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: "clamp(30px, 7vw, 48px)",
             lineHeight: 1.2, color: "var(--brc-text)", margin: 0,
           }}>
             Client&apos;s Success Stories
           </h2>
         </div>
         <div style={{
-          background: "var(--brc-secondary)", borderRadius: 16, padding: 40,
+          background: "var(--brc-secondary)", borderRadius: 16, padding: "clamp(24px, 5vw, 40px)",
           color: "#fff", backgroundImage: "linear-gradient(rgba(255,255,255,.04),transparent)",
           position: "relative", minHeight: 240,
         }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20, gap: 16, flexWrap: "wrap" }}>
             <div>
               <div style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 18, color: "var(--brc-primary-tint)" }}>
                 {TESTIMONIALS[idx]!.name}

@@ -12,7 +12,8 @@ export function AuthShell({ children }: AuthShellProps) {
         background: "var(--brc-bg-subtle)",
         display: "flex",
         justifyContent: "center",
-        padding: "80px var(--brc-space-10, 104px) 96px",
+        padding: "var(--brc-auth-shell-y, 80px) var(--brc-space-10, 104px) var(--brc-auth-shell-bottom, 96px)",
+        width: "100%",
       }}
     >
       {children}

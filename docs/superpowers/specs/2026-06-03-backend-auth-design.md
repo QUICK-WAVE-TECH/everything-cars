@@ -88,6 +88,20 @@ Custom user model extending `AbstractBaseUser` + `PermissionsMixin`.
 - `USERNAME_FIELD = "email"`, `REQUIRED_FIELDS = ["name"]`
 - Custom `UserManager` that creates users without requiring a password
 
+### CustomerProfile
+
+Created alongside User when `role="customer"`. OneToOne relationship.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| user | OneToOneField → User | on_delete=CASCADE |
+| drivers_license | CharField(50) | Optional |
+| date_of_birth | DateField | Optional |
+| address | CharField(300) | Optional |
+| state | CharField(100) | Optional |
+| city | CharField(100) | Optional |
+| created_at | DateTimeField | Auto now add |
+
 ### OwnerProfile
 
 Created alongside User when `role="owner"`. OneToOne relationship.

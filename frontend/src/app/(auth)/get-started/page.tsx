@@ -26,7 +26,7 @@ function RoleCard({
 }) {
   return (
     <Card
-      className="group w-80 rounded-2xl border-[0.5px] p-5 transition-all duration-300 ease-out hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] hover:-translate-y-1 hover:border-(--brc-border-strong)"
+      className="group w-full max-w-80 rounded-2xl border-[0.5px] p-5 transition-all duration-300 ease-out hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] hover:-translate-y-1 hover:border-(--brc-border-strong)"
       style={{ borderColor: "var(--brc-border)", boxShadow: "var(--brc-shadow-xs)" }}
     >
       <CardContent className="flex flex-col gap-4 p-0">
@@ -85,9 +85,10 @@ export default function GetStartedPage() {
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: 64,
+          gap: "clamp(36px, 8vw, 64px)",
           alignItems: "center",
           maxWidth: 1232,
+          width: "100%",
         }}
       >
         <div
@@ -139,6 +140,8 @@ export default function GetStartedPage() {
               gap: 24,
               justifyContent: "center",
               alignItems: "stretch",
+              flexWrap: "wrap",
+              width: "100%",
             }}
           >
             <RoleCard
@@ -167,6 +170,7 @@ export default function GetStartedPage() {
               display: "flex",
               justifyContent: "center",
               gap: 8,
+              flexWrap: "wrap",
               fontFamily: "var(--brc-font-ui)",
               fontSize: 16,
               color: "var(--brc-text)",

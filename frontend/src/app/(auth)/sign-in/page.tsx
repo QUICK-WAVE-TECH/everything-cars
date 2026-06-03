@@ -17,7 +17,7 @@ export default function SignInPage() {
         flexDirection: "column",
         gap: 32,
         alignItems: "center",
-        width: 632,
+        width: "min(100%, 632px)",
       }}>
         <Image
           src="/logo.png"
@@ -26,7 +26,7 @@ export default function SignInPage() {
           height={52}
           style={{ height: 52, width: "auto" }}
         />
-        <Card className="w-full rounded-2xl border-[0.5px] p-10 shadow-xs"
+        <Card className="w-full rounded-2xl border-[0.5px] p-6 shadow-xs sm:p-10"
           style={{ borderColor: "var(--brc-border)" }}>
           <CardContent className="flex flex-col gap-8 p-0">
             <h1 style={{
@@ -59,6 +59,7 @@ export default function SignInPage() {
               display: "flex",
               justifyContent: "center",
               gap: 8,
+              flexWrap: "wrap",
               fontFamily: "var(--brc-font-ui)",
               fontSize: 16,
               color: "var(--brc-text)",

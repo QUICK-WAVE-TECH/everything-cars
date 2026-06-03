@@ -27,8 +27,8 @@ const LISTED = [
 
 export function ServicesSection() {
   return (
-    <section style={{ background: "#fff", padding: "104px var(--brc-space-10, 104px)" }}>
-      <div style={{ maxWidth: 1232, margin: "0 auto", display: "flex", flexDirection: "column", gap: 80 }}>
+    <section style={{ background: "#fff", padding: "var(--brc-section-y, 104px) var(--brc-space-10, 104px)" }}>
+      <div style={{ maxWidth: 1232, margin: "0 auto", display: "flex", flexDirection: "column", gap: "clamp(48px, 8vw, 80px)" }}>
         <div style={{ alignSelf: "center" }}>
           <SectionHead
             pill="Our Services"

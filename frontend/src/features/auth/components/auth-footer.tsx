@@ -24,9 +24,13 @@ const LEGAL_LINKS = ["Privacy Policy", "Terms of Service", "Cookie Policy"];
 
 export function AuthFooter() {
   return (
-    <footer style={{ background: "var(--brc-secondary)", color: "#fff", padding: "80px 104px 48px" }}>
+    <footer style={{ background: "var(--brc-secondary)", color: "#fff", padding: "var(--brc-section-y, 80px) var(--brc-space-10, 104px) 48px" }}>
       <div style={{ maxWidth: 1232, margin: "0 auto" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1.2fr", gap: 64 }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 210px), 1fr))",
+          gap: "clamp(32px, 6vw, 64px)",
+        }}>
           {/* Brand column */}
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <Image src="/logo.png" alt="Buy & Rent Cars" width={170} height={72} style={{ height: 72, width: "auto", alignSelf: "flex-start", filter: "brightness(0) invert(1)" }} />
@@ -89,7 +93,7 @@ export function AuthFooter() {
           <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 13, color: "rgba(255,255,255,.6)" }}>
             Buy & Rent Cars &copy; {new Date().getFullYear()}. All rights reserved.
           </span>
-          <div style={{ display: "flex", gap: 24 }}>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
             {LEGAL_LINKS.map((l) => (
               <a key={l} style={{
                 fontFamily: "var(--brc-font-ui)", fontSize: 13, color: "rgba(255,255,255,.6)",

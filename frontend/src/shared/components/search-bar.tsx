@@ -17,7 +17,13 @@ export function SearchBar({ onSearch }: SearchBarProps) {
   const [type, setType] = useState("All");
   const [price, setPrice] = useState("All");
 
-  const cellStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, flex: 1 };
+  const cellStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+    flex: "1 1 180px",
+    minWidth: "min(100%, 180px)",
+  };
   const labelStyle: React.CSSProperties = { fontFamily: "var(--brc-font-ui)", fontSize: 13, color: "var(--brc-text-muted)" };
   const inputStyle: React.CSSProperties = {
     height: 48, borderRadius: 8, border: "1px solid var(--brc-border)",
@@ -36,7 +42,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
   return (
     <div style={{
       background: "#fff", borderRadius: 12, padding: 16,
-      display: "flex", gap: 16, alignItems: "flex-end",
+      display: "flex", gap: 16, alignItems: "flex-end", flexWrap: "wrap",
       boxShadow: "var(--brc-shadow-md)", maxWidth: 980, width: "100%",
     }}>
       <div style={cellStyle}>
@@ -62,7 +68,7 @@ export function SearchBar({ onSearch }: SearchBarProps) {
           background: "var(--brc-primary)", color: "var(--brc-text-on-primary)",
           fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14,
           cursor: "pointer", display: "inline-flex", alignItems: "center",
-          justifyContent: "center", gap: 8,
+          justifyContent: "center", gap: 8, flex: "1 1 150px", minWidth: "min(100%, 150px)",
         }}
       >
         <Icon name="search" size={18} />

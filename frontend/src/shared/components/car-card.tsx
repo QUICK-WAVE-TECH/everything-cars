@@ -30,7 +30,7 @@ export function CarCard({ car, onAction }: CarCardProps) {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        width: 300, flexShrink: 0, display: "flex", flexDirection: "column",
+        width: "min(300px, calc(100vw - 48px))", flexShrink: 0, display: "flex", flexDirection: "column",
         gap: 16, cursor: "pointer", transition: "transform .2s ease",
         transform: hover ? "translateY(-4px)" : "none",
       }}
@@ -57,7 +57,7 @@ export function CarCard({ car, onAction }: CarCardProps) {
         display: "flex", flexDirection: "column", gap: 8,
         borderBottom: "1px solid var(--brc-border)", paddingBottom: 10,
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
           <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text)" }}>{car.name}</span>
           <Chip>{car.type}</Chip>
         </div>
@@ -68,8 +68,8 @@ export function CarCard({ car, onAction }: CarCardProps) {
       </div>
 
       {/* Price + CTA */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 22 }}>{car.price}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: "clamp(18px, 5vw, 22px)" }}>{car.price}</span>
         <button
           onClick={() => onAction?.(car)}
           style={{

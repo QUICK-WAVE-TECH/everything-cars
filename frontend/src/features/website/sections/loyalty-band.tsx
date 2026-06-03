@@ -8,11 +8,16 @@ const PERKS = [
 
 export function LoyaltyBand() {
   return (
-    <section style={{ display: "grid", gridTemplateColumns: "1.28fr 1fr", minHeight: 560, width: "100%" }}>
+    <section style={{
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
+      minHeight: 560,
+      width: "100%",
+    }}>
       {/* Left — Road CTA */}
       <div style={{
         position: "relative", display: "flex", flexDirection: "column", justifyContent: "center", gap: 24,
-        padding: "100px clamp(40px, 7vw, 145px)", overflow: "hidden",
+        padding: "var(--brc-section-y, 104px) clamp(24px, 7vw, 145px)", overflow: "hidden",
         background: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(/road-cta.jpg) center/cover no-repeat`,
         backgroundColor: "rgba(0,0,0,0.4)",
       }}>
@@ -24,7 +29,7 @@ export function LoyaltyBand() {
           Ready to hit the road?
         </h2>
         <p style={{
-          fontFamily: "var(--brc-font-ui)", fontSize: 20, lineHeight: 1.5,
+          fontFamily: "var(--brc-font-ui)", fontSize: "clamp(16px, 4vw, 20px)", lineHeight: 1.5,
           color: "var(--brc-border)", maxWidth: 483, margin: 0,
         }}>
           Experience the best of ride on your journey. Available for purchase or hire processes.
@@ -44,10 +49,10 @@ export function LoyaltyBand() {
       <div style={{
         position: "relative", background: "var(--brc-accent-deep)", color: "#fff",
         overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "72px clamp(32px,4vw,80px)",
+        padding: "var(--brc-section-y, 72px) clamp(24px,4vw,80px)",
       }}>
         {/* Concentric ring texture */}
-        <div aria-hidden="true" style={{
+        <div aria-hidden="true" className="loyalty-ring-texture" style={{
           position: "absolute", top: "-55%", right: "-30%", width: "160%",
           aspectRatio: "1", borderRadius: "50%", opacity: 0.16,
           background: "repeating-radial-gradient(circle, transparent 0 34px, #fff 34px 36px)",
@@ -58,7 +63,7 @@ export function LoyaltyBand() {
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <Icon name="gift" size={34} stroke="#fff" />
               <h3 style={{
-                fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 34,
+                fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: "clamp(26px, 6vw, 34px)",
                 lineHeight: 1.2, margin: 0,
               }}>
                 Loyalty Rewards Program
@@ -73,7 +78,7 @@ export function LoyaltyBand() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
             {PERKS.map((perk) => (
-              <div key={perk.title} style={{ display: "flex", gap: 18, alignItems: "center" }}>
+              <div key={perk.title} style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
                 <div style={{
                   width: 52, height: 52, borderRadius: "50%", background: "#fff",
                   display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
@@ -81,7 +86,7 @@ export function LoyaltyBand() {
                   <Icon name={perk.icon} size={24} stroke="var(--brc-accent-deep)" />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 21, lineHeight: 1.2 }}>{perk.title}</span>
+                  <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: "clamp(18px, 4.8vw, 21px)", lineHeight: 1.2 }}>{perk.title}</span>
                   <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 15, lineHeight: 1.45, color: "rgba(255,255,255,.92)" }}>{perk.desc}</span>
                 </div>
               </div>

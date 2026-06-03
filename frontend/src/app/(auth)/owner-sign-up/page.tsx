@@ -25,9 +25,9 @@ export default function OwnerSignUpPage() {
         flexDirection: "column",
         gap: 32,
         alignItems: "center",
-        width: 632,
+        width: "min(100%, 632px)",
       }}>
-        <Card className="w-full rounded-2xl border-[0.5px] p-10 shadow-xs"
+        <Card className="w-full rounded-2xl border-[0.5px] p-6 shadow-xs sm:p-10"
           style={{ borderColor: "var(--brc-border)" }}>
           <CardContent className="flex flex-col gap-8 p-0">
             {/* Header + progress */}
@@ -104,7 +104,7 @@ export default function OwnerSignUpPage() {
                   <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text)" }}>
                     Type of Ownership
                   </span>
-                  <div style={{ display: "flex", gap: 64, padding: "8px 0" }}>
+                  <div style={{ display: "flex", gap: 24, padding: "8px 0", flexWrap: "wrap" }}>
                     <Radio
                       checked={ownerType === "private"}
                       label="Private Car"
@@ -210,8 +210,8 @@ export default function OwnerSignUpPage() {
                 Continue
               </AuthButton>
             ) : (
-              <div style={{ display: "flex", gap: 12 }}>
-                <AuthButton variant="neutral" onClick={() => setStep(1)} style={{ width: 120 }}>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <AuthButton variant="neutral" onClick={() => setStep(1)} style={{ width: "min(100%, 120px)" }}>
                   Back
                 </AuthButton>
                 <AuthButton full href="/verify">Create Account</AuthButton>
@@ -222,6 +222,7 @@ export default function OwnerSignUpPage() {
               display: "flex",
               justifyContent: "center",
               gap: 8,
+              flexWrap: "wrap",
               fontFamily: "var(--brc-font-ui)",
               fontSize: 16,
               color: "var(--brc-text)",
