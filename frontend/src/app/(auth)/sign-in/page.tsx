@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { AuthField, AuthButton, AuthShell } from "@/features/auth/components";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function SignInPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -54,7 +55,7 @@ export default function SignInPage() {
                 onChange={setPassword}
               />
             </div>
-            <AuthButton full>Continue</AuthButton>
+            <AuthButton full onClick={() => {}}>Continue</AuthButton>
             <div style={{
               display: "flex",
               justifyContent: "center",
@@ -64,17 +65,16 @@ export default function SignInPage() {
               color: "var(--brc-text)",
             }}>
               <span>Don&apos;t have an account?</span>
-              <Link
-                href="/sign-up"
+              <button
+                onClick={() => router.push("/get-started")}
                 style={{
-                  fontFamily: "var(--brc-font-link)",
-                  fontSize: 16,
-                  color: "var(--brc-accent)",
-                  textDecoration: "underline",
+                  border: "none", background: "transparent", cursor: "pointer",
+                  fontFamily: "var(--brc-font-link)", fontSize: 16,
+                  color: "var(--brc-accent)", textDecoration: "underline", padding: 0,
                 }}
               >
                 Sign Up
-              </Link>
+              </button>
             </div>
           </CardContent>
         </Card>

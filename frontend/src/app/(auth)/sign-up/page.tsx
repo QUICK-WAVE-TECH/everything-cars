@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AuthField, AuthButton, Checkbox, AuthShell } from "@/features/auth/components";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function SignUpPage() {
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [agree, setAgree] = useState(false);
@@ -147,7 +148,7 @@ export default function SignUpPage() {
                 <AuthButton variant="neutral" onClick={() => setStep(1)} style={{ width: 120 }}>
                   Back
                 </AuthButton>
-                <AuthButton full>Create Account</AuthButton>
+                <AuthButton full onClick={() => {}}>Create Account</AuthButton>
               </div>
             )}
 
@@ -160,17 +161,16 @@ export default function SignUpPage() {
               color: "var(--brc-text)",
             }}>
               <span>Already have an account?</span>
-              <Link
-                href="/sign-in"
+              <button
+                onClick={() => router.push("/sign-in")}
                 style={{
-                  fontFamily: "var(--brc-font-link)",
-                  fontSize: 16,
-                  color: "var(--brc-accent)",
-                  textDecoration: "underline",
+                  border: "none", background: "transparent", cursor: "pointer",
+                  fontFamily: "var(--brc-font-link)", fontSize: 16,
+                  color: "var(--brc-accent)", textDecoration: "underline", padding: 0,
                 }}
               >
                 Log In
-              </Link>
+              </button>
             </div>
           </CardContent>
         </Card>

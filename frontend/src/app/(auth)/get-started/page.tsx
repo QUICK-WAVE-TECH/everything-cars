@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Icon, AuthButton, AuthShell } from "@/features/auth/components";
 import type { IconName } from "@/features/auth/components";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,64 +24,67 @@ function RoleCard({
   variant: "primary" | "neutral";
   href: string;
 }) {
+  const router = useRouter();
+
   return (
-    <Link href={href} className="block cursor-pointer">
-      <Card
-        className="w-80 rounded-2xl border-[0.5px] p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:-translate-y-1"
-        style={{ borderColor: "var(--brc-border)" }}
-      >
-        <CardContent className="flex flex-col gap-4 p-0">
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 24,
-              background: iconBg,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Icon name={iconName} size={20} stroke={iconFg} />
+    <Card
+      className="w-80 cursor-pointer rounded-2xl border-[0.5px] p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:-translate-y-1"
+      style={{ borderColor: "var(--brc-border)" }}
+      onClick={() => router.push(href)}
+    >
+      <CardContent className="flex flex-col gap-4 p-0">
+        <div
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 24,
+            background: iconBg,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon name={iconName} size={20} stroke={iconFg} />
+        </div>
+        <div
+          style={{ display: "flex", flexDirection: "column", gap: 24, flex: 1 }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <span
+              style={{
+                fontFamily: "var(--brc-font-ui)",
+                fontWeight: 700,
+                fontSize: 18,
+                color: "var(--brc-text)",
+              }}
+            >
+              {title}
+            </span>
+            <span
+              style={{
+                fontFamily: "var(--brc-font-ui)",
+                fontSize: 16,
+                lineHeight: 1.5,
+                color: "var(--brc-text-muted)",
+              }}
+            >
+              {body}
+            </span>
           </div>
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: 24, flex: 1 }}
-          >
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <span
-                style={{
-                  fontFamily: "var(--brc-font-ui)",
-                  fontWeight: 700,
-                  fontSize: 18,
-                  color: "var(--brc-text)",
-                }}
-              >
-                {title}
-              </span>
-              <span
-                style={{
-                  fontFamily: "var(--brc-font-ui)",
-                  fontSize: 16,
-                  lineHeight: 1.5,
-                  color: "var(--brc-text-muted)",
-                }}
-              >
-                {body}
-              </span>
-            </div>
-            <div style={{ marginTop: "auto" }}>
-              <AuthButton variant={variant} full>
-                {cta}
-              </AuthButton>
-            </div>
+          <div style={{ marginTop: "auto" }}>
+            <AuthButton variant={variant} full>
+              {cta}
+            </AuthButton>
           </div>
-        </CardContent>
-      </Card>
-    </Link>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
 export default function GetStartedPage() {
+  const router = useRouter();
+
   return (
     <AuthShell>
       <div
@@ -176,17 +179,16 @@ export default function GetStartedPage() {
             }}
           >
             <span>Already have an account?</span>
-            <Link
-              href="/sign-in"
+            <button
+              onClick={() => router.push("/sign-in")}
               style={{
-                fontFamily: "var(--brc-font-link)",
-                fontSize: 16,
-                color: "var(--brc-accent)",
-                textDecoration: "underline",
+                border: "none", background: "transparent", cursor: "pointer",
+                fontFamily: "var(--brc-font-link)", fontSize: 16,
+                color: "var(--brc-accent)", textDecoration: "underline", padding: 0,
               }}
             >
               Log In
-            </Link>
+            </button>
           </div>
         </div>
       </div>

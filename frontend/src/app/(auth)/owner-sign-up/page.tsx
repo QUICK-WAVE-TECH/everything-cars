@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AuthField, AuthButton, Radio, Checkbox, UploadField, AuthShell } from "@/features/auth/components";
 import { Card, CardContent } from "@/components/ui/card";
 
 type OwnerType = "private" | "company" | null;
 
 export default function OwnerSignUpPage() {
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [ownerType, setOwnerType] = useState<OwnerType>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -210,7 +211,7 @@ export default function OwnerSignUpPage() {
                 <AuthButton variant="neutral" onClick={() => setStep(1)} style={{ width: 120 }}>
                   Back
                 </AuthButton>
-                <AuthButton full>Create Account</AuthButton>
+                <AuthButton full onClick={() => {}}>Create Account</AuthButton>
               </div>
             )}
 
@@ -223,17 +224,16 @@ export default function OwnerSignUpPage() {
               color: "var(--brc-text)",
             }}>
               <span>Already have an account?</span>
-              <Link
-                href="/sign-in"
+              <button
+                onClick={() => router.push("/sign-in")}
                 style={{
-                  fontFamily: "var(--brc-font-link)",
-                  fontSize: 16,
-                  color: "var(--brc-accent)",
-                  textDecoration: "underline",
+                  border: "none", background: "transparent", cursor: "pointer",
+                  fontFamily: "var(--brc-font-link)", fontSize: 16,
+                  color: "var(--brc-accent)", textDecoration: "underline", padding: 0,
                 }}
               >
                 Log In
-              </Link>
+              </button>
             </div>
           </CardContent>
         </Card>
