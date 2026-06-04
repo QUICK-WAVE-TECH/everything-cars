@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Icon } from "@/features/auth/components/icon";
 
 const PERKS = [
@@ -18,31 +19,43 @@ export function LoyaltyBand() {
       <div style={{
         position: "relative", display: "flex", flexDirection: "column", justifyContent: "center", gap: 24,
         padding: "var(--brc-section-y, 104px) clamp(24px, 7vw, 145px)", overflow: "hidden",
-        background: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(/road-cta.jpg) center/cover no-repeat`,
         backgroundColor: "rgba(0,0,0,0.4)",
       }}>
-        <h2 style={{
-          fontFamily: "var(--brc-font-ui)", fontWeight: 700,
-          fontSize: "clamp(32px,3.5vw,48px)", lineHeight: 1.2,
-          color: "#fff", maxWidth: 483, margin: 0,
-        }}>
-          Ready to hit the road?
-        </h2>
-        <p style={{
-          fontFamily: "var(--brc-font-ui)", fontSize: "clamp(16px, 4vw, 20px)", lineHeight: 1.5,
-          color: "var(--brc-border)", maxWidth: 483, margin: 0,
-        }}>
-          Experience the best of ride on your journey. Available for purchase or hire processes.
-        </p>
-        <button className="brc-button-motion" style={{
-          marginTop: 8, background: "var(--brc-accent)", color: "#fff",
-          border: "none", borderRadius: 8, height: 56, padding: "0 28px",
-          fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14,
-          cursor: "pointer", display: "inline-flex", alignItems: "center",
-          gap: 10, width: "fit-content",
-        }}>
-          Browse Cars <Icon name="arrow" size={18} />
-        </button>
+        <Image
+          src="/road-cta.jpg"
+          alt=""
+          fill
+          sizes="(max-width: 900px) 100vw, 50vw"
+          style={{ objectFit: "cover", zIndex: 0 }}
+        />
+        <div
+          aria-hidden="true"
+          style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 1 }}
+        />
+        <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", gap: 24, alignItems: "flex-start" }}>
+          <h2 style={{
+            fontFamily: "var(--brc-font-ui)", fontWeight: 700,
+            fontSize: "clamp(32px,3.5vw,48px)", lineHeight: 1.2,
+            color: "#fff", maxWidth: 483, margin: 0,
+          }}>
+            Ready to hit the road?
+          </h2>
+          <p style={{
+            fontFamily: "var(--brc-font-ui)", fontSize: "clamp(16px, 4vw, 20px)", lineHeight: 1.5,
+            color: "var(--brc-border)", maxWidth: 483, margin: 0,
+          }}>
+            Experience the best of ride on your journey. Available for purchase or hire processes.
+          </p>
+          <button className="brc-button-motion" style={{
+            marginTop: 8, background: "var(--brc-accent)", color: "#fff",
+            border: "none", borderRadius: 8, height: 56, padding: "0 28px",
+            fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14,
+            cursor: "pointer", display: "inline-flex", alignItems: "center",
+            gap: 10, width: "fit-content",
+          }}>
+            Browse Cars <Icon name="arrow" size={18} />
+          </button>
+        </div>
       </div>
 
       {/* Right — Loyalty panel */}

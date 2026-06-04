@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Pill } from "./pill";
 
 type TextImageRowProps = {
@@ -32,8 +33,16 @@ export function TextImageRow({ pill, title, body, img, reverse, bg }: TextImageR
   const image = (
     <div style={{
       minHeight: "clamp(260px, 64vw, 396px)", borderRadius: 16,
-      background: `url(${img}) center/cover no-repeat`,
-    }} />
+      overflow: "hidden", position: "relative",
+    }}>
+      <Image
+        src={img}
+        alt={title}
+        fill
+        sizes="(max-width: 900px) 100vw, 50vw"
+        style={{ objectFit: "cover" }}
+      />
+    </div>
   );
 
   return (

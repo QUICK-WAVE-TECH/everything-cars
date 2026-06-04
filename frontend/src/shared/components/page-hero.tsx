@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 type PageHeroProps = {
   img: string;
   title: string;
@@ -9,10 +11,22 @@ export function PageHero({ img, title, sub }: PageHeroProps) {
     <section style={{
       position: "relative", minHeight: "clamp(360px, 62vw, 500px)", display: "flex", flexDirection: "column",
       justifyContent: "center", padding: "clamp(72px, 14vw, 120px) var(--brc-space-10, 104px)",
-      background: `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url(${img}) center/cover no-repeat`,
       backgroundColor: "rgba(0,0,0,0.4)",
+      overflow: "hidden",
     }}>
-      <div style={{ maxWidth: 1232, margin: "0 auto", width: "100%" }}>
+      <Image
+        src={img}
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        style={{ objectFit: "cover", zIndex: 0 }}
+      />
+      <div
+        aria-hidden="true"
+        style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 1 }}
+      />
+      <div style={{ maxWidth: 1232, margin: "0 auto", width: "100%", position: "relative", zIndex: 2 }}>
         <div style={{ maxWidth: 700, display: "flex", flexDirection: "column", gap: 16 }}>
           <h1 style={{
             fontFamily: "var(--brc-font-display)", fontWeight: 700,
