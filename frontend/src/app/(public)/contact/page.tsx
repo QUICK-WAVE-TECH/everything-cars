@@ -47,10 +47,11 @@ export default function ContactPage() {
         sub="Have questions or need help? Reach out and our team will get back to you as soon as possible."
       />
 
-      <section style={{ background: "#fff", padding: "104px var(--brc-space-10, 104px)" }}>
+      <section style={{ background: "#fff", padding: "var(--brc-section-y, 104px) var(--brc-space-10, 104px)" }}>
         <div style={{
           maxWidth: 1232, margin: "0 auto", display: "grid",
-          gridTemplateColumns: "1fr 1fr", gap: 88, alignItems: "center",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
+          gap: "clamp(36px, 7vw, 88px)", alignItems: "start",
         }}>
           {/* Left — copy + contact details + decorative mark */}
           <div style={{ display: "flex", flexDirection: "column", gap: 40, position: "relative" }}>
@@ -71,38 +72,50 @@ export default function ContactPage() {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {([ ["phone", "+234 8123456789"], ["mail", "support@buyandrentcars.com"] ] as [IconName, string][]).map(([ic, txt]) => (
-                <div key={txt} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div key={txt} style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                   <span style={{
                     width: 24, height: 24, borderRadius: 4, background: "var(--brc-accent)",
                     display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                   }}>
                     <Icon name={ic} size={14} stroke="#fff" />
                   </span>
-                  <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-accent)" }}>{txt}</span>
+                  <span style={{
+                    fontFamily: "var(--brc-font-ui)", fontSize: 16,
+                    color: "var(--brc-accent)", overflowWrap: "anywhere",
+                  }}>{txt}</span>
                 </div>
               ))}
             </div>
             <div aria-hidden="true" style={{
-              fontFamily: "var(--brc-font-display)", fontWeight: 800, fontSize: 220,
+              fontFamily: "var(--brc-font-display)", fontWeight: 800,
+              fontSize: "clamp(96px, 35vw, 220px)",
               lineHeight: 0.8, color: "var(--brc-primary-tint)", marginTop: 8, userSelect: "none",
             }}>?</div>
           </div>
 
           {/* Right — form card */}
           <div style={{
-            background: "var(--brc-bg-subtle)", borderRadius: 12, padding: 24,
+            background: "var(--brc-bg-subtle)", borderRadius: 12,
+            padding: "clamp(20px, 5vw, 24px)",
             display: "flex", flexDirection: "column", gap: 20,
+            minWidth: 0,
           }}>
             <ContactField label="Full Name" placeholder="Your name" value={fields.name} onChange={set("name")} />
             <ContactField label="Email Address" placeholder="Your email" value={fields.email} onChange={set("email")} type="email" />
             <ContactField label="Phone Number" placeholder="Your phone number" value={fields.phone} onChange={set("phone")} />
             <ContactField label="Message" placeholder="Your message" value={fields.message} onChange={set("message")} textarea />
             <button
+              className="brc-button-motion brc-contact-submit"
               onClick={handleSubmit}
               style={{
                 alignSelf: "flex-start", background: "var(--brc-accent)", color: "#fff",
-                border: "none", borderRadius: 8, height: 51, padding: "0 40px",
-                fontFamily: "var(--brc-font-ui)", fontWeight: 600, fontSize: 16, cursor: "pointer",
+                border: "none", borderRadius: 8, height: 50,
+                padding: "0 clamp(24px, 7vw, 38px)",
+                fontFamily: "var(--brc-font-ui)", fontWeight: 600,
+                fontSize: "clamp(14px, 3.6vw, 16px)", lineHeight: 1,
+                cursor: "pointer", width: "fit-content", maxWidth: "100%",
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                whiteSpace: "nowrap",
               }}
             >
               Send Message

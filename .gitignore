@@ -38,8 +38,15 @@ coverage/
 htmlcov/
 .pytest_cache/
 
+# Django migrations generated locally
+**/migrations/*.py
+!**/migrations/__init__.py
+
 # Superpowers
 .superpowers/
+
+# Docs (specs/plans generated locally)
+docs/
 
 #superdesign
 superdesign/

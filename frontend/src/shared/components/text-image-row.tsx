@@ -31,16 +31,17 @@ export function TextImageRow({ pill, title, body, img, reverse, bg }: TextImageR
 
   const image = (
     <div style={{
-      minHeight: 396, borderRadius: 16,
+      minHeight: "clamp(260px, 64vw, 396px)", borderRadius: 16,
       background: `url(${img}) center/cover no-repeat`,
     }} />
   );
 
   return (
-    <section style={{ background: bg || "#fff", padding: "104px var(--brc-space-10, 104px)" }}>
+    <section style={{ background: bg || "#fff", padding: "var(--brc-section-y, 104px) var(--brc-space-10, 104px)" }}>
       <div style={{
         maxWidth: 1232, margin: "0 auto", display: "grid",
-        gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center",
+        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
+        gap: "clamp(32px, 6vw, 64px)", alignItems: "center",
       }}>
         {reverse ? <>{image}{text}</> : <>{text}{image}</>}
       </div>

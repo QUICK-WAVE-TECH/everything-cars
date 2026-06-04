@@ -313,6 +313,14 @@ canvas {
       rgba(255, 255, 255, 0.92) 28px 30px
     ) !important;
   }
+
+  .brc-contact-submit {
+    align-self: stretch !important;
+    width: 100% !important;
+    padding-right: 20px !important;
+    padding-left: 20px !important;
+    font-size: 14px !important;
+  }
 }
 
 @layer base {

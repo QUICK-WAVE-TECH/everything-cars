@@ -90,18 +90,19 @@ function FounderProfile({ open, onClose }: { open: boolean; onClose: () => void 
       style={{
         position: "fixed", inset: 0, background: "rgba(18,18,18,.55)",
         zIndex: 200, display: "flex", alignItems: "flex-start", justifyContent: "center",
-        padding: "48px 24px", overflowY: "auto",
+        padding: "clamp(20px, 6vw, 48px) var(--brc-space-10, 24px)", overflowY: "auto",
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           background: "#fff", borderRadius: 16, maxWidth: 1100, width: "100%",
-          padding: "56px clamp(28px,4vw,64px)", boxShadow: "var(--brc-shadow-lg)",
+          padding: "clamp(28px,6vw,56px) clamp(20px,5vw,64px)", boxShadow: "var(--brc-shadow-lg)",
           position: "relative",
         }}
       >
         <button
+          className="brc-button-motion brc-button-motion-icon"
           onClick={onClose}
           style={{
             position: "absolute", top: 24, right: 24, width: 40, height: 40,
@@ -112,23 +113,32 @@ function FounderProfile({ open, onClose }: { open: boolean; onClose: () => void 
         >
           ✕
         </button>
-        <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: 56, alignItems: "start" }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+          gap: "clamp(28px, 6vw, 56px)",
+          alignItems: "start",
+        }}>
           {/* Left — photo + contact */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 24, position: "sticky", top: 0 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
             <div style={{
-              width: "100%", aspectRatio: "1", borderRadius: "50%",
+              width: "min(100%, 300px)", aspectRatio: "1", borderRadius: "50%",
               background: "url(/founder-ceo.jpg) center/cover no-repeat",
+              alignSelf: "center",
             }} />
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {CEO_CONTACT.map((c) => (
-                <div key={c.text} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div key={c.text} style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                   <span style={{
                     width: 24, height: 24, borderRadius: 4, background: "var(--brc-accent)",
                     display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                   }}>
                     <ContactIcon entry={c} />
                   </span>
-                  <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 14, color: "var(--brc-text-secondary)" }}>{c.text}</span>
+                  <span style={{
+                    fontFamily: "var(--brc-font-ui)", fontSize: 14,
+                    color: "var(--brc-text-secondary)", overflowWrap: "anywhere",
+                  }}>{c.text}</span>
                 </div>
               ))}
             </div>
@@ -198,10 +208,15 @@ export default function AboutPage() {
       />
 
       {/* Founders Section */}
-      <section style={{ background: "#fff", padding: "104px var(--brc-space-10, 104px)" }}>
-        <div style={{ maxWidth: 1232, margin: "0 auto", display: "flex", flexDirection: "column", gap: 72 }}>
+      <section style={{ background: "#fff", padding: "var(--brc-section-y, 104px) var(--brc-space-10, 104px)" }}>
+        <div style={{ maxWidth: 1232, margin: "0 auto", display: "flex", flexDirection: "column", gap: "clamp(48px, 8vw, 72px)" }}>
           {/* Header row */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
+            gap: "clamp(24px, 6vw, 64px)",
+            alignItems: "center",
+          }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div style={{ alignSelf: "flex-start" }}><Pill>Founders</Pill></div>
               <h2 style={{
@@ -219,7 +234,12 @@ export default function AboutPage() {
           </div>
 
           {/* CEO + Team grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(380px, 460px) 1fr", gap: 56, alignItems: "center" }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
+            gap: "clamp(40px, 7vw, 56px)",
+            alignItems: "center",
+          }}>
             {/* Featured CEO */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
               <div style={{
@@ -230,6 +250,7 @@ export default function AboutPage() {
                 <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 24, color: "var(--brc-text)" }}>Mr. Arinze Okoh</span>
                 <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text-muted)" }}>Managing Director / CEO</span>
                 <button
+                  className="brc-button-motion brc-button-motion-subtle"
                   onClick={() => setProfileOpen(true)}
                   style={{
                     marginTop: 10, display: "inline-flex", alignItems: "center", gap: 8,
@@ -243,7 +264,11 @@ export default function AboutPage() {
               </div>
             </div>
             {/* Team grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 40 }}>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))",
+              gap: "clamp(24px, 5vw, 40px)",
+            }}>
               {TEAM.map((m) => <TeamMember key={m.name} m={m} />)}
             </div>
           </div>
