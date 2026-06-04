@@ -157,8 +157,10 @@ export function CarDetailPage() {
         style={{
           maxWidth: 1200,
           margin: "0 auto",
-          padding: "32px 24px 80px",
+          padding: "clamp(24px, 5vw, 32px) clamp(16px, 5vw, 24px) 80px",
           fontFamily: "var(--brc-font-ui)",
+          width: "100%",
+          boxSizing: "border-box",
         }}
       >
         {/* ------------------------------------------------------------------ */}
@@ -179,6 +181,7 @@ export function CarDetailPage() {
               style={{
                 display: "flex",
                 alignItems: "center",
+                flexWrap: "wrap",
                 gap: 6,
                 listStyle: "none",
                 margin: 0,
@@ -246,6 +249,7 @@ export function CarDetailPage() {
         {/* Two-column layout: Gallery + Request Panel                          */}
         {/* ------------------------------------------------------------------ */}
         <div
+          className="car-detail-two-col"
           style={{
             display: "grid",
             gridTemplateColumns: "minmax(0, 504px) 1fr",
@@ -255,12 +259,13 @@ export function CarDetailPage() {
           }}
         >
           {/* ---- Gallery ---- */}
-          <section aria-label="Car gallery">
+          <section aria-label="Car gallery" style={{ minWidth: 0 }}>
             {/* Main image */}
             <div
+              className="car-detail-main-image"
               style={{
                 position: "relative",
-                height: 460,
+                height: "clamp(300px, 58vw, 460px)",
                 borderRadius: "var(--brc-radius-lg)",
                 background: "var(--brc-bg-subtle)",
                 overflow: "hidden",
@@ -329,7 +334,7 @@ export function CarDetailPage() {
 
             {/* Thumbnail strip */}
             <div
-              style={{ display: "flex", gap: 10, marginTop: 12 }}
+              style={{ display: "flex", gap: 10, marginTop: 12, overflowX: "auto", paddingBottom: 4 }}
               role="list"
               aria-label="Image thumbnails"
             >
@@ -368,7 +373,7 @@ export function CarDetailPage() {
           </section>
 
           {/* ---- Request Panel ---- */}
-          <section aria-label="Car details and request">
+          <section aria-label="Car details and request" style={{ minWidth: 0 }}>
             {/* Product label */}
             <p
               style={{
@@ -402,7 +407,7 @@ export function CarDetailPage() {
             </h1>
 
             {/* Meta */}
-            <div style={{ display: "flex", gap: 16, fontSize: 14, color: "var(--brc-text-secondary)", marginBottom: 12 }}>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 14, color: "var(--brc-text-secondary)", marginBottom: 12 }}>
               <span>Colour: <strong style={{ color: "var(--brc-text)" }}>{DETAIL_CAR.colour}</strong></span>
               <span>Model: <strong style={{ color: "var(--brc-text)" }}>{DETAIL_CAR.model}</strong></span>
             </div>
@@ -436,7 +441,7 @@ export function CarDetailPage() {
             {/* ---- Rent form ---- */}
             {mode === "rent" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div className="car-detail-date-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label
                       htmlFor="start-date"
@@ -564,6 +569,8 @@ export function CarDetailPage() {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: 8,
                   }}
                 >
                   <span style={{ fontSize: 14, color: "var(--brc-text-secondary)", fontWeight: 600 }}>
@@ -604,12 +611,15 @@ export function CarDetailPage() {
                 height: "auto",
                 marginBottom: 32,
                 gap: 0,
+                maxWidth: "100%",
+                overflowX: "auto",
               }}
             >
               {(["description", "reviews"] as const).map((tab) => (
                 <TabsTrigger
                   key={tab}
                   value={tab}
+                  className="car-detail-tab-trigger"
                   style={{
                     fontFamily: "var(--brc-font-ui)",
                     fontWeight: 700,
@@ -628,6 +638,7 @@ export function CarDetailPage() {
             {/* ---- Description tab ---- */}
             <TabsContent value="description">
               <div
+                className="car-detail-desc-grid"
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr minmax(0, 320px)",
@@ -764,6 +775,7 @@ export function CarDetailPage() {
             {/* ---- Reviews tab ---- */}
             <TabsContent value="reviews">
               <div
+                className="car-detail-reviews-grid"
                 style={{
                   display: "grid",
                   gridTemplateColumns: "minmax(0, 340px) 1fr",
@@ -1060,6 +1072,7 @@ export function CarDetailPage() {
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
+              flexWrap: "wrap",
               marginBottom: 24,
               gap: 12,
             }}
@@ -1143,6 +1156,22 @@ export function CarDetailPage() {
           }
           .car-detail-reviews-grid {
             grid-template-columns: 1fr !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .car-detail-main-image {
+            height: clamp(260px, 72vw, 340px) !important;
+          }
+
+          .car-detail-date-grid {
+            grid-template-columns: 1fr !important;
+          }
+
+          .car-detail-tab-trigger {
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+            font-size: 14px !important;
           }
         }
       `}</style>

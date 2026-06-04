@@ -324,7 +324,7 @@ function FilterSidebar({
   };
 
   return (
-    <aside style={{
+    <aside className="services-filter-sidebar" style={{
       width: 240, flexShrink: 0,
       display: "flex", flexDirection: "column", gap: 0,
       border: "1px solid var(--brc-border)",
@@ -552,6 +552,8 @@ export function ServicesListing() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / CARS_PER_PAGE));
   const currentCars = filtered.slice((page - 1) * CARS_PER_PAGE, page * CARS_PER_PAGE);
+  const startResult = filtered.length === 0 ? 0 : (page - 1) * CARS_PER_PAGE + 1;
+  const endResult = Math.min(page * CARS_PER_PAGE, filtered.length);
 
   function handleFiltersChange(f: Filters) {
     setFilters(f);
@@ -605,7 +607,7 @@ export function ServicesListing() {
       {/* ------------------------------------------------------------------ */}
       {/* Page body: sidebar + main                                            */}
       {/* ------------------------------------------------------------------ */}
-      <div style={{
+      <div className="services-listing-shell" style={{
         display: "flex", gap: 32, alignItems: "flex-start",
         padding: "48px clamp(20px, 8vw, 104px) 80px",
         maxWidth: 1400, margin: "0 auto", width: "100%",
@@ -615,12 +617,12 @@ export function ServicesListing() {
         <FilterSidebar mode={mode} filters={filters} onChange={handleFiltersChange} />
 
         {/* Main content */}
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 24 }}>
+        <div className="services-listing-main" style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 24 }}>
 
           {/* Top bar: search + mode toggle */}
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <div className="services-listing-toolbar" style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             {/* Search */}
-            <div style={{
+            <div className="services-listing-search" style={{
               flex: 1, minWidth: 220, position: "relative",
               display: "flex", alignItems: "center",
             }}>
@@ -637,7 +639,7 @@ export function ServicesListing() {
             </div>
 
             {/* Rent / Buy toggle */}
-            <div style={{
+            <div className="services-mode-toggle" style={{
               display: "flex", borderRadius: "var(--brc-radius-sm)",
               border: "1px solid var(--brc-border)",
               overflow: "hidden", flexShrink: 0,
@@ -668,16 +670,16 @@ export function ServicesListing() {
           }}>
             Showing{" "}
             <strong style={{ color: "var(--brc-text)" }}>
-              {(page - 1) * CARS_PER_PAGE + 1}–{Math.min(page * CARS_PER_PAGE, filtered.length)}
+              {startResult}–{endResult}
             </strong>
             {" "}of <strong style={{ color: "var(--brc-text)" }}>{filtered.length}</strong> results
           </p>
 
           {/* Car grid */}
           {currentCars.length > 0 ? (
-            <div style={{
+            <div className="services-car-grid" style={{
               display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
               gap: "clamp(16px, 3vw, 28px)",
             }}>
               {currentCars.map((car) => (
@@ -695,7 +697,7 @@ export function ServicesListing() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center", marginTop: 8 }}>
+            <div className="services-pagination" style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center", marginTop: 8 }}>
               {/* Prev */}
               <Button
                 variant="outline"
@@ -742,6 +744,57 @@ export function ServicesListing() {
           )}
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 960px) {
+          .services-listing-shell {
+            flex-direction: column !important;
+            gap: 24px !important;
+            padding-top: 36px !important;
+            padding-bottom: 64px !important;
+          }
+
+          .services-filter-sidebar {
+            width: 100% !important;
+            position: static !important;
+            align-self: stretch !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .services-listing-shell {
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+          }
+
+          .services-listing-toolbar {
+            align-items: stretch !important;
+          }
+
+          .services-listing-search {
+            min-width: 100% !important;
+          }
+
+          .services-mode-toggle {
+            width: 100% !important;
+            flex-shrink: 1 !important;
+          }
+
+          .services-mode-toggle > button {
+            flex: 1 1 0 !important;
+            padding-left: 12px !important;
+            padding-right: 12px !important;
+          }
+
+          .services-car-grid {
+            grid-template-columns: 1fr !important;
+          }
+
+          .services-pagination {
+            flex-wrap: wrap !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
