@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { PageHero } from "@/shared/components/page-hero";
 import { TextImageRow } from "@/shared/components/text-image-row";
@@ -123,9 +124,16 @@ function FounderProfile({ open, onClose }: { open: boolean; onClose: () => void 
           <div style={{ display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
             <div style={{
               width: "min(100%, 300px)", aspectRatio: "1", borderRadius: "50%",
-              background: "url(/founder-ceo.jpg) center/cover no-repeat",
-              alignSelf: "center",
-            }} />
+              alignSelf: "center", position: "relative", overflow: "hidden",
+            }}>
+              <Image
+                src="/founder-ceo.jpg"
+                alt="Mr. Arinze Okoh"
+                fill
+                sizes="300px"
+                style={{ objectFit: "cover" }}
+              />
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {CEO_CONTACT.map((c) => (
                 <div key={c.text} style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
@@ -244,8 +252,16 @@ export default function AboutPage() {
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
               <div style={{
                 width: "100%", aspectRatio: "1", borderRadius: "50%",
-                background: "url(/founder-ceo.jpg) center/cover no-repeat", maxWidth: 380,
-              }} />
+                maxWidth: 380, position: "relative", overflow: "hidden",
+              }}>
+                <Image
+                  src="/founder-ceo.jpg"
+                  alt="Mr. Arinze Okoh"
+                  fill
+                  sizes="(max-width: 640px) 90vw, 380px"
+                  style={{ objectFit: "cover" }}
+                />
+              </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
                 <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 24, color: "var(--brc-text)" }}>Mr. Arinze Okoh</span>
                 <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text-muted)" }}>Managing Director / CEO</span>

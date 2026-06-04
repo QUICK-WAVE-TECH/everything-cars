@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Pill } from "@/shared/components/pill";
 import { SectionHead } from "@/shared/components/section-head";
 import { Icon } from "@/features/auth/components/icon";
@@ -50,23 +51,37 @@ export default function ServicesPage() {
         position: "relative", minHeight: "clamp(320px, 46vh, 480px)",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         padding: "var(--brc-section-y, 104px) var(--brc-space-10, 104px)",
-        background: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(/hero-bg.jpg) center/cover no-repeat`,
-        textAlign: "center", gap: 20,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        textAlign: "center", gap: 20, overflow: "hidden",
       }}>
-        <Pill white>Our Services</Pill>
-        <h1 style={{
-          fontFamily: "var(--brc-font-display)", fontWeight: 800,
-          fontSize: "clamp(34px, 7vw, 60px)", lineHeight: 1.15,
-          color: "#fff", margin: 0, maxWidth: 760,
-        }}>
-          Find the Perfect Car for Every Journey
-        </h1>
-        <p style={{
-          fontFamily: "var(--brc-font-ui)", fontSize: "clamp(16px, 3.5vw, 20px)", lineHeight: 1.5,
-          color: "rgba(255,255,255,.92)", margin: 0, maxWidth: 580,
-        }}>
-          Rent, buy, or sell — all from one trusted platform. Choose what you need and we&apos;ll handle the rest.
-        </p>
+        <Image
+          src="/hero-bg.jpg"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          style={{ objectFit: "cover", zIndex: 0 }}
+        />
+        <div
+          aria-hidden="true"
+          style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1 }}
+        />
+        <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+          <Pill white>Our Services</Pill>
+          <h1 style={{
+            fontFamily: "var(--brc-font-display)", fontWeight: 800,
+            fontSize: "clamp(34px, 7vw, 60px)", lineHeight: 1.15,
+            color: "#fff", margin: 0, maxWidth: 760,
+          }}>
+            Find the Perfect Car for Every Journey
+          </h1>
+          <p style={{
+            fontFamily: "var(--brc-font-ui)", fontSize: "clamp(16px, 3.5vw, 20px)", lineHeight: 1.5,
+            color: "rgba(255,255,255,.92)", margin: 0, maxWidth: 580,
+          }}>
+            Rent, buy, or sell — all from one trusted platform. Choose what you need and we&apos;ll handle the rest.
+          </p>
+        </div>
       </section>
 
       {/* Service offerings */}
