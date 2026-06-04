@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import Image from "next/image";
 import { Icon } from "@/features/auth/components/icon";
 import { Star } from "@/shared/components/star";
@@ -188,13 +189,15 @@ function ServiceCarCard({
 }) {
   const [hover, setHover] = useState(false);
   return (
-    <div
+    <Link
+      href={`/cars/${car.id}?mode=${mode}`}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
         display: "flex", flexDirection: "column", gap: 14,
         cursor: "pointer", transition: "transform .2s ease",
         transform: hover ? "translateY(-4px)" : "none",
+        textDecoration: "none", color: "inherit",
       }}
     >
       {/* Image tile */}
@@ -253,7 +256,7 @@ function ServiceCarCard({
           {cta}
         </button>
       </div>
-    </div>
+    </Link>
   );
 }
 
