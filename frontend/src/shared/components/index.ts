@@ -10,3 +10,5 @@ export type { Car } from "./car-card";
 export { CarRow } from "./car-row";
 export { SearchBar } from "./search-bar";
 export { WebsiteNavbar } from "./website-navbar";
+export { PageHero } from "./page-hero";
+export { TextImageRow } from "./text-image-row";
