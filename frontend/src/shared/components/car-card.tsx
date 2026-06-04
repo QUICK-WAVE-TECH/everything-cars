@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import Image from "next/image";
 import { Icon } from "@/features/auth/components/icon";
 import { Star } from "./star";
@@ -25,14 +26,18 @@ export function CarCard({ car, onAction }: CarCardProps) {
   const [hover, setHover] = useState(false);
   const cta = car.mode === "buy" ? "Buy Now" : car.mode === "list" ? "View" : "Rent Now";
 
+  const mode = car.mode === "buy" ? "buy" : "rent";
+
   return (
-    <div
+    <Link
+      href={`/cars/${car.id}?mode=${mode}`}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
         width: "min(300px, calc(100vw - 48px))", flexShrink: 0, display: "flex", flexDirection: "column",
         gap: 16, cursor: "pointer", transition: "transform .2s ease",
         transform: hover ? "translateY(-4px)" : "none",
+        textDecoration: "none", color: "inherit",
       }}
     >
       {/* Image tile */}
@@ -83,7 +88,7 @@ export function CarCard({ car, onAction }: CarCardProps) {
           {cta}
         </button>
       </div>
-    </div>
+    </Link>
   );
 }
 
