@@ -1,0 +1,19 @@
+django>=5.1,<6.0
+djangorestframework>=3.15
+django-cors-headers>=4.4
+PyJWT>=2.9
+cryptography>=43.0
+python-dotenv>=1.0
+psycopg[binary]>=3.2
+django-storages>=1.14
+boto3>=1.35
+celery>=5.4
+redis>=5.0
+gunicorn>=23.0
+resend>=2.0
+
+# Dev / Test
+ruff>=0.7
+pytest>=8.3
+pytest-django>=4.9
+factory-boy>=3.3
