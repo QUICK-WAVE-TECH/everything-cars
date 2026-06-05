@@ -1,0 +1,62 @@
+import type { IconName } from "@/features/auth/components/icon";
+
+// ---------------------------------------------------------------------------
+// Customer summary stats (shared by dashboard + requests pages)
+// ---------------------------------------------------------------------------
+
+export type StatItem = {
+  label: string;
+  value: string;
+  unit?: string;
+  icon: IconName;
+  color: string;
+};
+
+export const CUSTOMER_STATS: StatItem[] = [
+  { label: "Total Requests", value: "3", icon: "car", color: "var(--brc-primary)" },
+  { label: "Pending Requests", value: "2", icon: "clock", color: "var(--brc-warning)" },
+  { label: "Approved Requests", value: "1", icon: "check", color: "var(--brc-success)" },
+  { label: "Loyalty Point", value: "120", unit: "points", icon: "gift", color: "var(--brc-accent)" },
+];
+
+// ---------------------------------------------------------------------------
+// Mock customer requests
+// ---------------------------------------------------------------------------
+
+export type RequestType = "Rent" | "Buy";
+export type RequestStatus = "approved" | "pending" | "rejected";
+
+export type CustomerRequest = {
+  id: number;
+  car: string;
+  type: RequestType;
+  requestDate: string;
+  owner: string;
+  customer: string;
+  price: number;
+  duration: string;
+  color: string;
+  requestedOn: string;
+  status: RequestStatus;
+};
+
+export const CUSTOMER_REQUESTS: CustomerRequest[] = [
+  { id: 1, car: "Lexus NS 350", type: "Rent", requestDate: "04 Nov 2025", owner: "Daniel Emmanuel", customer: "Daniel Emmanuel", price: 175000, duration: "5 days", color: "White", requestedOn: "10/29/2025", status: "approved" },
+  { id: 2, car: "Lexus NS 350", type: "Rent", requestDate: "04 Nov 2025", owner: "Okon Nnamdi", customer: "Daniel Emmanuel", price: 175000, duration: "5 days", color: "Black", requestedOn: "10/29/2025", status: "pending" },
+  { id: 3, car: "Lexus NS 350", type: "Buy", requestDate: "04 Nov 2025", owner: "Shalom Aderonke", customer: "Daniel Emmanuel", price: 175000, duration: "5 days", color: "Silver", requestedOn: "10/29/2025", status: "pending" },
+  { id: 4, car: "Lexus NS 350", type: "Rent", requestDate: "04 Nov 2025", owner: "Daniel Emmanuel", customer: "Daniel Emmanuel", price: 175000, duration: "5 days", color: "White", requestedOn: "10/29/2025", status: "rejected" },
+  { id: 5, car: "Lexus NS 350", type: "Rent", requestDate: "04 Nov 2025", owner: "Okon Nnamdi", customer: "Daniel Emmanuel", price: 175000, duration: "5 days", color: "Grey", requestedOn: "10/29/2025", status: "pending" },
+  { id: 6, car: "Lexus NS 350", type: "Rent", requestDate: "04 Nov 2025", owner: "Shalom Aderonke", customer: "Daniel Emmanuel", price: 175000, duration: "5 days", color: "Blue", requestedOn: "10/29/2025", status: "rejected" },
+  { id: 7, car: "Lexus NS 350", type: "Rent", requestDate: "04 Nov 2025", owner: "Hilary Emmanuel", customer: "Daniel Emmanuel", price: 175000, duration: "5 days", color: "White", requestedOn: "10/29/2025", status: "pending" },
+  { id: 8, car: "Lexus NS 350", type: "Buy", requestDate: "03 Nov 2025", owner: "Premium Auto Gallery", customer: "Daniel Emmanuel", price: 175000, duration: "5 days", color: "Red", requestedOn: "10/28/2025", status: "approved" },
+  { id: 9, car: "Lexus NS 350", type: "Rent", requestDate: "03 Nov 2025", owner: "Okon Nnamdi", customer: "Daniel Emmanuel", price: 175000, duration: "5 days", color: "Black", requestedOn: "10/28/2025", status: "pending" },
+  { id: 10, car: "Lexus NS 350", type: "Rent", requestDate: "02 Nov 2025", owner: "Hilary Emmanuel", customer: "Daniel Emmanuel", price: 175000, duration: "5 days", color: "White", requestedOn: "10/27/2025", status: "pending" },
+];
+
+export function naira(n: number): string {
+  return `₦${n.toLocaleString("en-NG")}`;
+}
+
+export function getCustomerRequest(id: number): CustomerRequest | undefined {
+  return CUSTOMER_REQUESTS.find((r) => r.id === id);
+}

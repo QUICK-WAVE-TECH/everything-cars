@@ -1,6 +1,18 @@
 export { Header } from "./header";
 export { Footer } from "./footer";
 export { Sidebar } from "./sidebar";
+export { DashboardNavbar } from "./dashboard-navbar";
+export { StatCard } from "./stat-card";
+export type { StatCardProps } from "./stat-card";
+export { Breadcrumb } from "./breadcrumb";
+export type { Crumb } from "./breadcrumb";
+export { Pagination } from "./pagination";
+export { FilterPopover } from "./filter-popover";
+export type { FilterField, FilterOption, FilterValues } from "./filter-popover";
+export { RowMenu } from "./row-menu";
+export type { RowMenuItem } from "./row-menu";
+export { RentalDetailCard } from "./rental-detail-card";
+export type { DetailField } from "./rental-detail-card";
 export { Pill } from "./pill";
 export { Chip } from "./chip";
 export { Star } from "./star";
