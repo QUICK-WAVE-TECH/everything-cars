@@ -34,7 +34,7 @@ class SignUpView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        with transaction:
+        with transaction.atomic():
             user = User.objects.create_user(
                 email=data["email"],
                 name=data["name"],

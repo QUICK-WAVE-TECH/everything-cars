@@ -82,6 +82,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 class CustomerProfileSerializer(serializers.ModelSerializer):
+    country = serializers.CharField(source="country.code", default="", read_only=True)
+
     class Meta:
         model = CustomerProfile
         fields = [
