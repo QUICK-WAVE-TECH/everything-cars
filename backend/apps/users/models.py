@@ -107,6 +107,12 @@ class AccessCode(models.Model):
 
     class Meta:
         db_table = "access_codes"
+        indexes = [
+            models.Index(
+                fields=["email", "purpose", "is_used", "expires_at"],
+                name="access_code_lookup_idx",
+            )
+        ]
 
     @staticmethod
     def _hash_code(code: str) -> str:
@@ -114,6 +120,11 @@ class AccessCode(models.Model):
 
     @classmethod
     def create_code(cls, email: str, purpose: str, user=None):
+        cls.objects.filter(
+            email=email,
+            purpose=purpose,
+            is_used=False,
+        ).update(is_used=True)
         plain_code = f"{secrets.randbelow(1000000):06d}"
         obj = cls.objects.create(
             user=user,
@@ -128,15 +139,19 @@ class AccessCode(models.Model):
     @classmethod
     def verify_code(cls, email: str, code: str, purpose: str):
         code_hash = cls._hash_code(code)
-        try:
-            obj = cls.objects.get(
+        obj = (
+            cls.objects.filter(
                 email=email,
                 code_hash=code_hash,
                 purpose=purpose,
                 is_used=False,
                 expires_at__gt=timezone.now(),
             )
-        except cls.DoesNotExist:
+            .order_by("-created_at")
+            .first()
+        )
+
+        if obj is None:
             return None
         obj.is_used = True
         obj.save(update_fields=["is_used"])

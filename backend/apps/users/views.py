@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 
 from .models import User, CustomerProfile, OwnerProfile, AccessCode
 from .serializers import (
-    CustomerProfileSerializer,
+    CustomerProfileWriteSerializer,
     OwnerProfileSerializer,
     SignInSerializer,
     SignUpSerializer,
@@ -44,7 +44,7 @@ class SignUpView(APIView):
             )
 
             if data["role"] == "customer":
-                profile_serializer = CustomerProfileSerializer(data=data)
+                profile_serializer = CustomerProfileWriteSerializer(data=data)
                 profile_serializer.is_valid(raise_exception=True)
                 CustomerProfile.objects.create(
                     user=user, **profile_serializer.validated_data
@@ -55,17 +55,18 @@ class SignUpView(APIView):
                 OwnerProfile.objects.create(
                     user=user, **profile_serializer.validated_data
                 )
-
-            generate_and_send_code(
-                email=user.email, purpose="sign_up_verify", user=user
+            transaction.on_commit(
+                lambda: generate_and_send_code(
+                    email=user.email, purpose="sign_up_verify", user=user
+                )
             )
-            return Response(
-                {
-                    "message": "Verification code sent to your email.",
-                    "email": user.email,
-                },
-                status=status.HTTP_201_CREATED,
-            )
+        return Response(
+            {
+                "message": "Verification code sent to your email.",
+                "email": user.email,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class SignInView(APIView):

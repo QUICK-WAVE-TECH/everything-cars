@@ -96,6 +96,21 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
         ]
 
 
+class CustomerProfileWriteSerializer(serializers.ModelSerializer):
+    country = CountryField(required=False)
+
+    class Meta:
+        model = CustomerProfile
+        fields = [
+            "drivers_license",
+            "date_of_birth",
+            "address",
+            "state",
+            "city",
+            "country",
+        ]
+
+
 class OwnerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = OwnerProfile

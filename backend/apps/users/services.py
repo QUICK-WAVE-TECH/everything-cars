@@ -8,7 +8,13 @@ from django.conf import settings
 from .models import AccessCode, RefreshTokenBlacklist
 
 
+def _require_jwt_keys() -> None:
+    if not settings.JWT_PRIVATE_KEY or not settings.JWT_PUBLIC_KEY:
+        raise RuntimeError("JWT_PRIVATE_KEY and JWT_PUBLIC_KEY must be configured.")
+
+
 def issue_tokens(user) -> dict:
+    _require_jwt_keys()
     now = datetime.now(timezone.utc)
     jti_access = uuid.uuid4().hex
     jti_refresh = uuid.uuid4().hex
@@ -44,6 +50,8 @@ def issue_tokens(user) -> dict:
 
 
 def verify_access_token(token: str) -> dict | None:
+    _require_jwt_keys()
+
     try:
         payload = jwt.decode(token, settings.JWT_PUBLIC_KEY, algorithms=["RS256"])
         if payload.get("type") != "access":
@@ -54,6 +62,8 @@ def verify_access_token(token: str) -> dict | None:
 
 
 def verify_refresh_token(token: str) -> dict | None:
+    _require_jwt_keys()
+
     try:
         payload = jwt.decode(token, settings.JWT_PUBLIC_KEY, algorithms=["RS256"])
         if payload.get("type") != "refresh":
