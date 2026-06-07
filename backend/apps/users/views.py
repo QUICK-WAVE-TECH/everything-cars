@@ -106,6 +106,7 @@ class VerifyView(APIView):
     Verify the user email, then proceed to check if the user exists in the system
     after which we verify the purpose for which they're coming, sign up or sign in and provide tokens
     """
+    throttle_scope = "verify_code"
 
     permission_classes = [AllowAny]
 

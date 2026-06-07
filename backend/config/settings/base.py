@@ -155,6 +155,7 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_RATES": {
         "resend_code": "3/min",
+        "verify_code": "5/min",
     },
 }
 

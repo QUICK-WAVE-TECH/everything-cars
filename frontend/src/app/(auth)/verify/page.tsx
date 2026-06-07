@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -89,7 +89,7 @@ function VerifyContent() {
         },
         onError: (error) => {
           toast.error("Invalid code", { description: error.message });
-          form.setValue("code", "");
+          // Don't clear — let user see what they typed. They can clear manually.
         },
       });
     },
@@ -119,13 +119,19 @@ function VerifyContent() {
     }
   }, [cooldown, email, form, isResending]);
 
-  // Auto-submit when all 6 digits entered
+  // Auto-submit when all 6 digits entered (only once, not on error retry)
   const codeValue = form.watch("code");
+  const hasAutoSubmitted = useRef(false);
+
   useEffect(() => {
-    if (codeValue?.length === 6) {
+    if (codeValue?.length === 6 && !verify.isPending && !hasAutoSubmitted.current) {
+      hasAutoSubmitted.current = true;
       form.handleSubmit(handleSubmit)();
     }
-  }, [codeValue, form, handleSubmit]);
+    if (codeValue?.length !== 6) {
+      hasAutoSubmitted.current = false;
+    }
+  }, [codeValue, form, handleSubmit, verify.isPending]);
 
   const maskedEmail = email.replace(/(.{2})(.*)(@.*)/, "$1***$3");
 
