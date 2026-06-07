@@ -23,32 +23,34 @@ type AuthGuardProps = {
 export function AuthGuard({ children, requiredRole }: AuthGuardProps) {
   const router = useRouter();
   const { isAuthenticated, userRole } = useAuthStore();
-  const { isLoading, isError } = useMe();
+  const { data: user, isLoading, isError } = useMe();
+  const isReadyAuthenticated = Boolean(user) || isAuthenticated;
+  const currentRole = user?.role ?? userRole;
 
   useEffect(() => {
     // Still loading — wait
     if (isLoading) return;
 
     // Not authenticated
-    if (!isAuthenticated || isError) {
+    if (!isReadyAuthenticated || isError) {
       router.replace("/sign-in");
       return;
     }
 
     // Wrong role
-    if (requiredRole && userRole !== requiredRole) {
+    if (requiredRole && currentRole !== requiredRole) {
       const correctDashboard =
-        userRole === "owner" ? "/owner/dashboard" : "/customer/dashboard";
+        currentRole === "owner" ? "/owner/dashboard" : "/customer/dashboard";
       router.replace(correctDashboard);
     }
-  }, [isAuthenticated, userRole, isLoading, isError, requiredRole, router]);
+  }, [currentRole, isReadyAuthenticated, isLoading, isError, requiredRole, router]);
 
   // Show nothing while loading or redirecting
-  if (isLoading || !isAuthenticated) {
+  if (isLoading || !isReadyAuthenticated || isError) {
     return null;
   }
 
-  if (requiredRole && userRole !== requiredRole) {
+  if (requiredRole && currentRole !== requiredRole) {
     return null;
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -80,6 +80,16 @@ export default function SignUpPage() {
     );
   };
 
+  const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (step === 1) {
+      event.preventDefault();
+      void handleContinue();
+      return;
+    }
+
+    void form.handleSubmit(handleSubmit)(event);
+  };
+
   return (
     <AuthShell>
       <div className="flex w-[min(100%,632px)] flex-col items-center gap-8">
@@ -105,7 +115,7 @@ export default function SignUpPage() {
             </div>
 
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col gap-8">
+              <form onSubmit={handleFormSubmit} className="flex flex-col gap-8">
                 {/* Step 1 */}
                 {step === 1 ? (
                   <div className="flex flex-col gap-4">

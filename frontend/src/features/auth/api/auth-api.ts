@@ -142,11 +142,12 @@ export function useVerify() {
 }
 
 export function useMe() {
-  const { clearAuth, setAuth } = useAuthStore();
+  const { clearAuth, setAuth, hasSession } = useAuthStore();
 
   const query = useQuery({
     queryKey: ["me"],
     queryFn: () => apiClient.get<UserProfile>("/users/me"),
+    enabled: hasSession, // Skip API call if user has never logged in on this browser
     staleTime: 5 * 60 * 1000, //5minutes
   });
 

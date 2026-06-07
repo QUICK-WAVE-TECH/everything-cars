@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,6 +22,7 @@ import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
 export default function OwnerSignUpPage() {
   const [step, setStep] = useState(1);
   const [agree, setAgree] = useState(false);
+  const [document, setDocument] = useState<File | null>(null);
   const router = useRouter();
   const signUp = useSignUp();
 
@@ -76,6 +77,7 @@ export default function OwnerSignUpPage() {
         rc_number: values.rc_number,
         bank_account: values.bank_account,
         bank_name: values.bank_name,
+        document: document ?? undefined,
       },
       {
         onSuccess: (data) => {
@@ -87,6 +89,16 @@ export default function OwnerSignUpPage() {
         },
       },
     );
+  };
+
+  const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (step === 1) {
+      event.preventDefault();
+      void handleContinue();
+      return;
+    }
+
+    void form.handleSubmit(handleSubmit)(event);
   };
 
   return (
@@ -114,7 +126,7 @@ export default function OwnerSignUpPage() {
             </div>
 
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col gap-8">
+              <form onSubmit={handleFormSubmit} className="flex flex-col gap-8">
                 {/* Step 1 */}
                 {step === 1 ? (
                   <div className="flex flex-col gap-4">
@@ -177,7 +189,12 @@ export default function OwnerSignUpPage() {
                             <FormMessage />
                           </FormItem>
                         )} />
-                        <UploadField label="Upload CAC Document" hint="PDF, DOC, or DOCX (Max 9MB)" onPick={() => {}} />
+                        <UploadField
+                          label="Upload CAC Document"
+                          hint="PDF, DOC, or DOCX (Max 9MB)"
+                          value={document?.name}
+                          onPick={setDocument}
+                        />
                       </>
                     ) : (
                       <>
@@ -193,7 +210,12 @@ export default function OwnerSignUpPage() {
                             <FormMessage />
                           </FormItem>
                         )} />
-                        <UploadField label="Upload Car Ownership Document" hint="PDF, DOC, or DOCX (Max 9MB)" onPick={() => {}} />
+                        <UploadField
+                          label="Upload Car Ownership Document"
+                          hint="PDF, DOC, or DOCX (Max 9MB)"
+                          value={document?.name}
+                          onPick={setDocument}
+                        />
                       </>
                     )}
                     <FormField control={form.control} name="bank_account" render={({ field }) => (
