@@ -1,6 +1,7 @@
 export { Icon } from "./icon";
 export type { IconName } from "./icon";
 export { AuthField } from "./auth-field";
+export { PhoneField } from "./phone-field";
 export { AuthButton } from "./auth-button";
 export { AuthAltLink } from "./auth-alt-link";
 export { Radio } from "./radio";

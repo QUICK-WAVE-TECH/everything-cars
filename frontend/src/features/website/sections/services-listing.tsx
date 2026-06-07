@@ -42,18 +42,18 @@ const SERVICE_MODES = {
 type Mode = keyof typeof SERVICE_MODES;
 
 const BASE_CARS = [
-  { id: 1,  name: "Lexus NX 300h",      type: "SUV",    location: "Lagos, Nigeria",      rating: 4, rentPrice: 35000,  buyPrice: 35000000 },
-  { id: 2,  name: "Toyota Camry",        type: "Sedan",  location: "Abuja, Nigeria",      rating: 5, rentPrice: 28000,  buyPrice: 18000000 },
-  { id: 3,  name: "Honda Accord",        type: "Sedan",  location: "Lagos, Nigeria",      rating: 4, rentPrice: 30000,  buyPrice: 20000000 },
-  { id: 4,  name: "Mercedes-Benz GLE",   type: "Luxury", location: "Lagos, Nigeria",      rating: 5, rentPrice: 85000,  buyPrice: 78000000 },
-  { id: 5,  name: "Toyota RAV4",         type: "SUV",    location: "Port Harcourt",       rating: 4, rentPrice: 42000,  buyPrice: 28000000 },
-  { id: 6,  name: "Hyundai Elantra",     type: "Sedan",  location: "Ibadan, Nigeria",     rating: 3, rentPrice: 22000,  buyPrice: 15000000 },
-  { id: 7,  name: "Lexus RX 350",        type: "SUV",    location: "Lagos, Nigeria",      rating: 5, rentPrice: 60000,  buyPrice: 52000000 },
-  { id: 8,  name: "Kia Sportage",        type: "SUV",    location: "Abuja, Nigeria",      rating: 4, rentPrice: 38000,  buyPrice: 24000000 },
-  { id: 9,  name: "Toyota Corolla",      type: "Sedan",  location: "Lagos, Nigeria",      rating: 4, rentPrice: 25000,  buyPrice: 16000000 },
-  { id: 10, name: "Ford Explorer",       type: "SUV",    location: "Lagos, Nigeria",      rating: 4, rentPrice: 48000,  buyPrice: 33000000 },
-  { id: 11, name: "Mercedes C-Class",    type: "Luxury", location: "Abuja, Nigeria",      rating: 5, rentPrice: 70000,  buyPrice: 45000000 },
-  { id: 12, name: "Honda CR-V",          type: "SUV",    location: "Lagos, Nigeria",      rating: 4, rentPrice: 40000,  buyPrice: 26000000 },
+  { id: 1,  name: "Lexus NX 300h",      type: "SUV",    location: "Lagos, Nigeria",      rating: 4, rentPrice: 35000,  buyPrice: 35000000, available: true,  year: 2022, mileage: 25000 },
+  { id: 2,  name: "Toyota Camry",        type: "Sedan",  location: "Abuja, Nigeria",      rating: 5, rentPrice: 28000,  buyPrice: 18000000, available: true,  year: 2021, mileage: 32000 },
+  { id: 3,  name: "Honda Accord",        type: "Sedan",  location: "Lagos, Nigeria",      rating: 4, rentPrice: 30000,  buyPrice: 20000000, available: false, year: 2020, mileage: 41000 },
+  { id: 4,  name: "Mercedes-Benz GLE",   type: "Luxury", location: "Lagos, Nigeria",      rating: 5, rentPrice: 85000,  buyPrice: 78000000, available: true,  year: 2024, mileage: 0 },
+  { id: 5,  name: "Toyota RAV4",         type: "SUV",    location: "Port Harcourt",       rating: 4, rentPrice: 42000,  buyPrice: 28000000, available: true,  year: 2022, mileage: 28000 },
+  { id: 6,  name: "Hyundai Elantra",     type: "Sedan",  location: "Ibadan, Nigeria",     rating: 3, rentPrice: 22000,  buyPrice: 15000000, available: false, year: 2019, mileage: 55000 },
+  { id: 7,  name: "Lexus RX 350",        type: "SUV",    location: "Lagos, Nigeria",      rating: 5, rentPrice: 60000,  buyPrice: 52000000, available: true,  year: 2024, mileage: 0 },
+  { id: 8,  name: "Kia Sportage",        type: "SUV",    location: "Abuja, Nigeria",      rating: 4, rentPrice: 38000,  buyPrice: 24000000, available: false, year: 2021, mileage: 30000 },
+  { id: 9,  name: "Toyota Corolla",      type: "Sedan",  location: "Lagos, Nigeria",      rating: 4, rentPrice: 25000,  buyPrice: 16000000, available: true,  year: 2020, mileage: 47000 },
+  { id: 10, name: "Ford Explorer",       type: "SUV",    location: "Lagos, Nigeria",      rating: 4, rentPrice: 48000,  buyPrice: 33000000, available: true,  year: 2022, mileage: 22000 },
+  { id: 11, name: "Mercedes C-Class",    type: "Luxury", location: "Abuja, Nigeria",      rating: 5, rentPrice: 70000,  buyPrice: 45000000, available: false, year: 2023, mileage: 12000 },
+  { id: 12, name: "Honda CR-V",          type: "SUV",    location: "Lagos, Nigeria",      rating: 4, rentPrice: 40000,  buyPrice: 26000000, available: true,  year: 2024, mileage: 0 },
 ];
 
 const CAR_TYPES_LIST = ["Camry", "Chevrolet", "Ford", "Honda Accord", "Honda CRV", "Hyundai", "Kia", "Lexus"];
@@ -188,24 +188,32 @@ function ServiceCarCard({
   cta: string;
 }) {
   const [hover, setHover] = useState(false);
-  return (
-    <Link
-      href={`/cars/${car.id}?mode=${mode}`}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        display: "flex", flexDirection: "column", gap: 14,
-        cursor: "pointer", transition: "transform .2s ease",
-        transform: hover ? "translateY(-4px)" : "none",
-        textDecoration: "none", color: "inherit",
-      }}
-    >
+  const available = car.available;
+  const inactiveLabel = mode === "buy" ? "Sold" : "Currently Rented";
+  const statusLabel = available ? "Available" : inactiveLabel;
+  const statusBg = available
+    ? "var(--brc-success-bg)"
+    : mode === "buy" ? "var(--brc-danger-bg)" : "var(--brc-warning-bg)";
+  const statusFg = available
+    ? "var(--brc-success)"
+    : mode === "buy" ? "var(--brc-danger)" : "#9a7400";
+
+  const specChipStyle: React.CSSProperties = {
+    display: "inline-flex", alignItems: "center", gap: 5,
+    background: "var(--brc-bg-subtle)", border: "1px solid var(--brc-border)",
+    borderRadius: "var(--brc-radius-pill)", padding: "4px 10px",
+    fontFamily: "var(--brc-font-ui)", fontSize: 12, fontWeight: 600,
+    color: "var(--brc-text-secondary)",
+  };
+
+  const content = (
+    <>
       {/* Image tile */}
       <div style={{
         position: "relative", height: 200, borderRadius: "var(--brc-radius-lg)",
         background: "var(--brc-bg-subtle)", overflow: "hidden",
         display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: hover ? "var(--brc-shadow-md)" : "var(--brc-shadow-xs)",
+        boxShadow: hover && available ? "var(--brc-shadow-md)" : "var(--brc-shadow-xs)",
         transition: "box-shadow .2s ease",
       }}>
         <Image
@@ -213,7 +221,11 @@ function ServiceCarCard({
           alt={car.name}
           width={258}
           height={160}
-          style={{ width: "86%", height: "auto", objectFit: "contain" }}
+          style={{
+            width: "86%", height: "auto", objectFit: "contain",
+            opacity: available ? 1 : 0.5,
+            filter: available ? "none" : "grayscale(0.7)",
+          }}
         />
         {/* Star rating badge */}
         <div style={{
@@ -222,6 +234,14 @@ function ServiceCarCard({
           padding: "3px 8px", display: "flex", gap: 1,
         }}>
           {[0, 1, 2, 3, 4].map((i) => <Star key={i} filled={i < car.rating} />)}
+        </div>
+        {/* Availability badge */}
+        <div style={{
+          position: "absolute", top: 12, right: 12,
+          background: statusBg, color: statusFg, borderRadius: "var(--brc-radius-pill)",
+          padding: "4px 10px", fontFamily: "var(--brc-font-ui)", fontWeight: 600, fontSize: 12,
+        }}>
+          {statusLabel}
         </div>
       </div>
 
@@ -240,22 +260,83 @@ function ServiceCarCard({
           <Icon name="pin" size={14} stroke="var(--brc-text-muted)" />
           {car.location}
         </div>
-        <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 20, color: "var(--brc-text)" }}>
-          {fmtPrice(car, mode)}
-        </span>
+        {/* Price + car specs on one line (year for rent & buy; mileage/condition buy-only) */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 20, color: available ? "var(--brc-text)" : "var(--brc-text-muted)" }}>
+            {fmtPrice(car, mode)}
+          </span>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span style={specChipStyle}>
+              <Icon name="calendar" size={13} stroke="var(--brc-text-secondary)" />
+              {car.year}
+            </span>
+            {mode === "buy" &&
+              (car.mileage === 0 ? (
+                <span style={{ ...specChipStyle, background: "var(--brc-success-bg)", borderColor: "var(--brc-success-bg)", color: "var(--brc-success)" }}>
+                  Brand New
+                </span>
+              ) : (
+                <span style={specChipStyle}>
+                  <Icon name="car" size={13} stroke="var(--brc-text-secondary)" />
+                  {fmt(car.mileage)} km
+                </span>
+              ))}
+          </div>
+        </div>
         {/* Full-width CTA */}
-        <button
-          className="brc-button-motion"
-          style={{
-            width: "100%", height: 46, borderRadius: "var(--brc-radius-sm)",
-            border: "none", background: "var(--brc-primary)", color: "#fff",
-            fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14,
-            cursor: "pointer",
-          }}
-        >
-          {cta}
-        </button>
+        {available ? (
+          <button
+            className="brc-button-motion"
+            style={{
+              width: "100%", height: 46, borderRadius: "var(--brc-radius-sm)",
+              border: "none", background: "var(--brc-primary)", color: "#fff",
+              fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14,
+              cursor: "pointer",
+            }}
+          >
+            {cta}
+          </button>
+        ) : (
+          <button
+            disabled
+            aria-disabled="true"
+            style={{
+              width: "100%", height: 46, borderRadius: "var(--brc-radius-sm)",
+              border: "1px solid var(--brc-border)", background: "var(--brc-bg-muted)",
+              color: "var(--brc-text-muted)",
+              fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14,
+              cursor: "not-allowed",
+            }}
+          >
+            {inactiveLabel}
+          </button>
+        )}
       </div>
+    </>
+  );
+
+  // Unavailable cars are inactive: not clickable, no hover lift.
+  if (!available) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, cursor: "default" }}>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={`/cars/${car.id}?mode=${mode}`}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "flex", flexDirection: "column", gap: 14,
+        cursor: "pointer", transition: "transform .2s ease",
+        transform: hover ? "translateY(-4px)" : "none",
+        textDecoration: "none", color: "inherit",
+      }}
+    >
+      {content}
     </Link>
   );
 }
@@ -537,6 +618,11 @@ export function ServicesListing() {
           return first !== undefined && nameUpper.includes(first);
         });
         if (!matched) return false;
+      }
+      // availability ("All" | "Available" | "Currently Rented"/"Sold")
+      if (filters.availability !== "All") {
+        const wantAvailable = filters.availability === "Available";
+        if (car.available !== wantAvailable) return false;
       }
       // price range
       const price = mode === "rent" ? car.rentPrice : car.buyPrice;

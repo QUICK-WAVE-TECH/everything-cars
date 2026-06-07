@@ -162,7 +162,7 @@ export function DashboardNavbar({ role }: DashboardNavbarProps) {
 
       {/* Action icons */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <button aria-label="Notifications" className="brc-button-motion-icon" style={iconBtnStyle}>
+        <Link href={`/${role}/notifications`} aria-label="Notifications" className="brc-button-motion-icon" style={iconBtnStyle}>
           <Icon name="bell" size={20} stroke="var(--brc-text)" />
           <span
             aria-hidden="true"
@@ -177,8 +177,8 @@ export function DashboardNavbar({ role }: DashboardNavbarProps) {
               border: "1.5px solid #fff",
             }}
           />
-        </button>
-        <Link href={dashboardHref} aria-label="Profile" className="brc-button-motion-icon" style={iconBtnStyle}>
+        </Link>
+        <Link href={`/${role}/profile`} aria-label="Profile" className="brc-button-motion-icon" style={iconBtnStyle}>
           <Icon name="user" size={20} stroke="var(--brc-text)" />
         </Link>
         <button

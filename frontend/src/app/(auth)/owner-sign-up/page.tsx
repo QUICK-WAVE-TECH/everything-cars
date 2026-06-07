@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AuthField, AuthButton, Radio, Checkbox, UploadField, AuthShell } from "@/features/auth/components";
+import { AuthField, PhoneField, AuthButton, Radio, Checkbox, UploadField, AuthShell } from "@/features/auth/components";
 import { Card, CardContent } from "@/components/ui/card";
 
 type OwnerType = "private" | "company" | null;
@@ -68,23 +68,35 @@ export default function OwnerSignUpPage() {
             {/* Fields */}
             {step === 1 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <AuthField
-                  label="Full Name"
-                  placeholder="First Name"
-                  value={fields.name || ""}
-                  onChange={set("name")}
-                />
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <AuthField
+                      label="First Name"
+                      placeholder="First Name"
+                      value={fields.firstName || ""}
+                      onChange={set("firstName")}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <AuthField
+                      label="Last Name"
+                      placeholder="Last Name"
+                      value={fields.lastName || ""}
+                      onChange={set("lastName")}
+                    />
+                  </div>
+                </div>
                 <AuthField
                   label="Email Address"
                   placeholder="Email Address"
                   value={fields.email || ""}
                   onChange={set("email")}
                 />
-                <AuthField
-                  label="Phone Number"
-                  placeholder="Enter your phone number"
+                <PhoneField
                   value={fields.phone || ""}
                   onChange={set("phone")}
+                  code={fields.phoneCode || "+234"}
+                  onCodeChange={set("phoneCode")}
                 />
                 <AuthField
                   label="Password"
