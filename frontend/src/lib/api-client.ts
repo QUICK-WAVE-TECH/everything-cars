@@ -59,6 +59,10 @@ async function throwApiError(response: Response): Promise<never> {
   throw new ApiError(response.status, message, errorData);
 }
 
+function isAuthErrorStatus(status: number) {
+  return status === 401 || status === 403;
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -101,7 +105,7 @@ async function request<T>(
   if (!response.ok) {
     const isRefreshRequest = path === "/auth/refresh";
 
-    if (response.status === 401 && !isRefreshRequest) {
+    if (isAuthErrorStatus(response.status) && !isRefreshRequest) {
       if (!refreshPromise) {
         refreshPromise = refreshAccessToken().finally(() => {
           refreshPromise = null;

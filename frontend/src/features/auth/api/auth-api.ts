@@ -112,6 +112,10 @@ function toSignUpBody(data: SignUpData): SignUpData | FormData {
   return formData;
 }
 
+function isAuthError(error: unknown) {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
+}
+
 // ---------- Hooks ----------
 export function useSignUp() {
   return useMutation({
@@ -158,7 +162,7 @@ export function useMe() {
   }, [query.data, setAuth]);
 
   useEffect(() => {
-    if (query.error instanceof ApiError && query.error.status === 401) {
+    if (isAuthError(query.error)) {
       clearAuth();
     }
   }, [clearAuth, query.error]);
