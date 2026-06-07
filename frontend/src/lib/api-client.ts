@@ -11,9 +11,53 @@ export class ApiError extends Error {
   }
 }
 
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  try {
+    const response = await fetch(`${config.apiUrl}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { accessToken: string };
+    return data.accessToken;
+  } catch {
+    return null;
+  }
+}
+
 type RequestOptions = {
   headers?: Record<string, string>;
 };
+
+function hasBody(body: unknown) {
+  return body !== undefined && body !== null;
+}
+
+function isFormData(body: unknown): body is FormData {
+  return typeof FormData !== "undefined" && body instanceof FormData;
+}
+
+async function parseResponse<T>(response: Response): Promise<T> {
+  if (response.status === 204) {
+    return undefined as T;
+  }
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+  return JSON.parse(text) as T;
+}
+
+async function throwApiError(response: Response): Promise<never> {
+  const errorData = await parseResponse<unknown>(response).catch(() => ({}));
+  const message =
+    (errorData as { detail?: string }).detail ||
+    `Request failed with status ${response.status}`;
+
+  throw new ApiError(response.status, message, errorData);
+}
 
 async function request<T>(
   method: string,
@@ -27,15 +71,21 @@ async function request<T>(
     ...options?.headers,
   };
 
-  if (body) {
+  const requestHasBody = hasBody(body);
+  const requestIsFormData = isFormData(body);
+
+  if (requestHasBody && !requestIsFormData) {
     headers["Content-Type"] = "application/json";
   }
 
+  const requestBody: BodyInit | undefined = requestHasBody
+    ? requestIsFormData
+      ? body
+      : JSON.stringify(body)
+    : undefined;
   // Add access token if available (stored in memory by auth store)
   const token =
-    typeof window !== "undefined"
-      ? window.__everythingcars_token
-      : undefined;
+    typeof window !== "undefined" ? window.__everythingcars_token : undefined;
 
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
@@ -44,19 +94,48 @@ async function request<T>(
   const response = await fetch(url, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: requestBody,
     credentials: "include", // sends httpOnly refresh cookie
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const message =
-      (errorData as { detail?: string }).detail ||
-      `Request failed with status ${response.status}`;
-    throw new ApiError(response.status, message, errorData);
-  }
+    const isRefreshRequest = path === "/auth/refresh";
 
-  return response.json() as Promise<T>;
+    if (response.status === 401 && !isRefreshRequest) {
+      if (!refreshPromise) {
+        refreshPromise = refreshAccessToken().finally(() => {
+          refreshPromise = null;
+        });
+      }
+
+      const newToken = await refreshPromise;
+
+      if (newToken && typeof window !== "undefined") {
+        window.__everythingcars_token = newToken;
+        headers["Authorization"] = `Bearer ${newToken}`;
+
+        const retryResponse = await fetch(url, {
+          method,
+          headers,
+          body: requestBody,
+          credentials: "include",
+        });
+
+        if (retryResponse.ok) {
+          return parseResponse<T>(retryResponse);
+        }
+
+        return throwApiError(retryResponse);
+      }
+
+      if (typeof window !== "undefined") {
+        delete window.__everythingcars_token;
+      }
+    }
+
+    return throwApiError(response);
+  }
+  return parseResponse<T>(response);
 }
 
 export const apiClient = {

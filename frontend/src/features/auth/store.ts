@@ -5,7 +5,7 @@ type AuthStore = {
   isAuthenticated: boolean;
   userRole: UserRole | null;
   userId: string | null;
-  setAuth: (userId: string, role: UserRole, token: string) => void;
+  setAuth: (userId: string, role: UserRole, token?: string) => void;
   clearAuth: () => void;
 };
 
@@ -14,7 +14,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   userRole: null,
   userId: null,
   setAuth: (userId, role, token) => {
-    if (typeof window !== "undefined") {
+    if (token && typeof window !== "undefined") {
       window.__everythingcars_token = token;
     }
     set({ isAuthenticated: true, userId, userRole: role });
