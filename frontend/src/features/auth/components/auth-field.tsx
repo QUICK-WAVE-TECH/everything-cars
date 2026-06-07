@@ -8,12 +8,15 @@ import { Icon } from "./icon";
 type AuthFieldProps = {
   label: string;
   placeholder: string;
-  value: string;
+  name?: string;
+  value?: string;
+  defaultValue?: string;
   onChange?: (value: string) => void;
   type?: "text" | "password" | "select";
+  required?: boolean;
 };
 
-export function AuthField({ label, placeholder, value, onChange, type = "text" }: AuthFieldProps) {
+export function AuthField({ label, placeholder, name, value, defaultValue, onChange, type = "text", required }: AuthFieldProps) {
   const [show, setShow] = useState(false);
   const isPw = type === "password";
   const isSelect = type === "select";
@@ -35,9 +38,12 @@ export function AuthField({ label, placeholder, value, onChange, type = "text" }
       >
         <Input
           type={isPw && !show ? "password" : "text"}
+          name={name}
           value={value}
+          defaultValue={defaultValue}
           placeholder={placeholder}
           readOnly={isSelect}
+          required={required}
           onChange={(e) => onChange?.(e.target.value)}
           className="h-full border-0 bg-transparent px-0 text-sm shadow-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
           style={{

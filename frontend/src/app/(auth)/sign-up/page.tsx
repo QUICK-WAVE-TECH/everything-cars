@@ -1,174 +1,205 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AuthField, AuthButton, Checkbox, AuthShell } from "@/features/auth/components";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import {
+  AuthField,
+  AuthButton,
+  Checkbox,
+  AuthShell,
+} from "@/features/auth/components";
+import { useSignUp } from "@/features/auth/api";
+import { customerSignUpSchema, type CustomerSignUpInput } from "@/features/auth/schemas";
 import { Card, CardContent } from "@/components/ui/card";
+import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
 
 export default function SignUpPage() {
   const [step, setStep] = useState(1);
-  const [fields, setFields] = useState<Record<string, string>>({});
   const [agree, setAgree] = useState(false);
+  const router = useRouter();
+  const signUp = useSignUp();
 
-  const set = (key: string) => (value: string) =>
-    setFields((prev) => ({ ...prev, [key]: value }));
+  const form = useForm<CustomerSignUpInput>({
+    resolver: zodResolver(customerSignUpSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      password: "",
+      confirmPassword: "",
+      drivers_license: "",
+      date_of_birth: "",
+      address: "",
+      state: "",
+      city: "",
+    },
+  });
+
+  const handleContinue = async () => {
+    const valid = await form.trigger(["name", "email", "phone", "password", "confirmPassword"]);
+    if (!valid) {
+      const firstError = Object.values(form.formState.errors)[0];
+      if (firstError?.message) toast.error(firstError.message);
+      return;
+    }
+    setStep(2);
+  };
+
+  const handleSubmit = (values: CustomerSignUpInput) => {
+    if (!agree) {
+      toast.error("Please agree to the Terms & Conditions");
+      return;
+    }
+
+    signUp.mutate(
+      {
+        role: "customer",
+        email: values.email,
+        name: values.name,
+        password: values.password,
+        phone: values.phone,
+        drivers_license: values.drivers_license,
+        date_of_birth: values.date_of_birth,
+        address: values.address,
+        state: values.state,
+        city: values.city,
+      },
+      {
+        onSuccess: (data) => {
+          toast.success(data.message);
+          router.push(`/verify?email=${encodeURIComponent(data.email)}&purpose=sign_up_verify`);
+        },
+        onError: (error) => {
+          toast.error(error.message);
+        },
+      },
+    );
+  };
 
   return (
     <AuthShell>
-      <div style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 32,
-        alignItems: "center",
-        width: "min(100%, 632px)",
-      }}>
-        <Card className="w-full rounded-2xl border-[0.5px] p-6 shadow-xs sm:p-10"
-          style={{ borderColor: "var(--brc-border)" }}>
+      <div className="flex w-[min(100%,632px)] flex-col items-center gap-8">
+        <Card className="w-full rounded-2xl border-[0.5px] border-(--brc-border) p-6 shadow-xs sm:p-10">
           <CardContent className="flex flex-col gap-8 p-0">
             {/* Header + progress */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <h1 style={{
-                  fontFamily: "var(--brc-font-ui)",
-                  fontWeight: 700,
-                  fontSize: 32,
-                  lineHeight: 1.2,
-                  color: "var(--brc-text)",
-                  margin: 0,
-                }}>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <h1 className="m-0 text-[32px] leading-[1.2] font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
                   Customer Sign Up
                 </h1>
-                <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text-muted)" }}>
+                <span className="text-base text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
                   Step {step} of 2
                 </span>
               </div>
-              <div style={{
-                height: 4,
-                borderRadius: 2,
-                background: "var(--brc-bg-muted)",
-                overflow: "hidden",
-              }}>
-                <div style={{
-                  height: "100%",
-                  width: "100%",
-                  background: "var(--brc-primary)",
-                  borderRadius: 2,
-                  transformOrigin: "left",
-                  transform: `scaleX(${step === 1 ? 0.5 : 1})`,
-                  transition: "transform 0.3s ease",
-                }} />
+              <div className="h-1 overflow-hidden rounded-[2px] bg-(--brc-bg-muted)">
+                <div
+                  className={`h-full w-full origin-left rounded-[2px] bg-(--brc-primary) transition-transform duration-300 ${
+                    step === 1 ? "scale-x-50" : "scale-x-100"
+                  }`}
+                />
               </div>
             </div>
 
-            {/* Fields */}
-            {step === 1 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <AuthField
-                  label="Full Name"
-                  placeholder="First Name"
-                  value={fields.name || ""}
-                  onChange={set("name")}
-                />
-                <AuthField
-                  label="Email Address"
-                  placeholder="Email Address"
-                  value={fields.email || ""}
-                  onChange={set("email")}
-                />
-                <AuthField
-                  label="Phone Number"
-                  placeholder="Enter your phone number"
-                  value={fields.phone || ""}
-                  onChange={set("phone")}
-                />
-                <AuthField
-                  label="Password"
-                  placeholder="Password"
-                  type="password"
-                  value={fields.pw || ""}
-                  onChange={set("pw")}
-                />
-                <AuthField
-                  label="Confirm Password"
-                  placeholder="Password"
-                  type="password"
-                  value={fields.pw2 || ""}
-                  onChange={set("pw2")}
-                />
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <AuthField
-                  label="Driver's License"
-                  placeholder="Enter license number"
-                  value={fields.dl || ""}
-                  onChange={set("dl")}
-                />
-                <AuthField
-                  label="Date of Birth"
-                  placeholder="dd/mm/yyyy"
-                  value={fields.dob || ""}
-                  onChange={set("dob")}
-                />
-                <AuthField
-                  label="Address"
-                  placeholder="Enter your address"
-                  value={fields.addr || ""}
-                  onChange={set("addr")}
-                />
-                <AuthField
-                  label="State"
-                  placeholder="Select state"
-                  type="select"
-                  value={fields.state || ""}
-                />
-                <AuthField
-                  label="City"
-                  placeholder="Select city"
-                  type="select"
-                  value={fields.city || ""}
-                />
-                <Checkbox checked={agree} onChange={() => setAgree(!agree)}>
-                  I agree to the{" "}
-                  <span style={{ color: "var(--brc-accent)", textDecoration: "underline" }}>
-                    Terms &amp; Conditions
-                  </span>
-                </Checkbox>
-              </div>
-            )}
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col gap-8">
+                {/* Step 1 */}
+                {step === 1 ? (
+                  <div className="flex flex-col gap-4">
+                    <FormField control={form.control} name="name" render={({ field }) => (
+                      <FormItem>
+                        <AuthField label="Full Name" placeholder="First Name" value={field.value} onChange={field.onChange} />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="email" render={({ field }) => (
+                      <FormItem>
+                        <AuthField label="Email Address" placeholder="Email Address" value={field.value} onChange={field.onChange} />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="phone" render={({ field }) => (
+                      <FormItem>
+                        <AuthField label="Phone Number" placeholder="Enter your phone number" value={field.value ?? ""} onChange={field.onChange} />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="password" render={({ field }) => (
+                      <FormItem>
+                        <AuthField label="Password" placeholder="Password" type="password" value={field.value} onChange={field.onChange} />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="confirmPassword" render={({ field }) => (
+                      <FormItem>
+                        <AuthField label="Confirm Password" placeholder="Password" type="password" value={field.value} onChange={field.onChange} />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    <FormField control={form.control} name="drivers_license" render={({ field }) => (
+                      <FormItem>
+                        <AuthField label="Driver's License" placeholder="Enter license number" value={field.value ?? ""} onChange={field.onChange} />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="date_of_birth" render={({ field }) => (
+                      <FormItem>
+                        <AuthField label="Date of Birth" placeholder="dd/mm/yyyy" value={field.value ?? ""} onChange={field.onChange} />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="address" render={({ field }) => (
+                      <FormItem>
+                        <AuthField label="Address" placeholder="Enter your address" value={field.value ?? ""} onChange={field.onChange} />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="state" render={({ field }) => (
+                      <FormItem>
+                        <AuthField label="State" placeholder="Select state" value={field.value ?? ""} onChange={field.onChange} />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="city" render={({ field }) => (
+                      <FormItem>
+                        <AuthField label="City" placeholder="Select city" value={field.value ?? ""} onChange={field.onChange} />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <Checkbox checked={agree} onChange={() => setAgree(!agree)}>
+                      I agree to the{" "}
+                      <span className="text-(--brc-accent) underline">Terms &amp; Conditions</span>
+                    </Checkbox>
+                  </div>
+                )}
 
-            {/* Actions */}
-            {step === 1 ? (
-              <AuthButton full iconEnd="arrow" onClick={() => setStep(2)}>
-                Continue
-              </AuthButton>
-            ) : (
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <AuthButton variant="neutral" onClick={() => setStep(1)} style={{ width: "min(100%, 120px)" }}>
-                  Back
-                </AuthButton>
-                <AuthButton full href="/verify">Create Account</AuthButton>
-              </div>
-            )}
+                {/* Actions */}
+                {step === 1 ? (
+                  <AuthButton full iconEnd="arrow" onClick={handleContinue}>
+                    Continue
+                  </AuthButton>
+                ) : (
+                  <div className="flex flex-wrap gap-3">
+                    <AuthButton variant="neutral" onClick={() => setStep(1)} className="w-[min(100%,120px)]">
+                      Back
+                    </AuthButton>
+                    <AuthButton full type="submit" loading={signUp.isPending}>
+                      {signUp.isPending ? "Creating Account..." : "Create Account"}
+                    </AuthButton>
+                  </div>
+                )}
+              </form>
+            </Form>
 
-            <div style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 8,
-              flexWrap: "wrap",
-              fontFamily: "var(--brc-font-ui)",
-              fontSize: 16,
-              color: "var(--brc-text)",
-            }}>
+            <div className="flex flex-wrap justify-center gap-2 text-base text-(--brc-text) [font-family:var(--brc-font-ui)]">
               <span>Already have an account?</span>
-              <Link
-                href="/sign-in"
-                style={{
-                  border: "none", background: "transparent", cursor: "pointer",
-                  fontFamily: "var(--brc-font-link)", fontSize: 16,
-                  color: "var(--brc-accent)", textDecoration: "underline", padding: 0,
-                }}
-              >
+              <Link href="/sign-in" className="cursor-pointer p-0 text-base text-(--brc-accent) underline [font-family:var(--brc-font-link)]">
                 Log In
               </Link>
             </div>

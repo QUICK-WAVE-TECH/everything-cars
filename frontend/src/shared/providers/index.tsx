@@ -12,4 +12,4 @@ export function Providers({ children }: { children: React.ReactNode }) {
 }
 
 export { QueryProvider } from "./query-provider";
-export { AuthProvider, useAuthContext } from "./auth-provider";
+export { AuthProvider } from "./auth-provider";
