@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback, useRef } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -119,19 +119,7 @@ function VerifyContent() {
     }
   }, [cooldown, email, form, isResending]);
 
-  // Auto-submit when all 6 digits entered (only once, not on error retry)
-  const codeValue = form.watch("code");
-  const hasAutoSubmitted = useRef(false);
-
-  useEffect(() => {
-    if (codeValue?.length === 6 && !verify.isPending && !hasAutoSubmitted.current) {
-      hasAutoSubmitted.current = true;
-      form.handleSubmit(handleSubmit)();
-    }
-    if (codeValue?.length !== 6) {
-      hasAutoSubmitted.current = false;
-    }
-  }, [codeValue, form, handleSubmit, verify.isPending]);
+  // No auto-submit — user presses Enter or clicks Verify button
 
   const maskedEmail = email.replace(/(.{2})(.*)(@.*)/, "$1***$3");
 
