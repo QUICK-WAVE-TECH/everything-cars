@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import {
   AuthField,
@@ -44,7 +44,10 @@ export default function OwnerSignUpPage() {
     },
   });
 
-  const ownerType = form.watch("owner_type");
+  const ownerType = useWatch({
+    control: form.control,
+    name: "owner_type",
+  });
   const isCompany = ownerType === "fleet";
 
   const handleContinue = async () => {
