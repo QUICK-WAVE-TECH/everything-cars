@@ -241,3 +241,33 @@ class MeView(APIView):
         # Re-fetch with profiles for the response
         user = self._get_user(request)
         return Response(MeSerializer(user).data)
+
+
+class ResendCodeView(APIView):
+    permission_classes = [AllowAny]
+    throttle_scope = "resend_code"
+
+    def post(self, request):
+        email = request.data.get("email", "")
+        purpose = request.data.get("purpose", "sign_in")
+
+        if purpose not in ("sign_in", "sign_up_verify"):
+            return Response(
+                {"detail": "Invalid purpose"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist():
+            # Do not reveal if the email exists
+            return Response(
+                {"message": "If this email is registered, a new code has been sent."},
+                status=status.HTTP_200_OK,
+            )
+
+        generate_and_send_code(email=user.email, purpose=purpose, user=user)
+
+        return Response(
+            {"message": "If this email is registered, a new code has been sent."},
+            status=status.HTTP_200_OK,
+        )

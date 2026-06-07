@@ -100,19 +100,20 @@ function VerifyContent() {
     if (cooldown > 0 || isResending) return;
     setIsResending(true);
     try {
-      const [result] = await Promise.allSettled([
-        apiClient.post("/auth/sign-in", { email, password: "" }),
+      await Promise.all([
+        apiClient.post("/auth/resend", { email, purpose }),
         new Promise((r) => setTimeout(r, 1500)), // Min 1.5s spin so user sees it
       ]);
-      if (result.status === "rejected") {
-        // Sign-up resend needs a dedicated endpoint — placeholder for now
-      }
       toast.success("Code resent", { description: `A new code was sent to ${email}` });
       setCooldown(60);
       setExpiresIn(10 * 60); // Reset 10-minute expiry
       form.setValue("code", "");
-    } catch {
-      toast.error("Failed to resend code");
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("throttle")) {
+        toast.error("Too many requests", { description: "Please wait before requesting another code." });
+      } else {
+        toast.error("Failed to resend code");
+      }
     } finally {
       setIsResending(false);
     }
