@@ -46,12 +46,26 @@ function VerifyContent() {
 
   const [cooldown, setCooldown] = useState(0);
   const [isResending, setIsResending] = useState(false);
+  const [expiresIn, setExpiresIn] = useState(10 * 60); // 10 minutes in seconds
 
+  // Resend cooldown timer
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
     return () => clearTimeout(timer);
   }, [cooldown]);
+
+  // Code expiry timer
+  useEffect(() => {
+    if (expiresIn <= 0) return;
+    const timer = setTimeout(() => setExpiresIn((t) => t - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [expiresIn]);
+
+  const isExpired = expiresIn <= 0;
+  const expiryMinutes = Math.floor(expiresIn / 60);
+  const expirySeconds = expiresIn % 60;
+  const expiryDisplay = `${expiryMinutes}:${expirySeconds.toString().padStart(2, "0")}`;
 
   const form = useForm<VerifyInput>({
     resolver: zodResolver(verifySchema),
@@ -60,6 +74,11 @@ function VerifyContent() {
 
   const handleSubmit = useCallback(
     (values: VerifyInput) => {
+      if (isExpired) {
+        toast.error("Code expired", { description: "Please request a new code." });
+        form.setValue("code", "");
+        return;
+      }
       verify.mutate(values, {
         onSuccess: (data) => {
           toast.success("Welcome to EverythingCars!", {
@@ -90,6 +109,7 @@ function VerifyContent() {
       }
       toast.success("Code resent", { description: `A new code was sent to ${email}` });
       setCooldown(60);
+      setExpiresIn(10 * 60); // Reset 10-minute expiry
       form.setValue("code", "");
     } catch {
       toast.error("Failed to resend code");
@@ -169,6 +189,24 @@ function VerifyContent() {
                           </InputOTP>
                         </div>
                         <FormMessage />
+                        {/* Expiry timer */}
+                        <div className="flex items-center justify-center gap-2 text-sm" style={{ fontFamily: "var(--brc-font-ui)" }}>
+                          {isExpired ? (
+                            <span style={{ color: "var(--brc-danger)" }}>
+                              Code expired — please request a new one
+                            </span>
+                          ) : (
+                            <>
+                              <span style={{ color: "var(--brc-text-muted)" }}>Code expires in</span>
+                              <span
+                                className="font-mono font-semibold"
+                                style={{ color: expiresIn <= 60 ? "var(--brc-danger)" : "var(--brc-text)" }}
+                              >
+                                {expiryDisplay}
+                              </span>
+                            </>
+                          )}
+                        </div>
                         <FieldDescription className="text-center">
                           Didn&apos;t receive the code? Check your spam folder.
                         </FieldDescription>
@@ -179,8 +217,8 @@ function VerifyContent() {
               </CardContent>
 
               <CardFooter className="flex flex-col gap-4">
-                <AuthButton full type="submit" loading={verify.isPending}>
-                  {verify.isPending ? "Verifying..." : "Verify & Continue"}
+                <AuthButton full type="submit" loading={verify.isPending} disabled={isExpired}>
+                  {verify.isPending ? "Verifying..." : isExpired ? "Code Expired" : "Verify & Continue"}
                 </AuthButton>
                 <p className="text-center text-sm" style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text-muted)" }}>
                   Having trouble?{" "}
