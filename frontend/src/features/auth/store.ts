@@ -5,7 +5,8 @@ const SESSION_KEY = "ec_has_session";
 
 function getHasSession(): boolean {
   if (typeof window === "undefined") return false;
-  return localStorage.getItem(SESSION_KEY) === "1";
+  if (typeof window.localStorage?.getItem !== "function") return false;
+  return window.localStorage.getItem(SESSION_KEY) === "1";
 }
 
 type AuthStore = {
@@ -26,15 +27,17 @@ export const useAuthStore = create<AuthStore>((set) => ({
     if (token && typeof window !== "undefined") {
       window.__everythingcars_token = token;
     }
-    if (typeof window !== "undefined") {
-      localStorage.setItem(SESSION_KEY, "1");
+    if (typeof window !== "undefined" && typeof window.localStorage?.setItem === "function") {
+      window.localStorage.setItem(SESSION_KEY, "1");
     }
     set({ isAuthenticated: true, hasSession: true, userId, userRole: role });
   },
   clearAuth: () => {
     if (typeof window !== "undefined") {
       delete window.__everythingcars_token;
-      localStorage.removeItem(SESSION_KEY);
+      if (typeof window.localStorage?.removeItem === "function") {
+        window.localStorage.removeItem(SESSION_KEY);
+      }
     }
     set({ isAuthenticated: false, hasSession: false, userId: null, userRole: null });
   },
