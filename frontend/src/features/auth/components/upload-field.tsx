@@ -1,74 +1,53 @@
 "use client";
 
+import { useId } from "react";
 import { Icon } from "./icon";
 
 type UploadFieldProps = {
   label: string;
   hint: string;
   value?: string;
-  onPick: () => void;
+  onPick: (file: File | null) => void;
 };
 
 export function UploadField({ label, hint, value, onPick }: UploadFieldProps) {
+  const id = useId();
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text)" }}>
+    <div className="flex flex-col gap-2">
+      <span className="text-base text-(--brc-text) [font-family:var(--brc-font-ui)]">
         {label}
       </span>
-      <button
-        type="button"
-        className="brc-button-motion brc-button-motion-subtle"
-        onClick={onPick}
-        style={{
-          minHeight: 150,
-          borderRadius: 8,
-          background: "var(--brc-bg-subtle)",
-          border: "1px dashed var(--brc-border-strong)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 12,
-          padding: "28px 24px",
-          cursor: "pointer",
-          textAlign: "center",
+      <label
+        htmlFor={id}
+        className="brc-button-motion brc-button-motion-subtle flex min-h-[150px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-(--brc-border-strong) bg-(--brc-bg-subtle) px-6 py-7 text-center"
+        onDragOver={(event) => {
+          event.preventDefault();
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          onPick(event.dataTransfer.files?.[0] ?? null);
         }}
       >
-        <span
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: "50%",
-            background: "var(--brc-accent-bg)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
+        <input
+          id={id}
+          type="file"
+          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          className="sr-only"
+          onChange={(event) => onPick(event.target.files?.[0] ?? null)}
+        />
+        <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-accent-bg)">
           <Icon name="upload" size={22} stroke="var(--brc-accent)" />
         </span>
-        <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span
-            style={{
-              fontFamily: "var(--brc-font-ui)",
-              fontWeight: 600,
-              fontSize: 14,
-              color: "var(--brc-text)",
-            }}
-          >
+        <span className="flex flex-col gap-1">
+          <span className="text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
             {value || "Upload a file or drag and drop here"}
           </span>
-          <span
-            style={{
-              fontFamily: "var(--brc-font-ui)",
-              fontSize: 12,
-              color: "var(--brc-text-muted)",
-            }}
-          >
+          <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
             {hint}
           </span>
         </span>
-      </button>
+      </label>
     </div>
   );
 }

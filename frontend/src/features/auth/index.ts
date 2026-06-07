@@ -1,3 +1,13 @@
-export { signUpSchema, signInSchema, accessCodeSchema } from "./schemas";
-export type { SignUpInput, SignInInput, AccessCodeInput } from "./schemas";
+export {
+  customerSignUpSchema,
+  ownerSignUpSchema,
+  signInSchema,
+  verifySchema,
+} from "./schemas";
+export type {
+  CustomerSignUpInput,
+  OwnerSignUpInput,
+  SignInInput,
+  VerifyInput,
+} from "./schemas";
 export { useAuthStore } from "./store";

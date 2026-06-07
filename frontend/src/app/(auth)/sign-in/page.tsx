@@ -1,77 +1,105 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import { AuthField, AuthButton, AuthShell } from "@/features/auth/components";
+import { useSignIn } from "@/features/auth/api";
+import { signInSchema, type SignInInput } from "@/features/auth/schemas";
 import { Card, CardContent } from "@/components/ui/card";
+import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
 
 export default function SignInPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const router = useRouter();
+  const signIn = useSignIn();
+  const form = useForm<SignInInput>({
+    resolver: zodResolver(signInSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
 
+  const handleSubmit = (values: SignInInput) => {
+    signIn.mutate(values, {
+      onSuccess: (data) => {
+        toast.success(data.message);
+        router.push(
+          `/verify?email=${encodeURIComponent(data.email)}&purpose=sign_in`,
+        );
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    });
+  };
   return (
     <AuthShell>
-      <div style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 32,
-        alignItems: "center",
-        width: "min(100%, 632px)",
-      }}>
+      <div className="flex w-[min(100%,632px)] flex-col items-center gap-8">
         <Image
           src="/logo.png"
           alt="Buy & Rent Cars"
           width={170}
           height={52}
-          style={{ height: 52, width: "auto" }}
+          className="h-[52px] w-auto"
         />
-        <Card className="w-full rounded-2xl border-[0.5px] p-6 shadow-xs sm:p-10"
-          style={{ borderColor: "var(--brc-border)" }}>
+        <Card className="w-full rounded-2xl border-[0.5px] border-(--brc-border) p-6 shadow-xs sm:p-10">
           <CardContent className="flex flex-col gap-8 p-0">
-            <h1 style={{
-              fontFamily: "var(--brc-font-ui)",
-              fontWeight: 700,
-              fontSize: 32,
-              lineHeight: 1.2,
-              color: "var(--brc-text)",
-              margin: 0,
-            }}>
+            <h1 className="m-0 text-[32px] leading-[1.2] font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
               Welcome Back
             </h1>
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <AuthField
-                label="Email Address"
-                placeholder="Email Address"
-                value={email}
-                onChange={setEmail}
-              />
-              <AuthField
-                label="Password"
-                placeholder="Password"
-                type="password"
-                value={password}
-                onChange={setPassword}
-              />
-            </div>
-            <AuthButton full href="/verify">Continue</AuthButton>
-            <div style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 8,
-              flexWrap: "wrap",
-              fontFamily: "var(--brc-font-ui)",
-              fontSize: 16,
-              color: "var(--brc-text)",
-            }}>
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(handleSubmit)}
+                className="flex flex-col gap-8"
+              >
+                <div className="flex flex-col gap-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <AuthField
+                          label="Email Address"
+                          placeholder="Email Address"
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <AuthField
+                          label="Password"
+                          placeholder="Password"
+                          type="password"
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <AuthButton full type="submit" loading={signIn.isPending}>
+                  {signIn.isPending ? "Signing in..." : "Continue"}
+                </AuthButton>
+              </form>
+            </Form>
+
+            <div className="flex flex-wrap justify-center gap-2 text-base text-(--brc-text) [font-family:var(--brc-font-ui)]">
               <span>Don&apos;t have an account?</span>
               <Link
                 href="/get-started"
-                style={{
-                  border: "none", background: "transparent", cursor: "pointer",
-                  fontFamily: "var(--brc-font-link)", fontSize: 16,
-                  color: "var(--brc-accent)", textDecoration: "underline", padding: 0,
-                }}
+                className="cursor-pointer p-0 text-base text-(--brc-accent) underline [font-family:var(--brc-font-link)]"
               >
                 Sign Up
               </Link>
