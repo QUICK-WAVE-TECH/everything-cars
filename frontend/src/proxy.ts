@@ -9,6 +9,12 @@ const protectedPaths = [
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // In local development, skip all auth gating so pages can be viewed
+  // without signing in. Production behaviour is unchanged.
+  if (process.env.NODE_ENV !== "production") {
+    return NextResponse.next();
+  }
+
   const refreshToken = request.cookies.get("refresh_token")?.value;
   const isAuthenticated = !!refreshToken;
 

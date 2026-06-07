@@ -1,5 +1,7 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Icon } from "@/features/auth/components/icon";
+import { JoinProgramButton } from "./join-program-button";
 
 const PERKS = [
   { icon: "gift" as const, title: "Earn Points on Every Rental", desc: "Accumulate points with each booking and watch your rewards grow." },
@@ -46,15 +48,15 @@ export function LoyaltyBand() {
           }}>
             Experience the best of ride on your journey. Available for purchase or hire processes.
           </p>
-          <button className="brc-button-motion" style={{
+          <Link href="/services" className="brc-button-motion" style={{
             marginTop: 8, background: "var(--brc-accent)", color: "#fff",
             border: "none", borderRadius: 8, height: 56, padding: "0 28px",
             fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14,
             cursor: "pointer", display: "inline-flex", alignItems: "center",
-            gap: 10, width: "fit-content",
+            gap: 10, width: "fit-content", textDecoration: "none",
           }}>
             Browse Cars <Icon name="arrow" size={18} />
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -105,14 +107,7 @@ export function LoyaltyBand() {
               </div>
             ))}
           </div>
-          <button className="brc-button-motion" style={{
-            background: "#fff", color: "var(--brc-accent-deep)", border: "none",
-            borderRadius: 8, height: 60, fontFamily: "var(--brc-font-ui)",
-            fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex",
-            alignItems: "center", justifyContent: "center", gap: 10, width: "100%",
-          }}>
-            Join the Program <Icon name="arrow" size={18} />
-          </button>
+          <JoinProgramButton />
         </div>
       </div>
     </section>

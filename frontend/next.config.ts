@@ -4,6 +4,10 @@ const nextConfig: NextConfig = {
   output: "standalone",
   allowedDevOrigins: ["192.168.1.30"],
 
+  images: {
+    remotePatterns: [{ protocol: "https", hostname: "flagcdn.com" }],
+  },
+
   async headers() {
     return [
       {

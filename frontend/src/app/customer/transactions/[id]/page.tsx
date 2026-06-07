@@ -1,19 +1,19 @@
 import { notFound } from "next/navigation";
 import { Breadcrumb } from "@/shared/components";
-import { CustomerStats, RequestDetail, getCustomerRequest } from "@/features/requests";
+import { TransactionDetail, getTransaction } from "@/features/payments";
 
-export default async function ViewRequestPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TransactionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const request = getCustomerRequest(Number(id));
+  const transaction = getTransaction(Number(id));
 
-  if (!request) notFound();
+  if (!transaction) notFound();
 
   return (
     <>
       <Breadcrumb
         items={[
-          { label: "My Request", href: "/customer/requests" },
-          { label: "View Request" },
+          { label: "Transactions", href: "/customer/transactions" },
+          { label: "Transaction Details" },
         ]}
       />
       <div style={{ background: "var(--brc-bg-subtle)" }}>
@@ -30,15 +30,14 @@ export default async function ViewRequestPage({ params }: { params: Promise<{ id
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <h1 style={{ fontFamily: "var(--brc-font-display)", fontWeight: 800, fontSize: "clamp(28px, 6vw, 44px)", color: "var(--brc-text)", margin: 0 }}>
-              My Request
+              Transaction History
             </h1>
             <p style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text-muted)", margin: 0 }}>
-              Here&apos;s what&apos;s happening with your requests
+              An overview of all your previous transactions
             </p>
           </div>
 
-          <CustomerStats />
-          <RequestDetail request={request} />
+          <TransactionDetail transaction={transaction} />
         </div>
       </div>
     </>

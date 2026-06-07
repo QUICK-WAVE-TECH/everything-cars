@@ -6,6 +6,7 @@ import { Icon } from "@/features/auth/components/icon";
 import { Star } from "@/shared/components/star";
 import { CarCard } from "@/shared/components/car-card";
 import { AuthButton } from "@/features/auth/components/auth-button";
+import { PhoneField } from "@/features/auth/components/phone-field";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -108,6 +109,11 @@ export function CarDetailPage() {
   const [endDate, setEndDate] = useState("");
   const [rentMessage, setRentMessage] = useState("");
   const [buyMessage, setBuyMessage] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [phoneCode, setPhoneCode] = useState("+234");
   const [reviewText, setReviewText] = useState("");
   const [reviewName, setReviewName] = useState("");
   const [reviewRating, setReviewRating] = useState(0);
@@ -127,6 +133,31 @@ export function CarDetailPage() {
     if (!carouselRef.current) return;
     carouselRef.current.scrollBy({ left: dir === "right" ? 320 : -320, behavior: "smooth" });
   }
+
+  const fieldLabelStyle: React.CSSProperties = { fontSize: 13, fontWeight: 600, color: "var(--brc-text-secondary)" };
+
+  // Shared contact fields used by both the rent and buy forms.
+  const contactFields = (
+    <>
+      <div className="car-detail-name-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label htmlFor="contact-firstname" style={fieldLabelStyle}>First Name</label>
+          <Input id="contact-firstname" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} style={{ height: 44, fontSize: 14 }} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label htmlFor="contact-lastname" style={fieldLabelStyle}>Last Name</label>
+          <Input id="contact-lastname" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} style={{ height: 44, fontSize: 14 }} />
+        </div>
+      </div>
+      <div className="car-detail-contact-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "start" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label htmlFor="contact-email" style={fieldLabelStyle}>Email Address</label>
+          <Input id="contact-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ height: 44, fontSize: 14 }} />
+        </div>
+        <PhoneField value={phone} onChange={setPhone} code={phoneCode} onCodeChange={setPhoneCode} />
+      </div>
+    </>
+  );
 
   const structuredData = {
     "@context": "https://schema.org",
@@ -441,6 +472,7 @@ export function CarDetailPage() {
             {/* ---- Rent form ---- */}
             {mode === "rent" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {contactFields}
                 <div className="car-detail-date-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <label
@@ -530,6 +562,7 @@ export function CarDetailPage() {
             {/* ---- Buy form ---- */}
             {mode === "buy" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {contactFields}
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label
                     htmlFor="buy-message"
@@ -1164,7 +1197,9 @@ export function CarDetailPage() {
             height: clamp(260px, 72vw, 340px) !important;
           }
 
-          .car-detail-date-grid {
+          .car-detail-date-grid,
+          .car-detail-name-grid,
+          .car-detail-contact-grid {
             grid-template-columns: 1fr !important;
           }
 
