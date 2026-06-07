@@ -81,9 +81,13 @@ function VerifyContent() {
     if (cooldown > 0 || isResending) return;
     setIsResending(true);
     try {
-      await apiClient.post("/auth/sign-in", { email, password: "" }).catch(() => {
-        // Sign-up resend needs a dedicated endpoint — this is a placeholder
-      });
+      const [result] = await Promise.allSettled([
+        apiClient.post("/auth/sign-in", { email, password: "" }),
+        new Promise((r) => setTimeout(r, 1500)), // Min 1.5s spin so user sees it
+      ]);
+      if (result.status === "rejected") {
+        // Sign-up resend needs a dedicated endpoint — placeholder for now
+      }
       toast.success("Code resent", { description: `A new code was sent to ${email}` });
       setCooldown(60);
       form.setValue("code", "");
@@ -150,7 +154,7 @@ function VerifyContent() {
                           </Button>
                         </div>
                         <div className="flex justify-center py-2">
-                          <InputOTP maxLength={6} id="otp-verification" value={field.value} onChange={field.onChange}>
+                          <InputOTP maxLength={6} id="otp-verification" value={field.value} onChange={field.onChange} inputMode="numeric" pattern="^[0-9]*$">
                             <InputOTPGroup className="*:data-[slot=input-otp-slot]:h-12 *:data-[slot=input-otp-slot]:w-11 *:data-[slot=input-otp-slot]:text-xl">
                               <InputOTPSlot index={0} />
                               <InputOTPSlot index={1} />
