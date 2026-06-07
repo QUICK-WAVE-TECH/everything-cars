@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { RefreshCwIcon, ShieldCheckIcon, MailIcon } from "lucide-react";
 import { AuthButton, AuthShell } from "@/features/auth/components";
 import { useVerify } from "@/features/auth/api";
+import { ApiError } from "@/lib/api-client";
 import { verifySchema, type VerifyInput } from "@/features/auth/schemas";
 import {
   Card,
@@ -47,6 +48,7 @@ function VerifyContent() {
   const [cooldown, setCooldown] = useState(0);
   const [isResending, setIsResending] = useState(false);
   const [expiresIn, setExpiresIn] = useState(10 * 60); // 10 minutes in seconds
+  const [throttledUntil, setThrottledUntil] = useState(0); // seconds until throttle lifts
 
   // Resend cooldown timer
   useEffect(() => {
@@ -62,7 +64,15 @@ function VerifyContent() {
     return () => clearTimeout(timer);
   }, [expiresIn]);
 
+  // Throttle countdown timer
+  useEffect(() => {
+    if (throttledUntil <= 0) return;
+    const timer = setTimeout(() => setThrottledUntil((t) => t - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [throttledUntil]);
+
   const isExpired = expiresIn <= 0;
+  const isThrottled = throttledUntil > 0;
   const expiryMinutes = Math.floor(expiresIn / 60);
   const expirySeconds = expiresIn % 60;
   const expiryDisplay = `${expiryMinutes}:${expirySeconds.toString().padStart(2, "0")}`;
@@ -79,6 +89,10 @@ function VerifyContent() {
         form.setValue("code", "");
         return;
       }
+      if (isThrottled) {
+        toast.error("Too many attempts", { description: `Please wait ${throttledUntil}s before trying again.` });
+        return;
+      }
       verify.mutate(values, {
         onSuccess: (data) => {
           toast.success("Welcome to EverythingCars!", {
@@ -88,8 +102,16 @@ function VerifyContent() {
           router.push(dashboard);
         },
         onError: (error) => {
+          // Handle 429 throttle — read Retry-After from the error
+          if (error instanceof ApiError && error.status === 429) {
+            const wait = error.retryAfter || 60;
+            setThrottledUntil(wait);
+            toast.error("Too many attempts", {
+              description: `Please wait ${wait} seconds before trying again.`,
+            });
+            return;
+          }
           toast.error("Invalid code", { description: error.message });
-          // Don't clear — let user see what they typed. They can clear manually.
         },
       });
     },
@@ -212,8 +234,14 @@ function VerifyContent() {
               </CardContent>
 
               <CardFooter className="flex flex-col gap-4">
-                <AuthButton full type="submit" loading={verify.isPending} disabled={isExpired}>
-                  {verify.isPending ? "Verifying..." : isExpired ? "Code Expired" : "Verify & Continue"}
+                <AuthButton full type="submit" loading={verify.isPending} disabled={isExpired || isThrottled}>
+                  {verify.isPending
+                    ? "Verifying..."
+                    : isThrottled
+                      ? `Too many attempts — wait ${throttledUntil}s`
+                      : isExpired
+                        ? "Code Expired"
+                        : "Verify & Continue"}
                 </AuthButton>
                 <p className="text-center text-sm" style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text-muted)" }}>
                   Having trouble?{" "}
