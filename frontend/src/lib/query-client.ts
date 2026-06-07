@@ -1,6 +1,10 @@
 import { QueryClient } from "@tanstack/react-query";
 import { ApiError } from "./api-client";
 
+function isAuthError(error: unknown) {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
+}
+
 export function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
@@ -8,7 +12,7 @@ export function makeQueryClient() {
         staleTime: 60 * 1000, // 1 minute
         retry: (failureCount, error) => {
           // Don't retry on auth errors
-          if (error instanceof ApiError && error.status === 401) {
+          if (isAuthError(error)) {
             return false;
           }
           return failureCount < 3;
