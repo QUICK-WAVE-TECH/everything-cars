@@ -199,11 +199,10 @@ function QuickActionTile({ link, delay }: { link: QuickLink; delay: number }) {
         <span
           className="flex size-9 items-center justify-center rounded-full border border-(--brc-border) text-(--brc-text-muted)"
           style={{
-            transform: hovered ? "translateX(0)" : "translateX(-8px)",
             opacity: hovered ? 1 : 0,
             borderColor: hovered ? link.fg : undefined,
             color: hovered ? link.fg : undefined,
-            transition: "all 0.35s cubic-bezier(0.23, 1, 0.32, 1)",
+            transition: "opacity 0.3s ease, border-color 0.3s ease, color 0.3s ease",
           }}
         >
           <Icon name="arrow" size={15} stroke="currentColor" />
@@ -305,28 +304,28 @@ function TopCarCard({ car, delay }: { car: (typeof TOP_CARS)[number]; delay: num
 
 function EarningsSnapshot() {
   return (
-    <section className="brc-dashboard-card brc-dashboard-reveal overflow-hidden rounded-2xl border border-(--brc-border) bg-(--brc-surface-inverse) p-5 text-white shadow-[var(--brc-shadow-xs)]" style={{ "--delay": "520ms" } as DashboardStyle}>
+    <section className="brc-dashboard-card brc-dashboard-reveal overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-5 shadow-[var(--brc-shadow-xs)]" style={{ "--delay": "520ms" } as DashboardStyle}>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-white/60 [font-family:var(--brc-font-ui)]">Loyalty</p>
-          <h2 className="m-0 text-lg font-extrabold [font-family:var(--brc-font-display)]">Reward Center</h2>
+          <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-(--brc-accent) [font-family:var(--brc-font-ui)]">Loyalty</p>
+          <h2 className="m-0 text-lg font-extrabold text-(--brc-text) [font-family:var(--brc-font-display)]">Reward Center</h2>
         </div>
-        <span className="flex size-11 items-center justify-center rounded-full bg-white/10"><Icon name="gift" size={20} stroke="#fff" /></span>
+        <span className="flex size-11 items-center justify-center rounded-full bg-(--brc-accent-bg)"><Icon name="gift" size={20} stroke="var(--brc-accent)" /></span>
       </div>
       <div className="mb-4 flex items-end justify-between gap-4">
         <div>
-          <p className="m-0 text-4xl font-black [font-family:var(--brc-font-display)]">120</p>
-          <p className="m-0 text-sm text-white/60 [font-family:var(--brc-font-ui)]">available points</p>
+          <p className="m-0 text-4xl font-black text-(--brc-text) [font-family:var(--brc-font-display)]">120</p>
+          <p className="m-0 text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">available points</p>
         </div>
-        <Link href="/owner/loyalty" className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-extrabold text-(--brc-accent) no-underline transition-transform duration-200 hover:-translate-y-0.5 [font-family:var(--brc-font-ui)]">
+        <Link href="/owner/loyalty" className="inline-flex items-center gap-2 rounded-full bg-(--brc-accent) px-4 py-2 text-sm font-extrabold text-white no-underline transition-transform duration-200 hover:-translate-y-0.5 [font-family:var(--brc-font-ui)]">
           View
           <Icon name="arrow" size={14} stroke="currentColor" />
         </Link>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-white/10">
-        <div className="brc-progress-fill h-full w-[68%] rounded-full bg-(--brc-warning)" style={{ "--delay": "760ms" } as DashboardStyle} />
+      <div className="h-2 overflow-hidden rounded-full bg-(--brc-bg-muted)">
+        <div className="brc-progress-fill h-full w-[68%] rounded-full bg-(--brc-accent)" style={{ "--delay": "760ms" } as DashboardStyle} />
       </div>
-      <p className="mt-3 text-xs text-white/60 [font-family:var(--brc-font-ui)]">180 more points unlock your next reward tier.</p>
+      <p className="mt-3 text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">180 more points unlock your next reward tier.</p>
     </section>
   );
 }
