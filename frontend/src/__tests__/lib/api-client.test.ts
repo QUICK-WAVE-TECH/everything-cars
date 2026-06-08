@@ -49,6 +49,12 @@ describe("apiClient", () => {
     await apiClient.post("/test", { key: "value" });
 
     const callArgs = mockFetch.mock.calls[0];
+    expect(callArgs).toBeDefined();
+
+    if (!callArgs) {
+      throw new Error("Expected fetch to have been called");
+    }
+
     expect(callArgs[1].headers).toEqual(
       expect.objectContaining({ "Content-Type": "application/json" }),
     );
