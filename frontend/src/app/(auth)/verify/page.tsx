@@ -41,7 +41,8 @@ export default function VerifyPage() {
 function VerifyContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get("email") || "";
-  const purpose = (searchParams.get("purpose") || "sign_in") as VerifyInput["purpose"];
+  const purpose = (searchParams.get("purpose") ||
+    "sign_in") as VerifyInput["purpose"];
   const router = useRouter();
   const verify = useVerify();
 
@@ -85,12 +86,16 @@ function VerifyContent() {
   const handleSubmit = useCallback(
     (values: VerifyInput) => {
       if (isExpired) {
-        toast.error("Code expired", { description: "Please request a new code." });
+        toast.error("Code expired", {
+          description: "Please request a new code.",
+        });
         form.setValue("code", "");
         return;
       }
       if (isThrottled) {
-        toast.error("Too many attempts", { description: `Please wait ${throttledUntil}s before trying again.` });
+        toast.error("Too many attempts", {
+          description: `Please wait ${throttledUntil}s before trying again.`,
+        });
         return;
       }
       verify.mutate(values, {
@@ -98,7 +103,8 @@ function VerifyContent() {
           toast.success("Welcome to EverythingCars!", {
             description: "Redirecting to your dashboard...",
           });
-          const dashboard = data.role === "owner" ? "/owner/dashboard" : "/customer/dashboard";
+          const dashboard =
+            data.role === "owner" ? "/owner/dashboard" : "/customer/dashboard";
           router.push(dashboard);
         },
         onError: (error) => {
@@ -126,13 +132,17 @@ function VerifyContent() {
         apiClient.post("/auth/resend", { email, purpose }),
         new Promise((r) => setTimeout(r, 1500)), // Min 1.5s spin so user sees it
       ]);
-      toast.success("Code resent", { description: `A new code was sent to ${email}` });
+      toast.success("Code resent", {
+        description: `A new code was sent to ${email}`,
+      });
       setCooldown(60);
       setExpiresIn(10 * 60); // Reset 10-minute expiry
       form.setValue("code", "");
     } catch (error) {
       if (error instanceof Error && error.message.includes("throttle")) {
-        toast.error("Too many requests", { description: "Please wait before requesting another code." });
+        toast.error("Too many requests", {
+          description: "Please wait before requesting another code.",
+        });
       } else {
         toast.error("Failed to resend code");
       }
@@ -148,23 +158,55 @@ function VerifyContent() {
   return (
     <AuthShell>
       <div className="flex w-[min(100%,520px)] flex-col items-center gap-6">
-        <Image src="/logo.png" alt="Buy & Rent Cars" width={170} height={52} className="h-[52px] w-auto" />
+        <Image
+          src="/logo.png"
+          alt="Buy & Rent Cars"
+          width={170}
+          height={52}
+          className="h-[52px] w-auto"
+        />
 
-        <Card className="w-full rounded-2xl border-[0.5px] shadow-xs" style={{ borderColor: "var(--brc-border)" }}>
+        <Card
+          className="w-full rounded-2xl border-[0.5px] shadow-xs"
+          style={{ borderColor: "var(--brc-border)" }}
+        >
           <CardHeader className="flex flex-col items-center gap-4 pb-2 text-center">
             <div
               className="flex items-center justify-center rounded-full"
-              style={{ width: 64, height: 64, background: "var(--brc-primary-tint)" }}
+              style={{
+                width: 64,
+                height: 64,
+                background: "var(--brc-primary-tint)",
+              }}
             >
-              <ShieldCheckIcon size={28} strokeWidth={1.8} style={{ color: "var(--brc-primary)" }} />
+              <ShieldCheckIcon
+                size={28}
+                strokeWidth={1.8}
+                style={{ color: "var(--brc-primary)" }}
+              />
             </div>
             <div className="flex flex-col gap-2">
-              <CardTitle className="text-2xl font-bold" style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text)" }}>
+              <CardTitle
+                className="text-2xl font-bold"
+                style={{
+                  fontFamily: "var(--brc-font-ui)",
+                  color: "var(--brc-text)",
+                }}
+              >
                 Verify Your Identity
               </CardTitle>
-              <CardDescription className="text-sm" style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text-muted)" }}>
+              <CardDescription
+                className="text-sm"
+                style={{
+                  fontFamily: "var(--brc-font-ui)",
+                  color: "var(--brc-text-muted)",
+                }}
+              >
                 We sent a 6-digit verification code to{" "}
-                <span className="inline-flex items-center gap-1 font-medium" style={{ color: "var(--brc-text)" }}>
+                <span
+                  className="inline-flex items-center gap-1 font-medium"
+                  style={{ color: "var(--brc-text)" }}
+                >
                   <MailIcon size={14} />
                   {maskedEmail}
                 </span>
@@ -182,16 +224,39 @@ function VerifyContent() {
                     <FormItem>
                       <Field>
                         <div className="flex items-center justify-between">
-                          <FieldLabel htmlFor="otp-verification" style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text)" }}>
+                          <FieldLabel
+                            htmlFor="otp-verification"
+                            style={{
+                              fontFamily: "var(--brc-font-ui)",
+                              color: "var(--brc-text)",
+                            }}
+                          >
                             Verification code
                           </FieldLabel>
-                          <Button variant="outline" size="xs" type="button" disabled={cooldown > 0 || isResending} onClick={handleResend}>
-                            <RefreshCwIcon className={isResending ? "animate-spin" : ""} />
-                            {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend Code"}
+                          <Button
+                            variant="outline"
+                            size="xs"
+                            type="button"
+                            disabled={cooldown > 0 || isResending}
+                            onClick={handleResend}
+                          >
+                            <RefreshCwIcon
+                              className={isResending ? "animate-spin" : ""}
+                            />
+                            {cooldown > 0
+                              ? `Resend in ${cooldown}s`
+                              : "Resend Code"}
                           </Button>
                         </div>
                         <div className="flex justify-center py-2">
-                          <InputOTP maxLength={6} id="otp-verification" value={field.value} onChange={field.onChange} inputMode="numeric" pattern="^[0-9]*$">
+                          <InputOTP
+                            maxLength={6}
+                            id="otp-verification"
+                            value={field.value}
+                            onChange={field.onChange}
+                            inputMode="numeric"
+                            pattern="^[0-9]*$"
+                          >
                             <InputOTPGroup className="*:data-[slot=input-otp-slot]:h-12 *:data-[slot=input-otp-slot]:w-11 *:data-[slot=input-otp-slot]:text-xl">
                               <InputOTPSlot index={0} />
                               <InputOTPSlot index={1} />
@@ -207,17 +272,27 @@ function VerifyContent() {
                         </div>
                         <FormMessage />
                         {/* Expiry timer */}
-                        <div className="flex items-center justify-center gap-2 text-sm" style={{ fontFamily: "var(--brc-font-ui)" }}>
+                        <div
+                          className="flex items-center justify-center gap-2 text-sm"
+                          style={{ fontFamily: "var(--brc-font-ui)" }}
+                        >
                           {isExpired ? (
                             <span style={{ color: "var(--brc-danger)" }}>
                               Code expired — please request a new one
                             </span>
                           ) : (
                             <>
-                              <span style={{ color: "var(--brc-text-muted)" }}>Code expires in</span>
+                              <span style={{ color: "var(--brc-text-muted)" }}>
+                                Code expires in
+                              </span>
                               <span
                                 className="font-mono font-semibold"
-                                style={{ color: expiresIn <= 60 ? "var(--brc-danger)" : "var(--brc-text)" }}
+                                style={{
+                                  color:
+                                    expiresIn <= 60
+                                      ? "var(--brc-danger)"
+                                      : "var(--brc-text)",
+                                }}
                               >
                                 {expiryDisplay}
                               </span>
@@ -234,7 +309,12 @@ function VerifyContent() {
               </CardContent>
 
               <CardFooter className="flex flex-col gap-4">
-                <AuthButton full type="submit" loading={verify.isPending} disabled={isExpired || isThrottled}>
+                <AuthButton
+                  full
+                  type="submit"
+                  loading={verify.isPending}
+                  disabled={isExpired || isThrottled}
+                >
                   {verify.isPending
                     ? "Verifying..."
                     : isThrottled
@@ -243,9 +323,19 @@ function VerifyContent() {
                         ? "Code Expired"
                         : "Verify & Continue"}
                 </AuthButton>
-                <p className="text-center text-sm" style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text-muted)" }}>
+                <p
+                  className="text-center text-sm"
+                  style={{
+                    fontFamily: "var(--brc-font-ui)",
+                    color: "var(--brc-text-muted)",
+                  }}
+                >
                   Having trouble?{" "}
-                  <a href="/contact" className="underline underline-offset-4 transition-colors" style={{ color: "var(--brc-accent)" }}>
+                  <a
+                    href="/contact"
+                    className="underline underline-offset-4 transition-colors"
+                    style={{ color: "var(--brc-accent)" }}
+                  >
                     Contact support
                   </a>
                 </p>
@@ -262,12 +352,32 @@ function VerifyFallback() {
   return (
     <AuthShell>
       <div className="flex w-[min(100%,520px)] flex-col items-center gap-6">
-        <Card className="w-full rounded-2xl border-[0.5px] shadow-xs" style={{ borderColor: "var(--brc-border)" }}>
+        <Card
+          className="w-full rounded-2xl border-[0.5px] shadow-xs"
+          style={{ borderColor: "var(--brc-border)" }}
+        >
           <CardContent className="flex flex-col items-center gap-4 py-16">
-            <div className="flex items-center justify-center rounded-full" style={{ width: 64, height: 64, background: "var(--brc-primary-tint)" }}>
-              <ShieldCheckIcon size={28} strokeWidth={1.8} style={{ color: "var(--brc-primary)" }} />
+            <div
+              className="flex items-center justify-center rounded-full"
+              style={{
+                width: 64,
+                height: 64,
+                background: "var(--brc-primary-tint)",
+              }}
+            >
+              <ShieldCheckIcon
+                size={28}
+                strokeWidth={1.8}
+                style={{ color: "var(--brc-primary)" }}
+              />
             </div>
-            <p className="text-base" style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text-muted)" }}>
+            <p
+              className="text-base"
+              style={{
+                fontFamily: "var(--brc-font-ui)",
+                color: "var(--brc-text-muted)",
+              }}
+            >
               Preparing verification...
             </p>
           </CardContent>

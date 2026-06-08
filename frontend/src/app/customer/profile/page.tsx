@@ -1,18 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
-
-const PROFILE = {
-  name: "Okoh Daniel Emmanuel",
-  email: "DanielEmmanuel@gmail.com",
-  phone: "08133416934",
-  dob: "10/05/1998",
-  license: "LAG84280EB20",
-  address: "Dominion Tower, Igbo-Efor, Lekki-Ajah Expressway",
-  state: "Lagos State",
-  city: "Eti-Osa II",
-  loyaltyPoints: 0,
-};
+import { useMe } from "@/features/auth/api";
 
 function initials(name: string): string {
   return name
@@ -25,17 +16,6 @@ function initials(name: string): string {
 
 type Field = { label: string; value: string; icon: IconName };
 
-const FIELDS: Field[] = [
-  { label: "Full Name", value: PROFILE.name, icon: "user" },
-  { label: "Email Address", value: PROFILE.email, icon: "mail" },
-  { label: "Phone No", value: PROFILE.phone, icon: "phone" },
-  { label: "Date of Birth", value: PROFILE.dob, icon: "calendar" },
-  { label: "Driver's License", value: PROFILE.license, icon: "idcard" },
-  { label: "Address", value: PROFILE.address, icon: "pin" },
-  { label: "State", value: PROFILE.state, icon: "pin" },
-  { label: "City", value: PROFILE.city, icon: "pin" },
-];
-
 const cardStyle: React.CSSProperties = {
   background: "#fff",
   border: "1px solid var(--brc-border)",
@@ -45,8 +25,19 @@ const cardStyle: React.CSSProperties = {
 
 function ReadonlyField({ field }: { field: Field }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
-      <span style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "var(--brc-font-ui)", fontSize: 14, color: "var(--brc-text-secondary)" }}>
+    <div
+      style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}
+    >
+      <span
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontFamily: "var(--brc-font-ui)",
+          fontSize: 14,
+          color: "var(--brc-text-secondary)",
+        }}
+      >
         <Icon name={field.icon} size={16} stroke="var(--brc-text-secondary)" />
         {field.label}
       </span>
@@ -74,6 +65,42 @@ function ReadonlyField({ field }: { field: Field }) {
 }
 
 export default function ProfilePage() {
+  const { data: user, isLoading } = useMe();
+
+  if (isLoading || !user) {
+    return (
+      <div
+        style={{
+          padding: 40,
+          textAlign: "center",
+          color: "var(--brc-text-muted)",
+        }}
+      >
+        Loading...
+      </div>
+    );
+  }
+  const profile = user.customer_profile;
+  const fields: Field[] = [
+    { label: "Full Name", value: user.name, icon: "user" },
+    { label: "Email Address", value: user.email, icon: "mail" },
+    { label: "Phone No", value: user.phone, icon: "phone" },
+    {
+      label: "Date of Birth",
+      value: profile?.date_of_birth || "-",
+      icon: "calendar",
+    },
+    {
+      label: "Driver's License",
+      value: profile?.drivers_license || "-",
+      icon: "idcard",
+    },
+    { label: "Address", value: profile?.address || "—", icon: "pin" },
+    { label: "State", value: profile?.state || "—", icon: "pin" },
+    { label: "City", value: profile?.city || "—", icon: "pin" },
+    { label: "Country", value: profile?.country || "—", icon: "pin" },
+  ];
+
   return (
     <div style={{ background: "var(--brc-bg-subtle)" }}>
       <div
@@ -89,18 +116,47 @@ export default function ProfilePage() {
       >
         {/* Header */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <h1 style={{ fontFamily: "var(--brc-font-display)", fontWeight: 800, fontSize: "clamp(28px, 6vw, 44px)", color: "var(--brc-text)", margin: 0 }}>
+          <h1
+            style={{
+              fontFamily: "var(--brc-font-display)",
+              fontWeight: 800,
+              fontSize: "clamp(28px, 6vw, 44px)",
+              color: "var(--brc-text)",
+              margin: 0,
+            }}
+          >
             My Profile
           </h1>
-          <p style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text-muted)", margin: 0 }}>
+          <p
+            style={{
+              fontFamily: "var(--brc-font-ui)",
+              fontSize: 16,
+              color: "var(--brc-text-muted)",
+              margin: 0,
+            }}
+          >
             Manage your account information
           </p>
         </div>
 
         {/* Account card */}
-        <section style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: 28 }}>
+        <section
+          style={{
+            ...cardStyle,
+            display: "flex",
+            flexDirection: "column",
+            gap: 28,
+          }}
+        >
           {/* Identity */}
-          <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 18,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
             <span
               style={{
                 width: 88,
@@ -117,11 +173,28 @@ export default function ProfilePage() {
                 flexShrink: 0,
               }}
             >
-              {initials(PROFILE.name)}
+              {initials(user.name)}
             </span>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 22, color: "var(--brc-text)" }}>{PROFILE.name}</span>
-              <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 14, color: "var(--brc-text-muted)" }}>{PROFILE.email}</span>
+              <span
+                style={{
+                  fontFamily: "var(--brc-font-ui)",
+                  fontWeight: 700,
+                  fontSize: 22,
+                  color: "var(--brc-text)",
+                }}
+              >
+                {user.name}
+              </span>
+              <span
+                style={{
+                  fontFamily: "var(--brc-font-ui)",
+                  fontSize: 14,
+                  color: "var(--brc-text-muted)",
+                }}
+              >
+                {user.email}
+              </span>
               <span
                 style={{
                   display: "inline-flex",
@@ -137,7 +210,14 @@ export default function ProfilePage() {
                   fontSize: 12,
                 }}
               >
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--brc-accent)" }} />
+                <span
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: "var(--brc-accent)",
+                  }}
+                />
                 Customer Account
               </span>
             </div>
@@ -149,19 +229,35 @@ export default function ProfilePage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
               gap: "20px 24px",
             }}
           >
-            {FIELDS.map((f) => (
+            {fields.map((f) => (
               <ReadonlyField key={f.label} field={f} />
             ))}
           </div>
         </section>
 
         {/* Loyalty information */}
-        <section style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: 18 }}>
-          <h2 style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 20, color: "var(--brc-text)", margin: 0 }}>
+        <section
+          style={{
+            ...cardStyle,
+            display: "flex",
+            flexDirection: "column",
+            gap: 18,
+          }}
+        >
+          <h2
+            style={{
+              fontFamily: "var(--brc-font-ui)",
+              fontWeight: 700,
+              fontSize: 20,
+              color: "var(--brc-text)",
+              margin: 0,
+            }}
+          >
             Loyalty Information
           </h2>
           <div
@@ -172,14 +268,30 @@ export default function ProfilePage() {
               gap: 16,
               flexWrap: "wrap",
               borderRadius: "var(--brc-radius-md)",
-              background: "linear-gradient(120deg, var(--brc-accent-bg), #fbe7d6)",
+              background:
+                "linear-gradient(120deg, var(--brc-accent-bg), #fbe7d6)",
               padding: "20px 24px",
             }}
           >
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 14, color: "var(--brc-text-secondary)" }}>Current Point</span>
-              <span style={{ fontFamily: "var(--brc-font-display)", fontWeight: 800, fontSize: 32, color: "var(--brc-accent-deep)" }}>
-                {PROFILE.loyaltyPoints}
+              <span
+                style={{
+                  fontFamily: "var(--brc-font-ui)",
+                  fontSize: 14,
+                  color: "var(--brc-text-secondary)",
+                }}
+              >
+                Current Point
+              </span>
+              <span
+                style={{
+                  fontFamily: "var(--brc-font-display)",
+                  fontWeight: 800,
+                  fontSize: 32,
+                  color: "var(--brc-accent-deep)",
+                }}
+              >
+                {0}
               </span>
             </div>
             <Link

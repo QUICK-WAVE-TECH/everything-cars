@@ -6,12 +6,7 @@ import Image from "next/image";
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
 import { CustomerStats } from "@/features/requests";
-
-// ---------------------------------------------------------------------------
-// Mock data
-// ---------------------------------------------------------------------------
-
-const CUSTOMER_NAME = "Daniel";
+import { useMe } from "@/features/auth/api";
 
 type QuickLink = {
   label: string;
@@ -266,6 +261,8 @@ function PanelCard({ title, children }: { title: string; children: React.ReactNo
 
 export default function CustomerDashboard() {
   const greeting = useGreeting();
+  const { data: user } = useMe();
+  const firstName = user?.name?.split(" ")[0] || "";
 
   return (
     <div
@@ -282,7 +279,7 @@ export default function CustomerDashboard() {
       {/* Greeting */}
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <h1 style={{ fontFamily: "var(--brc-font-display)", fontWeight: 800, fontSize: "clamp(28px, 6vw, 44px)", color: "var(--brc-text)", margin: 0 }}>
-          {greeting}, {CUSTOMER_NAME}
+          {greeting}, {firstName}
         </h1>
         <p style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text-muted)", margin: 0 }}>
           Here&apos;s what&apos;s happening with your requests

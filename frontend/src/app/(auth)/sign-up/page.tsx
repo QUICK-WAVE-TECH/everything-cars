@@ -13,9 +13,21 @@ import {
   AuthShell,
 } from "@/features/auth/components";
 import { useSignUp } from "@/features/auth/api";
-import { customerSignUpSchema, type CustomerSignUpInput } from "@/features/auth/schemas";
+import {
+  customerSignUpSchema,
+  type CustomerSignUpInput,
+} from "@/features/auth/schemas";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export default function SignUpPage() {
   const [step, setStep] = useState(1);
@@ -40,7 +52,13 @@ export default function SignUpPage() {
   });
 
   const handleContinue = async () => {
-    const valid = await form.trigger(["name", "email", "phone", "password", "confirmPassword"]);
+    const valid = await form.trigger([
+      "name",
+      "email",
+      "phone",
+      "password",
+      "confirmPassword",
+    ]);
     if (!valid) {
       const firstError = Object.values(form.formState.errors)[0];
       if (firstError?.message) toast.error(firstError.message);
@@ -71,7 +89,9 @@ export default function SignUpPage() {
       {
         onSuccess: (data) => {
           toast.success(data.message);
-          router.push(`/verify?email=${encodeURIComponent(data.email)}&purpose=sign_up_verify`);
+          router.push(
+            `/verify?email=${encodeURIComponent(data.email)}&purpose=sign_up_verify`,
+          );
         },
         onError: (error) => {
           toast.error(error.message);
@@ -119,72 +139,228 @@ export default function SignUpPage() {
                 {/* Step 1 */}
                 {step === 1 ? (
                   <div className="flex flex-col gap-4">
-                    <FormField control={form.control} name="name" render={({ field }) => (
-                      <FormItem>
-                        <AuthField label="Full Name" placeholder="First Name" value={field.value} onChange={field.onChange} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="email" render={({ field }) => (
-                      <FormItem>
-                        <AuthField label="Email Address" placeholder="Email Address" value={field.value} onChange={field.onChange} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="phone" render={({ field }) => (
-                      <FormItem>
-                        <AuthField label="Phone Number" placeholder="Enter your phone number" value={field.value ?? ""} onChange={field.onChange} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="password" render={({ field }) => (
-                      <FormItem>
-                        <AuthField label="Password" placeholder="Password" type="password" value={field.value} onChange={field.onChange} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="confirmPassword" render={({ field }) => (
-                      <FormItem>
-                        <AuthField label="Confirm Password" placeholder="Password" type="password" value={field.value} onChange={field.onChange} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label="Full Name"
+                            placeholder="First Name"
+                            value={field.value}
+                            onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label="Email Address"
+                            placeholder="Email Address"
+                            value={field.value}
+                            onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label="Phone Number"
+                            placeholder="Enter your phone number"
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label="Password"
+                            placeholder="Password"
+                            type="password"
+                            value={field.value}
+                            onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label="Confirm Password"
+                            placeholder="Password"
+                            type="password"
+                            value={field.value}
+                            onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 ) : (
                   <div className="flex flex-col gap-4">
-                    <FormField control={form.control} name="drivers_license" render={({ field }) => (
-                      <FormItem>
-                        <AuthField label="Driver's License" placeholder="Enter license number" value={field.value ?? ""} onChange={field.onChange} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="date_of_birth" render={({ field }) => (
-                      <FormItem>
-                        <AuthField label="Date of Birth" placeholder="dd/mm/yyyy" value={field.value ?? ""} onChange={field.onChange} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="address" render={({ field }) => (
-                      <FormItem>
-                        <AuthField label="Address" placeholder="Enter your address" value={field.value ?? ""} onChange={field.onChange} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="state" render={({ field }) => (
-                      <FormItem>
-                        <AuthField label="State" placeholder="Select state" value={field.value ?? ""} onChange={field.onChange} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="city" render={({ field }) => (
-                      <FormItem>
-                        <AuthField label="City" placeholder="Select city" value={field.value ?? ""} onChange={field.onChange} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
+                    <FormField
+                      control={form.control}
+                      name="drivers_license"
+                      render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label="Driver's License"
+                            placeholder="Enter license number"
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="date_of_birth"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex flex-col gap-2">
+                            <span
+                              style={{
+                                fontFamily: "var(--brc-font-ui)",
+                                fontSize: 16,
+                                color: "var(--brc-text)",
+                              }}
+                            >
+                              Date of Birth
+                            </span>
+                            <Popover>
+                              <PopoverTrigger>
+                                <div
+                                  className="flex h-14 w-full items-center justify-between rounded-lg px-6 text-left text-sm"
+                                  style={{
+                                    background: "var(--brc-bg-subtle)",
+                                    border: "1px solid var(--brc-border)",
+                                    fontFamily: "var(--brc-font-ui)",
+                                    color: field.value
+                                      ? "var(--brc-text)"
+                                      : "var(--brc-text-muted)",
+                                  }}
+                                >
+                                  {field.value
+                                    ? format(
+                                        new Date(field.value),
+                                        "dd/MM/yyyy",
+                                      )
+                                    : "Select date of birth"}
+                                  <CalendarIcon
+                                    size={18}
+                                    style={{ color: "var(--brc-text-muted)" }}
+                                  />
+                                </div>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className="w-auto p-0"
+                                align="start"
+                              >
+                                <Calendar
+                                  mode="single"
+                                  selected={
+                                    field.value
+                                      ? new Date(field.value)
+                                      : undefined
+                                  }
+                                  onSelect={(date) =>
+                                    field.onChange(
+                                      date ? format(date, "yyyy-MM-dd") : "",
+                                    )
+                                  }
+                                  disabled={(date) =>
+                                    date > new Date() ||
+                                    date < new Date("1920-01-01")
+                                  }
+                                  defaultMonth={
+                                    field.value
+                                      ? new Date(field.value)
+                                      : new Date(2000, 0)
+                                  }
+                                  captionLayout="dropdown"
+                                  startMonth={new Date(1920, 0)}
+                                  endMonth={new Date()}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label="Address"
+                            placeholder="Enter your address"
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="state"
+                      render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label="State"
+                            placeholder="Select state"
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="city"
+                      render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label="City"
+                            placeholder="Select city"
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <Checkbox checked={agree} onChange={() => setAgree(!agree)}>
                       I agree to the{" "}
-                      <span className="text-(--brc-accent) underline">Terms &amp; Conditions</span>
+                      <span className="text-(--brc-accent) underline">
+                        Terms &amp; Conditions
+                      </span>
                     </Checkbox>
                   </div>
                 )}
@@ -196,11 +372,17 @@ export default function SignUpPage() {
                   </AuthButton>
                 ) : (
                   <div className="flex flex-wrap gap-3">
-                    <AuthButton variant="neutral" onClick={() => setStep(1)} className="w-[min(100%,120px)]">
+                    <AuthButton
+                      variant="neutral"
+                      onClick={() => setStep(1)}
+                      className="w-[min(100%,120px)]"
+                    >
                       Back
                     </AuthButton>
                     <AuthButton full type="submit" loading={signUp.isPending}>
-                      {signUp.isPending ? "Creating Account..." : "Create Account"}
+                      {signUp.isPending
+                        ? "Creating Account..."
+                        : "Create Account"}
                     </AuthButton>
                   </div>
                 )}
@@ -209,7 +391,10 @@ export default function SignUpPage() {
 
             <div className="flex flex-wrap justify-center gap-2 text-base text-(--brc-text) [font-family:var(--brc-font-ui)]">
               <span>Already have an account?</span>
-              <Link href="/sign-in" className="cursor-pointer p-0 text-base text-(--brc-accent) underline [font-family:var(--brc-font-link)]">
+              <Link
+                href="/sign-in"
+                className="cursor-pointer p-0 text-base text-(--brc-accent) underline [font-family:var(--brc-font-link)]"
+              >
                 Log In
               </Link>
             </div>

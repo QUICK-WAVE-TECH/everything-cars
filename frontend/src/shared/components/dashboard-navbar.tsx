@@ -66,7 +66,7 @@ export function DashboardNavbar({ role }: DashboardNavbarProps) {
         zIndex: 50,
       }}
     >
-      <Link href={dashboardHref}>
+      <Link href="/">
         <Image
           src="/logo.png"
           alt="Buy & Rent Cars"
