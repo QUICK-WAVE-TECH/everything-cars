@@ -58,7 +58,7 @@ class CustomerProfile(models.Model):
         verbose_name_plural = "Customer Profiles"
 
     def __str__(self):
-        return f"{self.user.name} - customer profile"
+        return f"{self.user.first_name} {self.user.last_name} - customer profile"
 
 
 def owner_document_path(instance, filename):
@@ -88,7 +88,7 @@ class OwnerProfile(models.Model):
         db_table = "owner_profiles"
 
     def __str__(self):
-        return f"{self.user.name} - {self.owner_type}"
+        return f"{self.user.first_name} {self.user.last_name} - {self.owner_type}"
 
 
 class AccessCode(models.Model):
