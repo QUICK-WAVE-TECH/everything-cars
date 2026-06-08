@@ -268,15 +268,281 @@ canvas {
   box-shadow: none;
 }
 
+@keyframes brc-dashboard-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes brc-dashboard-sheen {
+  from {
+    transform: translateX(-140%) skewX(-14deg);
+  }
+  to {
+    transform: translateX(140%) skewX(-14deg);
+  }
+}
+
+@keyframes brc-dashboard-progress-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes brc-dashboard-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-0.4deg);
+  }
+  50% {
+    transform: translate3d(0, -9px, 0) rotate(0.5deg);
+  }
+}
+
+@keyframes brc-dashboard-shadow-breathe {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scaleX(1);
+  }
+  50% {
+    opacity: 0.42;
+    transform: scaleX(0.86);
+  }
+}
+
+@keyframes brc-dashboard-badge-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes brc-dashboard-badge-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes brc-live-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+}
+
+@keyframes brc-status-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--status-ring, rgba(0, 0, 139, 0.18));
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.brc-dashboard-reveal {
+  animation: brc-dashboard-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+.brc-dashboard-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transform: translateY(0);
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 240ms ease,
+    border-color 240ms ease,
+    background-color 240ms ease;
+  will-change: transform;
+}
+
+.brc-dashboard-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.brc-dashboard-card::after {
+  content: "";
+  position: absolute;
+  inset: -35% -55%;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.55) 48%,
+    transparent 62%
+  );
+  opacity: 0;
+  transform: translateX(-140%) skewX(-14deg);
+}
+
+.brc-dashboard-card:hover {
+  transform: translateY(-6px) scale(1.01);
+  border-color: rgba(0, 0, 139, 0.22);
+  box-shadow: 0 18px 34px rgba(18, 18, 18, 0.1);
+}
+
+.brc-dashboard-card:hover::after {
+  opacity: 1;
+  animation: brc-dashboard-sheen 760ms ease;
+}
+
+.brc-dashboard-icon-bubble,
+.brc-dashboard-arrow,
+.brc-dashboard-car-thumb,
+.brc-dashboard-button {
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.brc-dashboard-card:hover .brc-dashboard-icon-bubble {
+  transform: translateY(-2px) rotate(-3deg) scale(1.06);
+  filter: saturate(1.12);
+}
+
+.brc-dashboard-card:hover .brc-dashboard-arrow {
+  transform: translateX(4px);
+}
+
+.brc-dashboard-card:hover .brc-dashboard-car-thumb {
+  transform: translateY(-2px) scale(1.08);
+}
+
+.brc-dashboard-button:hover .brc-dashboard-arrow {
+  transform: translateX(5px);
+}
+
+.brc-dashboard-accent-bar,
+.brc-progress-fill {
+  transform-origin: left;
+  animation: brc-dashboard-progress-fill 820ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+.brc-dashboard-hero {
+  isolation: isolate;
+}
+
+.brc-dashboard-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.brc-dashboard-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(120deg, transparent 0 42%, rgba(0, 0, 139, 0.055) 47%, transparent 54%),
+    repeating-linear-gradient(
+      135deg,
+      rgba(0, 0, 139, 0.035) 0 1px,
+      transparent 1px 22px
+    );
+  opacity: 0.75;
+}
+
+.brc-dashboard-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.78) 50%, transparent 62%);
+  transform: translateX(-120%) skewX(-14deg);
+  animation: brc-dashboard-sheen 1100ms ease 260ms both;
+}
+
+.brc-dashboard-hero-car {
+  animation: brc-dashboard-float 5.2s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.brc-dashboard-car-shadow {
+  animation: brc-dashboard-shadow-breathe 5.2s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.brc-dashboard-badge-pop {
+  animation:
+    brc-dashboard-badge-pop 700ms cubic-bezier(0.16, 1, 0.3, 1) 420ms both,
+    brc-dashboard-badge-float 4.8s ease-in-out 1.2s infinite;
+}
+
+.brc-live-dot {
+  animation: brc-live-pulse 1800ms ease-in-out infinite;
+  transform-origin: center;
+}
+
+.brc-status-dot {
+  animation: brc-status-pulse 1800ms ease-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .brc-button-motion {
+  .brc-button-motion,
+  .brc-dashboard-card,
+  .brc-dashboard-icon-bubble,
+  .brc-dashboard-arrow,
+  .brc-dashboard-car-thumb,
+  .brc-dashboard-button {
     transition: none;
+  }
+
+  .brc-dashboard-reveal,
+  .brc-dashboard-accent-bar,
+  .brc-progress-fill,
+  .brc-dashboard-hero-car,
+  .brc-dashboard-car-shadow,
+  .brc-dashboard-badge-pop,
+  .brc-live-dot,
+  .brc-status-dot {
+    animation: none;
+  }
+
+  .brc-dashboard-card::after,
+  .brc-dashboard-hero::after {
+    display: none;
   }
 
   .brc-button-motion:hover,
   .brc-button-motion:active,
   .brc-button-motion-icon:hover,
-  .brc-button-motion-subtle:hover {
+  .brc-button-motion-subtle:hover,
+  .brc-dashboard-card:hover,
+  .brc-dashboard-card:hover .brc-dashboard-icon-bubble,
+  .brc-dashboard-card:hover .brc-dashboard-arrow,
+  .brc-dashboard-card:hover .brc-dashboard-car-thumb,
+  .brc-dashboard-button:hover .brc-dashboard-arrow {
     transform: none;
   }
 }

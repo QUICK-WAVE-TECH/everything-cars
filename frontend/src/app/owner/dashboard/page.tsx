@@ -1,71 +1,80 @@
 "use client";
 
-import { useSyncExternalStore, useState } from "react";
-import Link from "next/link";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import Image from "next/image";
+import Link from "next/link";
+
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
 import { useMe } from "@/features/auth/api";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type StatTile = {
-  icon: IconName;
-  label: string;
-  value: string;
-  accent: string;
-};
+type DashboardStyle = CSSProperties & Record<`--${string}`, string | number>;
 
 type QuickLink = {
   label: string;
+  description: string;
   icon: IconName;
   href: string;
   bg: string;
   fg: string;
-  border?: boolean;
 };
+
+const OWNER_STATS = [
+  { icon: "car" as IconName, label: "Listed Cars", value: "5", color: "var(--brc-primary)" },
+  { icon: "clock" as IconName, label: "Pending Requests", value: "3", color: "var(--brc-warning)" },
+  { icon: "handshake" as IconName, label: "Approved", value: "8", color: "var(--brc-success)" },
+  { icon: "banknote" as IconName, label: "Earnings", value: "₦1.2M", color: "var(--brc-accent)" },
+];
+
+const OWNER_QUICK_LINKS: QuickLink[] = [
+  { label: "My Cars", description: "Manage listings, pricing, and availability.", icon: "car", href: "/owner/my-cars", bg: "var(--brc-primary-tint)", fg: "var(--brc-primary)" },
+  { label: "Requests", description: "Review and approve rental requests.", icon: "clock", href: "/owner/requests", bg: "var(--brc-bg-muted)", fg: "var(--brc-text-secondary)" },
+  { label: "Transactions", description: "Track earnings and payment history.", icon: "banknote", href: "/owner/transactions", bg: "var(--brc-success-bg)", fg: "var(--brc-success)" },
+  { label: "Rewards", description: "Loyalty points and owner perks.", icon: "gift", href: "/owner/loyalty", bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)" },
+];
 
 type RequestStatus = "approved" | "pending";
 
 type IncomingRequest = {
   id: number;
   car: string;
-  renter: string;
-  kind: "Rent" | "Buy";
-  duration?: string;
-  amount: string;
+  party: string;
+  mode: "Rent" | "Buy";
+  days?: number;
+  price: number;
   status: RequestStatus;
+  note: string;
+  action?: { label: string; href: string };
 };
 
-// ---------------------------------------------------------------------------
-// Mock data
-// ---------------------------------------------------------------------------
-
-const OWNER_STATS: StatTile[] = [
-  { icon: "car",       label: "Listed Cars",        value: "5",      accent: "var(--brc-primary)"  },
-  { icon: "clock",     label: "Pending Requests",   value: "3",      accent: "var(--brc-warning)"  },
-  { icon: "handshake", label: "Approved Requests",  value: "8",      accent: "var(--brc-success)"  },
-  { icon: "banknote",  label: "Total Earnings",     value: "₦1.2M",  accent: "var(--brc-accent)"   },
-];
-
-const OWNER_QUICK_LINKS: QuickLink[] = [
-  { label: "My Cars",           icon: "car",      href: "/owner/my-cars",      bg: "var(--brc-primary-tint)", fg: "var(--brc-primary)"        },
-  { label: "Incoming Requests", icon: "clock",    href: "/owner/requests",     bg: "var(--brc-bg-muted)",     fg: "var(--brc-text-secondary)", border: true },
-  { label: "Transactions",      icon: "banknote", href: "/owner/transactions", bg: "var(--brc-success-bg)",   fg: "var(--brc-success)"        },
-  { label: "Loyalty Rewards",   icon: "gift",     href: "/owner/loyalty",      bg: "#F9F0E9",                 fg: "var(--brc-accent)"         },
-];
-
 const RECENT_REQUESTS: IncomingRequest[] = [
-  { id: 1, car: "Lexus NX 300h",   renter: "Chika Akor",    kind: "Rent", duration: "5 days", amount: "₦175,000",    status: "approved" },
-  { id: 2, car: "Toyota RAV4",     renter: "John Adewara",  kind: "Rent", duration: "3 days", amount: "₦126,000",    status: "pending"  },
-  { id: 3, car: "Mercedes C300",   renter: "Aisha Bello",   kind: "Buy",                      amount: "₦24,000,000", status: "pending"  },
+  { id: 1, car: "Lexus NX 300h", party: "Chika Akor", mode: "Rent", days: 5, price: 175000, status: "approved", note: "Renter confirmed. Awaiting pickup.", action: { label: "View details", href: "/owner/requests/1" } },
+  { id: 2, car: "Toyota RAV4", party: "John Adewara", mode: "Rent", days: 3, price: 126000, status: "pending", note: "New request — review and respond." },
+  { id: 3, car: "Mercedes C300", party: "Aisha Bello", mode: "Buy", price: 24000000, status: "pending", note: "Purchase inquiry received." },
 ];
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const TOP_CARS = [
+  { id: 1, name: "Lexus NX 300h", location: "Lekki, Lagos", tag: "5 rentals", price: 35000, suffix: "per day", href: "/owner/my-cars/1" },
+  { id: 2, name: "Toyota RAV4", location: "Victoria Island", tag: "3 rentals", price: 42000, suffix: "per day", href: "/owner/my-cars/2" },
+];
+
+const STATUS_STYLES: Record<RequestStatus, { label: string; bg: string; fg: string; ring: string }> = {
+  approved: { label: "Approved", bg: "var(--brc-success-bg)", fg: "var(--brc-success)", ring: "rgba(32,184,88,0.22)" },
+  pending: { label: "Pending", bg: "var(--brc-warning-bg)", fg: "#9a7400", ring: "rgba(255,192,1,0.26)" },
+};
+
+const noopSubscribe = () => () => {};
+
+function naira(n: number): string {
+  return `₦${n.toLocaleString("en-NG")}`;
+}
 
 function greetingFor(hour: number): string {
   if (hour < 12) return "Good Morning";
@@ -73,332 +82,340 @@ function greetingFor(hour: number): string {
   return "Good Evening";
 }
 
-const noopSubscribe = () => () => {};
-
 function useGreeting(): string {
-  return useSyncExternalStore(
-    noopSubscribe,
-    () => greetingFor(new Date().getHours()),
-    () => "Welcome",
-  );
+  return useSyncExternalStore(noopSubscribe, () => greetingFor(new Date().getHours()), () => "Welcome");
 }
 
-const STATUS_STYLES: Record<RequestStatus, { label: string; bg: string; fg: string }> = {
-  approved: { label: "Approved", bg: "var(--brc-success-bg)", fg: "var(--brc-success)" },
-  pending:  { label: "Pending",  bg: "var(--brc-warning-bg)", fg: "#9a7400"             },
-};
+function AnimatedStatValue({ value }: { value: string }) {
+  const target = useMemo(() => {
+    const digits = value.replace(/[^\d]/g, "");
+    return digits ? Number(digits) : null;
+  }, [value]);
+  const [display, setDisplay] = useState(0);
 
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (target == null) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const t = window.setTimeout(() => setDisplay(target), 0);
+      return () => window.clearTimeout(t);
+    }
+    let frame = 0;
+    const start = performance.now();
+    const duration = 850;
+    const tick = (now: number) => {
+      const p = Math.min((now - start) / duration, 1);
+      setDisplay(Math.round(target * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [target]);
 
-const cardBase: React.CSSProperties = {
-  background: "#fff",
-  border: "1px solid var(--brc-border)",
-  borderRadius: 18,
-  boxShadow: "0 2px 4px rgba(18,18,18,0.04)",
-};
+  if (target == null) return value;
+  return display.toLocaleString("en-NG");
+}
 
-/** Upgraded stat tile with corner glow + tinted icon box. */
-function StatTile({ tile }: { tile: StatTile }) {
-  const iconBg = `color-mix(in srgb, ${tile.accent} 14%, #fff)`;
+function SectionHeader({ eyebrow, title, action }: { eyebrow?: string; title: string; action?: ReactNode }) {
   return (
-    <div style={{ ...cardBase, padding: "20px 22px", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", gap: 14 }}>
-      {/* Corner glow */}
-      <span
-        aria-hidden
-        style={{
-          position: "absolute",
-          top: -32,
-          right: -32,
-          width: 100,
-          height: 100,
-          borderRadius: "50%",
-          background: `radial-gradient(circle, ${tile.accent} 0%, transparent 70%)`,
-          opacity: 0.08,
-          pointerEvents: "none",
-        }}
-      />
-
-      {/* Icon + label row */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <span
-          style={{
-            width: 42,
-            height: 42,
-            borderRadius: 14,
-            background: iconBg,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <Icon name={tile.icon} size={20} stroke={tile.accent} />
-        </span>
-        <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--brc-text-muted)" }}>
-          {tile.label}
-        </span>
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0">
+        {eyebrow && <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-(--brc-accent) [font-family:var(--brc-font-ui)]">{eyebrow}</p>}
+        <h2 className="m-0 text-xl font-extrabold text-(--brc-text) [font-family:var(--brc-font-display)]">{title}</h2>
       </div>
-
-      {/* Value */}
-      <span style={{ fontFamily: "var(--brc-font-display)", fontWeight: 800, fontSize: 34, color: "var(--brc-text)", lineHeight: 1 }}>
-        {tile.value}
-      </span>
+      {action}
     </div>
   );
 }
 
-/** Quick-link tile with color-inversion hover. */
-function QuickLinkTile({ link }: { link: QuickLink }) {
-  const [hovered, setHovered] = useState(false);
+function DashboardButton({ href, children, variant = "primary" }: { href: string; children: ReactNode; variant?: "primary" | "soft" }) {
+  const primary = variant === "primary";
+  return (
+    <Link
+      href={href}
+      className={`brc-dashboard-button group inline-flex h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold transition-all duration-200 [font-family:var(--brc-font-ui)] hover:-translate-y-0.5 active:translate-y-0 ${
+        primary
+          ? "bg-(--brc-accent) text-white shadow-[0_12px_24px_rgba(195,101,35,0.16)] hover:shadow-[0_16px_30px_rgba(195,101,35,0.2)]"
+          : "border border-(--brc-border) bg-white text-(--brc-text) hover:border-(--brc-accent) hover:text-(--brc-accent) hover:shadow-[0_10px_20px_rgba(18,18,18,0.08)]"
+      }`}
+    >
+      {children}
+      <span className="brc-dashboard-arrow flex transition-transform duration-200 group-hover:translate-x-1">
+        <Icon name="arrow" size={16} stroke="currentColor" />
+      </span>
+    </Link>
+  );
+}
 
-  const bg    = hovered ? link.fg  : link.bg;
-  const color = hovered ? "#fff"   : link.fg;
-  const shadow = hovered ? "0 12px 28px rgba(18,18,18,0.14)" : "none";
-  const lift   = hovered ? "translateY(-3px)" : "translateY(0)";
-  const border = link.border ? `1px solid ${hovered ? "transparent" : "var(--brc-border)"}` : "none";
+function StatCard({ stat, delay }: { stat: (typeof OWNER_STATS)[number]; delay: number }) {
+  return (
+    <div
+      className="brc-dashboard-card brc-dashboard-reveal relative overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-5 shadow-[var(--brc-shadow-xs)]"
+      style={{ "--delay": `${delay}ms`, "--accent": stat.color } as DashboardStyle}
+    >
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <span className="brc-dashboard-icon-bubble flex size-11 items-center justify-center rounded-full text-white shadow-[0_10px_22px_rgba(18,18,18,0.1)]" style={{ background: stat.color }}>
+          <Icon name={stat.icon} size={21} stroke="#fff" />
+        </span>
+      </div>
+      <p className="mb-2 text-sm font-medium text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{stat.label}</p>
+      <div className="flex items-baseline gap-2">
+        <span className="text-3xl font-black text-(--brc-text) [font-family:var(--brc-font-display)]">
+          <AnimatedStatValue value={stat.value} />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Tilt + glow hover animation — different from customer dashboard's scale effect */
+function QuickActionTile({ link, delay }: { link: QuickLink; delay: number }) {
+  const [hovered, setHovered] = useState(false);
 
   return (
     <Link
       href={link.href}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className="brc-dashboard-card brc-dashboard-reveal group flex min-h-32 flex-col justify-between rounded-2xl border border-(--brc-border) bg-white p-5 text-left no-underline shadow-[var(--brc-shadow-xs)]"
       style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        padding: "18px 20px",
-        borderRadius: 14,
-        background: bg,
-        color,
-        textDecoration: "none",
-        border,
-        boxShadow: shadow,
-        transform: lift,
-        transition: "transform .3s cubic-bezier(.22,.61,.36,1), background .3s ease, color .3s ease, box-shadow .3s ease",
-      }}
+        "--delay": `${delay}ms`,
+        "--tile-bg": link.bg,
+        "--tile-fg": link.fg,
+        transform: hovered ? "perspective(600px) rotateY(-2deg) rotateX(1deg) translateY(-2px)" : "perspective(600px) rotateY(0deg) rotateX(0deg) translateY(0)",
+        boxShadow: hovered ? `0 16px 40px -8px color-mix(in srgb, ${link.fg} 25%, transparent), var(--brc-shadow-xs)` : "var(--brc-shadow-xs)",
+        transition: "all 0.4s cubic-bezier(0.23, 1, 0.32, 1)",
+      } as DashboardStyle}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div className="flex items-start justify-between gap-4">
         <span
+          className="flex size-12 items-center justify-center rounded-full bg-[var(--tile-bg)] text-[var(--tile-fg)]"
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: 11,
-            background: hovered ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            transition: "background .3s ease",
+            transform: hovered ? "rotate(8deg) scale(1.05)" : "rotate(0deg) scale(1)",
+            transition: "transform 0.4s cubic-bezier(0.23, 1, 0.32, 1)",
           }}
         >
-          <Icon name={link.icon} size={20} stroke={color} />
+          <Icon name={link.icon} size={22} stroke="currentColor" />
         </span>
-        <span style={{ opacity: hovered ? 1 : 0, transition: "opacity .25s ease" }}>
-          <Icon name="arrow" size={18} stroke={color} />
+        <span
+          className="flex size-9 items-center justify-center rounded-full border border-(--brc-border) text-(--brc-text-muted)"
+          style={{
+            transform: hovered ? "translateX(0)" : "translateX(-8px)",
+            opacity: hovered ? 1 : 0,
+            borderColor: hovered ? link.fg : undefined,
+            color: hovered ? link.fg : undefined,
+            transition: "all 0.35s cubic-bezier(0.23, 1, 0.32, 1)",
+          }}
+        >
+          <Icon name="arrow" size={15} stroke="currentColor" />
         </span>
       </div>
-      <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 600, fontSize: 14 }}>
-        {link.label}
-      </span>
+      <div className="mt-5">
+        <h3 className="m-0 text-base font-extrabold text-(--brc-text) [font-family:var(--brc-font-ui)]">{link.label}</h3>
+        <p className="mt-1 line-clamp-2 text-sm leading-6 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{link.description}</p>
+      </div>
     </Link>
   );
 }
 
-/** Incoming request row with thumbnail + badge. */
-function RequestRow({ req, last }: { req: IncomingRequest; last: boolean }) {
-  const s = STATUS_STYLES[req.status];
+function StatusBadge({ status }: { status: RequestStatus }) {
+  const tone = STATUS_STYLES[status];
   return (
-    <div style={{ paddingBottom: last ? 0 : 20, borderBottom: last ? "none" : "1px solid var(--brc-border)" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
-        {/* Car thumbnail */}
-        <div
-          style={{
-            width: 80,
-            height: 80,
-            borderRadius: 6,
-            border: "1px solid var(--brc-border)",
-            background: "#fff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-            flexShrink: 0,
-          }}
-        >
-          <Image
-            src="/car-lexus.png"
-            alt={req.car}
-            width={76}
-            height={52}
-            style={{ width: "90%", height: "auto", objectFit: "contain" }}
-          />
-        </div>
+    <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold [font-family:var(--brc-font-ui)]" style={{ background: tone.bg, color: tone.fg }}>
+      <span className="brc-status-dot size-2 rounded-full" style={{ background: tone.fg, "--status-ring": tone.ring } as DashboardStyle} />
+      {tone.label}
+    </span>
+  );
+}
 
-        {/* Details */}
-        <div style={{ flex: 1, minWidth: 180, display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 18, color: "var(--brc-text)" }}>
-            {req.car}
-          </span>
-          <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 14, color: "var(--brc-text-muted)" }}>
-            {req.renter}
-          </span>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              flexWrap: "wrap",
-              fontFamily: "var(--brc-font-ui)",
-              fontSize: 13,
-              color: "var(--brc-text-secondary)",
-            }}
-          >
-            <span>{req.kind}</span>
-            {req.duration && (
-              <>
-                <span style={{ color: "var(--brc-border-strong)" }}>&bull;</span>
-                <span>{req.duration}</span>
-              </>
-            )}
-            <span style={{ color: "var(--brc-border-strong)" }}>&bull;</span>
-            <span style={{ fontWeight: 700, color: "var(--brc-primary)" }}>{req.amount}</span>
+function RequestProgress({ status, delay = 0 }: { status: RequestStatus; delay?: number }) {
+  const steps = ["Requested", status === "approved" ? "Approved" : "Review", "Completed"];
+  const activeUntil = status === "approved" ? 1 : 0;
+  return (
+    <div className="mt-4 grid grid-cols-3 gap-2">
+      {steps.map((step, index) => {
+        const active = index <= activeUntil;
+        return (
+          <div key={step} className="min-w-0">
+            <div className="mb-2 h-1 overflow-hidden rounded-full bg-(--brc-bg-muted)">
+              <span className={`brc-progress-fill block h-full rounded-full ${active ? "bg-(--brc-accent)" : "bg-transparent"}`} style={{ "--delay": `${delay + index * 120}ms` } as DashboardStyle} />
+            </div>
+            <span className={`block truncate text-[11px] font-bold [font-family:var(--brc-font-ui)] ${active ? "text-(--brc-accent)" : "text-(--brc-text-muted)"}`}>{step}</span>
           </div>
-        </div>
-
-        {/* Status badge — top-right */}
-        <span
-          style={{
-            fontFamily: "var(--brc-font-ui)",
-            fontWeight: 600,
-            fontSize: 12,
-            padding: "4px 12px",
-            borderRadius: "var(--brc-radius-pill)",
-            background: s.bg,
-            color: s.fg,
-            flexShrink: 0,
-            alignSelf: "flex-start",
-          }}
-        >
-          {s.label}
-        </span>
-      </div>
-
-      {/* Footer */}
-      <div
-        style={{
-          marginTop: 12,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
-      >
-        <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 13, color: "var(--brc-text-muted)" }}>
-          {req.status === "approved" ? "Approved — awaiting payment from renter" : "Waiting for your approval"}
-        </span>
-        {req.status === "approved" && (
-          <Link
-            href="/owner/requests"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              fontFamily: "var(--brc-font-ui)",
-              fontWeight: 700,
-              fontSize: 14,
-              color: "var(--brc-primary)",
-              textDecoration: "none",
-            }}
-          >
-            View request
-            <Icon name="arrow" size={16} stroke="var(--brc-primary)" />
-          </Link>
-        )}
-      </div>
+        );
+      })}
     </div>
   );
 }
 
-function PanelCard({ title, children }: { title: string; children: React.ReactNode }) {
+function RequestCard({ req, delay }: { req: IncomingRequest; delay: number }) {
   return (
-    <section style={{ ...cardBase, padding: "20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
-      <h2 style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 18, color: "var(--brc-text)", margin: 0 }}>
-        {title}
-      </h2>
-      {children}
-    </section>
+    <article className="brc-dashboard-card brc-dashboard-reveal rounded-2xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] sm:p-5" style={{ "--delay": `${delay}ms` } as DashboardStyle}>
+      <div className="grid gap-4 sm:grid-cols-[84px_1fr]">
+        <div className="relative flex h-20 items-center justify-center overflow-hidden rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle)">
+          <Image src="/car-lexus.png" alt={req.car} width={92} height={60} className="brc-dashboard-car-thumb object-contain transition-transform duration-300 hover:scale-105" style={{ width: "88%", height: "auto" }} />
+        </div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="m-0 truncate text-base font-extrabold text-(--brc-text) [font-family:var(--brc-font-ui)]">{req.car}</h3>
+              <p className="mt-1 text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{req.party}</p>
+            </div>
+            <StatusBadge status={req.status} />
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+            <span className="rounded-full bg-(--brc-bg-muted) px-2.5 py-1 text-xs font-bold">{req.mode}</span>
+            {req.days != null && (<><span aria-hidden="true" className="text-(--brc-border-strong)">&bull;</span><span>{req.days} days</span></>)}
+            <span aria-hidden="true" className="text-(--brc-border-strong)">&bull;</span>
+            <span className="font-extrabold text-(--brc-accent)">{naira(req.price)}</span>
+          </div>
+          <RequestProgress status={req.status} delay={delay + 220} />
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="m-0 text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{req.note}</p>
+            {req.action && (
+              <Link href={req.action.href} className="group inline-flex items-center gap-2 text-sm font-extrabold text-(--brc-accent) no-underline [font-family:var(--brc-font-ui)]">
+                {req.action.label}
+                <span className="flex transition-transform duration-200 group-hover:translate-x-1"><Icon name="arrow" size={15} stroke="currentColor" /></span>
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+    </article>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
+function TopCarCard({ car, delay }: { car: (typeof TOP_CARS)[number]; delay: number }) {
+  return (
+    <Link href={car.href} className="brc-dashboard-card brc-dashboard-reveal group grid grid-cols-[88px_1fr] gap-4 rounded-2xl border border-(--brc-border) bg-white p-4 no-underline shadow-[var(--brc-shadow-xs)]" style={{ "--delay": `${delay}ms` } as DashboardStyle}>
+      <div className="relative flex h-20 items-center justify-center overflow-hidden rounded-xl bg-(--brc-accent-bg)">
+        <Image src="/car-lexus.png" alt={car.name} width={92} height={58} className="brc-dashboard-car-thumb object-contain transition-transform duration-300 group-hover:scale-105" style={{ width: "88%", height: "auto" }} />
+      </div>
+      <div className="min-w-0">
+        <div className="mb-2 flex items-center gap-2">
+          <span className="rounded-full bg-(--brc-bg-muted) px-2 py-0.5 text-[11px] font-bold text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">{car.tag}</span>
+          <span className="truncate text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{car.location}</span>
+        </div>
+        <h3 className="m-0 truncate text-sm font-extrabold text-(--brc-text) [font-family:var(--brc-font-ui)]">{car.name}</h3>
+        <p className="mt-1 text-sm font-black text-(--brc-accent) [font-family:var(--brc-font-display)]">{naira(car.price)}</p>
+        <p className="mt-0.5 text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{car.suffix}</p>
+      </div>
+    </Link>
+  );
+}
+
+function EarningsSnapshot() {
+  return (
+    <section className="brc-dashboard-card brc-dashboard-reveal overflow-hidden rounded-2xl border border-(--brc-border) bg-(--brc-surface-inverse) p-5 text-white shadow-[var(--brc-shadow-xs)]" style={{ "--delay": "520ms" } as DashboardStyle}>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-white/60 [font-family:var(--brc-font-ui)]">Loyalty</p>
+          <h2 className="m-0 text-lg font-extrabold [font-family:var(--brc-font-display)]">Reward Center</h2>
+        </div>
+        <span className="flex size-11 items-center justify-center rounded-full bg-white/10"><Icon name="gift" size={20} stroke="#fff" /></span>
+      </div>
+      <div className="mb-4 flex items-end justify-between gap-4">
+        <div>
+          <p className="m-0 text-4xl font-black [font-family:var(--brc-font-display)]">120</p>
+          <p className="m-0 text-sm text-white/60 [font-family:var(--brc-font-ui)]">available points</p>
+        </div>
+        <Link href="/owner/loyalty" className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-extrabold text-(--brc-accent) no-underline transition-transform duration-200 hover:-translate-y-0.5 [font-family:var(--brc-font-ui)]">
+          View
+          <Icon name="arrow" size={14} stroke="currentColor" />
+        </Link>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+        <div className="brc-progress-fill h-full w-[68%] rounded-full bg-(--brc-warning)" style={{ "--delay": "760ms" } as DashboardStyle} />
+      </div>
+      <p className="mt-3 text-xs text-white/60 [font-family:var(--brc-font-ui)]">180 more points unlock your next reward tier.</p>
+    </section>
+  );
+}
 
 export default function OwnerDashboard() {
   const greeting = useGreeting();
   const { data: user } = useMe();
   const firstName = user?.first_name || "";
+  const greetingText = firstName ? `${greeting}, ${firstName}` : `${greeting}, welcome back`;
 
   return (
-    <div
-      style={{
-        maxWidth: 1232,
-        margin: "0 auto",
-        width: "100%",
-        padding: "clamp(28px, 5vw, 48px) clamp(20px, 8vw, 104px) 64px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 28,
-      }}
-    >
-      {/* Greeting */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <h1 style={{ fontFamily: "var(--brc-font-display)", fontWeight: 800, fontSize: "clamp(28px, 6vw, 44px)", color: "var(--brc-text)", margin: 0 }}>
-          {greeting}, {firstName}
-        </h1>
-        <p style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text-muted)", margin: 0 }}>
-          Here&apos;s what&apos;s happening with your listings
-        </p>
-      </div>
+    <div className="min-h-screen bg-[linear-gradient(180deg,#FAFAFA_0%,#FFFFFF_46%,#FAFAFA_100%)]">
+      <div className="mx-auto flex w-full max-w-[1232px] flex-col gap-7 px-5 py-7 sm:px-8 sm:py-9 lg:px-[104px] lg:py-12">
+        {/* Hero */}
+        <section className="brc-dashboard-hero brc-dashboard-reveal relative overflow-hidden rounded-3xl border border-(--brc-border) bg-white shadow-[0_20px_48px_rgba(18,18,18,0.06)]">
+          <div className="grid min-h-[260px] gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_360px] lg:p-10">
+            <div className="relative z-10 flex flex-col justify-between gap-8">
+              <div>
+                <span className="brc-dashboard-pill mb-4 inline-flex items-center gap-2 rounded-full bg-(--brc-accent-bg) px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.12em] text-(--brc-accent) [font-family:var(--brc-font-ui)]">
+                  <span className="brc-live-dot size-2 rounded-full bg-(--brc-accent)" />
+                  Owner dashboard
+                </span>
+                <h1 className="m-0 max-w-2xl text-[clamp(2rem,6vw,3.4rem)] font-black leading-[1.04] text-(--brc-text) [font-family:var(--brc-font-display)]">{greetingText}</h1>
+                <p className="mt-4 max-w-xl text-base leading-7 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">You have 3 pending rental requests and 5 cars listed for rent.</p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <DashboardButton href="/owner/my-cars">Manage Cars</DashboardButton>
+                <DashboardButton href="/owner/requests" variant="soft">View Requests</DashboardButton>
+              </div>
+            </div>
+            <div className="relative hidden min-h-[220px] items-end justify-center lg:flex">
+              <div className="brc-dashboard-car-shadow absolute inset-x-8 bottom-7 h-8 rounded-full bg-[rgba(195,101,35,0.12)] blur-xl" />
+              <div className="brc-dashboard-badge-pop absolute right-0 top-0 rounded-2xl border border-(--brc-border) bg-(--brc-bg-subtle) px-4 py-3 text-sm font-bold text-(--brc-text-secondary) shadow-[var(--brc-shadow-xs)] [font-family:var(--brc-font-ui)]">Verified owner</div>
+              <Image src="/car-lexus.png" alt="Lexus car" width={360} height={230} priority className="brc-dashboard-hero-car relative z-10 object-contain" style={{ width: "100%", maxWidth: 360, height: "auto" }} />
+            </div>
+          </div>
+        </section>
 
-      {/* Stat tiles */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-          gap: "clamp(14px, 2vw, 20px)",
-        }}
-      >
-        {OWNER_STATS.map((tile) => (
-          <StatTile key={tile.label} tile={tile} />
-        ))}
-      </div>
-
-      {/* Quick Links */}
-      <PanelCard title="Quick Links">
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
-            gap: "clamp(12px, 2vw, 16px)",
-          }}
-        >
-          {OWNER_QUICK_LINKS.map((link) => (
-            <QuickLinkTile key={link.label} link={link} />
+        {/* Stats */}
+        <section aria-label="Owner summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {OWNER_STATS.map((stat, index) => (
+            <StatCard key={stat.label} stat={stat} delay={80 + index * 70} />
           ))}
-        </div>
-      </PanelCard>
+        </section>
 
-      {/* Recent Incoming Requests */}
-      <PanelCard title="Recent Requests">
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {RECENT_REQUESTS.map((req, i) => (
-            <RequestRow key={req.id} req={req} last={i === RECENT_REQUESTS.length - 1} />
-          ))}
+        {/* Main + sidebar */}
+        <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="flex min-w-0 flex-col gap-7">
+            <section className="flex flex-col gap-4">
+              <SectionHeader eyebrow="Shortcuts" title="Quick Actions" />
+              <div className="grid gap-4 sm:grid-cols-2">
+                {OWNER_QUICK_LINKS.map((link, index) => (
+                  <QuickActionTile key={link.label} link={link} delay={220 + index * 70} />
+                ))}
+              </div>
+            </section>
+
+            <section className="flex flex-col gap-4">
+              <SectionHeader
+                eyebrow="Requests"
+                title="Incoming Requests"
+                action={
+                  <Link href="/owner/requests" className="group inline-flex items-center gap-2 text-sm font-extrabold text-(--brc-accent) no-underline [font-family:var(--brc-font-ui)]">
+                    View all
+                    <span className="flex transition-transform duration-200 group-hover:translate-x-1"><Icon name="arrow" size={15} stroke="currentColor" /></span>
+                  </Link>
+                }
+              />
+              <div className="flex flex-col gap-4">
+                {RECENT_REQUESTS.map((request, index) => (
+                  <RequestCard key={request.id} req={request} delay={380 + index * 70} />
+                ))}
+              </div>
+            </section>
+          </div>
+
+          <aside className="flex min-w-0 flex-col gap-7">
+            <section className="flex flex-col gap-4">
+              <SectionHeader eyebrow="Performance" title="Your Top Cars" />
+              <div className="flex flex-col gap-4">
+                {TOP_CARS.map((car, index) => (
+                  <TopCarCard key={car.id} car={car} delay={430 + index * 70} />
+                ))}
+              </div>
+            </section>
+            <EarningsSnapshot />
+          </aside>
         </div>
-      </PanelCard>
+      </div>
     </div>
   );
 }
