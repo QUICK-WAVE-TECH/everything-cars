@@ -1,7 +1,18 @@
 import os
+import dj_database_url
 from .base import *  # noqa: F401,F403
 
 DEBUG = False
+
+# Database — parse DATABASE_URL from Render/Railway
+if os.environ.get("DATABASE_URL"):
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=os.environ.get("DATABASE_URL"),
+            conn_max_age=600,
+            ssl_require=True,
+        )
+    }
 
 # CORS — whitelist frontend only
 CORS_ALLOWED_ORIGINS = os.environ.get(
