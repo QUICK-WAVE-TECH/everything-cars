@@ -51,6 +51,11 @@ class SignUpSerializer(serializers.Serializer):
                 )
         return value
 
+    def validate_country(self, value):
+        if value:
+            return value.upper()
+        return value
+
     def validate(self, data):
         if data["role"] == "owner":
             if not data.get("owner_type"):

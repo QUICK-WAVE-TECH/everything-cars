@@ -156,6 +156,7 @@ export default function SignUpPage() {
         address: values.address,
         state: values.state,
         city: values.city,
+        country: values.country,
       },
       {
         onSuccess: (data) => {
