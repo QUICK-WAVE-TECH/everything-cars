@@ -279,15 +279,6 @@ canvas {
   }
 }
 
-@keyframes brc-dashboard-sheen {
-  from {
-    transform: translateX(-140%) skewX(-14deg);
-  }
-  to {
-    transform: translateX(140%) skewX(-14deg);
-  }
-}
-
 @keyframes brc-dashboard-progress-fill {
   from {
     transform: scaleX(0);
@@ -387,31 +378,10 @@ canvas {
   z-index: 1;
 }
 
-.brc-dashboard-card::after {
-  content: "";
-  position: absolute;
-  inset: -35% -55%;
-  z-index: 2;
-  pointer-events: none;
-  background: linear-gradient(
-    105deg,
-    transparent 35%,
-    rgba(255, 255, 255, 0.55) 48%,
-    transparent 62%
-  );
-  opacity: 0;
-  transform: translateX(-140%) skewX(-14deg);
-}
-
 .brc-dashboard-card:hover {
   transform: translateY(-6px) scale(1.01);
   border-color: rgba(0, 0, 139, 0.22);
   box-shadow: 0 18px 34px rgba(18, 18, 18, 0.1);
-}
-
-.brc-dashboard-card:hover::after {
-  opacity: 1;
-  animation: brc-dashboard-sheen 760ms ease;
 }
 
 .brc-dashboard-icon-bubble,
@@ -472,17 +442,6 @@ canvas {
   opacity: 0.75;
 }
 
-.brc-dashboard-hero::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.78) 50%, transparent 62%);
-  transform: translateX(-120%) skewX(-14deg);
-  animation: brc-dashboard-sheen 1100ms ease 260ms both;
-}
-
 .brc-dashboard-hero-car {
   animation: brc-dashboard-float 5.2s ease-in-out infinite;
   transform-origin: center;
@@ -527,11 +486,6 @@ canvas {
   .brc-live-dot,
   .brc-status-dot {
     animation: none;
-  }
-
-  .brc-dashboard-card::after,
-  .brc-dashboard-hero::after {
-    display: none;
   }
 
   .brc-button-motion:hover,
