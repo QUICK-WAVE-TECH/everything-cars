@@ -14,6 +14,7 @@ import {
   Checkbox,
   UploadField,
   AuthShell,
+  PhoneField,
 } from "@/features/auth/components";
 import { useSignUp } from "@/features/auth/api";
 import { ownerSignUpSchema, type OwnerSignUpInput } from "@/features/auth/schemas";
@@ -24,6 +25,7 @@ export default function OwnerSignUpPage() {
   const [step, setStep] = useState(1);
   const [agree, setAgree] = useState(false);
   const [document, setDocument] = useState<File | null>(null);
+  const [phoneCode, setPhoneCode] = useState("+234"); // Default Nigeria
   const router = useRouter();
   const signUp = useSignUp();
 
@@ -50,6 +52,7 @@ export default function OwnerSignUpPage() {
     name: "owner_type",
   });
   const isCompany = ownerType === "fleet";
+
 
   const handleContinue = async () => {
     const valid = await form.trigger(["name", "email", "phone", "password", "confirmPassword", "owner_type"]);
@@ -148,7 +151,12 @@ export default function OwnerSignUpPage() {
                     )} />
                     <FormField control={form.control} name="phone" render={({ field }) => (
                       <FormItem>
-                        <AuthField label="Phone Number" placeholder="Enter your phone number" value={field.value ?? ""} onChange={field.onChange} />
+                        <PhoneField
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          code={phoneCode}
+                          onCodeChange={setPhoneCode}
+                        />
                         <FormMessage />
                       </FormItem>
                     )} />

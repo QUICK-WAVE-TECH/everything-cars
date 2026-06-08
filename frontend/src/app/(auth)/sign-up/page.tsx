@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,7 +11,12 @@ import {
   AuthButton,
   Checkbox,
   AuthShell,
+  CountrySelect,
+  StateSelect,
+  CityCombobox,
+  PhoneField,
 } from "@/features/auth/components";
+import { COUNTRIES } from "@/features/auth/data/countries";
 import { useSignUp } from "@/features/auth/api";
 import {
   customerSignUpSchema,
@@ -21,7 +26,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
-
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -32,6 +36,7 @@ import {
 export default function SignUpPage() {
   const [step, setStep] = useState(1);
   const [agree, setAgree] = useState(false);
+  const [phoneCode, setPhoneCode] = useState("+234"); // Default Nigeria
   const router = useRouter();
   const signUp = useSignUp();
 
@@ -48,8 +53,25 @@ export default function SignUpPage() {
       address: "",
       state: "",
       city: "",
+      country: "",
     },
   });
+
+  // Resolve country name from iso for geo API
+  const countryIso = form.watch("country");
+  const countryName = COUNTRIES.find((c) => c.iso === countryIso)?.name ?? "";
+  const countryDial = COUNTRIES.find((c) => c.iso === countryIso)?.dial;
+
+  // When country changes, auto-sync phone code
+  useEffect(() => {
+    if (countryDial) setPhoneCode(countryDial);
+  }, [countryDial]);
+
+  // When country changes, reset state and city
+  useEffect(() => {
+    form.setValue("state", "");
+    form.setValue("city", "");
+  }, [countryIso, form]);
 
   const handleContinue = async () => {
     const valid = await form.trigger([
@@ -174,11 +196,11 @@ export default function SignUpPage() {
                       name="phone"
                       render={({ field }) => (
                         <FormItem>
-                          <AuthField
-                            label="Phone Number"
-                            placeholder="Enter your phone number"
+                          <PhoneField
                             value={field.value ?? ""}
                             onChange={field.onChange}
+                            code={phoneCode}
+                            onCodeChange={setPhoneCode}
                           />
                           <FormMessage />
                         </FormItem>
@@ -277,6 +299,17 @@ export default function SignUpPage() {
                               <PopoverContent
                                 className="w-auto p-0"
                                 align="start"
+                                style={{
+                                  background: "rgba(255, 255, 255, 0.85)",
+                                  backdropFilter: "blur(16px) saturate(180%)",
+                                  WebkitBackdropFilter:
+                                    "blur(16px) saturate(180%)",
+                                  border:
+                                    "1px solid rgba(255, 255, 255, 0.3)",
+                                  borderRadius: "var(--brc-radius-lg)",
+                                  boxShadow:
+                                    "0 8px 32px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.1) inset",
+                                }}
                               >
                                 <Calendar
                                   mode="single"
@@ -328,12 +361,24 @@ export default function SignUpPage() {
                     />
                     <FormField
                       control={form.control}
+                      name="country"
+                      render={({ field }) => (
+                        <FormItem>
+                          <CountrySelect
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
                       name="state"
                       render={({ field }) => (
                         <FormItem>
-                          <AuthField
-                            label="State"
-                            placeholder="Select state"
+                          <StateSelect
+                            country={countryName}
                             value={field.value ?? ""}
                             onChange={field.onChange}
                           />
@@ -346,9 +391,9 @@ export default function SignUpPage() {
                       name="city"
                       render={({ field }) => (
                         <FormItem>
-                          <AuthField
-                            label="City"
-                            placeholder="Select city"
+                          <CityCombobox
+                            country={countryName}
+                            state={form.watch("state") ?? ""}
                             value={field.value ?? ""}
                             onChange={field.onChange}
                           />

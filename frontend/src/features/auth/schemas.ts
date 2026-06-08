@@ -14,6 +14,7 @@ export const customerSignUpSchema = z
     address: z.string().trim().optional(),
     state: z.string().trim().optional(),
     city: z.string().trim().optional(),
+    country: z.string().trim().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
