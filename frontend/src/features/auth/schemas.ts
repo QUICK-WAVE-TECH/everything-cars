@@ -6,6 +6,10 @@ const phoneSchema = z
   .trim()
   .regex(/^\d*$/, "Phone number must contain digits only")
   .optional();
+const optionalDigitsSchema = (message: string) =>
+  z.string().trim().regex(/^\d*$/, message).optional();
+const requiredDigitsSchema = (requiredMessage: string, digitsMessage: string) =>
+  z.string().trim().min(1, requiredMessage).regex(/^\d+$/, digitsMessage);
 
 export const customerSignUpSchema = z
   .object({
@@ -39,13 +43,16 @@ export const ownerSignUpSchema = z
       message: "Select ownership type",
     }),
     fleet_name: z.string().trim().optional(),
-    national_id: z.string().trim().optional(),
+    national_id: optionalDigitsSchema("National ID must contain digits only"),
     location: z.string().trim().optional(),
     rc_number: z.string().trim().optional(),
     country: z.string().trim().optional(),
     state: z.string().trim().optional(),
     city: z.string().trim().optional(),
-    bank_account: z.string().trim().min(1, "Bank account is required"),
+    bank_account: requiredDigitsSchema(
+      "Bank account is required",
+      "Bank account number must contain digits only",
+    ),
     bank_name: z.string().trim().min(1, "Bank name is required"),
   })
   .superRefine((data, ctx) => {

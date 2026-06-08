@@ -1,6 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useState,
+  type HTMLInputTypeAttribute,
+  type InputHTMLAttributes,
+} from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Icon } from "./icon";
@@ -12,14 +16,28 @@ type AuthFieldProps = {
   value?: string;
   defaultValue?: string;
   onChange?: (value: string) => void;
-  type?: "text" | "password" | "select";
+  type?: HTMLInputTypeAttribute | "select";
+  inputMode?: InputHTMLAttributes<HTMLInputElement>["inputMode"];
+  pattern?: string;
   required?: boolean;
 };
 
-export function AuthField({ label, placeholder, name, value, defaultValue, onChange, type = "text", required }: AuthFieldProps) {
+export function AuthField({
+  label,
+  placeholder,
+  name,
+  value,
+  defaultValue,
+  onChange,
+  type = "text",
+  inputMode,
+  pattern,
+  required,
+}: AuthFieldProps) {
   const [show, setShow] = useState(false);
   const isPw = type === "password";
   const isSelect = type === "select";
+  const inputType = isPw ? (show ? "text" : "password") : isSelect ? "text" : type;
 
   return (
     <div className="flex flex-col gap-2">
@@ -37,11 +55,13 @@ export function AuthField({ label, placeholder, name, value, defaultValue, onCha
         }}
       >
         <Input
-          type={isPw && !show ? "password" : "text"}
+          type={inputType}
           name={name}
           value={value}
           defaultValue={defaultValue}
           placeholder={placeholder}
+          inputMode={inputMode}
+          pattern={pattern}
           readOnly={isSelect}
           required={required}
           onChange={(e) => onChange?.(e.target.value)}

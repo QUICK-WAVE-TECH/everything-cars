@@ -44,10 +44,15 @@ class SignUpSerializer(serializers.Serializer):
                 "application/pdf",
                 "application/msword",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/heic",
+                "image/heif",
             ]
             if value.content_type not in allowed:
                 raise serializers.ValidationError(
-                    "Only PDF, DOC, and DOCX files are allowed."
+                    "Only PDF, DOC, DOCX, JPG, PNG, and WEBP files are allowed."
                 )
         return value
 

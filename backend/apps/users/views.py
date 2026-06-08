@@ -1,6 +1,10 @@
 # Create your views here.
+import logging
+
 from django.conf import settings
 from django.db import transaction
+
+logger = logging.getLogger(__name__)
 
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -29,8 +33,10 @@ class SignUpView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-
+        logger.info("Sign-up request data keys: %s", list(request.data.keys()))
         serializer = SignUpSerializer(data=request.data)
+        if not serializer.is_valid():
+            logger.warning("Sign-up validation errors: %s", serializer.errors)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 

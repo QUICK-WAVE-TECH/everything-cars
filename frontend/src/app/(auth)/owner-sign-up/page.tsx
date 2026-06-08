@@ -25,6 +25,8 @@ import { ownerSignUpSchema, type OwnerSignUpInput } from "@/features/auth/schema
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
 
+const onlyDigits = (value: string) => value.replace(/\D/g, "");
+
 export default function OwnerSignUpPage() {
   const [step, setStep] = useState(1);
   const [agree, setAgree] = useState(false);
@@ -223,7 +225,7 @@ export default function OwnerSignUpPage() {
                         )} />
                         <UploadField
                           label="Upload CAC Document"
-                          hint="PDF, DOC, or DOCX (Max 9MB)"
+                          hint="PDF, DOC, DOCX, JPG, PNG, or WEBP (Max 9MB)"
                           value={document?.name}
                           onPick={setDocument}
                         />
@@ -265,13 +267,21 @@ export default function OwnerSignUpPage() {
                         )} />
                         <FormField control={form.control} name="national_id" render={({ field }) => (
                           <FormItem>
-                            <AuthField label="National ID" placeholder="Enter your ID number" value={field.value ?? ""} onChange={field.onChange} />
+                            <AuthField
+                              label="National ID"
+                              placeholder="Enter your ID number"
+                              value={field.value ?? ""}
+                              onChange={(value) => field.onChange(onlyDigits(value))}
+                              type="tel"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                            />
                             <FormMessage />
                           </FormItem>
                         )} />
                         <UploadField
                           label="Upload Car Ownership Document"
-                          hint="PDF, DOC, or DOCX (Max 9MB)"
+                          hint="PDF, DOC, DOCX, JPG, PNG, or WEBP (Max 9MB)"
                           value={document?.name}
                           onPick={setDocument}
                         />
@@ -279,7 +289,15 @@ export default function OwnerSignUpPage() {
                     )}
                     <FormField control={form.control} name="bank_account" render={({ field }) => (
                       <FormItem>
-                        <AuthField label="Bank Account Number" placeholder="Enter bank account number" value={field.value} onChange={field.onChange} />
+                        <AuthField
+                          label="Bank Account Number"
+                          placeholder="Enter bank account number"
+                          value={field.value}
+                          onChange={(value) => field.onChange(onlyDigits(value))}
+                          type="tel"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                        />
                         <FormMessage />
                       </FormItem>
                     )} />
