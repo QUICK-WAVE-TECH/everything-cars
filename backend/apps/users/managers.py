@@ -9,7 +9,7 @@ class UserManager(BaseUserManager):
             raise ValueError("Users must have a password")
         email = self.normalize_email(email)
         extra_fields.setdefault("is_active", False)
-        user = self.model(email=email, first_name=first_name, last_name=last_name, role=role, **extra_fields)
+        user = self.model(email=email, first_name=first_name.strip().title(), last_name=last_name.strip().title(), role=role, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
