@@ -15,7 +15,11 @@ import {
   UploadField,
   AuthShell,
   PhoneField,
+  CountrySelect,
+  StateSelect,
+  CityCombobox,
 } from "@/features/auth/components";
+import { COUNTRIES } from "@/features/auth/data/countries";
 import { useSignUp } from "@/features/auth/api";
 import { ownerSignUpSchema, type OwnerSignUpInput } from "@/features/auth/schemas";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,7 +29,7 @@ export default function OwnerSignUpPage() {
   const [step, setStep] = useState(1);
   const [agree, setAgree] = useState(false);
   const [document, setDocument] = useState<File | null>(null);
-  const [phoneCode, setPhoneCode] = useState("+234"); // Default Nigeria
+  const [phoneCode, setPhoneCode] = useState("+234");
   const router = useRouter();
   const signUp = useSignUp();
 
@@ -44,15 +48,24 @@ export default function OwnerSignUpPage() {
       rc_number: "",
       bank_account: "",
       bank_name: "",
+      country: "",
+      state: "",
+      city: "",
     },
   });
 
-  const ownerType = useWatch({
-    control: form.control,
-    name: "owner_type",
-  });
+  const ownerType = useWatch({ control: form.control, name: "owner_type" });
+  const countryIso = useWatch({ control: form.control, name: "country" });
+  const countryName = COUNTRIES.find((c) => c.iso === countryIso)?.name ?? "";
   const isCompany = ownerType === "fleet";
 
+  const handleCountryChange = (value: string, onChange: (v: string) => void) => {
+    onChange(value);
+    const dial = COUNTRIES.find((c) => c.iso === value)?.dial;
+    if (dial) setPhoneCode(dial);
+    form.setValue("state", "");
+    form.setValue("city", "");
+  };
 
   const handleContinue = async () => {
     const valid = await form.trigger(["name", "email", "phone", "password", "confirmPassword", "owner_type"]);
@@ -104,7 +117,6 @@ export default function OwnerSignUpPage() {
       void handleContinue();
       return;
     }
-
     void form.handleSubmit(handleSubmit)(event);
   };
 
@@ -210,9 +222,36 @@ export default function OwnerSignUpPage() {
                       </>
                     ) : (
                       <>
+                        <FormField control={form.control} name="country" render={({ field }) => (
+                          <FormItem>
+                            <CountrySelect
+                              value={field.value ?? ""}
+                              onChange={(v) => handleCountryChange(v, field.onChange)}
+                            />
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name="state" render={({ field }) => (
+                          <FormItem>
+                            <StateSelect country={countryName} value={field.value ?? ""} onChange={field.onChange} label="State" />
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name="city" render={({ field }) => (
+                          <FormItem>
+                            <CityCombobox
+                              country={countryName}
+                              state={form.getValues("state") ?? ""}
+                              value={field.value ?? ""}
+                              onChange={field.onChange}
+                              label="City"
+                            />
+                            <FormMessage />
+                          </FormItem>
+                        )} />
                         <FormField control={form.control} name="location" render={({ field }) => (
                           <FormItem>
-                            <AuthField label="Location" placeholder="Enter location" value={field.value ?? ""} onChange={field.onChange} />
+                            <AuthField label="Address" placeholder="Enter your address" value={field.value ?? ""} onChange={field.onChange} />
                             <FormMessage />
                           </FormItem>
                         )} />

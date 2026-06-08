@@ -1,12 +1,17 @@
 import { z } from "zod";
 
 const isBlank = (value?: string) => !value?.trim();
+const phoneSchema = z
+  .string()
+  .trim()
+  .regex(/^\d*$/, "Phone number must contain digits only")
+  .optional();
 
 export const customerSignUpSchema = z
   .object({
     name: z.string().trim().min(2, "Name must be at least 2 characters"),
     email: z.string().trim().email("Invalid email address"),
-    phone: z.string().trim().optional(),
+    phone: phoneSchema,
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string(),
     drivers_license: z.string().trim().optional(),
@@ -25,7 +30,7 @@ export const ownerSignUpSchema = z
   .object({
     name: z.string().trim().min(2, "Name must be at least 2 characters"),
     email: z.string().trim().email("Invalid email address"),
-    phone: z.string().trim().optional(),
+    phone: phoneSchema,
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string(),
     owner_type: z.enum(["individual", "fleet"], {
@@ -35,6 +40,9 @@ export const ownerSignUpSchema = z
     national_id: z.string().trim().optional(),
     location: z.string().trim().optional(),
     rc_number: z.string().trim().optional(),
+    country: z.string().trim().optional(),
+    state: z.string().trim().optional(),
+    city: z.string().trim().optional(),
     bank_account: z.string().trim().min(1, "Bank account is required"),
     bank_name: z.string().trim().min(1, "Bank name is required"),
   })

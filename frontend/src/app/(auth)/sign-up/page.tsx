@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import {
   AuthField,
@@ -25,7 +25,11 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import {
+  CalendarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+} from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -33,12 +37,22 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
+const MIN_BIRTH_YEAR = 1920;
+const DEFAULT_BIRTH_MONTH = new Date(2000, 0);
+
 export default function SignUpPage() {
   const [step, setStep] = useState(1);
   const [agree, setAgree] = useState(false);
   const [phoneCode, setPhoneCode] = useState("+234"); // Default Nigeria
+  const [birthMonth, setBirthMonth] = useState(DEFAULT_BIRTH_MONTH);
+  const [birthYearInput, setBirthYearInput] = useState(
+    String(DEFAULT_BIRTH_MONTH.getFullYear()),
+  );
   const router = useRouter();
   const signUp = useSignUp();
+  const today = new Date();
+  const maxBirthYear = today.getFullYear();
+  const maxBirthMonth = today.getMonth();
 
   const form = useForm<CustomerSignUpInput>({
     resolver: zodResolver(customerSignUpSchema),
@@ -58,20 +72,52 @@ export default function SignUpPage() {
   });
 
   // Resolve country name from iso for geo API
-  const countryIso = form.watch("country");
+  const countryIso = useWatch({
+    control: form.control,
+    name: "country",
+  });
+  const stateName = useWatch({
+    control: form.control,
+    name: "state",
+  });
   const countryName = COUNTRIES.find((c) => c.iso === countryIso)?.name ?? "";
-  const countryDial = COUNTRIES.find((c) => c.iso === countryIso)?.dial;
-
-  // When country changes, auto-sync phone code
-  useEffect(() => {
-    if (countryDial) setPhoneCode(countryDial);
-  }, [countryDial]);
-
-  // When country changes, reset state and city
-  useEffect(() => {
+  const handleCountryChange = (value: string, onChange: (value: string) => void) => {
+    onChange(value);
+    const dial = COUNTRIES.find((country) => country.iso === value)?.dial;
+    if (dial) setPhoneCode(dial);
     form.setValue("state", "");
     form.setValue("city", "");
-  }, [countryIso, form]);
+  };
+  const getSafeBirthMonth = (year: number, month: number) => {
+    const safeYear = Math.min(Math.max(year, MIN_BIRTH_YEAR), maxBirthYear);
+    const safeMonth =
+      safeYear === maxBirthYear ? Math.min(month, maxBirthMonth) : month;
+
+    return new Date(safeYear, safeMonth, 1);
+  };
+  const updateBirthMonth = (date: Date) => {
+    const nextMonth = getSafeBirthMonth(date.getFullYear(), date.getMonth());
+
+    setBirthMonth(nextMonth);
+    setBirthYearInput(String(nextMonth.getFullYear()));
+  };
+  const handleBirthYearInput = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 4);
+
+    setBirthYearInput(digits);
+    if (digits.length === 4) {
+      updateBirthMonth(getSafeBirthMonth(Number(digits), birthMonth.getMonth()));
+    }
+  };
+  const commitBirthYearInput = () => {
+    const parsedYear = Number(birthYearInput);
+    updateBirthMonth(
+      getSafeBirthMonth(
+        Number.isFinite(parsedYear) ? parsedYear : birthMonth.getFullYear(),
+        birthMonth.getMonth(),
+      ),
+    );
+  };
 
   const handleContinue = async () => {
     const valid = await form.trigger([
@@ -297,7 +343,7 @@ export default function SignUpPage() {
                                 </div>
                               </PopoverTrigger>
                               <PopoverContent
-                                className="w-auto p-0"
+                                className="w-[calc(100vw-2rem)] max-w-80 p-0 sm:w-auto"
                                 align="start"
                                 style={{
                                   background: "rgba(255, 255, 255, 0.85)",
@@ -311,31 +357,86 @@ export default function SignUpPage() {
                                     "0 8px 32px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.1) inset",
                                 }}
                               >
+                                <div className="flex items-center justify-end border-b border-(--brc-border) px-3 py-2">
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      aria-label="Previous year"
+                                      disabled={
+                                        birthMonth.getFullYear() <=
+                                        MIN_BIRTH_YEAR
+                                      }
+                                      onClick={() =>
+                                        updateBirthMonth(
+                                          new Date(
+                                            birthMonth.getFullYear() - 1,
+                                            birthMonth.getMonth(),
+                                            1,
+                                          ),
+                                        )
+                                      }
+                                      className="flex size-8 items-center justify-center rounded-md border border-(--brc-border) bg-white text-(--brc-text) transition hover:border-(--brc-primary) hover:bg-[var(--brc-primary-tint)] disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                      <ChevronLeftIcon className="size-4" />
+                                    </button>
+                                    <input
+                                      aria-label="Birth year"
+                                      inputMode="numeric"
+                                      min={MIN_BIRTH_YEAR}
+                                      max={maxBirthYear}
+                                      value={birthYearInput}
+                                      onBlur={commitBirthYearInput}
+                                      onChange={(event) =>
+                                        handleBirthYearInput(
+                                          event.target.value,
+                                        )
+                                      }
+                                      className="h-8 w-20 rounded-md border border-(--brc-border) bg-(--brc-bg-subtle) px-2 text-center text-sm font-medium text-(--brc-text) outline-none transition focus:border-(--brc-primary) focus:ring-2 focus:ring-[rgba(0,0,152,0.14)]"
+                                    />
+                                    <button
+                                      type="button"
+                                      aria-label="Next year"
+                                      disabled={
+                                        birthMonth.getFullYear() >= maxBirthYear
+                                      }
+                                      onClick={() =>
+                                        updateBirthMonth(
+                                          new Date(
+                                            birthMonth.getFullYear() + 1,
+                                            birthMonth.getMonth(),
+                                            1,
+                                          ),
+                                        )
+                                      }
+                                      className="flex size-8 items-center justify-center rounded-md border border-(--brc-border) bg-white text-(--brc-text) transition hover:border-(--brc-primary) hover:bg-[var(--brc-primary-tint)] disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                      <ChevronRightIcon className="size-4" />
+                                    </button>
+                                  </div>
+                                </div>
                                 <Calendar
-                                  className="p-3 [&_.rdp-month]:space-y-4 [&_.rdp-caption_label]:font-medium [&_.rdp-nav]:space-x-1 [&_.rdp-day_button]:h-9 [&_.rdp-day_button]:w-9 [&_.rdp-day_button]:rounded-lg [&_.rdp-day_button]:text-sm [&_.rdp-day_button:hover]:bg-[var(--brc-primary-tint)] [&_.rdp-day_selected_.rdp-day_button]:bg-[var(--brc-primary)] [&_.rdp-day_selected_.rdp-day_button]:text-white [&_.rdp-day_today_.rdp-day_button]:border [&_.rdp-day_today_.rdp-day_button]:border-[var(--brc-primary)] [&_select]:max-h-[200px] [&_select]:overflow-y-auto [&_select]:rounded-md [&_select]:border [&_select]:border-(--brc-border) [&_select]:bg-white [&_select]:px-2 [&_select]:py-1 [&_select]:text-sm"
+                                  className="p-3 [&_.rdp-month]:space-y-4 [&_.rdp-caption_label]:font-medium [&_.rdp-nav]:space-x-1 [&_.rdp-day_button]:h-9 [&_.rdp-day_button]:w-9 [&_.rdp-day_button]:rounded-lg [&_.rdp-day_button]:text-sm [&_.rdp-day_button:hover]:bg-[var(--brc-primary-tint)] [&_.rdp-day_selected_.rdp-day_button]:bg-[var(--brc-primary)] [&_.rdp-day_selected_.rdp-day_button]:text-white [&_.rdp-day_today_.rdp-day_button]:border [&_.rdp-day_today_.rdp-day_button]:border-[var(--brc-primary)]"
                                   mode="single"
                                   selected={
                                     field.value
                                       ? new Date(field.value)
                                       : undefined
                                   }
-                                  onSelect={(date) =>
+                                  onSelect={(date) => {
                                     field.onChange(
                                       date ? format(date, "yyyy-MM-dd") : "",
-                                    )
-                                  }
+                                    );
+                                    if (date) updateBirthMonth(date);
+                                  }}
                                   disabled={(date) =>
-                                    date > new Date() ||
+                                    date > today ||
                                     date < new Date("1920-01-01")
                                   }
-                                  defaultMonth={
-                                    field.value
-                                      ? new Date(field.value)
-                                      : new Date(2000, 0)
-                                  }
-                                  captionLayout="dropdown"
+                                  month={birthMonth}
+                                  onMonthChange={updateBirthMonth}
+                                  captionLayout="label"
                                   startMonth={new Date(1920, 0)}
-                                  endMonth={new Date()}
+                                  endMonth={today}
                                 />
                               </PopoverContent>
                             </Popover>
@@ -352,7 +453,9 @@ export default function SignUpPage() {
                         <FormItem>
                           <CountrySelect
                             value={field.value ?? ""}
-                            onChange={field.onChange}
+                            onChange={(value) =>
+                              handleCountryChange(value, field.onChange)
+                            }
                           />
                           <FormMessage />
                         </FormItem>
@@ -379,7 +482,7 @@ export default function SignUpPage() {
                         <FormItem>
                           <CityCombobox
                             country={countryName}
-                            state={form.watch("state") ?? ""}
+                            state={stateName ?? ""}
                             value={field.value ?? ""}
                             onChange={field.onChange}
                           />

@@ -1,6 +1,12 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, CustomerProfile, OwnerProfile, AccessCode, RefreshTokenBlacklist
+from .models import (
+    User,
+    CustomerProfile,
+    OwnerProfile,
+    AccessCode,
+    RefreshTokenBlacklist,
+)
 
 
 class CustomerProfileInline(admin.StackedInline):
@@ -17,22 +23,51 @@ class OwnerProfileInline(admin.StackedInline):
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ("email", "name", "role", "is_active", "is_staff", "date_joined")
+    list_display = (
+        "email",
+        "first_name",
+        "last_name",
+        "role",
+        "is_active",
+        "is_staff",
+        "date_joined",
+    )
     list_filter = ("role", "is_active", "is_staff")
-    search_fields = ("email", "name", "phone")
+    search_fields = ("email", "first_name", "last_name", "phone")
     ordering = ("-date_joined",)
     inlines = [CustomerProfileInline, OwnerProfileInline]
 
     fieldsets = (
-        (None, {"fields": ("email", "name", "phone", "role")}),
-        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
+        (None, {"fields": ("email", "first_name", "last_name", "phone", "role")}),
+        (
+            "Permissions",
+            {
+                "fields": (
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                )
+            },
+        ),
         ("Dates", {"fields": ("date_joined",)}),
     )
     add_fieldsets = (
-        (None, {
-            "classes": ("wide",),
-            "fields": ("email", "name", "role", "password1", "password2"),
-        }),
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": (
+                    "email",
+                    "first_name",
+                    "last_name",
+                    "role",
+                    "password1",
+                    "password2",
+                ),
+            },
+        ),
     )
 
 
