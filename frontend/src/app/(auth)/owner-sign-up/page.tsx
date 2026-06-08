@@ -14,23 +14,32 @@ import {
   Checkbox,
   UploadField,
   AuthShell,
+  PhoneField,
+  CountrySelect,
+  StateSelect,
+  CityCombobox,
 } from "@/features/auth/components";
+import { COUNTRIES } from "@/features/auth/data/countries";
 import { useSignUp } from "@/features/auth/api";
 import { ownerSignUpSchema, type OwnerSignUpInput } from "@/features/auth/schemas";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
 
+const onlyDigits = (value: string) => value.replace(/\D/g, "");
+
 export default function OwnerSignUpPage() {
   const [step, setStep] = useState(1);
   const [agree, setAgree] = useState(false);
   const [document, setDocument] = useState<File | null>(null);
+  const [phoneCode, setPhoneCode] = useState("+234");
   const router = useRouter();
   const signUp = useSignUp();
 
   const form = useForm<OwnerSignUpInput>({
     resolver: zodResolver(ownerSignUpSchema),
     defaultValues: {
-      name: "",
+      first_name: "",
+      last_name: "",
       email: "",
       phone: "",
       password: "",
@@ -42,17 +51,27 @@ export default function OwnerSignUpPage() {
       rc_number: "",
       bank_account: "",
       bank_name: "",
+      country: "",
+      state: "",
+      city: "",
     },
   });
 
-  const ownerType = useWatch({
-    control: form.control,
-    name: "owner_type",
-  });
+  const ownerType = useWatch({ control: form.control, name: "owner_type" });
+  const countryIso = useWatch({ control: form.control, name: "country" });
+  const countryName = COUNTRIES.find((c) => c.iso === countryIso)?.name ?? "";
   const isCompany = ownerType === "fleet";
 
+  const handleCountryChange = (value: string, onChange: (v: string) => void) => {
+    onChange(value);
+    const dial = COUNTRIES.find((c) => c.iso === value)?.dial;
+    if (dial) setPhoneCode(dial);
+    form.setValue("state", "");
+    form.setValue("city", "");
+  };
+
   const handleContinue = async () => {
-    const valid = await form.trigger(["name", "email", "phone", "password", "confirmPassword", "owner_type"]);
+    const valid = await form.trigger(["first_name", "last_name", "email", "phone", "password", "confirmPassword", "owner_type"]);
     if (!valid) {
       const firstError = Object.values(form.formState.errors)[0];
       if (firstError?.message) toast.error(firstError.message);
@@ -71,7 +90,8 @@ export default function OwnerSignUpPage() {
       {
         role: "owner",
         email: values.email,
-        name: values.name,
+        first_name: values.first_name,
+        last_name: values.last_name,
         password: values.password,
         phone: values.phone,
         owner_type: values.owner_type,
@@ -101,7 +121,6 @@ export default function OwnerSignUpPage() {
       void handleContinue();
       return;
     }
-
     void form.handleSubmit(handleSubmit)(event);
   };
 
@@ -134,9 +153,15 @@ export default function OwnerSignUpPage() {
                 {/* Step 1 */}
                 {step === 1 ? (
                   <div className="flex flex-col gap-4">
-                    <FormField control={form.control} name="name" render={({ field }) => (
+                    <FormField control={form.control} name="first_name" render={({ field }) => (
                       <FormItem>
-                        <AuthField label="Full Name" placeholder="First Name" value={field.value} onChange={field.onChange} />
+                        <AuthField label="First Name" placeholder="First Name" value={field.value} onChange={field.onChange} />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="last_name" render={({ field }) => (
+                      <FormItem>
+                        <AuthField label="Last Name" placeholder="Last Name" value={field.value} onChange={field.onChange} />
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -148,7 +173,12 @@ export default function OwnerSignUpPage() {
                     )} />
                     <FormField control={form.control} name="phone" render={({ field }) => (
                       <FormItem>
-                        <AuthField label="Phone Number" placeholder="Enter your phone number" value={field.value ?? ""} onChange={field.onChange} />
+                        <PhoneField
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          code={phoneCode}
+                          onCodeChange={setPhoneCode}
+                        />
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -195,28 +225,63 @@ export default function OwnerSignUpPage() {
                         )} />
                         <UploadField
                           label="Upload CAC Document"
-                          hint="PDF, DOC, or DOCX (Max 9MB)"
+                          hint="PDF, DOC, DOCX, JPG, PNG, or WEBP (Max 9MB)"
                           value={document?.name}
                           onPick={setDocument}
                         />
                       </>
                     ) : (
                       <>
+                        <FormField control={form.control} name="country" render={({ field }) => (
+                          <FormItem>
+                            <CountrySelect
+                              value={field.value ?? ""}
+                              onChange={(v) => handleCountryChange(v, field.onChange)}
+                            />
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name="state" render={({ field }) => (
+                          <FormItem>
+                            <StateSelect country={countryName} value={field.value ?? ""} onChange={field.onChange} label="State" />
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name="city" render={({ field }) => (
+                          <FormItem>
+                            <CityCombobox
+                              country={countryName}
+                              state={form.getValues("state") ?? ""}
+                              value={field.value ?? ""}
+                              onChange={field.onChange}
+                              label="City"
+                            />
+                            <FormMessage />
+                          </FormItem>
+                        )} />
                         <FormField control={form.control} name="location" render={({ field }) => (
                           <FormItem>
-                            <AuthField label="Location" placeholder="Enter location" value={field.value ?? ""} onChange={field.onChange} />
+                            <AuthField label="Address" placeholder="Enter your address" value={field.value ?? ""} onChange={field.onChange} />
                             <FormMessage />
                           </FormItem>
                         )} />
                         <FormField control={form.control} name="national_id" render={({ field }) => (
                           <FormItem>
-                            <AuthField label="National ID" placeholder="Enter your ID number" value={field.value ?? ""} onChange={field.onChange} />
+                            <AuthField
+                              label="National ID"
+                              placeholder="Enter your ID number"
+                              value={field.value ?? ""}
+                              onChange={(value) => field.onChange(onlyDigits(value))}
+                              type="tel"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                            />
                             <FormMessage />
                           </FormItem>
                         )} />
                         <UploadField
                           label="Upload Car Ownership Document"
-                          hint="PDF, DOC, or DOCX (Max 9MB)"
+                          hint="PDF, DOC, DOCX, JPG, PNG, or WEBP (Max 9MB)"
                           value={document?.name}
                           onPick={setDocument}
                         />
@@ -224,7 +289,15 @@ export default function OwnerSignUpPage() {
                     )}
                     <FormField control={form.control} name="bank_account" render={({ field }) => (
                       <FormItem>
-                        <AuthField label="Bank Account Number" placeholder="Enter bank account number" value={field.value} onChange={field.onChange} />
+                        <AuthField
+                          label="Bank Account Number"
+                          placeholder="Enter bank account number"
+                          value={field.value}
+                          onChange={(value) => field.onChange(onlyDigits(value))}
+                          type="tel"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                        />
                         <FormMessage />
                       </FormItem>
                     )} />

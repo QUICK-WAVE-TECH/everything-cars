@@ -1,12 +1,22 @@
 import { z } from "zod";
 
 const isBlank = (value?: string) => !value?.trim();
+const phoneSchema = z
+  .string()
+  .trim()
+  .regex(/^\d*$/, "Phone number must contain digits only")
+  .optional();
+const optionalDigitsSchema = (message: string) =>
+  z.string().trim().regex(/^\d*$/, message).optional();
+const requiredDigitsSchema = (requiredMessage: string, digitsMessage: string) =>
+  z.string().trim().min(1, requiredMessage).regex(/^\d+$/, digitsMessage);
 
 export const customerSignUpSchema = z
   .object({
-    name: z.string().trim().min(2, "Name must be at least 2 characters"),
+    first_name: z.string().trim().min(2, "First name must be at least 2 characters"),
+    last_name: z.string().trim().min(2, "Last name must be at least 2 characters"),
     email: z.string().trim().email("Invalid email address"),
-    phone: z.string().trim().optional(),
+    phone: phoneSchema,
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string(),
     drivers_license: z.string().trim().optional(),
@@ -14,6 +24,7 @@ export const customerSignUpSchema = z
     address: z.string().trim().optional(),
     state: z.string().trim().optional(),
     city: z.string().trim().optional(),
+    country: z.string().trim().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -22,19 +33,26 @@ export const customerSignUpSchema = z
 
 export const ownerSignUpSchema = z
   .object({
-    name: z.string().trim().min(2, "Name must be at least 2 characters"),
+    first_name: z.string().trim().min(2, "First name must be at least 2 characters"),
+    last_name: z.string().trim().min(2, "Last name must be at least 2 characters"),
     email: z.string().trim().email("Invalid email address"),
-    phone: z.string().trim().optional(),
+    phone: phoneSchema,
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string(),
     owner_type: z.enum(["individual", "fleet"], {
       message: "Select ownership type",
     }),
     fleet_name: z.string().trim().optional(),
-    national_id: z.string().trim().optional(),
+    national_id: optionalDigitsSchema("National ID must contain digits only"),
     location: z.string().trim().optional(),
     rc_number: z.string().trim().optional(),
-    bank_account: z.string().trim().min(1, "Bank account is required"),
+    country: z.string().trim().optional(),
+    state: z.string().trim().optional(),
+    city: z.string().trim().optional(),
+    bank_account: requiredDigitsSchema(
+      "Bank account is required",
+      "Bank account number must contain digits only",
+    ),
     bank_name: z.string().trim().min(1, "Bank name is required"),
   })
   .superRefine((data, ctx) => {

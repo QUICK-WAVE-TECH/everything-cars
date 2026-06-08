@@ -1,6 +1,8 @@
 import { config } from "./config";
 
 export class ApiError extends Error {
+  public retryAfter?: number;
+
   constructor(
     public status: number,
     message: string,
@@ -56,7 +58,17 @@ async function throwApiError(response: Response): Promise<never> {
     (errorData as { detail?: string }).detail ||
     `Request failed with status ${response.status}`;
 
-  throw new ApiError(response.status, message, errorData);
+  const error = new ApiError(response.status, message, errorData);
+
+  // Parse Retry-After header for 429 responses
+  if (response.status === 429) {
+    const retryAfter = response.headers.get("Retry-After");
+    if (retryAfter) {
+      error.retryAfter = Math.ceil(Number(retryAfter));
+    }
+  }
+
+  throw error;
 }
 
 function isAuthErrorStatus(status: number) {

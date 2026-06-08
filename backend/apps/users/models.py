@@ -17,7 +17,8 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True, db_index=True)
-    name = models.CharField(max_length=150)
+    first_name = models.CharField(max_length=150, default="")
+    last_name = models.CharField(max_length=150, default="")
     phone = models.CharField(max_length=20, blank=True, default="")
     role = models.CharField(max_length=10, choices=Role.choices)
     is_active = models.BooleanField(default=False)
@@ -27,13 +28,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     objects = UserManager()
 
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["name"]
+    REQUIRED_FIELDS = ["first_name", "last_name"]
 
     class Meta:
         db_table = "users"
 
     def __str__(self):
-        return f"{self.name} ({self.email})"
+        return f"{self.first_name} {self.last_name} ({self.email})"
 
 
 class CustomerProfile(models.Model):
@@ -57,7 +58,7 @@ class CustomerProfile(models.Model):
         verbose_name_plural = "Customer Profiles"
 
     def __str__(self):
-        return f"{self.user.name} - customer profile"
+        return f"{self.user.first_name} {self.user.last_name} - customer profile"
 
 
 def owner_document_path(instance, filename):
@@ -87,7 +88,7 @@ class OwnerProfile(models.Model):
         db_table = "owner_profiles"
 
     def __str__(self):
-        return f"{self.user.name} - {self.owner_type}"
+        return f"{self.user.first_name} {self.user.last_name} - {self.owner_type}"
 
 
 class AccessCode(models.Model):

@@ -7,6 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Icon } from "./icon";
 import { COUNTRIES, DEFAULT_COUNTRY, findCountryByDial, type Country } from "../data/countries";
 
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 function Flag({ iso, name }: { iso: string; name: string }) {
   return (
     <Image
@@ -175,10 +179,11 @@ export function PhoneField({
         {/* Phone number */}
         <Input
           type="tel"
-          inputMode="tel"
+          inputMode="numeric"
+          pattern="[0-9]*"
           value={value}
           placeholder={placeholder}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onChange(onlyDigits(e.target.value))}
           className="h-full border-0 bg-transparent px-4 text-sm shadow-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
           style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text)" }}
         />
