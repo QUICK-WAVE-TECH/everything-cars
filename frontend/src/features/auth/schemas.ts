@@ -9,7 +9,8 @@ const phoneSchema = z
 
 export const customerSignUpSchema = z
   .object({
-    name: z.string().trim().min(2, "Name must be at least 2 characters"),
+    first_name: z.string().trim().min(2, "First name must be at least 2 characters"),
+    last_name: z.string().trim().min(2, "Last name must be at least 2 characters"),
     email: z.string().trim().email("Invalid email address"),
     phone: phoneSchema,
     password: z.string().min(8, "Password must be at least 8 characters"),
@@ -28,7 +29,8 @@ export const customerSignUpSchema = z
 
 export const ownerSignUpSchema = z
   .object({
-    name: z.string().trim().min(2, "Name must be at least 2 characters"),
+    first_name: z.string().trim().min(2, "First name must be at least 2 characters"),
+    last_name: z.string().trim().min(2, "Last name must be at least 2 characters"),
     email: z.string().trim().email("Invalid email address"),
     phone: phoneSchema,
     password: z.string().min(8, "Password must be at least 8 characters"),

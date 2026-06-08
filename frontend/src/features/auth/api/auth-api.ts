@@ -8,7 +8,8 @@ import { useAuthStore } from "../store";
 
 type BaseSignUpData = {
   email: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   password: string;
   phone?: string;
 };
@@ -63,7 +64,8 @@ export type VerifyResponse = {
 export type UserProfile = {
   id: string;
   email: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   phone: string;
   role: UserRole;
   date_joined: string;

@@ -5,7 +5,8 @@ from .models import AccessCode, User, CustomerProfile, OwnerProfile
 
 class SignUpSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    name = serializers.CharField(min_length=2, max_length=150)
+    first_name = serializers.CharField(min_length=2, max_length=150)
+    last_name = serializers.CharField(min_length=2, max_length=150)
     password = serializers.CharField(min_length=8, write_only=True)
     phone = serializers.CharField(max_length=20, required=False, default="")
     role = serializers.ChoiceField(choices=User.Role.choices)
@@ -77,7 +78,7 @@ class VerifySerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "email", "name", "phone", "role", "date_joined"]
+        fields = ["id", "email", "first_name", "last_name", "phone", "role", "date_joined"]
         read_only_fields = ["id", "email", "role", "date_joined"]
 
 
@@ -136,7 +137,8 @@ class MeSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "email",
-            "name",
+            "first_name",
+            "last_name",
             "phone",
             "role",
             "date_joined",

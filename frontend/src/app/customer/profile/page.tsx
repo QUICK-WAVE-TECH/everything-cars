@@ -82,7 +82,8 @@ export default function ProfilePage() {
   }
   const profile = user.customer_profile;
   const fields: Field[] = [
-    { label: "Full Name", value: user.name, icon: "user" },
+    { label: "First Name", value: user.first_name, icon: "user" },
+    { label: "Last Name", value: user.last_name, icon: "user" },
     { label: "Email Address", value: user.email, icon: "mail" },
     { label: "Phone No", value: user.phone, icon: "phone" },
     {
@@ -173,7 +174,7 @@ export default function ProfilePage() {
                 flexShrink: 0,
               }}
             >
-              {initials(user.name)}
+              {initials(`${user.first_name} ${user.last_name}`)}
             </span>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <span
@@ -184,7 +185,7 @@ export default function ProfilePage() {
                   color: "var(--brc-text)",
                 }}
               >
-                {user.name}
+                {user.first_name} {user.last_name}
               </span>
               <span
                 style={{

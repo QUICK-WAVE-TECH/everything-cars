@@ -262,7 +262,7 @@ function PanelCard({ title, children }: { title: string; children: React.ReactNo
 export default function CustomerDashboard() {
   const greeting = useGreeting();
   const { data: user } = useMe();
-  const firstName = user?.name?.split(" ")[0] || "";
+  const firstName = user?.first_name || "";
 
   return (
     <div

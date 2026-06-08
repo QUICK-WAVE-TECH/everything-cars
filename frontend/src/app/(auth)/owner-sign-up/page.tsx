@@ -36,7 +36,8 @@ export default function OwnerSignUpPage() {
   const form = useForm<OwnerSignUpInput>({
     resolver: zodResolver(ownerSignUpSchema),
     defaultValues: {
-      name: "",
+      first_name: "",
+      last_name: "",
       email: "",
       phone: "",
       password: "",
@@ -68,7 +69,7 @@ export default function OwnerSignUpPage() {
   };
 
   const handleContinue = async () => {
-    const valid = await form.trigger(["name", "email", "phone", "password", "confirmPassword", "owner_type"]);
+    const valid = await form.trigger(["first_name", "last_name", "email", "phone", "password", "confirmPassword", "owner_type"]);
     if (!valid) {
       const firstError = Object.values(form.formState.errors)[0];
       if (firstError?.message) toast.error(firstError.message);
@@ -87,7 +88,8 @@ export default function OwnerSignUpPage() {
       {
         role: "owner",
         email: values.email,
-        name: values.name,
+        first_name: values.first_name,
+        last_name: values.last_name,
         password: values.password,
         phone: values.phone,
         owner_type: values.owner_type,
@@ -149,9 +151,15 @@ export default function OwnerSignUpPage() {
                 {/* Step 1 */}
                 {step === 1 ? (
                   <div className="flex flex-col gap-4">
-                    <FormField control={form.control} name="name" render={({ field }) => (
+                    <FormField control={form.control} name="first_name" render={({ field }) => (
                       <FormItem>
-                        <AuthField label="Full Name" placeholder="First Name" value={field.value} onChange={field.onChange} />
+                        <AuthField label="First Name" placeholder="First Name" value={field.value} onChange={field.onChange} />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="last_name" render={({ field }) => (
+                      <FormItem>
+                        <AuthField label="Last Name" placeholder="Last Name" value={field.value} onChange={field.onChange} />
                         <FormMessage />
                       </FormItem>
                     )} />

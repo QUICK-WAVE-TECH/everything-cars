@@ -57,7 +57,8 @@ export default function SignUpPage() {
   const form = useForm<CustomerSignUpInput>({
     resolver: zodResolver(customerSignUpSchema),
     defaultValues: {
-      name: "",
+      first_name: "",
+      last_name: "",
       email: "",
       phone: "",
       password: "",
@@ -121,7 +122,8 @@ export default function SignUpPage() {
 
   const handleContinue = async () => {
     const valid = await form.trigger([
-      "name",
+      "first_name",
+      "last_name",
       "email",
       "phone",
       "password",
@@ -145,7 +147,8 @@ export default function SignUpPage() {
       {
         role: "customer",
         email: values.email,
-        name: values.name,
+        first_name: values.first_name,
+        last_name: values.last_name,
         password: values.password,
         phone: values.phone,
         drivers_license: values.drivers_license,
@@ -209,12 +212,27 @@ export default function SignUpPage() {
                   <div className="flex flex-col gap-4">
                     <FormField
                       control={form.control}
-                      name="name"
+                      name="first_name"
                       render={({ field }) => (
                         <FormItem>
                           <AuthField
-                            label="Full Name"
+                            label="First Name"
                             placeholder="First Name"
+                            value={field.value}
+                            onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="last_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label="Last Name"
+                            placeholder="Last Name"
                             value={field.value}
                             onChange={field.onChange}
                           />

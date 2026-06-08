@@ -37,9 +37,10 @@ class SignUpView(APIView):
         with transaction.atomic():
             user = User.objects.create_user(
                 email=data["email"],
-                name=data["name"],
+                first_name=data["first_name"],
+                last_name=data["last_name"],
                 password=data["password"],
-                phone=data["phone"],
+                phone=data.get("phone", ""),
                 role=data["role"],
             )
 
