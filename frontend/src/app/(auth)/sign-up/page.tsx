@@ -312,7 +312,7 @@ export default function SignUpPage() {
                                 }}
                               >
                                 <Calendar
-                                  className="p-3 [&_.rdp-month]:space-y-4 [&_.rdp-caption_label]:font-medium [&_.rdp-nav]:space-x-1 [&_.rdp-day_button]:h-9 [&_.rdp-day_button]:w-9 [&_.rdp-day_button]:rounded-lg [&_.rdp-day_button]:text-sm [&_.rdp-day_button:hover]:bg-[var(--brc-primary-tint)] [&_.rdp-day_selected_.rdp-day_button]:bg-[var(--brc-primary)] [&_.rdp-day_selected_.rdp-day_button]:text-white [&_.rdp-day_today_.rdp-day_button]:border [&_.rdp-day_today_.rdp-day_button]:border-[var(--brc-primary)] [&_select]:rounded-md [&_select]:border [&_select]:border-[var(--brc-border)] [&_select]:bg-white [&_select]:px-2 [&_select]:py-1 [&_select]:text-sm"
+                                  className="p-3 [&_.rdp-month]:space-y-4 [&_.rdp-caption_label]:font-medium [&_.rdp-nav]:space-x-1 [&_.rdp-day_button]:h-9 [&_.rdp-day_button]:w-9 [&_.rdp-day_button]:rounded-lg [&_.rdp-day_button]:text-sm [&_.rdp-day_button:hover]:bg-[var(--brc-primary-tint)] [&_.rdp-day_selected_.rdp-day_button]:bg-[var(--brc-primary)] [&_.rdp-day_selected_.rdp-day_button]:text-white [&_.rdp-day_today_.rdp-day_button]:border [&_.rdp-day_today_.rdp-day_button]:border-[var(--brc-primary)] [&_select]:max-h-[200px] [&_select]:overflow-y-auto [&_select]:rounded-md [&_select]:border [&_select]:border-(--brc-border) [&_select]:bg-white [&_select]:px-2 [&_select]:py-1 [&_select]:text-sm"
                                   mode="single"
                                   selected={
                                     field.value
