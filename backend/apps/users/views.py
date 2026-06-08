@@ -4,8 +4,6 @@ import logging
 from django.conf import settings
 from django.db import transaction
 
-logger = logging.getLogger(__name__)
-
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -27,6 +25,8 @@ from .services import (
     verify_refresh_token,
     blacklist_token,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SignUpView(APIView):

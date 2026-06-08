@@ -244,7 +244,7 @@ function DashboardButton({
   return (
     <Link
       href={href}
-      className={`brc-dashboard-button group inline-flex h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold transition-all duration-200 [font-family:var(--brc-font-ui)] hover:-translate-y-0.5 active:translate-y-0 ${
+      className={`brc-dashboard-button group inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold transition-all duration-200 [font-family:var(--brc-font-ui)] hover:-translate-y-0.5 active:translate-y-0 sm:w-auto ${
         primary
           ? "bg-(--brc-primary) text-white shadow-[0_12px_24px_rgba(0,0,139,0.16)] hover:bg-(--brc-primary-hover) hover:shadow-[0_16px_30px_rgba(0,0,139,0.2)]"
           : "border border-(--brc-border) bg-white text-(--brc-text) hover:border-(--brc-primary) hover:text-(--brc-primary) hover:shadow-[0_10px_20px_rgba(18,18,18,0.08)]"
@@ -267,7 +267,7 @@ function StatCard({
 }) {
   return (
     <div
-      className="brc-dashboard-card brc-dashboard-reveal relative overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-5 shadow-[var(--brc-shadow-xs)]"
+      className="brc-dashboard-card brc-dashboard-reveal relative overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] sm:p-5"
       style={
         {
           "--delay": `${delay}ms`,
@@ -304,7 +304,7 @@ function QuickActionTile({ link, delay }: { link: QuickLink; delay: number }) {
   return (
     <Link
       href={link.href}
-      className="brc-dashboard-card brc-dashboard-reveal group flex min-h-32 flex-col justify-between rounded-2xl border border-(--brc-border) bg-white p-5 text-left no-underline shadow-[var(--brc-shadow-xs)]"
+      className="brc-dashboard-card brc-dashboard-reveal group flex min-h-32 flex-col justify-between rounded-2xl border border-(--brc-border) bg-white p-4 text-left no-underline shadow-[var(--brc-shadow-xs)] sm:p-5"
       style={
         {
           "--delay": `${delay}ms`,
@@ -404,14 +404,16 @@ function RequestCard({ req, delay }: { req: RecentRequest; delay: number }) {
       style={{ "--delay": `${delay}ms` } as DashboardStyle}
     >
       <div className="grid gap-4 sm:grid-cols-[84px_1fr]">
-        <div className="relative flex h-20 items-center justify-center overflow-hidden rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle)">
+        <div
+          className="relative flex items-center justify-center overflow-hidden rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle)"
+          style={{ height: "clamp(5rem, 25vw, 6rem)" }}
+        >
           <Image
             src="/car-lexus.png"
             alt={req.car}
-            width={92}
-            height={60}
-            className="brc-dashboard-car-thumb object-contain transition-transform duration-300 hover:scale-105"
-            style={{ width: "88%", height: "auto" }}
+            fill
+            sizes="(max-width: 640px) 88vw, 84px"
+            className="brc-dashboard-car-thumb object-contain p-2 transition-transform duration-300 hover:scale-105"
           />
         </div>
         <div className="min-w-0">
@@ -481,17 +483,19 @@ function RecommendedCard({
   return (
     <Link
       href={car.href}
-      className="brc-dashboard-card brc-dashboard-reveal group grid grid-cols-[88px_1fr] gap-4 rounded-2xl border border-(--brc-border) bg-white p-4 no-underline shadow-[var(--brc-shadow-xs)]"
+      className="brc-dashboard-card brc-dashboard-reveal group grid grid-cols-[76px_minmax(0,1fr)] gap-3 rounded-2xl border border-(--brc-border) bg-white p-3 no-underline shadow-[var(--brc-shadow-xs)] sm:grid-cols-[88px_minmax(0,1fr)] sm:gap-4 sm:p-4"
       style={{ "--delay": `${delay}ms` } as DashboardStyle}
     >
-      <div className="relative flex h-20 items-center justify-center overflow-hidden rounded-xl bg-(--brc-primary-tint)">
+      <div
+        className="relative flex items-center justify-center overflow-hidden rounded-xl bg-(--brc-primary-tint)"
+        style={{ height: "clamp(4.5rem, 18vw, 5rem)" }}
+      >
         <Image
           src="/car-lexus.png"
           alt={car.name}
-          width={92}
-          height={58}
-          className="brc-dashboard-car-thumb object-contain transition-transform duration-300 group-hover:scale-105"
-          style={{ width: "88%", height: "auto" }}
+          fill
+          sizes="(max-width: 640px) 76px, 88px"
+          className="brc-dashboard-car-thumb object-contain p-2 transition-transform duration-300 group-hover:scale-105"
         />
       </div>
       <div className="min-w-0">
@@ -520,46 +524,46 @@ function RecommendedCard({
 function LoyaltySnapshot() {
   return (
     <section
-      className="brc-dashboard-card brc-dashboard-reveal overflow-hidden rounded-2xl border border-(--brc-border) bg-(--brc-surface-inverse) p-5 text-white shadow-[var(--brc-shadow-xs)]"
+      className="brc-dashboard-card brc-dashboard-reveal overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] sm:p-5"
       style={{ "--delay": "520ms" } as DashboardStyle}
     >
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-white/60 [font-family:var(--brc-font-ui)]">
+          <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-(--brc-primary) [font-family:var(--brc-font-ui)]">
             Loyalty
           </p>
-          <h2 className="m-0 text-lg font-extrabold [font-family:var(--brc-font-display)]">
+          <h2 className="m-0 text-lg font-extrabold text-(--brc-text) [font-family:var(--brc-font-display)]">
             Reward Center
           </h2>
         </div>
-        <span className="flex size-11 items-center justify-center rounded-full bg-white/10">
-          <Icon name="gift" size={20} stroke="#fff" />
+        <span className="flex size-11 items-center justify-center rounded-full bg-(--brc-primary-tint)">
+          <Icon name="gift" size={20} stroke="var(--brc-primary)" />
         </span>
       </div>
-      <div className="mb-4 flex items-end justify-between gap-4">
+      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="m-0 text-4xl font-black [font-family:var(--brc-font-display)]">
+          <p className="m-0 text-4xl font-black text-(--brc-text) [font-family:var(--brc-font-display)]">
             120
           </p>
-          <p className="m-0 text-sm text-white/60 [font-family:var(--brc-font-ui)]">
+          <p className="m-0 text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
             available points
           </p>
         </div>
         <Link
           href="/customer/loyalty"
-          className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-extrabold text-(--brc-primary) no-underline transition-transform duration-200 hover:-translate-y-0.5 [font-family:var(--brc-font-ui)]"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-(--brc-primary) px-4 py-2 text-sm font-extrabold text-white no-underline transition-transform duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) [font-family:var(--brc-font-ui)] sm:w-auto"
         >
           View
           <Icon name="arrow" size={14} stroke="currentColor" />
         </Link>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+      <div className="h-2 overflow-hidden rounded-full bg-(--brc-bg-muted)">
         <div
-          className="brc-progress-fill h-full w-[68%] rounded-full bg-(--brc-warning)"
+          className="brc-progress-fill h-full w-[68%] rounded-full bg-(--brc-primary)"
           style={{ "--delay": "760ms" } as DashboardStyle}
         />
       </div>
-      <p className="mt-3 text-xs text-white/60 [font-family:var(--brc-font-ui)]">
+      <p className="mt-3 text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
         180 more points unlock your next reward tier.
       </p>
     </section>
@@ -576,9 +580,9 @@ export default function CustomerDashboard() {
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#FAFAFA_0%,#FFFFFF_46%,#FAFAFA_100%)]">
-      <div className="mx-auto flex w-full max-w-[1232px] flex-col gap-7 px-5 py-7 sm:px-8 sm:py-9 lg:px-[104px] lg:py-12">
+      <div className="mx-auto flex w-full max-w-[1232px] flex-col gap-6 px-4 py-6 sm:gap-7 sm:px-8 sm:py-9 lg:px-[104px] lg:py-12">
         <section className="brc-dashboard-hero brc-dashboard-reveal relative overflow-hidden rounded-3xl border border-(--brc-border) bg-white shadow-[0_20px_48px_rgba(18,18,18,0.06)]">
-          <div className="grid min-h-[260px] gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_360px] lg:p-10">
+          <div className="grid min-h-[260px] gap-6 p-5 sm:p-8 lg:grid-cols-[1fr_360px] lg:p-10">
             <div className="relative z-10 flex flex-col justify-between gap-8">
               <div>
                 <span className="brc-dashboard-pill mb-4 inline-flex items-center gap-2 rounded-full bg-(--brc-primary-tint) px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.12em] text-(--brc-primary) [font-family:var(--brc-font-ui)]">
@@ -592,7 +596,7 @@ export default function CustomerDashboard() {
                   You have 2 active requests awaiting owner updates and 1 approved request ready for payment.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-3">
+              <div className="grid gap-3 sm:flex sm:flex-wrap">
                 <DashboardButton href="/customer/listings">Browse Cars</DashboardButton>
                 <DashboardButton href="/customer/requests" variant="soft">
                   View Requests

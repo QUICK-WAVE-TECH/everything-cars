@@ -250,8 +250,8 @@ function RequestCard({ req, delay }: { req: IncomingRequest; delay: number }) {
   return (
     <article className="brc-dashboard-card brc-dashboard-reveal rounded-2xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] sm:p-5" style={{ "--delay": `${delay}ms` } as DashboardStyle}>
       <div className="grid gap-4 sm:grid-cols-[84px_1fr]">
-        <div className="relative flex h-20 items-center justify-center overflow-hidden rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle)">
-          <Image src="/car-lexus.png" alt={req.car} width={92} height={60} className="brc-dashboard-car-thumb object-contain transition-transform duration-300 hover:scale-105" style={{ width: "88%", height: "auto" }} />
+        <div className="relative flex items-center justify-center overflow-hidden rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle)" style={{ height: "clamp(5rem, 25vw, 6rem)" }}>
+          <Image src="/car-lexus.png" alt={req.car} fill sizes="(max-width: 640px) 88vw, 84px" className="brc-dashboard-car-thumb object-contain p-2 transition-transform duration-300 hover:scale-105" />
         </div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -286,8 +286,8 @@ function RequestCard({ req, delay }: { req: IncomingRequest; delay: number }) {
 function TopCarCard({ car, delay }: { car: (typeof TOP_CARS)[number]; delay: number }) {
   return (
     <Link href={car.href} className="brc-dashboard-card brc-dashboard-reveal group grid grid-cols-[88px_1fr] gap-4 rounded-2xl border border-(--brc-border) bg-white p-4 no-underline shadow-[var(--brc-shadow-xs)]" style={{ "--delay": `${delay}ms` } as DashboardStyle}>
-      <div className="relative flex h-20 items-center justify-center overflow-hidden rounded-xl bg-(--brc-accent-bg)">
-        <Image src="/car-lexus.png" alt={car.name} width={92} height={58} className="brc-dashboard-car-thumb object-contain transition-transform duration-300 group-hover:scale-105" style={{ width: "88%", height: "auto" }} />
+      <div className="relative flex items-center justify-center overflow-hidden rounded-xl bg-(--brc-accent-bg)" style={{ height: "5rem" }}>
+        <Image src="/car-lexus.png" alt={car.name} fill sizes="(max-width: 640px) 88px, 88px" className="brc-dashboard-car-thumb object-contain p-2 transition-transform duration-300 group-hover:scale-105" />
       </div>
       <div className="min-w-0">
         <div className="mb-2 flex items-center gap-2">
