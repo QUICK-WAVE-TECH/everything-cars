@@ -50,7 +50,7 @@ export default function ForgotPasswordPage() {
         <div className="flex w-[min(100%,520px)] flex-col items-center gap-6">
           <Image src="/logo.png" alt="Buy & Rent Cars" width={170} height={52} className="h-[52px] w-auto" />
 
-          <Card className="w-full rounded-2xl border-[0.5px] shadow-xs" style={{ borderColor: "var(--brc-border)" }}>
+          <Card className="w-full rounded-2xl border-[0.5px] border-(--brc-border) shadow-xs">
             <CardContent className="flex flex-col items-center gap-6 py-10 text-center">
               {/* Success icon */}
               <div className="relative flex size-[88px] items-center justify-center">
@@ -62,18 +62,12 @@ export default function ForgotPasswordPage() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <h1
-                  className="m-0 text-2xl font-bold"
-                  style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text)" }}
-                >
+                <h1 className="m-0 text-2xl font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
                   Check Your Email
                 </h1>
-                <p
-                  className="m-0 text-sm leading-6"
-                  style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text-muted)" }}
-                >
+                <p className="m-0 text-sm leading-6 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
                   We&apos;ve sent a password reset link to{" "}
-                  <span className="inline-flex items-center gap-1 font-medium" style={{ color: "var(--brc-text)" }}>
+                  <span className="inline-flex items-center gap-1 font-medium text-(--brc-text)">
                     <MailIcon size={14} />
                     {maskedEmail}
                   </span>
@@ -81,13 +75,10 @@ export default function ForgotPasswordPage() {
               </div>
 
               {/* Info box */}
-              <div
-                className="w-full rounded-xl p-4 text-left"
-                style={{ background: "var(--brc-bg-subtle)", border: "1px solid var(--brc-border)" }}
-              >
+              <div className="w-full rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle) p-4 text-left">
                 <div className="flex flex-col gap-2">
-                  <p className="m-0 text-sm leading-6" style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text-secondary)" }}>
-                    The link will expire in <strong style={{ color: "var(--brc-text)" }}>30 minutes</strong>. If you don&apos;t see the email, check your spam folder.
+                  <p className="m-0 text-sm leading-6 text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+                    The link will expire in <strong className="text-(--brc-text)">30 minutes</strong>. If you don&apos;t see the email, check your spam folder.
                   </p>
                 </div>
               </div>
@@ -105,8 +96,7 @@ export default function ForgotPasswordPage() {
                 </AuthButton>
                 <Link
                   href="/sign-in"
-                  className="group inline-flex items-center justify-center gap-2 text-sm font-semibold no-underline transition-colors"
-                  style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text-muted)" }}
+                  className="group inline-flex items-center justify-center gap-2 text-sm font-semibold text-(--brc-text-muted) no-underline transition-colors hover:text-(--brc-text) [font-family:var(--brc-font-ui)]"
                 >
                   <ArrowLeftIcon size={15} className="transition-transform duration-200 group-hover:-translate-x-1" />
                   Back to Sign In
@@ -124,7 +114,7 @@ export default function ForgotPasswordPage() {
       <div className="flex w-[min(100%,520px)] flex-col items-center gap-6">
         <Image src="/logo.png" alt="Buy & Rent Cars" width={170} height={52} className="h-[52px] w-auto" />
 
-        <Card className="w-full rounded-2xl border-[0.5px] shadow-xs" style={{ borderColor: "var(--brc-border)" }}>
+        <Card className="w-full rounded-2xl border-[0.5px] border-(--brc-border) shadow-xs">
           <CardHeader className="flex flex-col items-center gap-4 pb-2 text-center">
             {/* Icon badge */}
             <div className="relative flex size-20 items-center justify-center">
@@ -134,16 +124,10 @@ export default function ForgotPasswordPage() {
               </div>
             </div>
             <div className="flex flex-col gap-2">
-              <CardTitle
-                className="text-2xl font-bold"
-                style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text)" }}
-              >
+              <CardTitle className="text-2xl font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
                 Forgot Password?
               </CardTitle>
-              <CardDescription
-                className="text-sm leading-6"
-                style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text-muted)" }}
-              >
+              <CardDescription className="text-sm leading-6 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
                 No worries — enter the email address linked to your account and we&apos;ll send you a reset link.
               </CardDescription>
             </div>
@@ -174,8 +158,7 @@ export default function ForgotPasswordPage() {
 
                 <Link
                   href="/sign-in"
-                  className="group inline-flex items-center justify-center gap-2 text-sm font-semibold no-underline transition-colors"
-                  style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text-muted)" }}
+                  className="group inline-flex items-center justify-center gap-2 text-sm font-semibold text-(--brc-text-muted) no-underline transition-colors hover:text-(--brc-text) [font-family:var(--brc-font-ui)]"
                 >
                   <ArrowLeftIcon size={15} className="transition-transform duration-200 group-hover:-translate-x-1" />
                   Back to Sign In
