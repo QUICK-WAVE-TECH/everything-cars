@@ -12,7 +12,6 @@ from rest_framework.views import APIView
 from .models import User, CustomerProfile, OwnerProfile, AccessCode
 from .serializers import (
     CustomerProfileWriteSerializer,
-    OwnerProfileSerializer,
     SignInSerializer,
     SignUpSerializer,
     VerifySerializer,
@@ -112,7 +111,9 @@ class SignInView(APIView):
 
         # User exists and password is correct but account not verified
         if not user.is_active:
-            generate_and_send_code(email=user.email, purpose="sign_up_verify", user=user)
+            generate_and_send_code(
+                email=user.email, purpose="sign_up_verify", user=user
+            )
             return Response(
                 {
                     "detail": "Account not verified. A new verification code has been sent.",
@@ -135,6 +136,7 @@ class VerifyView(APIView):
     Verify the user email, then proceed to check if the user exists in the system
     after which we verify the purpose for which they're coming, sign up or sign in and provide tokens
     """
+
     throttle_scope = "verify_code"
 
     permission_classes = [AllowAny]
