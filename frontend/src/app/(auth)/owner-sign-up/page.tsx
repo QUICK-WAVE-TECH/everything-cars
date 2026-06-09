@@ -86,6 +86,12 @@ export default function OwnerSignUpPage() {
       toast.error("Please agree to the Terms of Service and Privacy Policy");
       return;
     }
+    if (!document) {
+      toast.error("Please upload a document", {
+        description: isCompany ? "CAC document is required" : "Car ownership document is required",
+      });
+      return;
+    }
 
     signUp.mutate(
       {

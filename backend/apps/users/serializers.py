@@ -71,6 +71,10 @@ class SignUpSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     {"bank_account": "Bank details are required for owner accounts."}
                 )
+            if not data.get("document"):
+                raise serializers.ValidationError(
+                    {"document": "Document upload is required for owner accounts."}
+                )
         return data
 
 
