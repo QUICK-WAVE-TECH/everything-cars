@@ -97,17 +97,29 @@ class SignInView(APIView):
         password = serializer.validated_data["password"]
 
         try:
-            user = User.objects.get(email__iexact=email, is_active=True)
-
+            user = User.objects.get(email__iexact=email)
         except User.DoesNotExist:
             return Response(
                 {"detail": "Invalid email or password"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
+
         if not user.check_password(password):
             return Response(
                 {"detail": "Invalid email or password"},
                 status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        # User exists and password is correct but account not verified
+        if not user.is_active:
+            generate_and_send_code(email=user.email, purpose="sign_up_verify", user=user)
+            return Response(
+                {
+                    "detail": "Account not verified. A new verification code has been sent.",
+                    "email": user.email,
+                    "requires_verification": True,
+                },
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         generate_and_send_code(email=user.email, purpose="sign_in", user=user)
