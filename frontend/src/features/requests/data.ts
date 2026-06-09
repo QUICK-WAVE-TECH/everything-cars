@@ -60,3 +60,48 @@ export function naira(n: number): string {
 export function getCustomerRequest(id: number): CustomerRequest | undefined {
   return CUSTOMER_REQUESTS.find((r) => r.id === id);
 }
+
+// ---------------------------------------------------------------------------
+// Owner summary stats
+// ---------------------------------------------------------------------------
+
+export const OWNER_STATS: StatItem[] = [
+  { label: "Total Requests", value: "8", icon: "car", color: "var(--brc-primary)" },
+  { label: "Pending Requests", value: "3", icon: "clock", color: "var(--brc-warning)" },
+  { label: "Approved Requests", value: "4", icon: "check", color: "var(--brc-success)" },
+  { label: "Earnings", value: "₦420k", icon: "banknote", color: "var(--brc-accent)" },
+];
+
+// ---------------------------------------------------------------------------
+// Mock owner requests (incoming from customers)
+// ---------------------------------------------------------------------------
+
+export type OwnerRequestStatus = "new" | "awaiting-payment" | "paid" | "rejected";
+
+export type OwnerRequest = {
+  id: number;
+  car: string;
+  type: RequestType;
+  requestDate: string;
+  customer: string;
+  price: number;
+  duration: string;
+  color: string;
+  year: number;
+  transmission: string;
+  fuelType: string;
+  seats: number;
+  requestedOn: string;
+  status: OwnerRequestStatus;
+};
+
+export const OWNER_REQUESTS: OwnerRequest[] = [
+  { id: 1, car: "Lexus NX 350", type: "Rent", requestDate: "04 Nov 2025", customer: "Chika Akor", price: 175000, duration: "5 days", color: "Grey", year: 2024, transmission: "Automatic", fuelType: "Petrol", seats: 4, requestedOn: "10/29/2025", status: "new" },
+  { id: 2, car: "Toyota Camry", type: "Rent", requestDate: "04 Nov 2025", customer: "Emeka Obi", price: 120000, duration: "3 days", color: "Black", year: 2023, transmission: "Automatic", fuelType: "Petrol", seats: 5, requestedOn: "10/28/2025", status: "awaiting-payment" },
+  { id: 3, car: "Honda Accord", type: "Buy", requestDate: "03 Nov 2025", customer: "Ngozi Eze", price: 8500000, duration: "N/A", color: "Silver", year: 2022, transmission: "Automatic", fuelType: "Petrol", seats: 5, requestedOn: "10/27/2025", status: "paid" },
+  { id: 4, car: "Lexus NX 350", type: "Rent", requestDate: "02 Nov 2025", customer: "Bayo Adeyemi", price: 175000, duration: "2 days", color: "White", year: 2024, transmission: "Automatic", fuelType: "Petrol", seats: 4, requestedOn: "10/26/2025", status: "rejected" },
+];
+
+export function getOwnerRequest(id: number): OwnerRequest | undefined {
+  return OWNER_REQUESTS.find((r) => r.id === id);
+}
