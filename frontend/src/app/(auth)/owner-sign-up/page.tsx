@@ -59,6 +59,7 @@ export default function OwnerSignUpPage() {
 
   const ownerType = useWatch({ control: form.control, name: "owner_type" });
   const countryIso = useWatch({ control: form.control, name: "country" });
+  const stateName = useWatch({ control: form.control, name: "state" });
   const countryName = COUNTRIES.find((c) => c.iso === countryIso)?.name ?? "";
   const isCompany = ownerType === "fleet";
 
@@ -251,7 +252,7 @@ export default function OwnerSignUpPage() {
                           <FormItem>
                             <CityCombobox
                               country={countryName}
-                              state={form.getValues("state") ?? ""}
+                              state={stateName ?? ""}
                               value={field.value ?? ""}
                               onChange={field.onChange}
                               label="City"
