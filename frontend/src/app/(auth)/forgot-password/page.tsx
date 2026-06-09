@@ -53,20 +53,11 @@ export default function ForgotPasswordPage() {
           <Card className="w-full rounded-2xl border-[0.5px] shadow-xs" style={{ borderColor: "var(--brc-border)" }}>
             <CardContent className="flex flex-col items-center gap-6 py-10 text-center">
               {/* Success icon */}
-              <div className="relative flex items-center justify-center">
-                <span
-                  className="absolute animate-ping rounded-full opacity-20"
-                  style={{ width: 72, height: 72, background: "var(--brc-success)" }}
-                />
-                <span
-                  className="absolute animate-pulse rounded-full opacity-10"
-                  style={{ width: 88, height: 88, background: "var(--brc-success)" }}
-                />
-                <div
-                  className="relative flex items-center justify-center rounded-full animate-[scaleIn_0.5s_ease-out]"
-                  style={{ width: 72, height: 72, background: "var(--brc-success-bg)" }}
-                >
-                  <CheckCircle2Icon size={32} strokeWidth={1.8} style={{ color: "var(--brc-success)" }} />
+              <div className="relative flex size-[88px] items-center justify-center">
+                <span className="absolute size-[72px] animate-ping rounded-full bg-(--brc-success) opacity-20" />
+                <span className="absolute size-[88px] animate-pulse rounded-full bg-(--brc-success) opacity-10" />
+                <div className="relative flex size-[72px] animate-[scaleIn_0.5s_ease-out] items-center justify-center rounded-full bg-(--brc-success-bg)">
+                  <CheckCircle2Icon size={32} strokeWidth={1.8} className="text-(--brc-success)" />
                 </div>
               </div>
 
@@ -136,16 +127,10 @@ export default function ForgotPasswordPage() {
         <Card className="w-full rounded-2xl border-[0.5px] shadow-xs" style={{ borderColor: "var(--brc-border)" }}>
           <CardHeader className="flex flex-col items-center gap-4 pb-2 text-center">
             {/* Icon badge */}
-            <div className="relative flex items-center justify-center">
-              <span
-                className="absolute animate-pulse rounded-full opacity-15"
-                style={{ width: 80, height: 80, background: "var(--brc-primary)" }}
-              />
-              <div
-                className="relative flex items-center justify-center rounded-full"
-                style={{ width: 64, height: 64, background: "var(--brc-primary-tint)" }}
-              >
-                <KeyRoundIcon size={28} strokeWidth={1.8} className="animate-[wiggle_2s_ease-in-out_infinite]" style={{ color: "var(--brc-primary)" }} />
+            <div className="relative flex size-20 items-center justify-center">
+              <span className="absolute size-20 animate-pulse rounded-full bg-(--brc-primary) opacity-15" />
+              <div className="relative flex size-16 items-center justify-center rounded-full bg-(--brc-primary-tint)">
+                <KeyRoundIcon size={28} strokeWidth={1.8} className="animate-[wiggle_2s_ease-in-out_infinite] text-(--brc-primary)" />
               </div>
             </div>
             <div className="flex flex-col gap-2">
