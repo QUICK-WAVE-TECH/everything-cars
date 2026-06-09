@@ -71,6 +71,10 @@ class SignUpSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     {"bank_account": "Bank details are required for owner accounts."}
                 )
+            if not data.get("document"):
+                raise serializers.ValidationError(
+                    {"document": "Document upload is required for owner accounts."}
+                )
         return data
 
 
@@ -123,6 +127,8 @@ class CustomerProfileWriteSerializer(serializers.ModelSerializer):
 
 
 class OwnerProfileSerializer(serializers.ModelSerializer):
+    country = serializers.CharField(source="country.code", default="", read_only=True)
+
     class Meta:
         model = OwnerProfile
         fields = [
@@ -131,6 +137,10 @@ class OwnerProfileSerializer(serializers.ModelSerializer):
             "national_id",
             "location",
             "rc_number",
+            "country",
+            "state",
+            "city",
+            "address",
             "bank_account",
             "bank_name",
             "is_verified",

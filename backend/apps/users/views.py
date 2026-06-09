@@ -57,10 +57,20 @@ class SignUpView(APIView):
                     user=user, **profile_serializer.validated_data
                 )
             elif data["role"] == "owner":
-                profile_serializer = OwnerProfileSerializer(data=data)
-                profile_serializer.is_valid(raise_exception=True)
                 OwnerProfile.objects.create(
-                    user=user, **profile_serializer.validated_data
+                    user=user,
+                    owner_type=data["owner_type"],
+                    fleet_name=data.get("fleet_name", ""),
+                    national_id=data.get("national_id", ""),
+                    location=data.get("location", ""),
+                    rc_number=data.get("rc_number", ""),
+                    country=data.get("country", ""),
+                    state=data.get("state", ""),
+                    city=data.get("city", ""),
+                    address=data.get("address", ""),
+                    bank_account=data["bank_account"],
+                    bank_name=data["bank_name"],
+                    document=data.get("document"),
                 )
             transaction.on_commit(
                 lambda: generate_and_send_code(
@@ -87,17 +97,29 @@ class SignInView(APIView):
         password = serializer.validated_data["password"]
 
         try:
-            user = User.objects.get(email__iexact=email, is_active=True)
-
+            user = User.objects.get(email__iexact=email)
         except User.DoesNotExist:
             return Response(
                 {"detail": "Invalid email or password"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
+
         if not user.check_password(password):
             return Response(
                 {"detail": "Invalid email or password"},
                 status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        # User exists and password is correct but account not verified
+        if not user.is_active:
+            generate_and_send_code(email=user.email, purpose="sign_up_verify", user=user)
+            return Response(
+                {
+                    "detail": "Account not verified. A new verification code has been sent.",
+                    "email": user.email,
+                    "requires_verification": True,
+                },
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         generate_and_send_code(email=user.email, purpose="sign_in", user=user)

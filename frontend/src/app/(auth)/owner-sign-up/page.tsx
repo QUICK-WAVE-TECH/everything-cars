@@ -86,6 +86,12 @@ export default function OwnerSignUpPage() {
       toast.error("Please agree to the Terms of Service and Privacy Policy");
       return;
     }
+    if (!document) {
+      toast.error("Please upload a document", {
+        description: isCompany ? "CAC document is required" : "Car ownership document is required",
+      });
+      return;
+    }
 
     signUp.mutate(
       {
@@ -100,6 +106,9 @@ export default function OwnerSignUpPage() {
         national_id: values.national_id,
         location: values.location,
         rc_number: values.rc_number,
+        country: values.country,
+        state: values.state,
+        city: values.city,
         bank_account: values.bank_account,
         bank_name: values.bank_name,
         document: document ?? undefined,
@@ -230,6 +239,39 @@ export default function OwnerSignUpPage() {
                           value={document?.name}
                           onPick={setDocument}
                         />
+                        <FormField control={form.control} name="country" render={({ field }) => (
+                          <FormItem>
+                            <CountrySelect
+                              value={field.value ?? ""}
+                              onChange={(v) => handleCountryChange(v, field.onChange)}
+                            />
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name="state" render={({ field }) => (
+                          <FormItem>
+                            <StateSelect country={countryName} value={field.value ?? ""} onChange={field.onChange} label="State" />
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name="city" render={({ field }) => (
+                          <FormItem>
+                            <CityCombobox
+                              country={countryName}
+                              state={stateName ?? ""}
+                              value={field.value ?? ""}
+                              onChange={field.onChange}
+                              label="City"
+                            />
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name="location" render={({ field }) => (
+                          <FormItem>
+                            <AuthField label="Company Address" placeholder="Enter company address" value={field.value ?? ""} onChange={field.onChange} />
+                            <FormMessage />
+                          </FormItem>
+                        )} />
                       </>
                     ) : (
                       <>
@@ -291,8 +333,8 @@ export default function OwnerSignUpPage() {
                     <FormField control={form.control} name="bank_account" render={({ field }) => (
                       <FormItem>
                         <AuthField
-                          label="Bank Account Number"
-                          placeholder="Enter bank account number"
+                          label={isCompany ? "Company Bank Account Number" : "Bank Account Number"}
+                          placeholder={isCompany ? "Enter company account number" : "Enter bank account number"}
                           value={field.value}
                           onChange={(value) => field.onChange(onlyDigits(value))}
                           type="tel"
@@ -304,7 +346,7 @@ export default function OwnerSignUpPage() {
                     )} />
                     <FormField control={form.control} name="bank_name" render={({ field }) => (
                       <FormItem>
-                        <AuthField label="Bank Name" placeholder="Enter bank name" value={field.value} onChange={field.onChange} />
+                        <AuthField label={isCompany ? "Company Bank Name" : "Bank Name"} placeholder={isCompany ? "Enter company bank name" : "Enter bank name"} value={field.value} onChange={field.onChange} />
                         <FormMessage />
                       </FormItem>
                     )} />

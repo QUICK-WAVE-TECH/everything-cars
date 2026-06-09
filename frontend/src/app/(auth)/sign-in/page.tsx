@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { AuthField, AuthButton, AuthShell } from "@/features/auth/components";
 import { useSignIn } from "@/features/auth/api";
+import { ApiError } from "@/lib/api-client";
 import { signInSchema, type SignInInput } from "@/features/auth/schemas";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
@@ -32,6 +33,17 @@ export default function SignInPage() {
         );
       },
       onError: (error) => {
+        // Handle unverified account — backend sends 403 with requires_verification
+        if (error instanceof ApiError && error.status === 403 && error.data) {
+          const data = error.data as { email?: string; requires_verification?: boolean };
+          if (data.requires_verification && data.email) {
+            toast.info("Account not verified", {
+              description: "A new verification code has been sent to your email.",
+            });
+            router.push(`/verify?email=${encodeURIComponent(data.email)}&purpose=sign_up_verify`);
+            return;
+          }
+        }
         toast.error(error.message);
       },
     });
