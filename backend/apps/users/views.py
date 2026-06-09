@@ -57,10 +57,20 @@ class SignUpView(APIView):
                     user=user, **profile_serializer.validated_data
                 )
             elif data["role"] == "owner":
-                profile_serializer = OwnerProfileSerializer(data=data)
-                profile_serializer.is_valid(raise_exception=True)
                 OwnerProfile.objects.create(
-                    user=user, **profile_serializer.validated_data
+                    user=user,
+                    owner_type=data["owner_type"],
+                    fleet_name=data.get("fleet_name", ""),
+                    national_id=data.get("national_id", ""),
+                    location=data.get("location", ""),
+                    rc_number=data.get("rc_number", ""),
+                    country=data.get("country", ""),
+                    state=data.get("state", ""),
+                    city=data.get("city", ""),
+                    address=data.get("address", ""),
+                    bank_account=data["bank_account"],
+                    bank_name=data["bank_name"],
+                    document=data.get("document"),
                 )
             transaction.on_commit(
                 lambda: generate_and_send_code(
