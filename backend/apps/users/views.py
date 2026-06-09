@@ -158,9 +158,9 @@ class VerifyView(APIView):
             value=tokens["refresh_token"],
             httponly=True,
             secure=not settings.DEBUG,
-            samesite="Strict",
+            samesite="None" if not settings.DEBUG else "Lax",
             max_age=settings.JWT_REFRESH_TOKEN_LIFETIME_DAYS * 86400,
-            path="/api/v1/auth/",
+            path="/",
         )
         return response
 
@@ -204,9 +204,9 @@ class RefreshView(APIView):
             value=tokens["refresh_token"],
             httponly=True,
             secure=not settings.DEBUG,
-            samesite="Strict",
+            samesite="None" if not settings.DEBUG else "Lax",
             max_age=settings.JWT_REFRESH_TOKEN_LIFETIME_DAYS * 86400,
-            path="/api/v1/auth/",
+            path="/",
         )
 
         return response
@@ -223,7 +223,7 @@ class SignOutView(APIView):
                 blacklist_token(payload["jti"])
 
         response = Response({"message": "Signed out."}, status=status.HTTP_200_OK)
-        response.delete_cookie("refresh_token", path="/api/v1/auth/")
+        response.delete_cookie("refresh_token", path="/")
         return response
 
 
