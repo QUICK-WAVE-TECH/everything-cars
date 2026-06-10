@@ -101,6 +101,14 @@ export default function SignInPage() {
                     )}
                   />
                 </div>
+                <div className="flex justify-end -mt-2">
+                  <Link
+                    href="/forgot-password"
+                    className="text-sm text-(--brc-accent) underline underline-offset-4 transition-colors hover:text-(--brc-accent-deep) [font-family:var(--brc-font-link)]"
+                  >
+                    Forgot Password?
+                  </Link>
+                </div>
                 <AuthButton full type="submit" loading={signIn.isPending}>
                   {signIn.isPending ? "Signing in..." : "Continue"}
                 </AuthButton>

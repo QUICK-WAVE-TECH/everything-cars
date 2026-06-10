@@ -203,6 +203,7 @@ JWT_ACCESS_TOKEN_LIFETIME_MINUTES = int(
 JWT_REFRESH_TOKEN_LIFETIME_DAYS = int(
     os.environ.get("JWT_REFRESH_TOKEN_LIFETIME_DAYS", "7")
 )
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # Resend (email)
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")

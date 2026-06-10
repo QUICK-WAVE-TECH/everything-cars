@@ -9,10 +9,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import User, CustomerProfile, OwnerProfile, AccessCode
+from .models import PasswordResetToken, User, CustomerProfile, OwnerProfile, AccessCode
 from .serializers import (
     CustomerProfileWriteSerializer,
-    OwnerProfileSerializer,
+    ForgotPasswordSerializer,
+    ResetPasswordSerializer,
     SignInSerializer,
     SignUpSerializer,
     VerifySerializer,
@@ -112,7 +113,9 @@ class SignInView(APIView):
 
         # User exists and password is correct but account not verified
         if not user.is_active:
-            generate_and_send_code(email=user.email, purpose="sign_up_verify", user=user)
+            generate_and_send_code(
+                email=user.email, purpose="sign_up_verify", user=user
+            )
             return Response(
                 {
                     "detail": "Account not verified. A new verification code has been sent.",
@@ -135,6 +138,7 @@ class VerifyView(APIView):
     Verify the user email, then proceed to check if the user exists in the system
     after which we verify the purpose for which they're coming, sign up or sign in and provide tokens
     """
+
     throttle_scope = "verify_code"
 
     permission_classes = [AllowAny]
@@ -299,5 +303,82 @@ class ResendCodeView(APIView):
 
         return Response(
             {"message": "If this email is registered, a new code has been sent."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class ForgotPasswordView(APIView):
+
+    permission_classes = [AllowAny]
+    throttle_scope = "resend_code"
+
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"]
+
+        try:
+            user = User.objects.get(email__iexact=email)
+
+        except User.DoesNotExist:
+            # Don't reveal if email exists
+            pass
+        else:
+            token_obj = PasswordResetToken.create_token(user)
+            # ? In prod we'll turn this to an email instead of printing with console
+            frontend_url = settings.FRONTEND_URL.rstrip("/")
+            reset_url = f"{frontend_url}/reset-password?token={token_obj.plain_token}"
+            if settings.RESEND_API_KEY:
+                try:
+                    import resend
+
+                    resend.api_key = settings.RESEND_API_KEY
+                    resend.Emails.send(
+                        {
+                            "from": settings.DEFAULT_FROM_EMAIL,
+                            "to": [email],
+                            "subject": "Reset your EverythingCars Password",
+                            "text": (
+                                "Click this link to reset your password:\n\n"
+                                f"{reset_url}\n\n"
+                                "This link expires in 30 minutes."
+                            ),
+                        }
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to send password reset email for user %s", user.id
+                    )
+            else:
+                print(f"\n[DEV] Password reset link for {email}: {reset_url}\n")
+
+        return Response(
+            {"message": "If this email is registered, a reset link has been sent."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class ResetPasswordView(APIView):
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        token_obj = PasswordResetToken.verify_token(serializer.validated_data["token"])
+        if token_obj is None:
+            return Response(
+                {
+                    "detail": "Invalid or expired reset link..",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        user = token_obj.user
+        user.set_password(serializer.validated_data["password"])
+        user.save(update_fields=["password"])
+
+        return Response(
+            {"message": "Password reset successfully. You can now sign in."},
             status=status.HTTP_200_OK,
         )

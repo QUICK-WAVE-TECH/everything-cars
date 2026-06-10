@@ -169,3 +169,52 @@ class RefreshTokenBlacklist(models.Model):
 
     class Meta:
         db_table = "refresh_token_blacklist"
+
+
+class PasswordResetToken(models.Model):
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    token_hash = models.CharField(max_length=128)
+    is_used = models.BooleanField(default=False)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "password_reset_tokens"
+
+    @classmethod
+    def create_token(cls, user):
+        # Invalidate old token for this user
+
+        cls.objects.filter(
+            user=user,
+            is_used=False,
+        ).update(is_used=True)
+        token = secrets.token_urlsafe(32)
+        obj = cls.objects.create(
+            user=user,
+            token_hash=hashlib.sha256(token.encode()).hexdigest(),
+            expires_at=timezone.now() + timedelta(minutes=30),
+        )
+        obj.plain_token = token
+        return obj
+
+    @classmethod
+    def verify_token(cls, token):
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        obj = (
+            cls.objects.filter(
+                token_hash=token_hash,
+                is_used=False,
+                expires_at__gt=timezone.now(),
+            )
+            .select_related("user")
+            .first()
+        )
+
+        if obj is None:
+            return None
+        obj.is_used = True
+        obj.save(update_fields=["is_used"])
+        return obj
