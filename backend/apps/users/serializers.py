@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from django_countries.serializer_fields import CountryField
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import AccessCode, User, CustomerProfile, OwnerProfile
 
 
@@ -92,7 +94,15 @@ class VerifySerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "email", "first_name", "last_name", "phone", "role", "date_joined"]
+        fields = [
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "phone",
+            "role",
+            "date_joined",
+        ]
         read_only_fields = ["id", "email", "role", "date_joined"]
 
 
@@ -166,3 +176,20 @@ class MeSerializer(serializers.ModelSerializer):
             "owner_profile",
         ]
         read_only_fields = ["id", "email", "role", "date_joined"]
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    password = serializers.CharField(min_length=8)
+
+    def validate_password(self, value):
+        try:
+            validate_password(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.message)) from exc
+
+        return value

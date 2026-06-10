@@ -9,6 +9,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { KeyRoundIcon, MailIcon, ArrowLeftIcon, CheckCircle2Icon } from "lucide-react";
 import { AuthField, AuthButton, AuthShell } from "@/features/auth/components";
+import { apiClient } from "@/lib/api-client";
 import {
   Card,
   CardContent,
@@ -33,13 +34,24 @@ export default function ForgotPasswordPage() {
     defaultValues: { email: "" },
   });
 
-  const handleSubmit = (values: ForgotInput) => {
-    // Frontend-only for now — backend endpoint will be wired later
-    setSubmittedEmail(values.email);
-    setSubmitted(true);
-    toast.success("Reset link sent", {
-      description: "Check your inbox for the password reset link.",
-    });
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (values: ForgotInput) => {
+    setIsLoading(true);
+    try {
+      await apiClient.post("/auth/forgot-password", { email: values.email });
+      setSubmittedEmail(values.email);
+      setSubmitted(true);
+      toast.success("Reset link sent", {
+        description: "Check your inbox for the password reset link.",
+      });
+    } catch {
+      // Always show success — don't reveal if email exists
+      setSubmittedEmail(values.email);
+      setSubmitted(true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const maskedEmail = submittedEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3");
@@ -152,8 +164,8 @@ export default function ForgotPasswordPage() {
                   )}
                 />
 
-                <AuthButton full type="submit">
-                  Send Reset Link
+                <AuthButton full type="submit" loading={isLoading}>
+                  {isLoading ? "Sending..." : "Send Reset Link"}
                 </AuthButton>
 
                 <Link
