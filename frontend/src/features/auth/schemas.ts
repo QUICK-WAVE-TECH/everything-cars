@@ -6,19 +6,27 @@ const phoneSchema = z
   .trim()
   .regex(/^\d*$/, "Phone number must contain digits only")
   .optional();
-const optionalDigitsSchema = (message: string) =>
-  z.string().trim().regex(/^\d*$/, message).optional();
 const requiredDigitsSchema = (requiredMessage: string, digitsMessage: string) =>
   z.string().trim().min(1, requiredMessage).regex(/^\d+$/, digitsMessage);
 
 export const customerSignUpSchema = z
   .object({
-    first_name: z.string().trim().min(2, "First name must be at least 2 characters"),
-    last_name: z.string().trim().min(2, "Last name must be at least 2 characters"),
+    first_name: z
+      .string()
+      .trim()
+      .min(2, "First name must be at least 2 characters"),
+    last_name: z
+      .string()
+      .trim()
+      .min(2, "Last name must be at least 2 characters"),
     email: z.string().trim().email("Invalid email address"),
     phone: phoneSchema,
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string(),
+    national_id: requiredDigitsSchema(
+      "NIN is required",
+      "NIN must contain digits only",
+    ),
     drivers_license: z.string().trim().optional(),
     date_of_birth: z.string().trim().optional(),
     address: z.string().trim().optional(),
@@ -33,8 +41,14 @@ export const customerSignUpSchema = z
 
 export const ownerSignUpSchema = z
   .object({
-    first_name: z.string().trim().min(2, "First name must be at least 2 characters"),
-    last_name: z.string().trim().min(2, "Last name must be at least 2 characters"),
+    first_name: z
+      .string()
+      .trim()
+      .min(2, "First name must be at least 2 characters"),
+    last_name: z
+      .string()
+      .trim()
+      .min(2, "Last name must be at least 2 characters"),
     email: z.string().trim().email("Invalid email address"),
     phone: phoneSchema,
     password: z.string().min(8, "Password must be at least 8 characters"),
@@ -43,7 +57,10 @@ export const ownerSignUpSchema = z
       message: "Select ownership type",
     }),
     fleet_name: z.string().trim().optional(),
-    national_id: optionalDigitsSchema("National ID must contain digits only"),
+    national_id: requiredDigitsSchema(
+      "NIN is required",
+      "NIN must contain digits only",
+    ),
     location: z.string().trim().optional(),
     rc_number: z.string().trim().optional(),
     country: z.string().trim().optional(),
@@ -90,14 +107,6 @@ export const ownerSignUpSchema = z
           path: ["location"],
         });
       }
-
-      if (isBlank(data.national_id)) {
-        ctx.addIssue({
-          code: "custom",
-          message: "National ID is required",
-          path: ["national_id"],
-        });
-      }
     }
   });
 
@@ -116,3 +125,44 @@ export type CustomerSignUpInput = z.infer<typeof customerSignUpSchema>;
 export type OwnerSignUpInput = z.infer<typeof ownerSignUpSchema>;
 export type SignInInput = z.infer<typeof signInSchema>;
 export type VerifyInput = z.infer<typeof verifySchema>;
+
+export const profileUpdateSchema = z.object({
+  first_name: z.string().trim().min(2, "First name required"),
+  last_name: z.string().trim().min(2, "Last name required"),
+  phone: phoneSchema,
+  // Customer fields
+  drivers_license: z.string().trim().optional(),
+  date_of_birth: z.string().trim().optional(),
+  address: z.string().trim().optional(),
+  state: z.string().trim().optional(),
+  city: z.string().trim().optional(),
+  country: z.string().trim().optional(),
+});
+
+export const ownerProfileUpdateSchema = z.object({
+  first_name: z.string().trim().min(2, "First name required"),
+  last_name: z.string().trim().min(2, "Last name required"),
+  phone: phoneSchema,
+  // Owner fields
+  fleet_name: z.string().trim().optional(),
+  national_id: z.string().trim().optional(),
+  location: z.string().trim().optional(),
+  rc_number: z.string().trim().optional(),
+  country: z.string().trim().optional(),
+  state: z.string().trim().optional(),
+  city: z.string().trim().optional(),
+  address: z.string().trim().optional(),
+  bank_account: z.string().trim().min(1, "Bank account required"),
+  bank_name: z.string().trim().min(1, "Bank name required"),
+});
+
+export const changePasswordSchema = z
+  .object({
+    old_password: z.string().min(1, "Current password required"),
+    new_password: z.string().min(8, "Password must be at least 8 characters"),
+    confirm_password: z.string(),
+  })
+  .refine((data) => data.new_password === data.confirm_password, {
+    message: "Passwords do not match",
+    path: ["confirm_password"],
+  });
