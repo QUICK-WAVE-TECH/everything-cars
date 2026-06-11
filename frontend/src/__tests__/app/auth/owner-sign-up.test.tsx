@@ -64,7 +64,7 @@ describe("OwnerSignUpPage", () => {
 
     expect(await screen.findByText("Step 2 of 2")).toBeInTheDocument();
     expect(screen.getByText("Address")).toBeInTheDocument();
-    expect(screen.getByText("National ID")).toBeInTheDocument();
+    expect(screen.getByText("NIN")).toBeInTheDocument();
     expect(screen.getByText("Upload Car Ownership Document")).toBeInTheDocument();
     expect(screen.getByText("Bank Account Number")).toBeInTheDocument();
     expect(screen.getByText("Bank Name")).toBeInTheDocument();
@@ -76,7 +76,7 @@ describe("OwnerSignUpPage", () => {
     fillStepOne();
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
-    const nationalId = await screen.findByPlaceholderText("Enter your ID number");
+    const nationalId = await screen.findByPlaceholderText("Enter your NIN");
     const bankAccount = screen.getByPlaceholderText("Enter bank account number");
 
     fireEvent.change(nationalId, { target: { value: "12ab-34" } });
