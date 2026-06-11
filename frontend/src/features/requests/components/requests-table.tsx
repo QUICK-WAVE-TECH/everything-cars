@@ -10,6 +10,7 @@ import { StatusBadge } from "./status-badge";
 
 const PAGE_SIZE = 7;
 const COLUMNS = ["Car", "Type", "Request date", "Owner", "Price", "Duration", "Status"];
+const COLUMN_WIDTHS = [180, 86, 132, 168, 126, 102, 128];
 
 const CAR_OPTIONS = Array.from(new Set(CUSTOMER_REQUESTS.map((r) => r.car)));
 
@@ -35,6 +36,7 @@ const thStyle: React.CSSProperties = {
   fontWeight: 600,
   color: "var(--brc-text-muted)",
   whiteSpace: "nowrap",
+  verticalAlign: "middle",
 };
 
 const tdStyle: React.CSSProperties = {
@@ -44,6 +46,10 @@ const tdStyle: React.CSSProperties = {
   color: "var(--brc-text)",
   whiteSpace: "nowrap",
   borderTop: "1px solid var(--brc-border)",
+  maxWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  verticalAlign: "middle",
 };
 
 const closeIcon = (
@@ -138,15 +144,27 @@ export function RequestsTable() {
 
       {/* Table */}
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 930, tableLayout: "fixed" }}>
+          <colgroup>
+            {COLUMN_WIDTHS.map((width, index) => (
+              <col key={`${COLUMNS[index]}-${width}`} style={{ width }} />
+            ))}
+            <col style={{ width: 56 }} />
+          </colgroup>
           <thead>
             <tr>
               {COLUMNS.map((c) => (
-                <th key={c} style={thStyle}>
+                <th
+                  key={c}
+                  style={{
+                    ...thStyle,
+                    textAlign: c === "Price" ? "right" : c === "Type" || c === "Duration" ? "center" : "left",
+                  }}
+                >
                   {c}
                 </th>
               ))}
-              <th style={{ ...thStyle, width: 40 }} aria-label="Actions" />
+              <th style={{ ...thStyle, width: 56 }} aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
@@ -160,15 +178,15 @@ export function RequestsTable() {
               rows.map((r) => (
                 <tr key={r.id}>
                   <td style={tdStyle}>{r.car}</td>
-                  <td style={tdStyle}>{r.type}</td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{r.type}</td>
                   <td style={{ ...tdStyle, color: "var(--brc-text-secondary)" }}>{r.requestDate}</td>
                   <td style={tdStyle}>{r.owner}</td>
-                  <td style={tdStyle}>{naira(r.price)}</td>
-                  <td style={{ ...tdStyle, color: "var(--brc-text-secondary)" }}>{r.duration}</td>
-                  <td style={tdStyle}>
+                  <td style={{ ...tdStyle, textAlign: "right" }}>{naira(r.price)}</td>
+                  <td style={{ ...tdStyle, color: "var(--brc-text-secondary)", textAlign: "center" }}>{r.duration}</td>
+                  <td style={{ ...tdStyle, overflow: "visible" }}>
                     <StatusBadge status={r.status} />
                   </td>
-                  <td style={{ ...tdStyle, textAlign: "right" }}>
+                  <td style={{ ...tdStyle, overflow: "visible", textAlign: "center" }}>
                     <RowMenu
                       items={[
                         {

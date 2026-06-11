@@ -16,6 +16,7 @@ type BaseSignUpData = {
 
 export type CustomerSignUpData = BaseSignUpData & {
   role: "customer";
+  national_id: string;
   drivers_license?: string;
   date_of_birth?: string;
   address?: string;
@@ -28,7 +29,7 @@ export type OwnerSignUpData = BaseSignUpData & {
   role: "owner";
   owner_type: "individual" | "fleet";
   fleet_name?: string;
-  national_id?: string;
+  national_id: string;
   location?: string;
   rc_number?: string;
   country?: string;
@@ -73,6 +74,7 @@ export type UserProfile = {
   role: UserRole;
   date_joined: string;
   customer_profile: {
+    national_id: string;
     drivers_license: string;
     date_of_birth: string | null;
     address: string;
@@ -122,7 +124,9 @@ function toSignUpBody(data: SignUpData): SignUpData | FormData {
 }
 
 function isAuthError(error: unknown) {
-  return error instanceof ApiError && (error.status === 401 || error.status === 403);
+  return (
+    error instanceof ApiError && (error.status === 401 || error.status === 403)
+  );
 }
 
 // ---------- Hooks ----------
@@ -189,5 +193,23 @@ export function useSignOut() {
       clearAuth();
       queryClient.clear();
     },
+  });
+}
+
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: Record<string, unknown>) =>
+      apiClient.patch<UserProfile>("/users/me", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+    },
+  });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (data: { old_password: string; new_password: string }) =>
+      apiClient.post<{ message: string }>("/auth/change-password", data),
   });
 }

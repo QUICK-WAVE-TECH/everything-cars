@@ -1,4 +1,12 @@
-export { useSignUp, useSignIn, useVerify, useMe, useSignOut } from "./auth-api";
+export {
+  useSignUp,
+  useSignIn,
+  useVerify,
+  useMe,
+  useSignOut,
+  useUpdateProfile,
+  useChangePassword,
+} from "./auth-api";
 export type {
   AuthResponse,
   CustomerSignUpData,

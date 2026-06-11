@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from django_countries.serializer_fields import CountryField
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import AccessCode, User, CustomerProfile, OwnerProfile
 
 
@@ -12,6 +14,9 @@ class SignUpSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=User.Role.choices)
 
     # Customer fields
+    national_id = serializers.CharField(
+        max_length=50, required=False, allow_blank=True, default=""
+    )
     drivers_license = serializers.CharField(max_length=50, required=False, default="")
     date_of_birth = serializers.DateField(required=False, allow_null=True, default=None)
     address = serializers.CharField(max_length=250, required=False, default="")
@@ -24,7 +29,6 @@ class SignUpSerializer(serializers.Serializer):
         choices=OwnerProfile.OwnerType.choices, required=False
     )
     fleet_name = serializers.CharField(max_length=200, required=False, default="")
-    national_id = serializers.CharField(max_length=50, required=False, default="")
     location = serializers.CharField(max_length=200, required=False, default="")
     rc_number = serializers.CharField(max_length=50, required=False, default="")
     bank_account = serializers.CharField(max_length=20, required=False, default="")
@@ -61,7 +65,16 @@ class SignUpSerializer(serializers.Serializer):
             return value.upper()
         return value
 
+    def validate_national_id(self, value):
+        value = value.strip()
+        if value and not value.isdigit():
+            raise serializers.ValidationError("NIN must contain digits only.")
+        return value
+
     def validate(self, data):
+        if not data.get("national_id"):
+            raise serializers.ValidationError({"national_id": "NIN is required."})
+
         if data["role"] == "owner":
             if not data.get("owner_type"):
                 raise serializers.ValidationError(
@@ -92,7 +105,15 @@ class VerifySerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "email", "first_name", "last_name", "phone", "role", "date_joined"]
+        fields = [
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "phone",
+            "role",
+            "date_joined",
+        ]
         read_only_fields = ["id", "email", "role", "date_joined"]
 
 
@@ -102,6 +123,7 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerProfile
         fields = [
+            "national_id",
             "drivers_license",
             "date_of_birth",
             "address",
@@ -109,6 +131,11 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
             "city",
             "country",
         ]
+
+    def validate_country(self, value):
+        if value:
+            return value.upper()
+        return value
 
 
 class CustomerProfileWriteSerializer(serializers.ModelSerializer):
@@ -117,6 +144,7 @@ class CustomerProfileWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerProfile
         fields = [
+            "national_id",
             "drivers_license",
             "date_of_birth",
             "address",
@@ -124,6 +152,11 @@ class CustomerProfileWriteSerializer(serializers.ModelSerializer):
             "city",
             "country",
         ]
+
+    def validate_country(self, value):
+        if value:
+            return value.upper()
+        return value
 
 
 class OwnerProfileSerializer(serializers.ModelSerializer):
@@ -147,6 +180,11 @@ class OwnerProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["is_verified"]
 
+    def validate_country(self, value):
+        if value:
+            return value.upper()
+        return value
+
 
 class MeSerializer(serializers.ModelSerializer):
     customer_profile = CustomerProfileSerializer(read_only=True)
@@ -166,3 +204,25 @@ class MeSerializer(serializers.ModelSerializer):
             "owner_profile",
         ]
         read_only_fields = ["id", "email", "role", "date_joined"]
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    password = serializers.CharField(min_length=8)
+
+    def validate_password(self, value):
+        try:
+            validate_password(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.message)) from exc
+
+        return value
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField()
+    new_password = serializers.CharField(min_length=8)

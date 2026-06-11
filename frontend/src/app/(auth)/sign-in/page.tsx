@@ -1,5 +1,6 @@
 "use client";
 
+import type { KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -48,6 +49,17 @@ export default function SignInPage() {
       },
     });
   };
+
+  const handleFormKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
+    if (event.key !== "Enter") return;
+    if (!(event.target instanceof HTMLInputElement)) return;
+
+    event.preventDefault();
+    if (!signIn.isPending) {
+      void form.handleSubmit(handleSubmit)();
+    }
+  };
+
   return (
     <AuthShell>
       <div className="flex w-[min(100%,632px)] flex-col items-center gap-8">
@@ -66,6 +78,7 @@ export default function SignInPage() {
             <Form {...form}>
               <form
                 onSubmit={form.handleSubmit(handleSubmit)}
+                onKeyDown={handleFormKeyDown}
                 className="flex flex-col gap-8"
               >
                 <div className="flex flex-col gap-4">
@@ -100,6 +113,14 @@ export default function SignInPage() {
                       </FormItem>
                     )}
                   />
+                </div>
+                <div className="flex justify-end -mt-2">
+                  <Link
+                    href="/forgot-password"
+                    className="text-sm text-(--brc-accent) underline underline-offset-4 transition-colors hover:text-(--brc-accent-deep) [font-family:var(--brc-font-link)]"
+                  >
+                    Forgot Password?
+                  </Link>
                 </div>
                 <AuthButton full type="submit" loading={signIn.isPending}>
                   {signIn.isPending ? "Signing in..." : "Continue"}

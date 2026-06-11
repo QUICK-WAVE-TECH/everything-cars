@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-import { Breadcrumb, StatCard } from "@/shared/components";
+import { Breadcrumb } from "@/shared/components";
+import { OwnerStats } from "@/features/requests";
 import { Icon } from "@/features/auth/components/icon";
 import {
   RequestDetailCard,
@@ -11,7 +12,6 @@ import {
   type RequestDetailStatus,
 } from "@/features/requests/components/request-detail-card";
 import {
-  OWNER_STATS,
   OWNER_REQUESTS,
   naira,
   type OwnerRequest,
@@ -162,18 +162,7 @@ export default function OwnerRequestDetailPage() {
           </div>
 
           {/* Stat cards */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-              gap: "clamp(14px, 2vw, 20px)",
-            }}
-          >
-            {OWNER_STATS.map((s) => (
-              <StatCard key={s.label} {...s} />
-            ))}
-          </div>
+          <OwnerStats />
 
           {/* Request detail card */}
           <RequestDetailCard

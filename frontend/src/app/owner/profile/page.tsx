@@ -17,7 +17,7 @@ import {
 } from "@/features/auth/components";
 import { useMe, useUpdateProfile, useChangePassword } from "@/features/auth/api";
 import {
-  profileUpdateSchema,
+  ownerProfileUpdateSchema,
   changePasswordSchema,
 } from "@/features/auth/schemas";
 import { COUNTRIES } from "@/features/auth/data/countries";
@@ -25,7 +25,7 @@ import { ApiError } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
 
-type ProfileInput = z.infer<typeof profileUpdateSchema>;
+type ProfileInput = z.infer<typeof ownerProfileUpdateSchema>;
 type PasswordInput = z.infer<typeof changePasswordSchema>;
 
 function initials(name: string): string {
@@ -57,27 +57,31 @@ function ReadonlyField({ field }: { field: Field }) {
   );
 }
 
-export default function ProfilePage() {
+export default function OwnerProfilePage() {
   const { data: user, isLoading } = useMe();
   const updateProfile = useUpdateProfile();
   const changePassword = useChangePassword();
   const [editing, setEditing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const profile = user?.customer_profile;
+  const profile = user?.owner_profile;
 
   const form = useForm<ProfileInput>({
-    resolver: zodResolver(profileUpdateSchema),
+    resolver: zodResolver(ownerProfileUpdateSchema),
     defaultValues: {
       first_name: user?.first_name ?? "",
       last_name: user?.last_name ?? "",
       phone: user?.phone ?? "",
-      drivers_license: profile?.drivers_license ?? "",
-      date_of_birth: profile?.date_of_birth ?? "",
-      address: profile?.address ?? "",
+      fleet_name: profile?.fleet_name ?? "",
+      national_id: profile?.national_id ?? "",
+      location: profile?.location ?? "",
+      rc_number: profile?.rc_number ?? "",
+      country: profile?.country ?? "",
       state: profile?.state ?? "",
       city: profile?.city ?? "",
-      country: profile?.country ?? "",
+      address: profile?.address ?? "",
+      bank_account: profile?.bank_account ?? "",
+      bank_name: profile?.bank_name ?? "",
     },
   });
 
@@ -90,7 +94,6 @@ export default function ProfilePage() {
     },
   });
 
-  // Watch country for state/city cascading
   const watchedCountry = useWatch({ control: form.control, name: "country" });
   const watchedState = useWatch({ control: form.control, name: "state" });
   const countryName = isoToName(watchedCountry ?? "");
@@ -100,12 +103,16 @@ export default function ProfilePage() {
       first_name: user?.first_name ?? "",
       last_name: user?.last_name ?? "",
       phone: user?.phone ?? "",
-      drivers_license: profile?.drivers_license ?? "",
-      date_of_birth: profile?.date_of_birth ?? "",
-      address: profile?.address ?? "",
+      fleet_name: profile?.fleet_name ?? "",
+      national_id: profile?.national_id ?? "",
+      location: profile?.location ?? "",
+      rc_number: profile?.rc_number ?? "",
+      country: profile?.country ?? "",
       state: profile?.state ?? "",
       city: profile?.city ?? "",
-      country: profile?.country ?? "",
+      address: profile?.address ?? "",
+      bank_account: profile?.bank_account ?? "",
+      bank_name: profile?.bank_name ?? "",
     });
     setEditing(true);
   }
@@ -164,19 +171,24 @@ export default function ProfilePage() {
     { label: "Email Address", value: user.email, icon: "mail" },
     { label: "Phone No", value: user.phone || "—", icon: "phone" },
     {
-      label: "Date of Birth",
-      value: profile?.date_of_birth || "—",
-      icon: "calendar",
+      label: "Owner Type",
+      value: profile?.owner_type === "fleet" ? "Fleet" : "Individual",
+      icon: "car",
     },
-    {
-      label: "Driver's License",
-      value: profile?.drivers_license || "—",
-      icon: "idcard",
-    },
+    { label: "Fleet Name", value: profile?.fleet_name || "—", icon: "car" },
+    { label: "National ID", value: profile?.national_id || "—", icon: "idcard" },
+    { label: "Location", value: profile?.location || "—", icon: "pin" },
+    { label: "RC Number", value: profile?.rc_number || "—", icon: "idcard" },
     { label: "Address", value: profile?.address || "—", icon: "pin" },
+    { label: "Country", value: profile?.country || "—", icon: "pin" },
     { label: "State", value: profile?.state || "—", icon: "pin" },
     { label: "City", value: profile?.city || "—", icon: "pin" },
-    { label: "Country", value: profile?.country || "—", icon: "pin" },
+    { label: "Bank Name", value: profile?.bank_name || "—", icon: "banknote" },
+    {
+      label: "Bank Account",
+      value: profile?.bank_account || "—",
+      icon: "banknote",
+    },
   ];
 
   return (
@@ -207,10 +219,17 @@ export default function ProfilePage() {
                 <span className="text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
                   {user.email}
                 </span>
-                <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-(--brc-accent-bg) px-3 py-1 text-xs font-semibold text-(--brc-accent) [font-family:var(--brc-font-ui)]">
-                  <span className="size-[7px] rounded-full bg-(--brc-accent)" />
-                  Customer Account
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-(--brc-accent-bg) px-3 py-1 text-xs font-semibold text-(--brc-accent) [font-family:var(--brc-font-ui)]">
+                    <span className="size-[7px] rounded-full bg-(--brc-accent)" />
+                    Owner Account
+                  </span>
+                  {profile?.is_verified && (
+                    <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-(--brc-success-bg) px-3 py-1 text-xs font-semibold text-(--brc-success) [font-family:var(--brc-font-ui)]">
+                      Verified
+                    </span>
+                  )}
+                </div>
               </div>
               {/* Edit button */}
               <div className="ml-auto">
@@ -306,14 +325,25 @@ export default function ProfilePage() {
                         </FormItem>
                       )}
                     />
+                    {/* Owner type — read-only */}
+                    <ReadonlyField
+                      field={{
+                        label: "Owner Type",
+                        value:
+                          profile?.owner_type === "fleet"
+                            ? "Fleet"
+                            : "Individual",
+                        icon: "car",
+                      }}
+                    />
                     <FormField
                       control={form.control}
-                      name="date_of_birth"
+                      name="fleet_name"
                       render={({ field }) => (
                         <FormItem>
                           <AuthField
-                            label="Date of Birth"
-                            placeholder="YYYY-MM-DD"
+                            label="Fleet Name"
+                            placeholder="Fleet/company name"
                             value={field.value ?? ""}
                             onChange={field.onChange}
                           />
@@ -323,12 +353,42 @@ export default function ProfilePage() {
                     />
                     <FormField
                       control={form.control}
-                      name="drivers_license"
+                      name="national_id"
                       render={({ field }) => (
                         <FormItem>
                           <AuthField
-                            label="Driver's License"
-                            placeholder="License number"
+                            label="National ID"
+                            placeholder="National ID number"
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="location"
+                      render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label="Location"
+                            placeholder="Your location"
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="rc_number"
+                      render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label="RC Number"
+                            placeholder="Company registration number"
                             value={field.value ?? ""}
                             onChange={field.onChange}
                           />
@@ -396,6 +456,37 @@ export default function ProfilePage() {
                             state={watchedState ?? ""}
                             value={field.value ?? ""}
                             onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="bank_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label="Bank Name"
+                            placeholder="Bank name"
+                            value={field.value}
+                            onChange={field.onChange}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="bank_account"
+                      render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label="Bank Account"
+                            placeholder="Account number"
+                            value={field.value}
+                            onChange={field.onChange}
+                            inputMode="numeric"
                           />
                           <FormMessage />
                         </FormItem>
@@ -516,26 +607,6 @@ export default function ProfilePage() {
                 </form>
               </Form>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Loyalty information */}
-        <Card className="rounded-(--brc-radius-lg) border border-(--brc-border) p-[clamp(20px,3vw,32px)] shadow-none">
-          <CardContent className="flex flex-col gap-[18px] p-0">
-            <h2 className="m-0 text-xl font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
-              Loyalty Information
-            </h2>
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-(--brc-radius-md) bg-linear-to-br from-(--brc-accent-bg) to-[#fbe7d6] p-5 px-6">
-              <div className="flex flex-col gap-1">
-                <span className="text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
-                  Current Point
-                </span>
-                <span className="text-[32px] font-extrabold text-(--brc-accent-deep) [font-family:var(--brc-font-display)]">
-                  0
-                </span>
-              </div>
-              <AuthButton href="/customer/loyalty">View Rewards</AuthButton>
-            </div>
           </CardContent>
         </Card>
       </div>

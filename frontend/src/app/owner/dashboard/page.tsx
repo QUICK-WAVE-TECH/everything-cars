@@ -28,7 +28,7 @@ type QuickLink = {
 };
 
 const OWNER_STATS = [
-  { icon: "car" as IconName, label: "Listed Cars", value: "5", color: "var(--brc-primary)" },
+  { icon: "car" as IconName, label: "Listed Cars", value: "5", color: "var(--brc-primary)", href: "/owner/my-cars" },
   { icon: "clock" as IconName, label: "Pending Requests", value: "3", color: "var(--brc-warning)" },
   { icon: "check" as IconName, label: "Approved", value: "8", color: "var(--brc-success)" },
   { icon: "banknote" as IconName, label: "Earnings", value: "₦1.2M", color: "var(--brc-accent)" },
@@ -148,11 +148,8 @@ function DashboardButton({ href, children, variant = "primary" }: { href: string
 }
 
 function StatCard({ stat, delay }: { stat: (typeof OWNER_STATS)[number]; delay: number }) {
-  return (
-    <div
-      className="brc-dashboard-card brc-dashboard-reveal relative overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-5 shadow-[var(--brc-shadow-xs)]"
-      style={{ "--delay": `${delay}ms`, "--accent": stat.color } as DashboardStyle}
-    >
+  const inner = (
+    <>
       <div className="mb-5 flex items-start justify-between gap-3">
         <span className="brc-dashboard-icon-bubble flex size-11 items-center justify-center rounded-full text-white shadow-[0_10px_22px_rgba(18,18,18,0.1)]" style={{ background: stat.color }}>
           <Icon name={stat.icon} size={21} stroke="#fff" />
@@ -164,8 +161,20 @@ function StatCard({ stat, delay }: { stat: (typeof OWNER_STATS)[number]; delay: 
           <AnimatedStatValue value={stat.value} />
         </span>
       </div>
-    </div>
+    </>
   );
+  const cls = "brc-dashboard-card brc-dashboard-reveal relative overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-5 shadow-[var(--brc-shadow-xs)]";
+  const style = { "--delay": `${delay}ms`, "--accent": stat.color } as DashboardStyle;
+
+  if (stat.href) {
+    return (
+      <Link href={stat.href} className={`${cls} no-underline transition-shadow hover:shadow-md`} style={style}>
+        {inner}
+      </Link>
+    );
+  }
+
+  return <div className={cls} style={style}>{inner}</div>;
 }
 
 /** Tilt + glow hover animation — different from customer dashboard's scale effect */

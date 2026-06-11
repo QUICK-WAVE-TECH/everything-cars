@@ -235,6 +235,20 @@ export default function OwnerSignUpPage() {
                             <FormMessage />
                           </FormItem>
                         )} />
+                        <FormField control={form.control} name="national_id" render={({ field }) => (
+                          <FormItem>
+                            <AuthField
+                              label="NIN"
+                              placeholder="Enter your NIN"
+                              value={field.value ?? ""}
+                              onChange={(value) => field.onChange(onlyDigits(value))}
+                              type="tel"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                            />
+                            <FormMessage />
+                          </FormItem>
+                        )} />
                         <UploadField
                           label="Upload CAC Document"
                           hint="PDF, DOC, DOCX, JPG, PNG, or WEBP (Max 9MB)"
@@ -313,8 +327,8 @@ export default function OwnerSignUpPage() {
                         <FormField control={form.control} name="national_id" render={({ field }) => (
                           <FormItem>
                             <AuthField
-                              label="National ID"
-                              placeholder="Enter your ID number"
+                              label="NIN"
+                              placeholder="Enter your NIN"
                               value={field.value ?? ""}
                               onChange={(value) => field.onChange(onlyDigits(value))}
                               type="tel"
