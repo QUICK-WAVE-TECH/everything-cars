@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import Image from "next/image";
 import { Icon } from "@/features/auth/components/icon";
 import { Star } from "@/shared/components/star";
@@ -20,14 +20,35 @@ import {
 } from "./car-detail-data";
 
 // ---------------------------------------------------------------------------
-// "You may also like" data (client-only, not needed for SSR metadata)
+// Car catalogue used to derive "You may also like" suggestions (client-only).
 // ---------------------------------------------------------------------------
 
-const ALSO_LIKE: Car[] = [
-  { id: 1, name: "Lexus NX 300h", type: "SUV", location: "Lagos, Nigeria", price: "₦35,000/day", rating: 4, mode: "rent" },
-  { id: 2, name: "Toyota RAV4", type: "SUV", location: "Abuja, Nigeria", price: "₦42,000/day", rating: 5, mode: "rent" },
-  { id: 3, name: "Mercedes GLE", type: "Luxury", location: "Lagos, Nigeria", price: "₦80,000/day", rating: 5, mode: "rent" },
-  { id: 4, name: "Honda CR-V", type: "SUV", location: "Ibadan, Nigeria", price: "₦40,000/day", rating: 4, mode: "rent" },
+type CatalogCar = {
+  id: number;
+  name: string;
+  type: string;
+  location: string;
+  rentPrice: number;
+  buyPrice: number;
+  rating: number;
+  available: boolean;
+  year: number;
+  mileage: number;
+};
+
+const CATALOG: CatalogCar[] = [
+  { id: 1,  name: "Lexus NX 300h",     type: "SUV",    location: "Lagos, Nigeria",  rentPrice: 35000, buyPrice: 35000000, rating: 4, available: true,  year: 2022, mileage: 25000 },
+  { id: 2,  name: "Toyota Camry",       type: "Sedan",  location: "Abuja, Nigeria",  rentPrice: 28000, buyPrice: 18000000, rating: 5, available: true,  year: 2021, mileage: 32000 },
+  { id: 3,  name: "Honda Accord",       type: "Sedan",  location: "Lagos, Nigeria",  rentPrice: 30000, buyPrice: 20000000, rating: 4, available: false, year: 2020, mileage: 41000 },
+  { id: 4,  name: "Mercedes-Benz GLE",  type: "Luxury", location: "Lagos, Nigeria",  rentPrice: 85000, buyPrice: 78000000, rating: 5, available: true,  year: 2024, mileage: 0 },
+  { id: 5,  name: "Toyota RAV4",        type: "SUV",    location: "Port Harcourt",   rentPrice: 42000, buyPrice: 28000000, rating: 4, available: true,  year: 2022, mileage: 28000 },
+  { id: 6,  name: "Hyundai Elantra",    type: "Sedan",  location: "Ibadan, Nigeria", rentPrice: 22000, buyPrice: 15000000, rating: 3, available: false, year: 2019, mileage: 55000 },
+  { id: 7,  name: "Lexus RX 350",       type: "SUV",    location: "Lagos, Nigeria",  rentPrice: 60000, buyPrice: 52000000, rating: 5, available: true,  year: 2024, mileage: 0 },
+  { id: 8,  name: "Kia Sportage",       type: "SUV",    location: "Abuja, Nigeria",  rentPrice: 38000, buyPrice: 24000000, rating: 4, available: false, year: 2021, mileage: 30000 },
+  { id: 9,  name: "Toyota Corolla",     type: "Sedan",  location: "Lagos, Nigeria",  rentPrice: 25000, buyPrice: 16000000, rating: 4, available: true,  year: 2020, mileage: 47000 },
+  { id: 10, name: "Ford Explorer",      type: "SUV",    location: "Lagos, Nigeria",  rentPrice: 48000, buyPrice: 33000000, rating: 4, available: true,  year: 2022, mileage: 22000 },
+  { id: 11, name: "Mercedes C-Class",   type: "Luxury", location: "Abuja, Nigeria",  rentPrice: 70000, buyPrice: 45000000, rating: 5, available: false, year: 2023, mileage: 12000 },
+  { id: 12, name: "Honda CR-V",         type: "SUV",    location: "Lagos, Nigeria",  rentPrice: 40000, buyPrice: 26000000, rating: 4, available: true,  year: 2024, mileage: 0 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -121,6 +142,23 @@ export function CarDetailPage() {
   const carouselRef = useRef<HTMLDivElement>(null);
 
   const totalRatingCount = RATING_DIST.reduce((s, [, c]) => s + c, 0);
+
+  // Suggestions relative to the previewed car: same body type first, then
+  // closest in price (for the current rent/buy mode), excluding this car.
+  const suggestedCars = useMemo<Car[]>(() => {
+    const target = mode === "rent" ? DETAIL_CAR.rentPrice : DETAIL_CAR.buyPrice;
+    const priceOf = (c: CatalogCar) => (mode === "rent" ? c.rentPrice : c.buyPrice);
+
+    return CATALOG.filter((c) => c.name !== DETAIL_CAR.name)
+      .map((c) => ({
+        car: c,
+        sameType: c.type === DETAIL_CAR.type ? 0 : 1,
+        priceDiff: Math.abs(priceOf(c) - target),
+      }))
+      .sort((a, b) => a.sameType - b.sameType || a.priceDiff - b.priceDiff)
+      .slice(0, 6)
+      .map(({ car: c }) => ({ ...c, mode }));
+  }, [mode]);
 
   function prevImage() {
     setActiveImage((i) => (i === 0 ? GALLERY_IMAGES.length - 1 : i - 1));
@@ -1171,7 +1209,7 @@ export function CarDetailPage() {
               scrollbarWidth: "none",
             }}
           >
-            {ALSO_LIKE.map((car) => (
+            {suggestedCars.map((car) => (
               <CarCard key={car.id} car={car} />
             ))}
           </div>

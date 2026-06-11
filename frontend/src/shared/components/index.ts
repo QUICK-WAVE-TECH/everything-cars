@@ -25,3 +25,4 @@ export { WebsiteNavbar } from "./website-navbar";
 export { PageHero } from "./page-hero";
 export { TextImageRow } from "./text-image-row";
 export { AuthGuard } from "./auth-guard";
+export { PromoBanner } from "./promo-banner";

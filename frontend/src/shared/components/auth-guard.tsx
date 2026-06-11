@@ -12,6 +12,13 @@ type AuthGuardProps = {
 };
 
 /**
+ * DEV BYPASS — set to true to make every protected page accessible without
+ * signing in. Flip back to false (or remove this block) to restore real
+ * auth gating before shipping.
+ */
+const BYPASS_AUTH = true;
+
+/**
  * Client-side auth guard. Wraps protected layouts.
  *
  * Waits for useMe() to resolve before deciding:
@@ -28,6 +35,8 @@ export function AuthGuard({ children, requiredRole }: AuthGuardProps) {
   const currentRole = user?.role ?? userRole;
 
   useEffect(() => {
+    if (BYPASS_AUTH) return;
+
     // Still loading — wait
     if (isLoading) return;
 
@@ -44,6 +53,11 @@ export function AuthGuard({ children, requiredRole }: AuthGuardProps) {
       router.replace(correctDashboard);
     }
   }, [currentRole, isReadyAuthenticated, isLoading, isError, requiredRole, router]);
+
+  // Dev bypass: render everything regardless of auth state.
+  if (BYPASS_AUTH) {
+    return <>{children}</>;
+  }
 
   // Show nothing while loading or redirecting
   if (isLoading || !isReadyAuthenticated || isError) {

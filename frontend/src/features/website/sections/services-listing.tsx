@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { Icon } from "@/features/auth/components/icon";
 import { Star } from "@/shared/components/star";
 import { Chip } from "@/shared/components/chip";
@@ -199,11 +200,11 @@ function ServiceCarCard({
     : mode === "buy" ? "var(--brc-danger)" : "#9a7400";
 
   const specChipStyle: React.CSSProperties = {
-    display: "inline-flex", alignItems: "center", gap: 5,
+    display: "inline-flex", alignItems: "center", gap: 4,
     background: "var(--brc-bg-subtle)", border: "1px solid var(--brc-border)",
-    borderRadius: "var(--brc-radius-pill)", padding: "4px 10px",
-    fontFamily: "var(--brc-font-ui)", fontSize: 12, fontWeight: 600,
-    color: "var(--brc-text-secondary)",
+    borderRadius: "var(--brc-radius-pill)", padding: "3px 8px",
+    fontFamily: "var(--brc-font-ui)", fontSize: 11, fontWeight: 600,
+    color: "var(--brc-text-secondary)", whiteSpace: "nowrap",
   };
 
   const content = (
@@ -260,14 +261,14 @@ function ServiceCarCard({
           <Icon name="pin" size={14} stroke="var(--brc-text-muted)" />
           {car.location}
         </div>
-        {/* Price + car specs on one line (year for rent & buy; mileage/condition buy-only) */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 20, color: available ? "var(--brc-text)" : "var(--brc-text-muted)" }}>
+        {/* Price + car specs always on one line (year for rent & buy; mileage/condition buy-only) */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "nowrap" }}>
+          <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 18, color: available ? "var(--brc-text)" : "var(--brc-text-muted)", whiteSpace: "nowrap" }}>
             {fmtPrice(car, mode)}
           </span>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", flexShrink: 0 }}>
             <span style={specChipStyle}>
-              <Icon name="calendar" size={13} stroke="var(--brc-text-secondary)" />
+              <Icon name="calendar" size={12} stroke="var(--brc-text-secondary)" />
               {car.year}
             </span>
             {mode === "buy" &&
@@ -575,16 +576,35 @@ function FilterSidebar({
 // Main component
 // ---------------------------------------------------------------------------
 
+// Maps a landing-page price option to a mode + price range.
+function priceConfigFor(option: string): { mode: Mode; range: [number, number] } | null {
+  switch (option) {
+    case "Under ₦50k/day": return { mode: "rent", range: [0, 50000] };
+    case "₦50k–₦200k/day": return { mode: "rent", range: [50000, 200000] };
+    case "₦5M–₦20M": return { mode: "buy", range: [5000000, 20000000] };
+    case "₦20M+": return { mode: "buy", range: [20000000, 100000000] };
+    default: return null;
+  }
+}
+
 export function ServicesListing() {
-  const [mode, setMode] = useState<Mode>("rent");
-  const [search, setSearch] = useState("");
+  const searchParams = useSearchParams();
+  const initialLocation = searchParams.get("location") ?? "";
+  const initialType = searchParams.get("type") ?? "";
+  const priceConfig = priceConfigFor(searchParams.get("price") ?? "");
+  const initialMode: Mode = priceConfig?.mode ?? "rent";
+
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const [search, setSearch] = useState(initialLocation);
+  // Body type from the landing search (e.g. "SUV"); "" means no constraint.
+  const bodyType = initialType && initialType !== "All" ? initialType : "";
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>({
     types: [],
     availability: "All",
     state: "All States",
     city: "All Cities",
-    price: [0, 200000],
+    price: priceConfig?.range ?? (initialMode === "rent" ? [0, 200000] : [0, 100000000]),
   });
 
   const modeData = SERVICE_MODES[mode];
@@ -610,6 +630,8 @@ export function ServicesListing() {
           !car.type.toLowerCase().includes(search.toLowerCase())) {
         return false;
       }
+      // body type from landing search (e.g. SUV / Sedan / Luxury)
+      if (bodyType && car.type.toLowerCase() !== bodyType.toLowerCase()) return false;
       // type filter — match against brand names loosely
       if (filters.types.length > 0) {
         const nameUpper = car.name.toLowerCase();
@@ -634,7 +656,7 @@ export function ServicesListing() {
       }
       return true;
     });
-  }, [search, filters, mode]);
+  }, [search, filters, mode, bodyType]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / CARS_PER_PAGE));
   const currentCars = filtered.slice((page - 1) * CARS_PER_PAGE, page * CARS_PER_PAGE);

@@ -7,7 +7,6 @@ import { CarCard, type Car } from "./car-card";
 type CarRowProps = {
   title: string;
   cars: Car[];
-  onAction?: (car: Car) => void;
 };
 
 const navBtnStyle: React.CSSProperties = {
@@ -16,7 +15,7 @@ const navBtnStyle: React.CSSProperties = {
   cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
 };
 
-export function CarRow({ title, cars, onAction }: CarRowProps) {
+export function CarRow({ title, cars }: CarRowProps) {
   const ref = useRef<HTMLDivElement>(null);
   const scroll = (d: number) => ref.current?.scrollBy({
     left: d * Math.min(340, window.innerWidth - 48),
@@ -48,7 +47,7 @@ export function CarRow({ title, cars, onAction }: CarRowProps) {
           scrollbarWidth: "none",
         }}
       >
-        {cars.map((c) => <CarCard key={c.id} car={c} onAction={onAction} />)}
+        {cars.map((c) => <CarCard key={c.id} car={c} />)}
       </div>
       {/* Dashed road divider */}
       <div style={{

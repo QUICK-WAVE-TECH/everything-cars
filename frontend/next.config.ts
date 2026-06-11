@@ -1,14 +1,24 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
   allowedDevOrigins: ["192.168.1.30"],
+
+  // Pin the workspace root to this directory so Next/Turbopack never infers it
+  // from a stray lockfile in a parent directory (which left dev requests hanging).
+  turbopack: {
+    root: path.join(__dirname),
+  },
 
   images: {
     remotePatterns: [{ protocol: "https", hostname: "flagcdn.com" }],
   },
 
   async headers() {
+    // Security headers (esp. HSTS) are for production only. Sending HSTS on
+    // localhost can make the browser force HTTPS and refuse to load dev.
+    if (process.env.NODE_ENV !== "production") return [];
     return [
       {
         source: "/(.*)",

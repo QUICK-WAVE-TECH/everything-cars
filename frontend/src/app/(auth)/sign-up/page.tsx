@@ -211,36 +211,38 @@ export default function SignUpPage() {
                 {/* Step 1 */}
                 {step === 1 ? (
                   <div className="flex flex-col gap-4">
-                    <FormField
-                      control={form.control}
-                      name="first_name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <AuthField
-                            label="First Name"
-                            placeholder="First Name"
-                            value={field.value}
-                            onChange={field.onChange}
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="last_name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <AuthField
-                            label="Last Name"
-                            placeholder="Last Name"
-                            value={field.value}
-                            onChange={field.onChange}
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="first_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <AuthField
+                              label="First Name"
+                              placeholder="First Name"
+                              value={field.value}
+                              onChange={field.onChange}
+                            />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="last_name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <AuthField
+                              label="Last Name"
+                              placeholder="Last Name"
+                              value={field.value}
+                              onChange={field.onChange}
+                            />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                     <FormField
                       control={form.control}
                       name="email"

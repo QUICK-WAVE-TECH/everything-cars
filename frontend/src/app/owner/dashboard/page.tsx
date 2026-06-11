@@ -14,6 +14,7 @@ import Link from "next/link";
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
 import { useMe } from "@/features/auth/api";
+import { PromoBanner } from "@/shared/components";
 
 type DashboardStyle = CSSProperties & Record<`--${string}`, string | number>;
 
@@ -29,7 +30,7 @@ type QuickLink = {
 const OWNER_STATS = [
   { icon: "car" as IconName, label: "Listed Cars", value: "5", color: "var(--brc-primary)" },
   { icon: "clock" as IconName, label: "Pending Requests", value: "3", color: "var(--brc-warning)" },
-  { icon: "handshake" as IconName, label: "Approved", value: "8", color: "var(--brc-success)" },
+  { icon: "check" as IconName, label: "Approved", value: "8", color: "var(--brc-success)" },
   { icon: "banknote" as IconName, label: "Earnings", value: "₦1.2M", color: "var(--brc-accent)" },
 ];
 
@@ -349,17 +350,15 @@ export default function OwnerDashboard() {
                   Owner dashboard
                 </span>
                 <h1 className="m-0 max-w-2xl text-[clamp(2rem,6vw,3.4rem)] font-black leading-[1.04] text-(--brc-text) [font-family:var(--brc-font-display)]">{greetingText}</h1>
-                <p className="mt-4 max-w-xl text-base leading-7 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">You have 3 pending rental requests and 5 cars listed for rent.</p>
               </div>
-              <div className="flex flex-wrap gap-3">
+              <p className="max-w-xl text-base leading-7 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">You have 3 pending rental requests and 5 cars listed for rent.</p>
+            </div>
+            <div className="relative z-10 flex flex-col justify-between gap-6">
+              <div className="brc-dashboard-badge-pop self-start rounded-2xl border border-(--brc-border) bg-(--brc-bg-subtle) px-4 py-3 text-sm font-bold text-(--brc-text-secondary) shadow-[var(--brc-shadow-xs)] [font-family:var(--brc-font-ui)] lg:self-end">Verified owner</div>
+              <div className="flex flex-wrap gap-3 self-start lg:justify-end lg:self-end">
                 <DashboardButton href="/owner/my-cars">Manage Cars</DashboardButton>
                 <DashboardButton href="/owner/requests" variant="soft">View Requests</DashboardButton>
               </div>
-            </div>
-            <div className="relative hidden min-h-[220px] items-end justify-center lg:flex">
-              <div className="brc-dashboard-car-shadow absolute inset-x-8 bottom-7 h-8 rounded-full bg-[rgba(195,101,35,0.12)] blur-xl" />
-              <div className="brc-dashboard-badge-pop absolute right-0 top-0 rounded-2xl border border-(--brc-border) bg-(--brc-bg-subtle) px-4 py-3 text-sm font-bold text-(--brc-text-secondary) shadow-[var(--brc-shadow-xs)] [font-family:var(--brc-font-ui)]">Verified owner</div>
-              <Image src="/car-lexus.png" alt="Lexus car" width={360} height={230} priority className="brc-dashboard-hero-car relative z-10 object-contain" style={{ width: "100%", maxWidth: 360, height: "auto" }} />
             </div>
           </div>
         </section>
@@ -412,6 +411,16 @@ export default function OwnerDashboard() {
               </div>
             </section>
             <EarningsSnapshot />
+            <PromoBanner
+              tag="Earn more"
+              title="List Another Car"
+              subtitle="Reach thousands of renters and grow your earnings."
+              ctaLabel="Add a Car"
+              href="/owner/my-cars/new"
+              image="/owner-banner.jpg"
+              imagePosition="55% 32%"
+              className="flex-1"
+            />
           </aside>
         </div>
       </div>
