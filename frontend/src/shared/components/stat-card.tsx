@@ -12,6 +12,22 @@ export type StatCardProps = {
   color: string;
 };
 
+function getIconTone(color: string) {
+  if (color === "var(--brc-warning)") {
+    return {
+      bg: "var(--brc-warning-bg)",
+      border: "color-mix(in srgb, var(--brc-warning) 42%, white)",
+      fg: "#9a7400",
+    };
+  }
+
+  return {
+    bg: `color-mix(in srgb, ${color} 14%, white)`,
+    border: `color-mix(in srgb, ${color} 34%, white)`,
+    fg: color,
+  };
+}
+
 function AnimatedValue({ value }: { value: string }) {
   const target = useMemo(() => {
     const digits = value.replace(/[^\d]/g, "");
@@ -42,14 +58,20 @@ function AnimatedValue({ value }: { value: string }) {
 }
 
 export function StatCard({ label, value, unit, icon, color }: StatCardProps) {
+  const iconTone = getIconTone(color);
+
   return (
     <div className="brc-dashboard-card relative overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-5 shadow-[var(--brc-shadow-xs)]">
       <div className="mb-5 flex items-start justify-between gap-3">
         <span
-          className="flex size-11 items-center justify-center rounded-full text-white shadow-[0_10px_22px_rgba(18,18,18,0.1)]"
-          style={{ background: color }}
+          className="brc-dashboard-icon-bubble flex size-11 items-center justify-center rounded-full border shadow-[0_10px_22px_rgba(18,18,18,0.08)]"
+          style={{
+            background: iconTone.bg,
+            borderColor: iconTone.border,
+            color: iconTone.fg,
+          }}
         >
-          <Icon name={icon} size={21} stroke="#fff" />
+          <Icon name={icon} size={21} stroke={iconTone.fg} />
         </span>
       </div>
       <p className="mb-2 text-sm font-medium text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
