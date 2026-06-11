@@ -45,6 +45,7 @@ class CustomerProfile(models.Model):
     drivers_license = models.CharField(
         max_length=250, null=True, blank=True, default=""
     )
+    national_id = models.CharField(max_length=50, blank=True, default="")
     date_of_birth = models.DateField(null=True, blank=True)
     address = models.CharField(max_length=250, null=True, blank=True, default="")
     city = models.CharField(max_length=250, null=True, blank=True, default="")

@@ -11,8 +11,11 @@ from rest_framework.views import APIView
 
 from .models import PasswordResetToken, User, CustomerProfile, OwnerProfile, AccessCode
 from .serializers import (
+    ChangePasswordSerializer,
+    CustomerProfileSerializer,
     CustomerProfileWriteSerializer,
     ForgotPasswordSerializer,
+    OwnerProfileSerializer,
     ResetPasswordSerializer,
     SignInSerializer,
     SignUpSerializer,
@@ -272,7 +275,23 @@ class MeView(APIView):
         serializer = UserProfileSerializer(user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        # Re-fetch with profiles for the response
+
+        # Update the profile fields based on th role
+        # # Re-fetch with profiles for the response
+        if user.role == "customer" and hasattr(user, "customer_profile"):
+            profile_serializer = CustomerProfileSerializer(
+                user.customer_profile, data=request.data, partial=True
+            )
+            profile_serializer.is_valid(raise_exception=True)
+            profile_serializer.save()
+
+        elif user.role == "owner" and hasattr(user, "owner_profile"):
+            profile_serializer = OwnerProfileSerializer(
+                user.owner_profile, data=request.data, partial=True
+            )
+            profile_serializer.is_valid(raise_exception=True)
+            profile_serializer.save()
+
         user = self._get_user(request)
         return Response(MeSerializer(user).data)
 
@@ -380,5 +399,26 @@ class ResetPasswordView(APIView):
 
         return Response(
             {"message": "Password reset successfully. You can now sign in."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        if not request.user.check_password(serializer.validated_data["old_password"]):
+            return Response(
+                {"detail": "Current password is incorrect"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        request.user.set_password(serializer.validated_data["new_password"])
+        request.user.save(update_fields=["password"])
+
+        return Response(
+            {"message": "Password changed successfully"},
             status=status.HTTP_200_OK,
         )
