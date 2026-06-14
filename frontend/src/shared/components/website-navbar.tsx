@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/features/auth/components/icon";
 import { AuthButton } from "@/features/auth/components/auth-button";
 import { useAuthStore } from "@/features/auth/store";
-import { useSignOut } from "@/features/auth/api";
+import { useSignOut, useMe } from "@/features/auth/api";
 
 const NAV_LINKS = [
   { label: "About Us", href: "/about" },
@@ -25,10 +25,12 @@ const iconBtnStyle: React.CSSProperties = {
 
 export function WebsiteNavbar() {
   const { isAuthenticated, userRole } = useAuthStore();
+  const { data: user } = useMe();
   const signOut = useSignOut();
   const router = useRouter();
 
-  const dashboardHref = userRole === "owner" ? "/owner/dashboard" : "/customer/dashboard";
+  const isStaff = user?.is_staff ?? false;
+  const dashboardHref = isStaff ? "/admin/approvals" : userRole === "owner" ? "/owner/dashboard" : "/customer/dashboard";
 
   const handleSignOut = () => {
     signOut.mutate(undefined, {
@@ -99,7 +101,7 @@ export function WebsiteNavbar() {
               textDecoration: "none",
             }}
           >
-            Dashboard
+            {isStaff ? "Admin" : "Dashboard"}
           </Link>
         )}
       </nav>

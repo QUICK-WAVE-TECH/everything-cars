@@ -66,10 +66,17 @@ function ResetContent() {
       toast.success("Password reset successfully");
     } catch (error) {
       if (error instanceof ApiError && error.status === 400) {
-        setStatus("expired");
-        toast.error("Reset link expired", {
-          description: "Please request a new password reset link.",
-        });
+        const data = error.data as { detail?: string; password?: string[] } | undefined;
+        if (data?.password) {
+          // Password validation error — show the message, don't mark as expired
+          toast.error(data.password[0] ?? "Password does not meet requirements");
+        } else {
+          // Token expired/invalid
+          setStatus("expired");
+          toast.error("Reset link expired", {
+            description: "Please request a new password reset link.",
+          });
+        }
       } else {
         toast.error("Something went wrong. Please try again.");
       }

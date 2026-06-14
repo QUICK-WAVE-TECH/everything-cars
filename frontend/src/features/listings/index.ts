@@ -1,2 +1,2 @@
-export { carSchema, searchFiltersSchema } from "./schemas";
-export type { Car, SearchFilters } from "./schemas";
+export { createCarSchema } from "./schemas";
+export type { CreateCarInput } from "./schemas";

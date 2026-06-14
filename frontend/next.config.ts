@@ -2,10 +2,14 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  allowedDevOrigins: ["192.168.1.30"],
+  allowedDevOrigins: ["192.168.1.30", "127.0.0.1:8000", "localhost"],
 
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "flagcdn.com" }],
+    remotePatterns: [
+      { protocol: "https", hostname: "flagcdn.com" },
+      { protocol: "http", hostname: "localhost" },
+      { protocol: "https", hostname: "**.amazonaws.com" },
+    ],
   },
 
   async headers() {

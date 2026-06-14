@@ -43,8 +43,10 @@ INSTALLED_APPS = [
     "django_countries",
     "corsheaders",
     "storages",
+    "djmoney",
     # Local
     "apps.users",
+    "apps.listings",
 ]
 
 

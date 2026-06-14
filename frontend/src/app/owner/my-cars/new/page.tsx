@@ -1,23 +1,50 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useId, type FormEvent } from "react";
 import Link from "next/link";
+import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { ArrowLeftIcon, CheckCircle2Icon, XIcon, UploadIcon, FileIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  CheckCircle2Icon,
+  XIcon,
+  Loader2Icon,
+} from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
+import { CountrySelect, StateSelect, CityCombobox } from "@/features/auth/components";
+import { COUNTRIES } from "@/features/auth/data/countries";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useCreateCar, useUploadCarImages } from "@/features/listings/api";
+import {
+  createCarSchema,
+  type CreateCarFormValues,
+  type CreateCarInput,
+} from "@/features/listings/schemas";
+import { ApiError } from "@/lib/api-client";
 
 // ---------- Form field components ----------
 
-function TextField({ label, placeholder, value, onChange, prefix, className }: {
+function stripNonDigits(v: string) { return v.replace(/[^\d]/g, ""); }
+function stripNonDecimal(v: string) { return v.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1"); }
+
+function TextField({ label, placeholder, value, onChange, prefix, className, inputMode, filter }: {
   label: string;
   placeholder: string;
   value: string;
   onChange: (v: string) => void;
   prefix?: string;
   className?: string;
+  inputMode?: "numeric" | "decimal" | "text";
+  filter?: "digits" | "decimal";
 }) {
+  function handleChange(raw: string) {
+    if (filter === "digits") return onChange(stripNonDigits(raw));
+    if (filter === "decimal") return onChange(stripNonDecimal(raw));
+    onChange(raw);
+  }
+
   return (
     <label className={cn("flex min-w-0 flex-col gap-2", className)}>
       <span className="text-sm text-(--brc-text) [font-family:var(--brc-font-ui)] sm:text-base">{label}</span>
@@ -26,12 +53,17 @@ function TextField({ label, placeholder, value, onChange, prefix, className }: {
         <input
           value={value}
           placeholder={placeholder}
-          onChange={(e) => onChange(e.target.value)}
+          inputMode={inputMode}
+          onChange={(e) => handleChange(e.target.value)}
           className="min-w-0 flex-1 border-none bg-transparent text-sm text-(--brc-text) outline-none placeholder:text-(--brc-text-muted) [font-family:var(--brc-font-ui)]"
         />
       </div>
     </label>
   );
+}
+
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
 }
 
 function SelectField({ label, placeholder, value, options, onPick, className }: {
@@ -60,31 +92,111 @@ function SelectField({ label, placeholder, value, options, onPick, className }: 
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="flex h-12 w-full cursor-pointer items-center justify-between rounded-lg bg-(--brc-bg-subtle) px-4 text-left text-sm [font-family:var(--brc-font-ui)] sm:h-14 sm:px-5"
-          style={{
-            border: open ? "1px solid var(--brc-primary)" : "1px solid var(--brc-border)",
-            color: value ? "var(--brc-text)" : "var(--brc-text-muted)",
-          }}
+          className={cn(
+            "flex h-12 w-full cursor-pointer items-center justify-between rounded-lg bg-(--brc-bg-subtle) px-4 text-left text-sm transition-all duration-200 [font-family:var(--brc-font-ui)] sm:h-14 sm:px-5",
+            open ? "border-2 border-(--brc-primary) shadow-[0_0_0_3px_rgba(0,0,139,0.08)]" : "border border-(--brc-border) hover:border-(--brc-text-muted)",
+          )}
+          style={{ color: value ? "var(--brc-text)" : "var(--brc-text-muted)" }}
         >
-          {value || placeholder}
-          <Icon name={open ? "chevup" : "chevdown"} size={18} stroke="var(--brc-text-muted)" />
+          {value ? capitalize(value) : placeholder}
+          <Icon
+            name={open ? "chevup" : "chevdown"}
+            size={16}
+            stroke="var(--brc-text-muted)"
+          />
         </button>
         {open && (
-          <div className="absolute left-0 right-0 top-[52px] z-40 max-h-[min(50vh,220px)] overflow-y-auto rounded-lg border border-(--brc-border) bg-white shadow-md sm:top-[60px]">
-            {options.map((o) => (
-              <button
-                key={o}
-                type="button"
-                onClick={() => { onPick(o); setOpen(false); }}
-                className="w-full cursor-pointer border-none px-5 py-3 text-left text-sm text-(--brc-text) [font-family:var(--brc-font-ui)]"
-                style={{ background: o === value ? "var(--brc-bg-subtle)" : "#fff" }}
-              >
-                {o}
-              </button>
-            ))}
+          <div className="absolute left-0 right-0 top-[54px] z-40 max-h-[min(50vh,240px)] overflow-y-auto rounded-xl border border-(--brc-border) bg-white p-1 shadow-lg sm:top-[62px]">
+            {options.map((o) => {
+              const selected = o === value;
+              return (
+                <button
+                  key={o}
+                  type="button"
+                  onClick={() => { onPick(o); setOpen(false); }}
+                  className={cn(
+                    "flex w-full cursor-pointer items-center justify-between rounded-lg border-none px-4 py-2.5 text-left text-sm transition-colors duration-150 [font-family:var(--brc-font-ui)]",
+                    selected
+                      ? "bg-(--brc-primary-tint) font-semibold text-(--brc-primary)"
+                      : "bg-transparent text-(--brc-text) hover:bg-(--brc-bg-subtle)",
+                  )}
+                >
+                  {capitalize(o)}
+                  {selected && <Icon name="check" size={16} stroke="var(--brc-primary)" />}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function FeaturesField({ features, onChange }: {
+  features: { name: string; value?: string }[];
+  onChange: (features: { name: string; value?: string }[]) => void;
+}) {
+  function addFeature() {
+    onChange([...features, { name: "", value: "" }]);
+  }
+
+  function removeFeature(index: number) {
+    onChange(features.filter((_, i) => i !== index));
+  }
+
+  function updateFeature(index: number, field: "name" | "value", val: string) {
+    const updated = features.map((f, i) => (i === index ? { ...f, [field]: val } : f));
+    onChange(updated);
+  }
+
+  return (
+    <div className="col-span-full flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-(--brc-text) [font-family:var(--brc-font-ui)] sm:text-base">Features</span>
+        <button
+          type="button"
+          onClick={addFeature}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-(--brc-border) bg-white px-3 py-1.5 text-xs font-semibold text-(--brc-primary) transition-colors hover:bg-(--brc-primary-tint) [font-family:var(--brc-font-ui)]"
+        >
+          <Icon name="plus" size={14} stroke="currentColor" />
+          Add Feature
+        </button>
+      </div>
+      {features.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-(--brc-border) px-4 py-6 text-center text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+          No features added yet. Click &quot;Add Feature&quot; to add GPS, Bluetooth, etc.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {features.map((f, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) px-3 py-2 sm:px-4 sm:py-2.5">
+                <input
+                  value={f.name}
+                  placeholder="Feature name (e.g. GPS)"
+                  onChange={(e) => updateFeature(i, "name", e.target.value)}
+                  className="min-w-0 flex-1 border-none bg-transparent text-sm text-(--brc-text) outline-none placeholder:text-(--brc-text-muted) [font-family:var(--brc-font-ui)]"
+                />
+                <span className="hidden text-xs text-(--brc-border) sm:block">|</span>
+                <input
+                  value={f.value ?? ""}
+                  placeholder="Value (optional)"
+                  onChange={(e) => updateFeature(i, "value", e.target.value)}
+                  className="hidden min-w-0 flex-1 border-none bg-transparent text-sm text-(--brc-text) outline-none placeholder:text-(--brc-text-muted) [font-family:var(--brc-font-ui)] sm:block"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => removeFeature(i)}
+                className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-(--brc-border) bg-white text-(--brc-danger) transition-colors hover:bg-(--brc-danger-bg)"
+              >
+                <XIcon size={15} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -115,104 +227,194 @@ function FileField({ label, files, onChoose, onClear }: {
   onChoose: (files: File[]) => void;
   onClear: () => void;
 }) {
+  const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  function handleFiles(fileList: FileList | File[] | null) {
+    const selectedFiles = Array.from(fileList ?? []);
+    if (selectedFiles.length > 0) {
+      onChoose(selectedFiles);
+    }
+  }
+
+  function handleClear() {
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+    onClear();
+  }
+
+  const selectedLabel = files.length
+    ? `${files.length} image${files.length > 1 ? "s" : ""} selected`
+    : "Upload images or drag and drop here";
+  const selectedNames = files
+    .slice(0, 3)
+    .map((file) => file.name)
+    .join(", ");
+  const hint = files.length
+    ? `${selectedNames}${files.length > 3 ? `, +${files.length - 3} more` : ""}`
+    : "JPG, PNG, WEBP, or HEIC (Max 5MB each)";
 
   return (
     <div className="col-span-full flex flex-col gap-2">
-      <span className="text-sm text-(--brc-text) [font-family:var(--brc-font-ui)] sm:text-base">{label}</span>
-      <div className="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) px-4 py-3 sm:min-h-14 sm:px-5">
-        <span className="flex min-w-0 items-center gap-2.5">
-          {files.length > 0 && <FileIcon size={18} className="shrink-0 text-(--brc-primary)" />}
-          <span className="truncate text-sm [font-family:var(--brc-font-ui)]" style={{ color: files.length ? "var(--brc-text)" : "var(--brc-text-muted)" }}>
-            {files.length ? `${files.length} image${files.length > 1 ? "s" : ""} selected` : "No file selected"}
-          </span>
-        </span>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm text-(--brc-text) [font-family:var(--brc-font-ui)] sm:text-base">{label}</span>
         {files.length > 0 && (
-          <button type="button" onClick={onClear} className="flex shrink-0 cursor-pointer border-none bg-transparent p-1.5">
-            <XIcon size={16} className="text-(--brc-text-muted)" />
+          <button
+            type="button"
+            onClick={handleClear}
+            className="inline-flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-xs font-semibold text-(--brc-danger) [font-family:var(--brc-font-ui)]"
+          >
+            Clear
+            <XIcon size={14} />
           </button>
         )}
       </div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/heic"
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          if (e.target.files?.length) {
-            onChoose(Array.from(e.target.files));
-          }
+      <label
+        htmlFor={id}
+        className={cn(
+          "brc-button-motion brc-button-motion-subtle flex min-h-[150px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-(--brc-border-strong) bg-(--brc-bg-subtle) px-6 py-7 text-center",
+          isDragging && "border-(--brc-primary) bg-(--brc-primary-tint)",
+        )}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          setIsDragging(true);
         }}
-      />
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        className="mt-1 inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-border) bg-white px-4 text-sm font-semibold text-(--brc-text) transition duration-200 hover:-translate-y-0.5 hover:bg-(--brc-bg-subtle) hover:shadow-sm [font-family:var(--brc-font-ui)] sm:w-fit sm:self-start"
+        onDragOver={(event) => {
+          event.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={(event) => {
+          event.preventDefault();
+          setIsDragging(false);
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          setIsDragging(false);
+          handleFiles(event.dataTransfer.files);
+        }}
       >
-        <UploadIcon size={16} />
-        Choose files
-      </button>
+        <input
+          id={id}
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic"
+          multiple
+          className="sr-only"
+          onChange={(event) => handleFiles(event.target.files)}
+        />
+        <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-accent-bg)">
+          <Icon name="upload" size={22} stroke="var(--brc-accent)" />
+        </span>
+        <span className="flex max-w-full flex-col gap-1">
+          <span className="text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+            {selectedLabel}
+          </span>
+          <span className="break-words text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+            {hint}
+          </span>
+        </span>
+      </label>
     </div>
   );
 }
 
-// ---------- Types ----------
-type FormData = {
-  title: string;
-  listingType: string;
-  price: string;
-  brand: string;
-  model: string;
-  color: string;
-  year: string;
-  transmission: string;
-  fuelType: string;
-  state: string;
-  city: string;
-  description: string;
-  features: string;
-};
-
-const BLANK: FormData = {
-  title: "", listingType: "", price: "", brand: "", model: "", color: "",
-  year: "", transmission: "", fuelType: "", state: "", city: "", description: "", features: "",
-};
-
-const MODELS = ["NX 300h", "RAV4", "C300", "Accord", "X5", "Sportage", "Camry", "Civic"];
-const STATES = ["Lagos", "Abuja (FCT)", "Rivers", "Oyo", "Kano", "Enugu"];
-const CITIES = ["Ikeja", "Lekki", "Victoria Island", "Yaba", "Surulere", "Ikoyi"];
-const REQUIRED: (keyof FormData)[] = ["title", "listingType", "price", "brand", "model", "year", "state"];
-
 // ---------- Page ----------
 export default function ListCarPage() {
-  const [f, setF] = useState(BLANK);
+  const createCar = useCreateCar();
+  const uploadImages = useUploadCarImages();
   const [files, setFiles] = useState<File[]>([]);
-  const [submitted, setSubmitted] = useState(false);
   const [done, setDone] = useState(false);
+  const submitInFlightRef = useRef(false);
 
-  const set = (key: keyof FormData) => (value: string) => setF((prev) => ({ ...prev, [key]: value }));
-  const isBuy = f.listingType === "Buy";
-  const priceLabel = isBuy ? "Sale Price (₦)" : "Rental Price per Day (₦)";
-  const missing = REQUIRED.filter((k) => !f[k]);
+  const form = useForm<CreateCarFormValues, unknown, CreateCarInput>({
+    resolver: zodResolver(createCarSchema),
+    defaultValues: {
+      title: "",
+      listing_type: undefined,
+      rent_price_per_day: "",
+      sale_price: "",
+      currency: "NGN",
+      brand: "",
+      model: "",
+      color: "",
+      year: "",
+      body_type: "",
+      transmission: "",
+      fuel_type: "",
+      seats: 5,
+      mileage: "",
+      country: "",
+      state: "",
+      city: "",
+      description: "",
+      features: [],
+    },
+  });
 
-  function handleSubmit() {
-    setSubmitted(true);
-    if (missing.length) {
-      toast.error(`${missing.length} required field${missing.length > 1 ? "s" : ""} left`);
+  const w = useWatch({ control: form.control });
+  const listingType = w.listing_type;
+  const countryName = COUNTRIES.find((c) => c.iso === (w.country ?? "").toLowerCase())?.name ?? "";
+  const isBuy = listingType === "buy";
+  // Show both price fields when no type selected yet, otherwise show based on type
+  const showRentPrice = !listingType || listingType === "rent" || listingType === "both";
+  const showSalePrice = !listingType || isBuy || listingType === "both";
+
+  async function handleSubmit(values: CreateCarInput) {
+    try {
+      const payload: Record<string, unknown> = {
+        ...values,
+        year: parseInt(values.year, 10),
+        seats: values.seats,
+      };
+      if (!values.mileage) delete payload.mileage;
+      else payload.mileage = parseInt(values.mileage, 10);
+      if (!values.rent_price_per_day) delete payload.rent_price_per_day;
+      if (!values.sale_price) delete payload.sale_price;
+
+      const car = await createCar.mutateAsync(payload);
+
+      if (files.length > 0) {
+        await uploadImages.mutateAsync({ carId: car.id, files });
+      }
+
+      setDone(true);
+      toast.success("Car listed successfully");
+    } catch (error) {
+      if (error instanceof ApiError) {
+        toast.error(error.message);
+      } else {
+        toast.error("Something went wrong. Please try again.");
+      }
+    } finally {
+      submitInFlightRef.current = false;
+    }
+  }
+
+  function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
+    if (submitInFlightRef.current) {
+      event.preventDefault();
       return;
     }
-    // TODO: call API to create listing
-    setDone(true);
-    toast.success("Car listed successfully");
+
+    submitInFlightRef.current = true;
+    void form.handleSubmit(handleSubmit, () => {
+      submitInFlightRef.current = false;
+    })(event);
   }
 
   function handleReset() {
-    setF(BLANK);
+    form.reset();
     setFiles([]);
-    setSubmitted(false);
     setDone(false);
+    submitInFlightRef.current = false;
   }
+
+  const title = w.title ?? "";
+  const brand = w.brand ?? "";
+  const isSubmitting =
+    form.formState.isSubmitting || createCar.isPending || uploadImages.isPending;
 
   // Success state
   if (done) {
@@ -229,7 +431,7 @@ export default function ListCarPage() {
                   Car Listed Successfully
                 </h2>
                 <p className="mx-auto mt-3 max-w-[460px] text-base text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                  <strong className="text-(--brc-text)">{f.title || f.brand}</strong> is now {isBuy ? "up for sale" : "available to rent"}. We&apos;ll notify you when a request comes in.
+                  <strong className="text-(--brc-text)">{title || brand}</strong> is now {isBuy ? "up for sale" : "available to rent"}. We&apos;ll notify you when a request comes in.
                 </p>
               </div>
               <div className="mt-2 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
@@ -280,51 +482,98 @@ export default function ListCarPage() {
               </p>
             </div>
 
-            {/* Form grid */}
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
-              <TextField label="Car Title" placeholder="Enter car title" value={f.title} onChange={set("title")} />
-              <SelectField label="Listing Type" placeholder="Select listing type" value={f.listingType} options={["Rent", "Buy"]} onPick={set("listingType")} />
-              <TextField label={priceLabel} placeholder="Enter amount" value={f.price} onChange={set("price")} prefix="₦" />
+            {/* Form */}
+            <form onSubmit={handleFormSubmit} className="flex flex-col gap-6 sm:gap-8">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
+                <TextField label="Car Title" placeholder="Enter car title" value={w.title ?? ""} onChange={(v) => form.setValue("title", v.replace(/\b\w/g, (c) => c.toUpperCase()))} />
+                <SelectField label="Listing Type" placeholder="Select listing type" value={w.listing_type ?? ""} options={["rent", "buy", "both"]} onPick={(v) => form.setValue("listing_type", v as "rent" | "buy" | "both")} />
 
-              <TextField label="Brand" placeholder="Enter brand name" value={f.brand} onChange={set("brand")} />
-              <SelectField label="Model" placeholder="Enter model" value={f.model} options={MODELS} onPick={set("model")} />
-              <TextField label="Color" placeholder="Enter color" value={f.color} onChange={set("color")} />
+                {showRentPrice && (
+                  <TextField label="Rental Price per Day" placeholder="e.g. 35000.00" value={w.rent_price_per_day ?? ""} onChange={(v) => form.setValue("rent_price_per_day", v)} prefix="₦" inputMode="decimal" filter="decimal" />
+                )}
+                {showSalePrice && (
+                  <TextField label="Sale Price" placeholder="e.g. 24000000.00" value={w.sale_price ?? ""} onChange={(v) => form.setValue("sale_price", v)} prefix="₦" inputMode="decimal" filter="decimal" />
+                )}
 
-              <TextField label="Year" placeholder="Enter year" value={f.year} onChange={set("year")} />
-              <SelectField label="Transmission" placeholder="Select transmission type" value={f.transmission} options={["Automatic", "Manual"]} onPick={set("transmission")} />
-              <SelectField label="Fuel Type" placeholder="Select fuel type" value={f.fuelType} options={["Petrol", "Diesel", "Hybrid", "Electric"]} onPick={set("fuelType")} />
+                <TextField label="Brand" placeholder="Enter brand name" value={w.brand ?? ""} onChange={(v) => form.setValue("brand", v)} />
+                <TextField label="Model" placeholder="Enter model" value={w.model ?? ""} onChange={(v) => form.setValue("model", v)} />
+                <TextField label="Color" placeholder="Enter color" value={w.color ?? ""} onChange={(v) => form.setValue("color", v)} />
 
-              <SelectField label="State" placeholder="Select state" value={f.state} options={STATES} onPick={set("state")} className="sm:col-span-2" />
-              <SelectField label="City" placeholder="Select city" value={f.city} options={CITIES} onPick={set("city")} />
+                <TextField label="Year" placeholder="e.g. 2024" value={w.year ?? ""} onChange={(v) => form.setValue("year", v)} inputMode="numeric" filter="digits" />
+                <SelectField label="Body Type" placeholder="Select body type" value={w.body_type ?? ""} options={["sedan", "suv", "hatchback", "coupe", "truck", "van", "wagon", "convertible", "minivan", "crossover"]} onPick={(v) => form.setValue("body_type", v)} />
+                <SelectField label="Transmission" placeholder="Select transmission" value={w.transmission ?? ""} options={["automatic", "manual"]} onPick={(v) => form.setValue("transmission", v)} />
 
-              <FileField
-                label="Car Image(s)"
-                files={files}
-                onChoose={setFiles}
-                onClear={() => setFiles([])}
-              />
-              <TextAreaField label="Description" placeholder="Describe your car, its condition, and any special features" value={f.description} onChange={set("description")} />
-              <TextField label="Features" placeholder="GPS, Bluetooth, ....." value={f.features} onChange={set("features")} className="sm:col-span-2 lg:col-span-3" />
-            </div>
+                <SelectField label="Fuel Type" placeholder="Select fuel type" value={w.fuel_type ?? ""} options={["petrol", "diesel", "hybrid", "electric"]} onPick={(v) => form.setValue("fuel_type", v)} />
+                <TextField label="Seats" placeholder="Number of seats" value={w.seats != null ? String(w.seats) : ""} onChange={(v) => form.setValue("seats", v === "" ? (0 as unknown as number) : parseInt(v, 10))} inputMode="numeric" filter="digits" />
+                <TextField label="Mileage (km)" placeholder="e.g. 45000" value={w.mileage ?? ""} onChange={(v) => form.setValue("mileage", v)} inputMode="numeric" filter="digits" />
 
-            {/* Validation error */}
-            {submitted && missing.length > 0 && (
-              <div className="flex items-center gap-2.5 rounded-lg border border-(--brc-danger)/30 bg-(--brc-danger-bg) px-4 py-3">
-                <span className="size-[7px] shrink-0 rounded-full bg-(--brc-danger)" />
-                <span className="text-sm text-(--brc-danger) [font-family:var(--brc-font-ui)]">
-                  Please complete the required fields before listing.
-                </span>
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <CountrySelect
+                    label="Country"
+                    value={w.country ?? ""}
+                    onChange={(iso) => {
+                      form.setValue("country", iso);
+                      form.setValue("state", "");
+                      form.setValue("city", "");
+                    }}
+                  />
+                </div>
+                <div className="sm:col-span-1 lg:col-span-2">
+                  <StateSelect
+                    country={countryName}
+                    value={w.state ?? ""}
+                    onChange={(val) => {
+                      form.setValue("state", val);
+                      form.setValue("city", "");
+                    }}
+                  />
+                </div>
+                <CityCombobox
+                  country={countryName}
+                  state={w.state ?? ""}
+                  value={w.city ?? ""}
+                  onChange={(val) => form.setValue("city", val)}
+                />
+
+                <FileField
+                  label="Car Image(s)"
+                  files={files}
+                  onChoose={setFiles}
+                  onClear={() => setFiles([])}
+                />
+                <TextAreaField label="Description" placeholder="Describe your car, its condition, and any special features" value={w.description ?? ""} onChange={(v) => form.setValue("description", v)} />
+
+                <FeaturesField
+                  features={(w.features ?? []) as { name: string; value?: string }[]}
+                  onChange={(features) => form.setValue("features", features)}
+                />
               </div>
-            )}
 
-            {/* Submit */}
-            <button
-              type="button"
-              onClick={handleSubmit}
-              className="h-12 w-full cursor-pointer rounded-lg border-none bg-(--brc-primary) text-sm font-bold text-(--brc-text-on-primary) transition duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) hover:shadow-md [font-family:var(--brc-font-ui)] sm:h-14 sm:text-base"
-            >
-              List Car
-            </button>
+              {/* Validation errors */}
+              {Object.keys(form.formState.errors).length > 0 && (
+                <div className="flex flex-col gap-1.5 rounded-lg border border-(--brc-danger)/30 bg-(--brc-danger-bg) px-4 py-3">
+                  {Object.entries(form.formState.errors).map(([key, error]) => (
+                    <div key={key} className="flex items-center gap-2.5">
+                      <span className="size-[7px] shrink-0 rounded-full bg-(--brc-danger)" />
+                      <span className="text-sm text-(--brc-danger) [font-family:var(--brc-font-ui)]">
+                        {error?.message as string}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                aria-busy={isSubmitting}
+                className="inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) text-sm font-bold text-(--brc-text-on-primary) transition duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-none [font-family:var(--brc-font-ui)] sm:h-14 sm:text-base"
+              >
+                {isSubmitting && <Loader2Icon size={18} className="animate-spin" />}
+                {isSubmitting ? "Listing..." : "List Car"}
+              </button>
+            </form>
           </CardContent>
         </Card>
       </div>

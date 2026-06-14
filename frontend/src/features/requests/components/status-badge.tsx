@@ -1,5 +1,6 @@
 import { Icon } from "@/features/auth/components/icon";
-import type { RequestStatus } from "../data";
+
+type RequestStatusKey = "pending" | "approved" | "rejected" | "cancelled" | "paid" | "active" | "completed";
 
 type BadgeStyle = {
   defaultLabel: string;
@@ -7,15 +8,22 @@ type BadgeStyle = {
   fg: string;
 };
 
-const STATUS_CONFIG: Record<RequestStatus, BadgeStyle> = {
-  approved: { defaultLabel: "Approved", bg: "var(--brc-success-bg)", fg: "var(--brc-success)" },
+const STATUS_CONFIG: Record<RequestStatusKey, BadgeStyle> = {
   pending: { defaultLabel: "Pending", bg: "var(--brc-warning-bg)", fg: "#9a7400" },
+  approved: { defaultLabel: "Approved", bg: "var(--brc-success-bg)", fg: "var(--brc-success)" },
   rejected: { defaultLabel: "Rejected", bg: "var(--brc-danger-bg)", fg: "var(--brc-danger)" },
+  cancelled: { defaultLabel: "Cancelled", bg: "var(--brc-bg-muted)", fg: "var(--brc-text-muted)" },
+  paid: { defaultLabel: "Paid", bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)" },
+  active: { defaultLabel: "Active", bg: "var(--brc-primary-tint)", fg: "var(--brc-primary)" },
+  completed: { defaultLabel: "Completed", bg: "var(--brc-success-bg)", fg: "var(--brc-success)" },
 };
 
-function StatusIcon({ status, color }: { status: RequestStatus; color: string }) {
-  if (status === "approved") return <Icon name="check" size={13} stroke={color} />;
+function StatusIcon({ status, color }: { status: string; color: string }) {
+  if (status === "approved" || status === "completed") return <Icon name="check" size={13} stroke={color} />;
   if (status === "pending") return <Icon name="clock" size={13} stroke={color} />;
+  if (status === "active") return <Icon name="car" size={13} stroke={color} />;
+  if (status === "paid") return <Icon name="banknote" size={13} stroke={color} />;
+  if (status === "cancelled") return <Icon name="plus" size={13} stroke={color} strokeWidth={2.5} />;
   // rejected — small x
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round">
@@ -26,13 +34,12 @@ function StatusIcon({ status, color }: { status: RequestStatus; color: string })
 }
 
 type StatusBadgeProps = {
-  status: RequestStatus;
-  /** Override the displayed text (e.g. "Accepted", "Awaiting Approval"). */
+  status: string;
   label?: string;
 };
 
 export function StatusBadge({ status, label }: StatusBadgeProps) {
-  const cfg = STATUS_CONFIG[status];
+  const cfg = STATUS_CONFIG[status as RequestStatusKey] ?? STATUS_CONFIG.pending;
   return (
     <span
       style={{

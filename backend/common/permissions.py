@@ -17,3 +17,8 @@ class IsOwner(BasePermission):
             and request.user.is_authenticated
             and request.user.role == "owner"
         )
+
+
+class IsStaff(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated and request.user.is_staff

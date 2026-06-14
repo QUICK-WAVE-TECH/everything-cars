@@ -2,95 +2,160 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Breadcrumb, StatCard } from "@/shared/components";
+import { toast } from "sonner";
+import { ChevronDownIcon, MessageSquareIcon, ClockIcon } from "lucide-react";
+import { Breadcrumb } from "@/shared/components";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Icon } from "@/features/auth/components/icon";
+import { StatusBadge } from "@/features/requests/components/status-badge";
 import {
   RequestDetailCard,
   ActionButton,
   type RequestDetailStatus,
 } from "@/features/requests/components/request-detail-card";
-import { CUSTOMER_STATS, CUSTOMER_REQUESTS, naira } from "@/features/requests/data";
-
-// ---------------------------------------------------------------------------
-// Customer status → page-level status
-// ---------------------------------------------------------------------------
+import { CustomerStats } from "@/features/requests";
+import { useCustomerRequestDetail, useCancelRequest } from "@/features/requests/api";
+import { useMe } from "@/features/auth/api";
 
 function toDetailStatus(s: string): RequestDetailStatus {
-  if (s === "approved") return "accepted";
-  if (s === "pending") return "awaiting-approval";
-  if (s === "rejected") return "cancelled";
-  return "awaiting-approval";
+  const map: Record<string, RequestDetailStatus> = {
+    pending: "awaiting-approval",
+    approved: "accepted",
+    rejected: "rejected",
+    cancelled: "cancelled",
+    paid: "paid",
+    active: "accepted",
+    completed: "accepted",
+  };
+  return map[s] ?? "awaiting-approval";
 }
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
+function formatPrice(amount: string, currency: string): string {
+  const symbol = currency === "NGN" ? "₦" : currency === "USD" ? "$" : currency;
+  return `${symbol}${Number(amount).toLocaleString("en-NG")}`;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+const REQUEST_STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+  cancelled: "Cancelled",
+  paid: "Paid",
+  active: "Active",
+  completed: "Completed",
+};
+
+function humanizeToken(value: string): string {
+  return value.replaceAll("_", " ");
+}
+
+function formatStatusLabel(status: string): string {
+  return REQUEST_STATUS_LABELS[status] ?? humanizeToken(status);
+}
+
+function formatTimelineNote(note: string): string {
+  return note.replace(/\b(confirm_payment|mark_active)\b/g, humanizeToken);
+}
 
 export default function CustomerRequestDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const id = Number(params?.id);
+  const requestId = params?.id as string;
 
-  const found = CUSTOMER_REQUESTS.find((r) => r.id === id);
-  const request = found ?? CUSTOMER_REQUESTS[0]!;
+  const { data: request, isLoading } = useCustomerRequestDetail(requestId);
+  const { data: me } = useMe();
+  const cancelRequest = useCancelRequest();
+  const myFullName = me ? `${me.first_name} ${me.last_name}` : "";
 
-  const [status, setStatus] = useState<RequestDetailStatus>(
-    toDetailStatus(request.status)
-  );
+  async function handleCancel() {
+    try {
+      await cancelRequest.mutateAsync(requestId);
+      toast.success("Request cancelled");
+      router.push("/customer/requests");
+    } catch {
+      toast.error("Failed to cancel request");
+    }
+  }
+
+  if (isLoading || !request) {
+    return (
+      <>
+        <Breadcrumb items={[{ label: "My Requests", href: "/customer/requests" }, { label: "View Request" }]} />
+        <div style={{ background: "var(--brc-bg-subtle)", minHeight: "80vh" }}>
+          <div style={{ maxWidth: 1232, margin: "0 auto", padding: "clamp(24px, 5vw, 40px) clamp(20px, 8vw, 104px) 64px", display: "flex", flexDirection: "column", gap: 28 }}>
+            <Skeleton className="h-10 w-48" />
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+            </div>
+            <Skeleton className="h-72 w-full rounded-xl" />
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  const car = request.car;
+  const ownerName = `${car.owner.first_name} ${car.owner.last_name}`;
+  const status = toDetailStatus(request.status);
+  const primaryImage = car.images.find((img) => img.is_primary)?.image ?? car.images[0]?.image ?? "/car-lexus.png";
 
   const specRows: [string, string][][] = [
     [
-      ["Request Type", request.type],
-      ["Duration", request.duration],
-      ["Amount", naira(request.price)],
-      ["Color", request.color],
-      ["Requested On", request.requestedOn],
+      ["Request Type", request.request_type === "rent" ? "Rent" : "Buy"],
+      ["Duration", request.duration_days ? `${request.duration_days} days` : "—"],
+      ["Amount", formatPrice(request.price_offered, request.currency)],
+      ["Start Date", request.start_date ? formatDate(request.start_date) : "—"],
+      ["Requested On", formatDate(request.created_at)],
     ],
     [
-      ["Year", "2024"],
-      ["Transmission", "Automatic"],
-      ["Fuel Type", "Petrol"],
-      ["Seats", "4"],
-      ["Request Date", request.requestDate],
+      ["Year", String(car.year)],
+      ["Transmission", car.transmission || "—"],
+      ["Fuel Type", car.fuel_type || "—"],
+      ["Seats", String(car.seats)],
+      ["Color", car.color || "—"],
     ],
   ];
 
   const actions = (() => {
-    switch (status) {
-      case "awaiting-approval":
+    switch (request.status) {
+      case "pending":
         return (
-          <ActionButton
-            kind="secondary"
-            onClick={() => setStatus("cancelled")}
-          >
+          <ActionButton kind="secondary" onClick={handleCancel}>
             Cancel Request
           </ActionButton>
         );
-      case "accepted":
+      case "approved":
         return (
-          <ActionButton
-            kind="dark"
-            onClick={() => router.push("/customer/payments")}
-          >
-            Proceed to Payment
-            <Icon name="arrow" size={17} stroke="#fff" />
-          </ActionButton>
+          <>
+            <ActionButton kind="dark" onClick={() => router.push("/customer/payments")}>
+              Proceed to Payment
+              <Icon name="arrow" size={17} stroke="#fff" />
+            </ActionButton>
+            <ActionButton kind="secondary" onClick={handleCancel}>
+              Cancel Request
+            </ActionButton>
+          </>
         );
       case "paid":
         return (
-          <ActionButton
-            kind="dark"
-            onClick={() => router.push("/customer/transactions")}
-          >
+          <ActionButton kind="dark" onClick={() => router.push("/customer/transactions")}>
             View Transactions
           </ActionButton>
         );
-      case "cancelled":
+      case "completed":
         return (
-          <ActionButton
-            kind="secondary"
-            onClick={() => router.push("/customer/listings")}
-          >
+          <ActionButton kind="accent" onClick={() => router.push(`/cars/${car.id}`)}>
+            Write a Review
+          </ActionButton>
+        );
+      case "cancelled":
+      case "rejected":
+        return (
+          <ActionButton kind="secondary" onClick={() => router.push("/customer/listings")}>
             Browse Cars
           </ActionButton>
         );
@@ -101,131 +166,131 @@ export default function CustomerRequestDetailPage() {
 
   return (
     <>
-      <Breadcrumb
-        items={[
-          { label: "My Requests", href: "/customer/requests" },
-          { label: "View Request" },
-        ]}
-      />
+      <Breadcrumb items={[{ label: "My Requests", href: "/customer/requests" }, { label: "View Request" }]} />
 
-      <div style={{ background: "var(--brc-bg-subtle)", minHeight: "100vh" }}>
-        <div
-          style={{
-            maxWidth: 1232,
-            margin: "0 auto",
-            width: "100%",
-            padding:
-              "clamp(24px, 5vw, 40px) clamp(20px, 8vw, 104px) 64px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 28,
-          }}
-        >
-          {/* Page heading */}
+      <div style={{ background: "var(--brc-bg-subtle)", minHeight: "80vh" }}>
+        <div style={{ maxWidth: 1232, margin: "0 auto", width: "100%", padding: "clamp(24px, 5vw, 40px) clamp(20px, 8vw, 104px) 64px", display: "flex", flexDirection: "column", gap: 28 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <h1
-              style={{
-                fontFamily: "var(--brc-font-display)",
-                fontWeight: 800,
-                fontSize: "clamp(28px, 6vw, 40px)",
-                color: "var(--brc-text)",
-                margin: 0,
-              }}
-            >
+            <h1 style={{ fontFamily: "var(--brc-font-display)", fontWeight: 800, fontSize: "clamp(28px, 6vw, 40px)", color: "var(--brc-text)", margin: 0 }}>
               My Request
             </h1>
-            <p
-              style={{
-                fontFamily: "var(--brc-font-ui)",
-                fontSize: 16,
-                color: "var(--brc-text-muted)",
-                margin: 0,
-              }}
-            >
-              Here&apos;s what&apos;s happening with your requests
+            <p style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text-muted)", margin: 0 }}>
+              Here&apos;s what&apos;s happening with your request
             </p>
           </div>
 
-          {/* Stat cards */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-              gap: "clamp(14px, 2vw, 20px)",
-            }}
-          >
-            {CUSTOMER_STATS.map((s) => (
-              <StatCard key={s.label} {...s} />
-            ))}
-          </div>
+          <CustomerStats />
 
-          {/* Request detail card */}
           <RequestDetailCard
-            carName={request.car}
+            carName={car.title}
             partyLabel="Owner"
-            partyName={request.owner}
+            partyName={ownerName}
             status={status}
             specRows={specRows}
             actions={actions}
+            imageSrc={primaryImage}
           />
 
-          {/* Dev status switcher (demo) */}
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              flexWrap: "wrap",
-              padding: "16px 20px",
-              background: "#fff",
-              border: "1px dashed var(--brc-border-strong)",
-              borderRadius: "var(--brc-radius-md)",
-            }}
-          >
-            <span
-              style={{
-                fontFamily: "var(--brc-font-ui)",
-                fontSize: 12,
-                color: "var(--brc-text-muted)",
-                alignSelf: "center",
-                marginRight: 8,
-              }}
-            >
-              Demo — switch status:
-            </span>
-            {(
-              [
-                "awaiting-approval",
-                "accepted",
-                "paid",
-                "cancelled",
-              ] as RequestDetailStatus[]
-            ).map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatus(s)}
-                style={{
-                  padding: "4px 14px",
-                  borderRadius: "var(--brc-radius-pill)",
-                  border:
-                    status === s
-                      ? "1.5px solid var(--brc-primary)"
-                      : "1.5px solid var(--brc-border)",
-                  background: status === s ? "var(--brc-primary-tint)" : "#fff",
-                  color:
-                    status === s ? "var(--brc-primary)" : "var(--brc-text-muted)",
-                  fontFamily: "var(--brc-font-ui)",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
+          {/* Owner note */}
+          {request.owner_note && (
+            <section className="overflow-hidden rounded-[var(--brc-radius-lg)] border border-(--brc-border) bg-white">
+              <div className="flex items-start gap-4 p-5 sm:p-6">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-(--brc-primary-tint)">
+                  <MessageSquareIcon size={18} className="text-(--brc-primary)" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="m-0 text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                    Owner&apos;s Note
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+                    {request.owner_note}
+                  </p>
+                  <span className="mt-2 block text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                    {car.owner.first_name} {car.owner.last_name}
+                  </span>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Status history — collapsible */}
+          <StatusTimeline events={request.status_events} currentUserName={myFullName} />
         </div>
       </div>
     </>
+  );
+}
+
+// ── Collapsible status timeline ──
+function StatusTimeline({ events, currentUserName }: { events: { id: string; from_status: string; to_status: string; actor_name: string; note: string; created_at: string }[]; currentUserName?: string }) {
+  const [open, setOpen] = useState(false);
+
+  if (events.length === 0) return null;
+
+  return (
+    <section className="overflow-hidden rounded-(--brc-radius-lg) border border-(--brc-border) bg-white">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full cursor-pointer items-center justify-between border-none bg-white p-5 text-left transition-colors hover:bg-(--brc-bg-subtle) sm:p-6"
+      >
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-(--brc-bg-muted)">
+            <ClockIcon size={18} className="text-(--brc-text-secondary)" />
+          </span>
+          <div>
+            <h3 className="m-0 text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+              Status History
+            </h3>
+            <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+              {events.length} update{events.length > 1 ? "s" : ""}
+            </span>
+          </div>
+        </div>
+        <ChevronDownIcon
+          size={18}
+          className="text-(--brc-text-muted) transition-transform duration-200"
+          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+        />
+      </button>
+
+      {open && (
+        <div className="border-t border-(--brc-border) px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
+          <div className="relative ml-5 border-l-2 border-(--brc-border) pl-6">
+            {events.map((event, i) => {
+              const isMe = currentUserName && event.actor_name.trim().toLowerCase() === currentUserName.trim().toLowerCase();
+              return (
+              <div key={event.id} className="relative pb-5 last:pb-0">
+                <span
+                  className="absolute left-[-31px] top-0.5 size-3 rounded-full border-2 border-white"
+                  style={{ background: i === events.length - 1 ? "var(--brc-primary)" : "var(--brc-border)" }}
+                />
+                <div className="flex flex-col gap-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge status={event.to_status} />
+                    {event.from_status && (
+                      <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                        from {formatStatusLabel(event.from_status)}
+                      </span>
+                    )}
+                  </div>
+                  {event.note && (
+                    <p className="m-0 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+                      {isMe
+                        ? formatTimelineNote(event.note).replace(/by customer/gi, "by you")
+                        : formatTimelineNote(event.note)}
+                    </p>
+                  )}
+                  <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                    {isMe ? "You" : event.actor_name} · {formatDate(event.created_at)}
+                  </span>
+                </div>
+              </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
