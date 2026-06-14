@@ -1,8 +1,21 @@
-import { StatCard } from "@/shared/components";
-import { OWNER_STATS } from "../data";
+"use client";
 
-/** The 4-card owner summary strip used on the owner dashboard and request pages. */
+import { useMemo } from "react";
+import { StatCard } from "@/shared/components";
+import { useOwnerRequests } from "@/features/requests/api";
+import type { StatItem } from "../data";
+
 export function OwnerStats() {
+  const { data } = useOwnerRequests();
+  const requests = data?.results ?? [];
+
+  const stats: StatItem[] = useMemo(() => [
+    { label: "Total Requests", value: String(requests.length), icon: "car", color: "var(--brc-primary)" },
+    { label: "Pending", value: String(requests.filter((r) => r.status === "pending").length), icon: "clock", color: "var(--brc-warning)" },
+    { label: "Approved", value: String(requests.filter((r) => r.status === "approved").length), icon: "check", color: "var(--brc-success)" },
+    { label: "Active", value: String(requests.filter((r) => r.status === "active").length), icon: "car", color: "var(--brc-accent)" },
+  ], [requests]);
+
   return (
     <div
       style={{
@@ -11,7 +24,7 @@ export function OwnerStats() {
         gap: "clamp(14px, 2vw, 20px)",
       }}
     >
-      {OWNER_STATS.map((s) => (
+      {stats.map((s) => (
         <StatCard key={s.label} {...s} />
       ))}
     </div>

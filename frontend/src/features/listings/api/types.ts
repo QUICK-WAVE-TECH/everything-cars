@@ -2,7 +2,11 @@ export type CarOwner = {
   id: string;
   first_name: string;
   last_name: string;
+  email: string;
+  phone: string;
+  date_joined: string;
   is_verified: boolean;
+  listing_count: number;
 };
 
 export type CarImage = {
@@ -46,6 +50,7 @@ export type CarDetail = CarListItem & {
   mileage: number | null;
   country: string;
   description: string;
+  admin_note: string;
   published_at: string | null;
   updated_at: string;
   images: CarImage[];

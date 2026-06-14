@@ -39,6 +39,7 @@ class FuelType(models.TextChoices):
 class CarStatus(models.TextChoices):
     DRAFT = "draft", "Draft"
     PENDING_REVIEW = "pending_review", "Pending Review"
+    NEEDS_CHANGES = "needs_changes", "Needs Changes"
     PUBLISHED = "published", "Published"
     PAUSED = "paused", "Paused"
     SUSPENDED = "suspended", "Suspended"
@@ -53,6 +54,24 @@ class Currency(models.TextChoices):
     GHS = "GHS", "Ghanaian Cedi (₵)"
     KES = "KES", "Kenyan Shilling (KSh)"
     ZAR = "ZAR", "South African Rand (R)"
+
+
+class RequestStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    APPROVED = "approved", "Approved"
+    REJECTED = "rejected", "Rejected"
+    CANCELLED = "cancelled", "Cancelled"
+    PAID = "paid", "Paid"
+    ACTIVE = "active", "Active"
+    COMPLETED = "completed", "Completed"
+
+
+ACTIVE_REQUEST_STATUSES = [
+    RequestStatus.PENDING,
+    RequestStatus.APPROVED,
+    RequestStatus.PAID,
+    RequestStatus.ACTIVE,
+]
 
 
 # Create your models here.
@@ -105,6 +124,7 @@ class Car(models.Model):
     status = models.CharField(
         max_length=20, choices=CarStatus.choices, default=CarStatus.DRAFT, db_index=True
     )
+    admin_note = models.TextField(blank=True)
     published_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -152,3 +172,67 @@ class ListingFeature(models.Model):
 
     class Meta:
         ordering = ["sort_order", "name"]
+
+
+class Request(models.Model):
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    car = models.ForeignKey(Car, on_delete=models.CASCADE, related_name="requests")
+    customer = models.ForeignKey(
+        "users.User", on_delete=models.CASCADE, related_name="rental_requests"
+    )
+    request_type = models.CharField(max_length=10, choices=ListingType.choices)
+    price_offered = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(
+        max_length=3,
+        choices=Currency.choices,
+        default=Currency.NGN,
+    )
+    duration_days = models.PositiveIntegerField(null=True, blank=True)  # Correct
+    start_date = models.DateField(null=True, blank=True)
+    message = models.TextField(
+        max_length=400,
+        blank=True,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=RequestStatus.choices,
+        db_index=True,
+        default=RequestStatus.PENDING,
+    )
+    owner_note = models.TextField(blank=True)
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["customer", "status"]),
+            models.Index(fields=["car", "status"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["car", "customer", "request_type"],
+                condition=models.Q(status__in=ACTIVE_REQUEST_STATUSES),
+                name="unique_active_request_per_customer_car_type",
+            )
+        ]
+
+
+class RequestStatusEvent(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    request = models.ForeignKey(
+        Request, on_delete=models.CASCADE, related_name="status_events"
+    )
+    from_status = models.CharField(max_length=20)
+    to_status = models.CharField(max_length=20)
+
+    actor = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="+")
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+
+        ordering = ["created_at"]  # Correct — oldest first, shows the timeline in order

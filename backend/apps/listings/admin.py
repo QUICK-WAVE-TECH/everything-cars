@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Car, CarImage, ListingFeature
+from .models import Car, CarImage, ListingFeature, Request, RequestStatusEvent
 
 
 class CarImageInline(admin.TabularInline):
@@ -28,3 +28,24 @@ class CarImageAdmin(admin.ModelAdmin):
 @admin.register(ListingFeature)
 class ListingFeatureAdmin(admin.ModelAdmin):
     list_display = ["car", "name", "value", "sort_order"]
+
+
+class RequestStatusEventInline(admin.TabularInline):
+    model = RequestStatusEvent
+    extra = 0
+    readonly_fields = ["from_status", "to_status", "actor", "note", "created_at"]
+
+
+@admin.register(Request)
+class RequestAdmin(admin.ModelAdmin):
+    list_display = ["id", "car", "customer", "request_type", "price_offered", "status", "created_at"]
+    list_filter = ["status", "request_type"]
+    search_fields = ["car__title", "car__brand", "customer__first_name", "customer__last_name"]
+    readonly_fields = ["created_at", "updated_at"]
+    inlines = [RequestStatusEventInline]
+
+
+@admin.register(RequestStatusEvent)
+class RequestStatusEventAdmin(admin.ModelAdmin):
+    list_display = ["request", "from_status", "to_status", "actor", "created_at"]
+    readonly_fields = ["request", "from_status", "to_status", "actor", "note", "created_at"]

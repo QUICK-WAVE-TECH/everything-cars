@@ -1,11 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import type { PaginatedResponse } from "@/shared/types/api";
 import { CarDetail, CarImage, CarListItem } from "./types";
+
+type UploadCarImagesInput = {
+  carId: string;
+  files: File[];
+};
+
 // Owner — list my cars
 export function useMyCarsList() {
   return useQuery({
     queryKey: ["my-cars"],
-    queryFn: () => apiClient.get<CarListItem[]>("/listings/my-cars"),
+    queryFn: () => apiClient.get<PaginatedResponse<CarListItem>>("/listings/my-cars"),
   });
 }
 
@@ -57,10 +64,10 @@ export function useDeleteCar() {
 }
 
 // Owner — upload images
-export function useUploadCarImages(carId: string) {
+export function useUploadCarImages() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (files: File[]) => {
+    mutationFn: ({ carId, files }: UploadCarImagesInput) => {
       const formData = new FormData();
       files.forEach((file) => formData.append("images", file));
       return apiClient.post<CarImage[]>(
@@ -68,9 +75,23 @@ export function useUploadCarImages(carId: string) {
         formData,
       );
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      const { carId } = variables;
       queryClient.invalidateQueries({ queryKey: ["my-cars", carId] });
       queryClient.invalidateQueries({ queryKey: ["cars", carId] });
+    },
+  });
+}
+
+// Owner — change car status
+export function useCarStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ carId, status }: { carId: string; status: string }) =>
+      apiClient.post<CarDetail>(`/listings/my-cars/${carId}/status`, { status }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["my-cars"] });
+      queryClient.invalidateQueries({ queryKey: ["my-cars", variables.carId] });
     },
   });
 }
@@ -79,7 +100,7 @@ export function useUploadCarImages(carId: string) {
 export function usePublicCars() {
   return useQuery({
     queryKey: ["cars"],
-    queryFn: () => apiClient.get<CarListItem[]>("/listings/cars"),
+    queryFn: () => apiClient.get<PaginatedResponse<CarListItem>>("/listings/cars"),
   });
 }
 

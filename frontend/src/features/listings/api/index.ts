@@ -5,6 +5,7 @@ export {
   useUpdateCar,
   useDeleteCar,
   useUploadCarImages,
+  useCarStatus,
   usePublicCars,
   usePublicCarDetail,
 } from "./listings-api";

@@ -72,6 +72,7 @@ export type UserProfile = {
   last_name: string;
   phone: string;
   role: UserRole;
+  is_staff: boolean;
   date_joined: string;
   customer_profile: {
     national_id: string;
