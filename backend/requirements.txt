@@ -7,6 +7,8 @@ asgiref==3.11.1
     #   django
     #   django-cors-headers
     #   django-countries
+babel==2.18.0
+    # via py-moneyed
 billiard==4.2.4
     # via celery
 boto3==1.43.24
@@ -44,11 +46,14 @@ django==5.2.15
     #   backend (pyproject.toml)
     #   dj-database-url
     #   django-cors-headers
+    #   django-money
     #   django-storages
     #   djangorestframework
 django-cors-headers==4.9.0
     # via backend (pyproject.toml)
 django-countries==8.2.0
+    # via backend (pyproject.toml)
+django-money==3.6.1
     # via backend (pyproject.toml)
 django-storages==1.14.6
     # via backend (pyproject.toml)
@@ -68,12 +73,16 @@ packaging==26.2
     # via
     #   gunicorn
     #   kombu
+pillow==12.2.0
+    # via backend (pyproject.toml)
 prompt-toolkit==3.0.52
     # via click-repl
 psycopg==3.3.4
     # via backend (pyproject.toml)
 psycopg-binary==3.3.4
     # via psycopg
+py-moneyed==3.0
+    # via django-money
 pycparser==3.0
     # via cffi
 pyjwt==2.13.0
@@ -99,6 +108,7 @@ sqlparse==0.5.5
 typing-extensions==4.15.0
     # via
     #   django-countries
+    #   py-moneyed
     #   resend
 tzdata==2026.2
     # via kombu

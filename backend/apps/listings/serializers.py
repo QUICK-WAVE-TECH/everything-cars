@@ -1,6 +1,5 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import ACTIVE_REQUEST_STATUSES
 from .models import (
     Car,
     CarImage,
@@ -28,7 +27,7 @@ class ListingFeatureSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
-class CarOwnerSerializer(serializers.Serializer):
+class CarOwnerSummarySerializer(serializers.Serializer):
     id = serializers.UUIDField()
     first_name = serializers.CharField()
     last_name = serializers.CharField()
@@ -42,13 +41,17 @@ class CarOwnerSerializer(serializers.Serializer):
         owner_profile = getattr(obj, "owner_profile", None)
         return owner_profile.is_verified if owner_profile else False
 
+
+class CarOwnerSerializer(CarOwnerSummarySerializer):
+    listing_count = serializers.SerializerMethodField()
+
     def get_listing_count(self, obj):
         return obj.cars.count()
 
 
 class CarListSerializer(serializers.ModelSerializer):
     primary_image = serializers.SerializerMethodField()
-    owner = CarOwnerSerializer(read_only=True)
+    owner = CarOwnerSummarySerializer(read_only=True)
 
     class Meta:
         model = Car
@@ -217,12 +220,19 @@ class CarCreateSerializer(serializers.ModelSerializer):
         return value.title()
 
 
+class CarImageUploadSerializer(serializers.Serializer):
+    images = serializers.ListField(
+        child=serializers.ImageField(),
+        allow_empty=False,
+    )
+
+
 # ---------- Request serializers ----------
 
 
 class RequestCarSummarySerializer(serializers.ModelSerializer):
     primary_image = serializers.SerializerMethodField()
-    owner = CarOwnerSerializer(read_only=True)
+    owner = CarOwnerSummarySerializer(read_only=True)
 
     class Meta:
         model = Car
@@ -346,18 +356,6 @@ class RequestCreateSerializer(serializers.ModelSerializer):
             )
 
         request_type = data.get("request_type")
-        if request and car and request_type:
-            duplicate_exists = Request.objects.filter(
-                car=car,
-                customer=request.user,
-                request_type=request_type,
-                status__in=ACTIVE_REQUEST_STATUSES,
-            ).exists()
-
-            if duplicate_exists:
-                raise serializers.ValidationError(
-                    {"detail": "You already have an active request for this car."}
-                )
         if car and request_type and car.listing_type != ListingType.BOTH:
             if request_type != car.listing_type:
                 raise serializers.ValidationError(
