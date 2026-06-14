@@ -18,6 +18,7 @@ from .models import (
     Request,
     RequestStatus,
     RequestStatusEvent,
+    Transaction,
 )
 from .serializers import (
     CarListSerializer,
@@ -682,6 +683,24 @@ class OwnerRequestActionView(APIView):
                     "complete": "Rental completed — car returned",
                 }.get(action, ""),
             )
+
+            # Auto-create transaction on payment confirmation
+            if action == "confirm_payment":
+                import uuid as uuid_lib
+
+                Transaction.objects.create(
+                    request=req,
+                    payer=req.customer,
+                    receiver=request.user,
+                    amount=req.price_offered,
+                    currency=req.currency,
+                    transaction_type=(
+                        "rental" if req.request_type == "rent" else "purchase"
+                    ),
+                    payment_method="manual",
+                    status="completed",
+                    reference=f"TXN-{uuid_lib.uuid4().hex[:12].upper()}",
+                )
 
         detail = request_detail_queryset().get(id=req.id)
         return Response(

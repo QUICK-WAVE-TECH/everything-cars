@@ -221,6 +221,70 @@ class Request(models.Model):
         ]
 
 
+class TransactionType(models.TextChoices):
+    RENTAL = "rental", "Rental"
+    PURCHASE = "purchase", "Purchase"
+    REFUND = "refund", "Refund"
+
+
+class PaymentMethod(models.TextChoices):
+    MANUAL = "manual", "Manual (Bank Transfer/Cash)"
+    CARD = "card", "Card"
+    PAYSTACK = "paystack", "Paystack"
+    OPAY = "opay", "Opay"
+    TRANSFER = "transfer", "Bank Transfer"
+
+
+class TransactionStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    COMPLETED = "completed", "Completed"
+    FAILED = "failed", "Failed"
+    REFUNDED = "refunded", "Refunded"
+
+
+class Transaction(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    request = models.ForeignKey(
+        Request, on_delete=models.CASCADE, related_name="transactions"
+    )
+    payer = models.ForeignKey(
+        "users.User", on_delete=models.CASCADE, related_name="payments_made"
+    )
+    receiver = models.ForeignKey(
+        "users.User", on_delete=models.CASCADE, related_name="payments_received"
+    )
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(
+        max_length=3, choices=Currency.choices, default=Currency.NGN
+    )
+    transaction_type = models.CharField(
+        max_length=20, choices=TransactionType.choices
+    )
+    payment_method = models.CharField(
+        max_length=20, choices=PaymentMethod.choices, default=PaymentMethod.MANUAL
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=TransactionStatus.choices,
+        default=TransactionStatus.PENDING,
+        db_index=True,
+    )
+    reference = models.CharField(max_length=100, unique=True)
+    idempotency_key = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["payer", "status"]),
+            models.Index(fields=["receiver", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.transaction_type} — {self.amount} {self.currency} ({self.status})"
+
+
 class RequestStatusEvent(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     request = models.ForeignKey(

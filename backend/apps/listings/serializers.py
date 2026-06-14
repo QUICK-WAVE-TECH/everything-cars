@@ -8,6 +8,7 @@ from .models import (
     ListingType,
     Request,
     RequestStatusEvent,
+    Transaction,
 )
 
 
