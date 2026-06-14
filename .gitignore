@@ -38,9 +38,7 @@ coverage/
 htmlcov/
 .pytest_cache/
 
-# Django migrations generated locally
-**/migrations/*.py
-!**/migrations/__init__.py
+# Django migrations are committed — production needs them to run `migrate`
 
 # Superpowers
 .superpowers/
