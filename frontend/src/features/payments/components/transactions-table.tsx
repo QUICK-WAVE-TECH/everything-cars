@@ -1,40 +1,40 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Icon } from "@/features/auth/components/icon";
 import { Input } from "@/components/ui/input";
-import { FilterPopover, Pagination, RowMenu, type FilterField, type FilterValues } from "@/shared/components";
-import { TRANSACTIONS, naira } from "../data";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  FilterPopover,
+  Pagination,
+  RowMenu,
+  type FilterField,
+  type FilterValues,
+} from "@/shared/components";
+import { useTransactions } from "@/features/payments/api";
 
 const PAGE_SIZE = 6;
-const COLUMNS = ["Description", "Type", "Payment date", "Payment Method", "Amount", "Status"];
+const COLUMNS = ["Description", "Type", "Date", "Method", "Amount", "Status"];
 
 const FILTER_FIELDS: FilterField[] = [
   {
     key: "type",
     label: "Type",
     options: [
-      { value: "Rental", label: "Rental" },
-      { value: "Purchase", label: "Purchase" },
-      { value: "Refund", label: "Refund" },
-    ],
-  },
-  {
-    key: "method",
-    label: "Payment Method",
-    options: [
-      { value: "Credit Card", label: "Credit Card" },
-      { value: "Pay Stack", label: "Pay Stack" },
-      { value: "Opay Transfer", label: "Opay Transfer" },
+      { value: "rental", label: "Rental" },
+      { value: "purchase", label: "Purchase" },
+      { value: "refund", label: "Refund" },
     ],
   },
   {
     key: "status",
     label: "Status",
     options: [
-      { value: "Success", label: "Success" },
-      { value: "Failed", label: "Failed" },
+      { value: "completed", label: "Completed" },
+      { value: "pending", label: "Pending" },
+      { value: "failed", label: "Failed" },
+      { value: "refunded", label: "Refunded" },
     ],
   },
 ];
@@ -58,16 +58,26 @@ const tdStyle: React.CSSProperties = {
   borderTop: "1px solid var(--brc-border)",
 };
 
-const closeIcon = (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--brc-danger)" strokeWidth="2.2" strokeLinecap="round">
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
+}
 
-function TxnStatusBadge({ status }: { status: "Success" | "Failed" }) {
-  const success = status === "Success";
-  const fg = success ? "var(--brc-success)" : "var(--brc-danger)";
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatAmount(amount: string, currency: string) {
+  const symbol = currency === "NGN" ? "₦" : currency === "USD" ? "$" : currency;
+  return `${symbol}${Number(amount).toLocaleString("en-NG")}`;
+}
+
+function TxnStatusBadge({ status }: { status: string }) {
+  const isSuccess = status === "completed";
+  const isFailed = status === "failed";
+  const label = capitalize(status);
+  const fg = isFailed ? "var(--brc-danger)" : isSuccess ? "var(--brc-success)" : "var(--brc-text-muted)";
+  const bg = isFailed ? "var(--brc-danger-bg)" : isSuccess ? "var(--brc-success-bg)" : "var(--brc-bg-muted)";
+
   return (
     <span
       style={{
@@ -79,46 +89,74 @@ function TxnStatusBadge({ status }: { status: "Success" | "Failed" }) {
         fontSize: 12,
         padding: "4px 12px",
         borderRadius: "var(--brc-radius-pill)",
-        background: success ? "var(--brc-success-bg)" : "var(--brc-danger-bg)",
+        background: bg,
         color: fg,
         whiteSpace: "nowrap",
       }}
     >
-      {success ? (
+      {isSuccess ? (
         <Icon name="check" size={13} stroke={fg} />
-      ) : (
+      ) : isFailed ? (
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={fg} strokeWidth="2.5" strokeLinecap="round">
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
+      ) : (
+        <Icon name="clock" size={13} stroke={fg} />
       )}
-      {status}
+      {label}
     </span>
   );
 }
 
+function getDetailPath(pathname: string, txnId: string) {
+  if (pathname.startsWith("/admin")) return `/admin/transactions/${txnId}`;
+  if (pathname.startsWith("/owner")) return `/owner/transactions/${txnId}`;
+  return `/customer/transactions/${txnId}`;
+}
+
 export function TransactionsTable() {
   const router = useRouter();
+  const pathname = usePathname();
+  const { data: paginatedData, isLoading } = useTransactions();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<FilterValues>({});
 
+  const transactions = paginatedData?.results ?? [];
+
   const filtered = useMemo(() => {
-    return TRANSACTIONS.filter((t) => {
+    return transactions.filter((t) => {
       if (search) {
         const q = search.toLowerCase();
-        if (!t.description.toLowerCase().includes(q) && !t.method.toLowerCase().includes(q)) return false;
+        if (
+          !t.car_detail.toLowerCase().includes(q) &&
+          !t.reference.toLowerCase().includes(q)
+        )
+          return false;
       }
-      if (filters.type && t.type !== filters.type) return false;
-      if (filters.method && t.method !== filters.method) return false;
+      if (filters.type && t.transaction_type !== filters.type) return false;
       if (filters.status && t.status !== filters.status) return false;
       return true;
     });
-  }, [search, filters]);
+  }, [transactions, search, filters]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  if (isLoading) {
+    return (
+      <section style={{ background: "#fff", border: "1px solid var(--brc-border)", borderRadius: "var(--brc-radius-lg)", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-11 w-full" />
+        <div className="flex flex-col gap-1">
+          <Skeleton className="h-10 w-full rounded-lg" />
+          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section
@@ -137,17 +175,7 @@ export function TransactionsTable() {
         <h2 style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 18, color: "var(--brc-text)", margin: 0 }}>
           All Transactions
         </h2>
-        <span
-          style={{
-            fontFamily: "var(--brc-font-ui)",
-            fontSize: 12,
-            fontWeight: 600,
-            color: "var(--brc-primary)",
-            background: "var(--brc-primary-tint)",
-            borderRadius: "var(--brc-radius-pill)",
-            padding: "2px 9px",
-          }}
-        >
+        <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 12, fontWeight: 600, color: "var(--brc-primary)", background: "var(--brc-primary-tint)", borderRadius: "var(--brc-radius-pill)", padding: "2px 9px" }}>
           {filtered.length}
         </span>
       </div>
@@ -159,24 +187,17 @@ export function TransactionsTable() {
             <Icon name="search" size={16} stroke="var(--brc-text-muted)" />
           </span>
           <Input
-            placeholder="Search"
+            placeholder="Search car or reference"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="pl-9 h-11 text-sm"
             style={{ fontFamily: "var(--brc-font-ui)" }}
           />
         </div>
-
         <FilterPopover
           fields={FILTER_FIELDS}
           values={filters}
-          onApply={(v) => {
-            setFilters(v);
-            setPage(1);
-          }}
+          onApply={(v) => { setFilters(v); setPage(1); }}
         />
       </div>
 
@@ -186,7 +207,7 @@ export function TransactionsTable() {
           <thead>
             <tr>
               {COLUMNS.map((c) => (
-                <th key={c} style={thStyle}>
+                <th key={c} style={{ ...thStyle, textAlign: c === "Amount" ? "right" : "left" }}>
                   {c}
                 </th>
               ))}
@@ -201,32 +222,42 @@ export function TransactionsTable() {
                 </td>
               </tr>
             ) : (
-              rows.map((t) => (
-                <tr key={t.id}>
-                  <td style={tdStyle}>{t.description}</td>
-                  <td style={tdStyle}>{t.type}</td>
-                  <td style={{ ...tdStyle, color: "var(--brc-text-secondary)" }}>{t.paymentDate}</td>
-                  <td style={tdStyle}>{t.method}</td>
-                  <td style={{ ...tdStyle, fontWeight: 600, color: t.type === "Refund" ? "var(--brc-success)" : "var(--brc-danger)" }}>
-                    {naira(t.amount)}
-                  </td>
-                  <td style={tdStyle}>
-                    <TxnStatusBadge status={t.status} />
-                  </td>
-                  <td style={{ ...tdStyle, textAlign: "right" }}>
-                    <RowMenu
-                      items={[
-                        {
-                          label: "View details",
-                          icon: <Icon name="car" size={16} stroke="var(--brc-text-secondary)" />,
-                          onClick: () => router.push(`/customer/transactions/${t.id}`),
-                        },
-                        { label: "Close", icon: closeIcon },
-                      ]}
-                    />
-                  </td>
-                </tr>
-              ))
+              rows.map((t) => {
+                const detailPath = getDetailPath(pathname, t.id);
+                return (
+                  <tr
+                    key={t.id}
+                    onClick={() => router.push(detailPath)}
+                    className="group/row cursor-pointer transition-[background-color,box-shadow,transform] duration-300 ease-out hover:-translate-y-0.5 hover:bg-[rgba(0,0,139,0.035)] hover:shadow-[0_16px_34px_rgba(0,0,139,0.10)]"
+                  >
+                    <td style={tdStyle}>
+                      <span className="font-semibold transition-colors duration-300 group-hover/row:text-(--brc-primary)">
+                        {capitalize(t.transaction_type)} — {t.car_detail}
+                      </span>
+                    </td>
+                    <td style={tdStyle}>{capitalize(t.transaction_type)}</td>
+                    <td style={{ ...tdStyle, color: "var(--brc-text-secondary)" }}>{formatDate(t.created_at)}</td>
+                    <td style={tdStyle}>{capitalize(t.payment_method)}</td>
+                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: t.transaction_type === "refund" ? "var(--brc-success)" : "var(--brc-text)" }}>
+                      {formatAmount(t.amount, t.currency)}
+                    </td>
+                    <td style={tdStyle}>
+                      <TxnStatusBadge status={t.status} />
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
+                      <RowMenu
+                        items={[
+                          {
+                            label: "View details",
+                            icon: <Icon name="banknote" size={16} stroke="var(--brc-text-secondary)" />,
+                            onClick: () => router.push(detailPath),
+                          },
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

@@ -6,6 +6,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/features/auth/components/icon";
 import { useAuthStore } from "@/features/auth/store";
+import { useUnreadCount } from "@/features/notifications/api";
+import { NotificationDropdown } from "@/features/notifications/components/notification-dropdown";
 import type { UserRole } from "@/shared/types";
 
 type DashboardNavbarProps = {
@@ -21,6 +23,9 @@ export function DashboardNavbar({ role }: DashboardNavbarProps) {
   const router = useRouter();
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const [servicesOpen, setServicesOpen] = useState(false);
+
+  const { data: unreadData } = useUnreadCount();
+  const unreadCount = unreadData?.unread_count ?? 0;
 
   const dashboardHref = `/${role}/dashboard`;
 
@@ -162,22 +167,7 @@ export function DashboardNavbar({ role }: DashboardNavbarProps) {
 
       {/* Action icons */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <Link href={`/${role}/notifications`} aria-label="Notifications" className="brc-button-motion-icon" style={iconBtnStyle}>
-          <Icon name="bell" size={20} stroke="var(--brc-text)" />
-          <span
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              top: 8,
-              right: 9,
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: "var(--brc-danger)",
-              border: "1.5px solid #fff",
-            }}
-          />
-        </Link>
+        <NotificationDropdown role={role} unreadCount={unreadCount} />
         <Link href={`/${role}/profile`} aria-label="Profile" className="brc-button-motion-icon" style={iconBtnStyle}>
           <Icon name="user" size={20} stroke="var(--brc-text)" />
         </Link>

@@ -1,6 +1,6 @@
 import { Icon } from "@/features/auth/components/icon";
 
-type RequestStatusKey = "pending" | "approved" | "rejected" | "cancelled" | "paid" | "active" | "completed";
+type RequestStatusKey = "pending" | "approved" | "rejected" | "cancelled" | "payment_submitted" | "paid" | "active" | "completed";
 
 type BadgeStyle = {
   defaultLabel: string;
@@ -13,6 +13,7 @@ const STATUS_CONFIG: Record<RequestStatusKey, BadgeStyle> = {
   approved: { defaultLabel: "Approved", bg: "var(--brc-success-bg)", fg: "var(--brc-success)" },
   rejected: { defaultLabel: "Rejected", bg: "var(--brc-danger-bg)", fg: "var(--brc-danger)" },
   cancelled: { defaultLabel: "Cancelled", bg: "var(--brc-bg-muted)", fg: "var(--brc-text-muted)" },
+  payment_submitted: { defaultLabel: "Payment Submitted", bg: "var(--brc-warning-bg)", fg: "#9a7400" },
   paid: { defaultLabel: "Paid", bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)" },
   active: { defaultLabel: "Active", bg: "var(--brc-primary-tint)", fg: "var(--brc-primary)" },
   completed: { defaultLabel: "Completed", bg: "var(--brc-success-bg)", fg: "var(--brc-success)" },
@@ -22,6 +23,7 @@ function StatusIcon({ status, color }: { status: string; color: string }) {
   if (status === "approved" || status === "completed") return <Icon name="check" size={13} stroke={color} />;
   if (status === "pending") return <Icon name="clock" size={13} stroke={color} />;
   if (status === "active") return <Icon name="car" size={13} stroke={color} />;
+  if (status === "payment_submitted") return <Icon name="clock" size={13} stroke={color} />;
   if (status === "paid") return <Icon name="banknote" size={13} stroke={color} />;
   if (status === "cancelled") return <Icon name="plus" size={13} stroke={color} strokeWidth={2.5} />;
   // rejected — small x

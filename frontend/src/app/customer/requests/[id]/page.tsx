@@ -23,6 +23,7 @@ function toDetailStatus(s: string): RequestDetailStatus {
     approved: "accepted",
     rejected: "rejected",
     cancelled: "cancelled",
+    payment_submitted: "paid",
     paid: "paid",
     active: "accepted",
     completed: "accepted",
@@ -44,6 +45,7 @@ const REQUEST_STATUS_LABELS: Record<string, string> = {
   approved: "Approved",
   rejected: "Rejected",
   cancelled: "Cancelled",
+  payment_submitted: "Payment Submitted",
   paid: "Paid",
   active: "Active",
   completed: "Completed",
@@ -131,7 +133,7 @@ export default function CustomerRequestDetailPage() {
       case "approved":
         return (
           <>
-            <ActionButton kind="dark" onClick={() => router.push("/customer/payments")}>
+            <ActionButton kind="dark" onClick={() => router.push(`/customer/payments?requestId=${requestId}`)}>
               Proceed to Payment
               <Icon name="arrow" size={17} stroke="#fff" />
             </ActionButton>
@@ -139,6 +141,12 @@ export default function CustomerRequestDetailPage() {
               Cancel Request
             </ActionButton>
           </>
+        );
+      case "payment_submitted":
+        return (
+          <ActionButton kind="dark" onClick={() => router.push("/customer/transactions")}>
+            Payment Submitted — Awaiting Verification
+          </ActionButton>
         );
       case "paid":
         return (

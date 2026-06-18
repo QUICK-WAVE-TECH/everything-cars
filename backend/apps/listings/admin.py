@@ -1,5 +1,12 @@
 from django.contrib import admin
-from .models import Car, CarImage, ListingFeature, Request, RequestStatusEvent
+from .models import (
+    Car,
+    CarImage,
+    ListingFeature,
+    Request,
+    RequestStatusEvent,
+    Transaction,
+)
 
 
 class CarImageInline(admin.TabularInline):
@@ -38,9 +45,22 @@ class RequestStatusEventInline(admin.TabularInline):
 
 @admin.register(Request)
 class RequestAdmin(admin.ModelAdmin):
-    list_display = ["id", "car", "customer", "request_type", "price_offered", "status", "created_at"]
+    list_display = [
+        "id",
+        "car",
+        "customer",
+        "request_type",
+        "price_offered",
+        "status",
+        "created_at",
+    ]
     list_filter = ["status", "request_type"]
-    search_fields = ["car__title", "car__brand", "customer__first_name", "customer__last_name"]
+    search_fields = [
+        "car__title",
+        "car__brand",
+        "customer__first_name",
+        "customer__last_name",
+    ]
     readonly_fields = ["created_at", "updated_at"]
     inlines = [RequestStatusEventInline]
 
@@ -48,4 +68,46 @@ class RequestAdmin(admin.ModelAdmin):
 @admin.register(RequestStatusEvent)
 class RequestStatusEventAdmin(admin.ModelAdmin):
     list_display = ["request", "from_status", "to_status", "actor", "created_at"]
-    readonly_fields = ["request", "from_status", "to_status", "actor", "note", "created_at"]
+    readonly_fields = [
+        "request",
+        "from_status",
+        "to_status",
+        "actor",
+        "note",
+        "created_at",
+    ]
+
+
+@admin.register(Transaction)
+class TransactionAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "request",
+        "payer",
+        "receiver",
+        "amount",
+        "currency",
+        "transaction_type",
+        "payment_method",
+        "status",
+        "reference",
+        "idempotency_key",
+        "created_at",
+    ]
+    readonly_fields = [
+        "id",
+        "request",
+        "payer",
+        "receiver",
+        "created_at",
+        "idempotency_key",
+        "transaction_type",
+    ]
+    list_filter = ["status", "request"]
+    search_fields = [
+        "reference",
+        "payer__first_name",
+        "payer__last_name",
+        "receiver__first_name",
+        "receiver__last_name",
+    ]

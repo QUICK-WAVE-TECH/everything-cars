@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
+
+from apps.users.models import User
 from .models import (
     Car,
     CarImage,
@@ -36,7 +38,6 @@ class CarOwnerSummarySerializer(serializers.Serializer):
     phone = serializers.CharField()
     date_joined = serializers.DateTimeField()
     is_verified = serializers.SerializerMethodField()
-    listing_count = serializers.SerializerMethodField()
 
     def get_is_verified(self, obj):
         owner_profile = getattr(obj, "owner_profile", None)
@@ -308,6 +309,8 @@ class RequestDetailSerializer(serializers.ModelSerializer):
             "message",
             "status",
             "owner_note",
+            "payment_method_choice",
+            "payment_receipt",
             "created_at",
             "updated_at",
             "status_events",
@@ -409,6 +412,91 @@ class RequestCreateSerializer(serializers.ModelSerializer):
 
 class RequestActionSerializer(serializers.Serializer):
     action = serializers.ChoiceField(
-        choices=["approve", "reject", "confirm_payment", "mark_active", "complete"]
+        choices=["approve", "reject", "mark_active", "complete"]
     )
     note = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class TransactionListSerializer(serializers.ModelSerializer):
+    car_detail = serializers.SerializerMethodField()
+    payer_name = serializers.SerializerMethodField()
+    receiver_name = serializers.SerializerMethodField()
+    request_type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Transaction
+        fields = [
+            "id",
+            "amount",
+            "currency",
+            "transaction_type",
+            "payment_method",
+            "car_detail",
+            "payer_name",
+            "receiver_name",
+            "request_type",
+            "status",
+            "reference",
+            "created_at",
+        ]
+
+    def get_car_detail(self, obj):
+
+        return obj.request.car.title
+
+    def get_payer_name(self, obj: Transaction):
+        first_name = obj.payer.first_name
+        last_name = obj.payer.last_name
+        return f"{first_name} {last_name}"
+
+    def get_receiver_name(self, obj: Transaction):
+        first_name = obj.receiver.first_name
+        last_name = obj.receiver.last_name
+        return f" {first_name} {last_name}"
+
+    def get_request_type(self, obj: Transaction):
+
+        return obj.request.request_type
+
+
+class TransactionDetailSerializer(serializers.ModelSerializer):
+    car_detail = serializers.SerializerMethodField()
+    payer_name = serializers.SerializerMethodField()
+    receiver_name = serializers.SerializerMethodField()
+    request_type = serializers.SerializerMethodField()
+    request = RequestDetailSerializer(read_only=True)
+
+    class Meta:
+        model = Transaction
+        fields = [
+            "id",
+            "amount",
+            "currency",
+            "transaction_type",
+            "payment_method",
+            "car_detail",
+            "payer_name",
+            "receiver_name",
+            "request_type",
+            "request",
+            "status",
+            "reference",
+            "created_at",
+        ]
+
+    def get_car_detail(self, obj):
+        return obj.request.car.title
+
+    def get_payer_name(self, obj: Transaction):
+        first_name = obj.payer.first_name
+        last_name = obj.payer.last_name
+        return f" {first_name} {last_name}"
+
+    def get_receiver_name(self, obj: Transaction):
+        first_name = obj.receiver.first_name
+        last_name = obj.receiver.last_name
+        return f"{first_name} {last_name}"
+
+    def get_request_type(self, obj: Transaction):
+
+        return obj.request.request_type
