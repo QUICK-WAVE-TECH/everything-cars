@@ -3,10 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/features/auth/components/icon";
 import { AuthButton } from "@/features/auth/components/auth-button";
 import { useAuthStore } from "@/features/auth/store";
 import { useSignOut, useMe } from "@/features/auth/api";
+import { useUnreadCount } from "@/features/notifications/api";
+import { NotificationDropdown } from "@/features/notifications/components/notification-dropdown";
+import { Icon } from "@/features/auth/components/icon";
 
 const NAV_LINKS = [
   { label: "About Us", href: "/about" },
@@ -31,6 +33,8 @@ export function WebsiteNavbar() {
 
   const isStaff = user?.is_staff ?? false;
   const dashboardHref = isStaff ? "/admin/approvals" : userRole === "owner" ? "/owner/dashboard" : "/customer/dashboard";
+  const { data: unreadData } = useUnreadCount();
+  const role = userRole ?? "customer";
 
   const handleSignOut = () => {
     signOut.mutate(undefined, {
@@ -108,22 +112,7 @@ export function WebsiteNavbar() {
 
       {isAuthenticated ? (
         <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-          <button style={iconBtnStyle} title="Notifications">
-            <div style={{ position: "relative", display: "flex" }}>
-              <Icon name="bell" size={24} stroke="var(--brc-text)" />
-              <span
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  right: 0,
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  background: "var(--brc-danger)",
-                }}
-              />
-            </div>
-          </button>
+          <NotificationDropdown role={role} unreadCount={unreadData?.unread_count ?? 0} />
           <Link href={`${dashboardHref}/../profile`} style={iconBtnStyle} title="Profile">
             <Icon name="user" size={24} stroke="var(--brc-text)" />
           </Link>

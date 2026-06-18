@@ -1,7 +1,9 @@
 from datetime import timedelta
 
+import uuid as uuid_lib
 from django.db import IntegrityError, transaction
 from django.db.models import Prefetch
+
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -30,6 +32,23 @@ from .serializers import (
     RequestDetailSerializer,
     RequestCreateSerializer,
     RequestActionSerializer,
+    TransactionDetailSerializer,
+    TransactionListSerializer,
+)
+from apps.notifications.service import (
+    notify_new_request,
+    notify_request_approved,
+    notify_request_rejected,
+    notify_request_cancelled,
+    notify_payment_submitted,
+    notify_payment_confirmed,
+    notify_rental_active,
+    notify_rental_completed,
+    notify_auto_rejected,
+    notify_listing_submitted,
+    notify_listing_approved,
+    notify_listing_rejected,
+    notify_listing_needs_changes,
 )
 
 
@@ -429,6 +448,9 @@ class MyCarStatusView(APIView):
             car.save(
                 update_fields=["status", "admin_note", "published_at", "updated_at"]
             )
+        if new_status == CarStatus.PENDING_REVIEW:
+            car_with_owner = Car.objects.select_related("owner").get(id=car.id)
+            notify_listing_submitted(car_with_owner)
 
         return Response(
             CarDetailSerializer(
@@ -496,6 +518,7 @@ class CustomerRequestListCreateView(APIView):
                     actor=request.user,
                     note="Request created",
                 )
+
         except IntegrityError:
             duplicate_exists = Request.objects.filter(
                 car=requested_car,
@@ -511,6 +534,7 @@ class CustomerRequestListCreateView(APIView):
             )
 
         detail = request_detail_queryset().get(id=req.id)
+        notify_new_request(detail)
         return Response(
             RequestDetailSerializer(detail, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
@@ -562,6 +586,10 @@ class CustomerRequestCancelView(APIView):
                 note="Request cancelled by customer",
             )
 
+        req = Request.objects.select_related("car__owner", "customer").get(
+            id=request_id
+        )
+        notify_request_cancelled(req)
         return Response({"detail": "Request cancelled."})
 
 
@@ -611,7 +639,6 @@ class OwnerRequestActionView(APIView):
     VALID_TRANSITIONS = {
         "approve": (RequestStatus.PENDING, RequestStatus.APPROVED),
         "reject": (RequestStatus.PENDING, RequestStatus.REJECTED),
-        "confirm_payment": (RequestStatus.APPROVED, RequestStatus.PAID),
         "mark_active": (RequestStatus.PAID, RequestStatus.ACTIVE),
         "complete": (RequestStatus.ACTIVE, RequestStatus.COMPLETED),
     }
@@ -678,31 +705,20 @@ class OwnerRequestActionView(APIView):
                 or {
                     "approve": "Request approved by owner",
                     "reject": "Request rejected by owner",
-                    "confirm_payment": "Payment confirmed by owner",
                     "mark_active": "Car handed over — rental is now active",
                     "complete": "Rental completed — car returned",
                 }.get(action, ""),
             )
 
-            # Auto-create transaction on payment confirmation
-            if action == "confirm_payment":
-                import uuid as uuid_lib
-
-                Transaction.objects.create(
-                    request=req,
-                    payer=req.customer,
-                    receiver=request.user,
-                    amount=req.price_offered,
-                    currency=req.currency,
-                    transaction_type=(
-                        "rental" if req.request_type == "rent" else "purchase"
-                    ),
-                    payment_method="manual",
-                    status="completed",
-                    reference=f"TXN-{uuid_lib.uuid4().hex[:12].upper()}",
-                )
-
         detail = request_detail_queryset().get(id=req.id)
+        if action == "approve":
+            notify_request_approved(detail)
+        elif action == "reject":
+            notify_request_rejected(detail)
+        elif action == "mark_active":
+            notify_rental_active(detail)
+        elif action == "complete":
+            notify_rental_completed(detail)
         return Response(
             RequestDetailSerializer(detail, context={"request": request}).data
         )
@@ -795,12 +811,7 @@ class AdminCarStatusView(APIView):
 
         with transaction.atomic():
             try:
-                car: Car = (
-                    Car.objects.select_for_update()
-                    .select_related("owner__owner_profile")
-                    .prefetch_related("images", "features")
-                    .get(id=car_id)
-                )
+                car = Car.objects.select_for_update().get(id=car_id)
             except Car.DoesNotExist:
                 return Response(
                     {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
@@ -827,4 +838,295 @@ class AdminCarStatusView(APIView):
                 update_fields=["status", "admin_note", "updated_at", "published_at"]
             )
 
+        car = (
+            Car.objects.select_related("owner__owner_profile")
+            .prefetch_related("images", "features")
+            .get(id=car_id)
+        )
+        if new_status == CarStatus.PUBLISHED:
+            notify_listing_approved(car)
+        elif new_status == CarStatus.SUSPENDED:
+            notify_listing_rejected(car)
+        elif new_status == CarStatus.NEEDS_CHANGES:
+            notify_listing_needs_changes(car)
         return Response(CarDetailSerializer(car, context={"request": request}).data)
+
+
+class TransactionListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Get the queryset
+        qs = Transaction.objects.select_related(
+            "request", "request__car", "payer", "receiver"
+        )
+        if not request.user.is_staff:
+            if request.user.role == "customer":
+                qs = qs.filter(payer=request.user)
+            elif request.user.role == "owner":
+                qs = qs.filter(receiver=request.user)
+
+            else:
+                return Response(
+                    {
+                        "detail": "Transaction are only available to customers and owners"
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = TransactionListSerializer(
+            page, many=True, context={"request": request}
+        )
+        return paginator.get_paginated_response(serializer.data)
+
+
+class TransactionDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, transaction_id):
+
+        try:
+            txn = (
+                Transaction.objects.select_related(
+                    "request",
+                    "request__car",
+                    "request__car__owner",
+                    "payer",
+                    "receiver",
+                )
+                .prefetch_related(
+                    "request__car__images",
+                    "request__car__features",
+                    "request__status_events",
+                )
+                .get(id=transaction_id)
+            )
+
+        except Transaction.DoesNotExist:
+            return Response(
+                {"detail": "Transaction not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        # Staff can see any transaction, others must be payer or receiver
+        if not request.user.is_staff and request.user not in (txn.payer, txn.receiver):
+            return Response(
+                {"detail": "Transaction not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response(
+            TransactionDetailSerializer(txn, context={"request": request}).data
+        )
+
+
+class CustomerPaymentSubmitView(APIView):
+    permission_classes = [IsCustomer]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request, request_id):
+        method = request.data.get("payment_method", "transfer")
+        receipt = request.FILES.get("receipt")
+
+        ALLOWED_RECEIPT_TYPES = [
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "application/pdf",
+        ]
+        # Validate payment method
+        if method not in ("transfer", "card"):
+            return Response(
+                {"detail": "Invalid payment method. Must be 'transfer' or 'card'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Receipt required for bank transfers
+        if method == "transfer" and not receipt:
+            return Response(
+                {"detail": "Payment receipt is required for bank transfers."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if receipt and receipt.content_type not in ALLOWED_RECEIPT_TYPES:
+            return Response(
+                {"detail": "Receipt must be a JPG, PNG, WebP, or PDF file."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate file size (max 5MB)
+        if receipt and receipt.size > 5 * 1024 * 1024:
+            return Response(
+                {"detail": "Receipt file must be 5MB or smaller."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            try:
+                req = Request.objects.select_for_update().get(
+                    id=request_id, customer=request.user
+                )
+            except Request.DoesNotExist:
+                return Response(
+                    {"detail": "Request not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            if req.status != RequestStatus.APPROVED:
+                return Response(
+                    {"detail": "Payment can only be submitted for approved requests."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            req.status = RequestStatus.PAYMENT_SUBMITTED
+            req.payment_method_choice = method
+            if receipt:
+                req.payment_receipt = receipt
+            req.save(
+                update_fields=[
+                    "status",
+                    "payment_method_choice",
+                    "payment_receipt",
+                    "updated_at",
+                ]
+            )
+
+            RequestStatusEvent.objects.create(
+                request=req,
+                from_status=RequestStatus.APPROVED,
+                to_status=RequestStatus.PAYMENT_SUBMITTED,
+                actor=request.user,
+                note=f"Payment submitted via {method}",
+            )
+
+        detail = request_detail_queryset().get(id=req.id)
+        notify_payment_submitted(detail)
+        return Response(
+            RequestDetailSerializer(detail, context={"request": request}).data,
+        )
+
+
+class AdminRequestListView(APIView):
+    permission_classes = [IsStaff]
+
+    def get(self, request):
+        qs = Request.objects.select_related(
+            "car", "car__owner", "customer"
+        ).prefetch_related("car__images")
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        search = request.query_params.get("search")
+        if search:
+            from django.db.models import Q
+
+            qs = qs.filter(
+                Q(car__title__icontains=search)
+                | Q(customer__first_name__icontains=search)
+                | Q(customer__last_name__icontains=search)
+                | Q(car__owner__first_name__icontains=search)
+                | Q(car__owner__last_name__icontains=search)
+            )
+
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = RequestListSerializer(
+            page, many=True, context={"request": request}
+        )
+        return paginator.get_paginated_response(serializer.data)
+
+
+class AdminRequestDetailView(APIView):
+    permission_classes = [IsStaff]
+
+    def get(self, request, request_id):
+        try:
+            req = request_detail_queryset().get(id=request_id)
+        except Request.DoesNotExist:
+            return Response(
+                {"detail": "Request not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        return Response(RequestDetailSerializer(req, context={"request": request}).data)
+
+
+class StaffConfirmPaymentView(APIView):
+    permission_classes = [IsStaff]
+
+    def post(self, request, request_id):
+        with transaction.atomic():
+            try:
+                req = Request.objects.select_for_update().get(id=request_id)
+            except Request.DoesNotExist:
+                return Response(
+                    {"detail": "Request not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            if req.status != RequestStatus.PAYMENT_SUBMITTED:
+                return Response(
+                    {
+                        "detail": f"Cannot confirm payment — request is '{req.status}', must be 'payment_submitted'."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            req.status = RequestStatus.PAID
+            req.save(update_fields=["status", "updated_at"])
+
+            # Re-fetch with relations for transaction creation
+            req = Request.objects.select_related("car__owner", "customer").get(
+                id=request_id
+            )
+
+            RequestStatusEvent.objects.create(
+                request=req,
+                from_status=RequestStatus.PAYMENT_SUBMITTED,
+                to_status=RequestStatus.PAID,
+                actor=request.user,
+                note="Payment verified and confirmed by staff",
+            )
+
+            Transaction.objects.create(
+                request=req,
+                payer=req.customer,
+                receiver=req.car.owner,
+                amount=req.price_offered,
+                currency=req.currency,
+                transaction_type="rental" if req.request_type == "rent" else "purchase",
+                payment_method=req.payment_method_choice or "manual",
+                status="completed",
+                reference=f"TXN-{uuid_lib.uuid4().hex[:12].upper()}",
+            )
+
+            # Auto-reject other pending/approved/payment_submitted requests
+            # for the same car when a buy request is confirmed
+            if req.request_type == "buy":
+                competing = Request.objects.filter(
+                    car_id=req.car_id,
+                    status__in=[
+                        RequestStatus.PENDING,
+                        RequestStatus.APPROVED,
+                        RequestStatus.PAYMENT_SUBMITTED,
+                    ],
+                ).exclude(id=req.id)
+                for other in competing:
+                    old = other.status
+                    other.status = RequestStatus.REJECTED
+                    other.save(update_fields=["status", "updated_at"])
+                    RequestStatusEvent.objects.create(
+                        request=other,
+                        from_status=old,
+                        to_status=RequestStatus.REJECTED,
+                        actor=request.user,
+                        note="Auto-rejected — car has been sold",
+                    )
+                    notify_auto_rejected(other)
+
+        detail = request_detail_queryset().get(id=req.id)
+        notify_payment_confirmed(detail)
+        return Response(
+            RequestDetailSerializer(detail, context={"request": request}).data,
+        )

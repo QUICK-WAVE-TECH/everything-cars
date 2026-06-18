@@ -5,10 +5,12 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.1.30", "127.0.0.1:8000", "localhost"],
 
   images: {
+    unoptimized: true,
     remotePatterns: [
       { protocol: "https", hostname: "flagcdn.com" },
       { protocol: "http", hostname: "localhost" },
       { protocol: "https", hostname: "**.amazonaws.com" },
+      { protocol: "https", hostname: "**.onrender.com" },
     ],
   },
 

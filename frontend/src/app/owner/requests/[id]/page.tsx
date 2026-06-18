@@ -24,6 +24,7 @@ function toDetailStatus(s: string): RequestDetailStatus {
     approved: "awaiting-payment",
     rejected: "rejected",
     cancelled: "cancelled",
+    payment_submitted: "awaiting-payment",
     paid: "paid",
     active: "accepted",
     completed: "accepted",
@@ -45,6 +46,7 @@ const REQUEST_STATUS_LABELS: Record<string, string> = {
   approved: "Approved",
   rejected: "Rejected",
   cancelled: "Cancelled",
+  payment_submitted: "Payment Submitted",
   paid: "Paid",
   active: "Active",
   completed: "Completed",
@@ -59,13 +61,12 @@ function formatStatusLabel(status: string): string {
 }
 
 function formatTimelineNote(note: string): string {
-  return note.replace(/\b(confirm_payment|mark_active)\b/g, humanizeToken);
+  return note.replace(/\b(payment_submitted|mark_active)\b/g, humanizeToken);
 }
 
 const ACTION_LABELS: Record<RequestAction, string> = {
   approve: "Approved",
   reject: "Rejected",
-  confirm_payment: "Payment confirmed",
   mark_active: "Marked active",
   complete: "Completed",
 };
@@ -144,8 +145,14 @@ export default function OwnerRequestDetailPage() {
         );
       case "approved":
         return (
-          <ActionButton kind="accent" onClick={() => handleAction("confirm_payment")}>
-            Confirm Payment Received
+          <ActionButton kind="secondary" onClick={() => router.push("/owner/requests")}>
+            Awaiting Customer Payment
+          </ActionButton>
+        );
+      case "payment_submitted":
+        return (
+          <ActionButton kind="secondary" onClick={() => router.push("/owner/requests")}>
+            Payment Under Review by Staff
           </ActionButton>
         );
       case "paid":

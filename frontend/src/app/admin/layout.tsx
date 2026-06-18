@@ -6,13 +6,20 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/features/auth/components/icon";
 import { useMe, useSignOut } from "@/features/auth/api";
+import { useUnreadCount } from "@/features/notifications/api";
+import { NotificationDropdown } from "@/features/notifications/components/notification-dropdown";
 
-const NAV_LINKS: { label: string; href: string }[] = [];
+const NAV_LINKS = [
+  { label: "Approvals", href: "/admin/approvals" },
+  { label: "Payments", href: "/admin/payments" },
+  { label: "Transactions", href: "/admin/transactions" },
+];
 
 function AdminNavbar() {
   const pathname = usePathname();
   const router = useRouter();
   const signOut = useSignOut();
+  const { data: unreadData } = useUnreadCount();
 
   function handleSignOut() {
     signOut.mutate(undefined, {
@@ -50,10 +57,7 @@ function AdminNavbar() {
         </nav>
 
         <div className="flex items-center gap-5">
-          <button type="button" className="relative flex cursor-pointer border-none bg-transparent p-0">
-            <Icon name="bell" size={22} stroke="var(--brc-text)" />
-            <span className="absolute right-0 top-0 size-1.5 rounded-full bg-(--brc-danger)" />
-          </button>
+          <NotificationDropdown role="owner" unreadCount={unreadData?.unread_count ?? 0} />
           <button type="button" className="flex cursor-pointer border-none bg-transparent p-0">
             <Icon name="user" size={22} stroke="var(--brc-text)" />
           </button>

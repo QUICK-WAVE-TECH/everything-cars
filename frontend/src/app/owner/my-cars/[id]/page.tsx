@@ -14,6 +14,7 @@ import {
   UploadIcon,
   Trash2Icon,
   ImageIcon,
+  ChevronDownIcon,
 } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import {
@@ -662,24 +663,9 @@ export default function CarDetailPage() {
           </div>
         </div>
 
-        {/* Admin note — shown when status is needs_changes */}
+        {/* Admin note — collapsible accordion when status is needs_changes */}
         {car.status === "needs_changes" && car.admin_note && (
-          <div className="flex gap-4 rounded-xl border border-(--brc-warning)/30 bg-(--brc-warning-bg) p-5">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-(--brc-warning)/20">
-              <Icon name="clock" size={20} stroke="#9a7400" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <h3 className="m-0 text-sm font-bold text-[#9a7400] [font-family:var(--brc-font-ui)]">
-                Changes Requested by Admin
-              </h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-[#9a7400]/90 [font-family:var(--brc-font-ui)]">
-                {car.admin_note}
-              </p>
-              <span className="mt-2 block text-xs text-[#9a7400]/60 [font-family:var(--brc-font-ui)]">
-                Please make the requested changes and click &quot;Resubmit for Review&quot; above.
-              </span>
-            </div>
-          </div>
+          <AdminNoteAccordion note={car.admin_note} />
         )}
 
         {/* Image Gallery */}
@@ -1159,6 +1145,53 @@ function ReadonlyDetail({ label, value }: { label: string; value: string }) {
       <span className="text-sm font-medium text-(--brc-text) [font-family:var(--brc-font-ui)]">
         {value}
       </span>
+    </div>
+  );
+}
+
+// ── Admin note accordion ──
+function AdminNoteAccordion({ note }: { note: string }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-(--brc-warning)/30 bg-(--brc-warning-bg)">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full cursor-pointer items-center justify-between border-none bg-transparent p-4 text-left transition-colors hover:bg-(--brc-warning)/10 sm:p-5"
+      >
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-(--brc-warning)/20">
+            <Icon name="clock" size={20} stroke="#9a7400" />
+          </span>
+          <div>
+            <h3 className="m-0 text-sm font-bold text-[#9a7400] [font-family:var(--brc-font-ui)]">
+              Changes Requested by Admin
+            </h3>
+            <span className="text-xs text-[#9a7400]/60 [font-family:var(--brc-font-ui)]">
+              {open ? "Click to collapse" : "Click to view details"}
+            </span>
+          </div>
+        </div>
+        <ChevronDownIcon
+          size={18}
+          className="text-[#9a7400] transition-transform duration-200"
+          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+        />
+      </button>
+
+      {open && (
+        <div className="border-t border-(--brc-warning)/20 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
+          <div className="rounded-lg border border-(--brc-warning)/20 bg-white/60 p-4">
+            <p className="m-0 text-sm leading-relaxed text-[#9a7400]/90 [font-family:var(--brc-font-ui)]">
+              {note}
+            </p>
+          </div>
+          <span className="mt-3 block text-xs text-[#9a7400]/60 [font-family:var(--brc-font-ui)]">
+            Please make the requested changes and click &quot;Resubmit for Review&quot; above.
+          </span>
+        </div>
+      )}
     </div>
   );
 }

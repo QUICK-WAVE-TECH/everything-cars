@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    CustomerPaymentSubmitView,
     MyCarListCreateView,
     MyCarDetailView,
     CarImageUploadView,
@@ -15,6 +16,11 @@ from .views import (
     AdminCarListView,
     AdminCarDetailView,
     AdminCarStatusView,
+    AdminRequestListView,
+    AdminRequestDetailView,
+    StaffConfirmPaymentView,
+    TransactionDetailView,
+    TransactionListView,
 )
 
 urlpatterns = [
@@ -56,12 +62,38 @@ urlpatterns = [
         OwnerRequestActionView.as_view(),
         name="owner-request-action",
     ),
+    path("transactions", TransactionListView.as_view(), name="transaction"),
+    path(
+        "transactions/<uuid:transaction_id>",
+        TransactionDetailView.as_view(),
+        name="transaction-detail",
+    ),
+    path(
+        "requests/<uuid:request_id>/submit-payment",
+        CustomerPaymentSubmitView.as_view(),
+        name="customer-submit-payment",
+    ),
     # Admin endpoints
+    path("admin/requests", AdminRequestListView.as_view(), name="admin-requests"),
+    path(
+        "admin/requests/<uuid:request_id>",
+        AdminRequestDetailView.as_view(),
+        name="admin-request-detail",
+    ),
     path("admin/cars", AdminCarListView.as_view(), name="admin-cars"),
-    path("admin/cars/<uuid:car_id>", AdminCarDetailView.as_view(), name="admin-car-detail"),
+    path(
+        "admin/cars/<uuid:car_id>",
+        AdminCarDetailView.as_view(),
+        name="admin-car-detail",
+    ),
     path(
         "admin/cars/<uuid:car_id>/status",
         AdminCarStatusView.as_view(),
         name="admin-car-status",
+    ),
+    path(
+        "admin/requests/<uuid:request_id>/confirm-payment",
+        StaffConfirmPaymentView.as_view(),
+        name="staff-confirm-payment",
     ),
 ]

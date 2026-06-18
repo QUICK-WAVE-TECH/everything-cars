@@ -1,12 +1,15 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Icon } from "@/features/auth/components/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { IconName } from "@/features/auth/components/icon";
 import { cn } from "@/lib/utils";
+import { Breadcrumb } from "@/shared/components";
 import { useDeleteCar, useMyCarsList } from "@/features/listings/api";
 import type { CarListItem } from "@/features/listings/api";
 import {
@@ -64,11 +67,40 @@ function toListing(item: CarListItem): Listing {
   };
 }
 
-const STATS: { icon: IconName; label: string; key: string; color: string; iconColor?: string; tint: string }[] = [
-  { icon: "car", label: "Total Listings", key: "total", color: "var(--brc-primary)", tint: "var(--brc-primary-tint)" },
-  { icon: "check", label: "Published", key: "published", color: "var(--brc-success)", tint: "var(--brc-success-bg)" },
-  { icon: "clock", label: "Draft", key: "draft", color: "var(--brc-warning)", iconColor: "#9a7400", tint: "var(--brc-warning-bg)" },
-  { icon: "coins", label: "Paused", key: "paused", color: "var(--brc-accent)", tint: "var(--brc-accent-bg)" },
+const STATS: { icon: IconName; label: string; key: string; color: string; iconColor?: string; tint: string; wash: string }[] = [
+  {
+    icon: "car",
+    label: "Total Listings",
+    key: "total",
+    color: "var(--brc-primary)",
+    tint: "var(--brc-primary-tint)",
+    wash: "linear-gradient(135deg, rgba(0,0,139,0.1), rgba(255,255,255,0.82))",
+  },
+  {
+    icon: "check",
+    label: "Published",
+    key: "published",
+    color: "var(--brc-success)",
+    tint: "var(--brc-success-bg)",
+    wash: "linear-gradient(135deg, rgba(22,163,74,0.1), rgba(255,255,255,0.84))",
+  },
+  {
+    icon: "clock",
+    label: "Draft",
+    key: "draft",
+    color: "var(--brc-warning)",
+    iconColor: "#9a7400",
+    tint: "var(--brc-warning-bg)",
+    wash: "linear-gradient(135deg, rgba(245,158,11,0.12), rgba(255,255,255,0.84))",
+  },
+  {
+    icon: "coins",
+    label: "Paused",
+    key: "paused",
+    color: "var(--brc-accent)",
+    tint: "var(--brc-accent-bg)",
+    wash: "linear-gradient(135deg, rgba(197,89,30,0.12), rgba(255,255,255,0.84))",
+  },
 ];
 
 const PER_PAGE = 10;
@@ -98,28 +130,48 @@ function StatusBadge({ status }: { status: ListingStatus }) {
   );
 }
 
-// ---------- Stat card (navy border, matching design) ----------
+// ---------- Premium stat card ----------
 function StatCard({ stat, value }: { stat: (typeof STATS)[number]; value: string }) {
   const iconColor = stat.iconColor ?? stat.color;
 
   return (
     <div
-      className="flex min-w-0 items-center gap-3 rounded-lg border border-(--brc-border) border-b-2 bg-white p-4 shadow-[var(--brc-shadow-xs)] sm:p-5"
-      style={{ borderBottomColor: stat.color }}
+      className="group relative min-w-0 overflow-hidden rounded-lg border border-white/80 bg-white p-4 shadow-[0_14px_36px_rgba(18,18,18,0.06)] transition duration-300 hover:-translate-y-1 hover:border-[color-mix(in_srgb,var(--stat-color)_34%,#fff)] hover:shadow-[0_24px_58px_rgba(18,18,18,0.12)] sm:p-5"
+      style={{
+        "--stat-color": stat.color,
+        background: stat.wash,
+      } as CSSProperties}
     >
-      <span
-        className="flex size-8 shrink-0 items-center justify-center rounded-full border"
-        style={{
-          background: stat.tint,
-          borderColor: `color-mix(in srgb, ${stat.color} 36%, white)`,
-        }}
-      >
-        <Icon name={stat.icon} size={16} stroke={iconColor} />
-      </span>
-      <span className="flex min-w-0 flex-col gap-1.5">
-        <span className="truncate text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{stat.label}</span>
-        <span className="text-xl font-bold text-(--brc-text) [font-family:var(--brc-font-ui)] sm:text-2xl">{value}</span>
-      </span>
+      <div
+        className="absolute inset-x-0 top-0 h-1 origin-left scale-x-75 transition-transform duration-300 group-hover:scale-x-100"
+        style={{ background: stat.color }}
+      />
+      <div className="pointer-events-none absolute -right-6 -top-10 h-28 w-28 rounded-full border border-white/70 bg-white/45 opacity-70 transition duration-300 group-hover:scale-110 group-hover:opacity-100" />
+      <div className="relative flex min-w-0 items-center justify-between gap-3">
+        <span className="flex min-w-0 flex-col gap-2">
+          <span className="truncate text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+            {stat.label}
+          </span>
+          <span className="text-[28px] font-black leading-none text-(--brc-text) [font-family:var(--brc-font-ui)] sm:text-[32px]">
+            {value}
+          </span>
+        </span>
+        <span
+          className="flex size-11 shrink-0 items-center justify-center rounded-lg border shadow-[0_14px_28px_rgba(18,18,18,0.08)] transition duration-300 group-hover:-rotate-3 group-hover:scale-110"
+          style={{
+            background: stat.tint,
+            borderColor: `color-mix(in srgb, ${stat.color} 34%, white)`,
+          }}
+        >
+          <Icon name={stat.icon} size={19} stroke={iconColor} strokeWidth={2.3} />
+        </span>
+      </div>
+      <div className="relative mt-4 h-1.5 overflow-hidden rounded-full bg-white/70">
+        <div
+          className="h-full w-[62%] rounded-full transition-all duration-500 group-hover:w-[88%]"
+          style={{ background: stat.color }}
+        />
+      </div>
     </div>
   );
 }
@@ -188,7 +240,7 @@ function FilterPanel({ filters, setFilters, onApply, onReset, onClose }: {
       </div>
       <div className="flex flex-col gap-4 p-4">
         <FilterSelect label="Type" value={filters.type} options={["Rent", "Buy", "Both"]} onPick={(v) => setFilters({ ...filters, type: v })} />
-        <FilterSelect label="Status" value={filters.status} options={["Draft", "Pending_review", "Published", "Paused", "Suspended", "Archived"]} onPick={(v) => setFilters({ ...filters, status: v })} />
+        <FilterSelect label="Status" value={filters.status} options={["Draft", "Pending Review", "Needs Changes", "Published", "Paused", "Suspended", "Archived"]} onPick={(v) => setFilters({ ...filters, status: v })} />
         <div className="my-1 h-px bg-(--brc-border)" />
         <div className="flex gap-3">
           <button type="button" onClick={onReset} className="h-10 flex-1 cursor-pointer rounded-lg border-none bg-(--brc-bg-muted) text-sm font-medium text-(--brc-text) [font-family:var(--brc-font-ui)]">
@@ -226,20 +278,37 @@ function MobileListingCard({
   isClosing: boolean;
 }) {
   return (
-    <article className="rounded-xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)]">
+    <article className="group rounded-lg border border-white/80 bg-white p-3 shadow-[0_16px_38px_rgba(18,18,18,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_58px_rgba(18,18,18,0.13)]">
+      <div className="relative mb-4 h-36 overflow-hidden rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle)">
+        {listing.primaryImage ? (
+          <Image
+            src={listing.primaryImage}
+            alt={listing.car}
+            fill
+            sizes="(max-width: 768px) 100vw, 360px"
+            className="object-cover transition duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <Icon name="car" size={34} stroke="var(--brc-text-muted)" />
+          </div>
+        )}
+        <div className="absolute left-3 top-3">
+          <StatusBadge status={listing.status} />
+        </div>
+      </div>
       <div className="flex items-start gap-3">
-        <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-(--brc-bg-subtle)">
+        <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-(--brc-primary-tint) shadow-[0_10px_22px_rgba(0,0,139,0.08)] transition duration-300 group-hover:scale-105">
           <Icon name="car" size={22} stroke="var(--brc-text-muted)" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="m-0 truncate text-base font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+          <h2 className="m-0 truncate text-base font-black text-(--brc-text) transition-colors duration-300 group-hover:text-(--brc-primary) [font-family:var(--brc-font-ui)]">
             {listing.car}
           </h2>
           <p className="mt-1 text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
             {listing.date}
           </p>
         </div>
-        <StatusBadge status={listing.status} />
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2.5">
@@ -403,7 +472,7 @@ export default function MyCarsPage() {
       const matchesSearch = !search ||
         r.car.toLowerCase().includes(search.toLowerCase());
       const matchesType = !applied.type || r.type.toLowerCase() === applied.type.toLowerCase();
-      const matchesStatus = !applied.status || r.status === applied.status.toLowerCase();
+      const matchesStatus = !applied.status || r.status === applied.status.toLowerCase().replace(/ /g, "_");
       return matchesSearch && matchesType && matchesStatus;
     });
   }, [listings, search, applied]);
@@ -423,8 +492,10 @@ export default function MyCarsPage() {
 
   if (isLoading) {
     return (
-      <div className="bg-(--brc-bg-subtle)">
-        <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6 px-4 py-6 pb-14 sm:gap-8 sm:px-6 sm:py-10 lg:px-[var(--brc-space-10,40px)] lg:py-12 lg:pb-20">
+      <>
+        <Breadcrumb items={[{ label: "Dashboard", href: "/owner/dashboard" }, { label: "Listed Cars" }]} />
+        <div className="min-h-screen bg-[linear-gradient(180deg,#f8f9fc_0%,#f3f6fb_42%,#fff_100%)]">
+          <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6 px-4 py-6 pb-14 sm:gap-8 sm:px-6 sm:py-10 lg:px-[var(--brc-space-10,40px)] lg:py-12 lg:pb-20">
           {/* Header skeleton */}
           <div className="flex items-end justify-between">
             <div className="flex flex-col gap-2">
@@ -463,41 +534,54 @@ export default function MyCarsPage() {
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="bg-(--brc-bg-subtle)">
-      <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6 px-4 py-6 pb-14 sm:gap-8 sm:px-6 sm:py-10 lg:px-[var(--brc-space-10,40px)] lg:py-12 lg:pb-20" ref={containerRef}>
-        {/* Header + List Cars CTA */}
-        <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
-          <div>
-            <h1 className="m-0 text-[32px] font-extrabold tracking-tight text-(--brc-text) [font-family:var(--brc-font-display)] sm:text-[44px]">
-              Listed Cars
-            </h1>
-            <p className="mt-2 text-base text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-              Keep track of all your listings
-            </p>
+    <>
+      <Breadcrumb items={[{ label: "Dashboard", href: "/owner/dashboard" }, { label: "Listed Cars" }]} />
+      <div className="min-h-screen bg-[linear-gradient(180deg,#f8f9fc_0%,#f3f6fb_42%,#fff_100%)]">
+        <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6 px-4 py-6 pb-14 sm:gap-8 sm:px-6 sm:py-10 lg:px-[var(--brc-space-10,40px)] lg:py-12 lg:pb-20" ref={containerRef}>
+          {/* Header + List Cars CTA */}
+          <div className="relative overflow-hidden rounded-lg border border-white/80 bg-white p-5 shadow-[0_22px_60px_rgba(18,18,18,0.08)] sm:p-7 lg:p-8">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,var(--brc-primary),var(--brc-success),var(--brc-accent))]" />
+            <div className="pointer-events-none absolute right-0 top-0 h-full w-1/2 bg-[linear-gradient(110deg,transparent,rgba(0,0,139,0.055))]" />
+            <div className="relative flex flex-col items-stretch gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div className="min-w-0">
+                <span className="inline-flex items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--brc-primary)_22%,#fff)] bg-(--brc-primary-tint) px-3 py-1 text-xs font-extrabold uppercase text-(--brc-primary) [font-family:var(--brc-font-ui)]">
+                  Owner Garage
+                </span>
+                <h1 className="m-0 mt-3 text-[34px] font-black tracking-tight text-(--brc-text) [font-family:var(--brc-font-display)] sm:text-[48px] lg:text-[56px]">
+                  Listed Cars
+                </h1>
+                <p className="mt-2 max-w-[620px] text-sm leading-6 text-(--brc-text-muted) [font-family:var(--brc-font-ui)] sm:text-base">
+                  Manage pricing, visibility, and review status across your vehicle portfolio.
+                </p>
+              </div>
+
+              <Link
+                href="/owner/my-cars/new"
+                className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-(--brc-secondary) px-[22px] text-sm font-extrabold text-[#FAFAFA] no-underline shadow-[0_18px_34px_rgba(18,18,18,0.16)] transition duration-300 hover:-translate-y-1 hover:bg-black hover:shadow-[0_24px_44px_rgba(18,18,18,0.22)] active:translate-y-0 [font-family:var(--brc-font-ui)] sm:w-auto"
+              >
+                List Cars
+                <span className="flex transition-transform duration-300 group-hover:rotate-90">
+                  <Icon name="plus" size={18} stroke="currentColor" />
+                </span>
+              </Link>
+            </div>
           </div>
-          <Link
-            href="/owner/my-cars/new"
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-(--brc-secondary) px-[22px] text-sm font-bold text-[#FAFAFA] no-underline transition duration-200 hover:-translate-y-0.5 hover:bg-black hover:shadow-md [font-family:var(--brc-font-ui)] sm:w-auto"
-          >
-            List Cars
-            <Icon name="plus" size={18} stroke="currentColor" />
-          </Link>
-        </div>
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-          {STATS.map((stat) => (
-            <StatCard key={stat.label} stat={stat} value={statValues[stat.key] ?? "0"} />
-          ))}
-        </div>
+          {/* Stat cards */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+            {STATS.map((stat) => (
+              <StatCard key={stat.label} stat={stat} value={statValues[stat.key] ?? "0"} />
+            ))}
+          </div>
 
-        {/* Table card */}
-        <div className="flex flex-col gap-4 rounded-xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] sm:rounded-2xl sm:p-6">
+          {/* Table card */}
+          <div className="flex flex-col gap-4 rounded-lg border border-white/80 bg-white/95 p-4 shadow-[0_22px_60px_rgba(18,18,18,0.08)] backdrop-blur sm:p-6">
           {/* Card title + count */}
           <div className="flex items-center gap-2">
             <span className="text-lg font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">Listed Cars</span>
@@ -580,7 +664,7 @@ export default function MyCarsPage() {
                   {paginated.map((r, i) => (
                     <div
                       key={r.id}
-                      className="relative grid min-h-[66px] items-center transition-colors hover:bg-(--brc-bg-subtle)/55"
+                      className="group relative grid min-h-[74px] items-center rounded-lg transition duration-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_16px_34px_rgba(18,18,18,0.08)]"
                       style={{
                         gridTemplateColumns: LISTING_TABLE_COLUMNS,
                         borderBottom: i === paginated.length - 1 ? "none" : "1px solid var(--brc-border)",
@@ -590,10 +674,20 @@ export default function MyCarsPage() {
                         className="flex min-w-0 items-center px-4 py-3"
                       >
                         <div className="flex min-w-0 items-center gap-2.5">
-                          <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-(--brc-bg-subtle)">
-                            <Icon name="car" size={20} stroke="var(--brc-text-muted)" />
+                          <span className="relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) shadow-[0_8px_18px_rgba(18,18,18,0.05)]">
+                            {r.primaryImage ? (
+                              <Image
+                                src={r.primaryImage}
+                                alt={r.car}
+                                fill
+                                sizes="48px"
+                                className="object-cover transition duration-500 group-hover:scale-110"
+                              />
+                            ) : (
+                              <Icon name="car" size={20} stroke="var(--brc-text-muted)" />
+                            )}
                           </span>
-                          <span className="truncate text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">{r.car}</span>
+                          <span className="truncate text-sm font-bold text-(--brc-text) transition-colors duration-200 group-hover:text-(--brc-primary) [font-family:var(--brc-font-ui)]">{r.car}</span>
                         </div>
                       </div>
                       <div className="flex min-w-0 items-center justify-center px-3 py-3">
@@ -603,7 +697,7 @@ export default function MyCarsPage() {
                         <span className="truncate text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">{r.date}</span>
                       </div>
                       <div className="flex min-w-0 items-center justify-end px-3 py-3 text-right">
-                        <span className="truncate text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">{r.price}</span>
+                        <span className="truncate text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">{r.price}</span>
                       </div>
                       <div className="flex min-w-0 items-center px-3 py-3">
                         <StatusBadge status={r.status} />
@@ -628,6 +722,7 @@ export default function MyCarsPage() {
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

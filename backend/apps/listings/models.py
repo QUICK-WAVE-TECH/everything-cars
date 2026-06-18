@@ -61,6 +61,7 @@ class RequestStatus(models.TextChoices):
     APPROVED = "approved", "Approved"
     REJECTED = "rejected", "Rejected"
     CANCELLED = "cancelled", "Cancelled"
+    PAYMENT_SUBMITTED = "payment_submitted", "Payment Submitted"  # NEW
     PAID = "paid", "Paid"
     ACTIVE = "active", "Active"
     COMPLETED = "completed", "Completed"
@@ -69,6 +70,7 @@ class RequestStatus(models.TextChoices):
 ACTIVE_REQUEST_STATUSES = [
     RequestStatus.PENDING,
     RequestStatus.APPROVED,
+    RequestStatus.PAYMENT_SUBMITTED,
     RequestStatus.PAID,
     RequestStatus.ACTIVE,
 ]
@@ -200,6 +202,14 @@ class Request(models.Model):
         db_index=True,
         default=RequestStatus.PENDING,
     )
+    payment_receipt = models.FileField(
+        upload_to="payment_receipts/%Y/%m/", blank=True, null=True
+    )
+    payment_method_choice = models.CharField(
+        max_length=20,
+        choices=[("transfer", "Bank Transfer"), ("card", "Card")],
+        blank=True,
+    )
     owner_note = models.TextField(blank=True)
     created_at = models.DateTimeField(
         auto_now_add=True,
@@ -257,9 +267,7 @@ class Transaction(models.Model):
     currency = models.CharField(
         max_length=3, choices=Currency.choices, default=Currency.NGN
     )
-    transaction_type = models.CharField(
-        max_length=20, choices=TransactionType.choices
-    )
+    transaction_type = models.CharField(max_length=20, choices=TransactionType.choices)
     payment_method = models.CharField(
         max_length=20, choices=PaymentMethod.choices, default=PaymentMethod.MANUAL
     )
@@ -282,7 +290,9 @@ class Transaction(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.transaction_type} — {self.amount} {self.currency} ({self.status})"
+        return (
+            f"{self.transaction_type} — {self.amount} {self.currency} ({self.status})"
+        )
 
 
 class RequestStatusEvent(models.Model):

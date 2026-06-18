@@ -35,6 +35,7 @@ export type RequestStatus =
   | "approved"
   | "rejected"
   | "cancelled"
+  | "payment_submitted"
   | "paid"
   | "active"
   | "completed";
@@ -64,6 +65,8 @@ export type RequestDetail = {
   message: string;
   status: RequestStatus;
   owner_note: string;
+  payment_method_choice: string;
+  payment_receipt: string | null;
   created_at: string;
   updated_at: string;
   status_events: RequestStatusEvent[];
@@ -81,6 +84,5 @@ export type CreateRequestData = {
 export type RequestAction =
   | "approve"
   | "reject"
-  | "confirm_payment"
   | "mark_active"
   | "complete";

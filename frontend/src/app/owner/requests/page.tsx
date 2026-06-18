@@ -214,8 +214,14 @@ export default function OwnerRequestsPage() {
                       </tr>
                     ) : (
                       rows.map((r) => (
-                        <tr key={r.id}>
-                          <td style={tdStyle}>{r.car.title}</td>
+                        <tr
+                          key={r.id}
+                          onClick={() => router.push(`/owner/requests/${r.id}`)}
+                          className="group/row cursor-pointer transition-[background-color,box-shadow,transform] duration-300 ease-out hover:-translate-y-0.5 hover:bg-[rgba(0,0,139,0.035)] hover:shadow-[0_16px_34px_rgba(0,0,139,0.10)]"
+                        >
+                          <td style={tdStyle}>
+                            <span className="font-semibold transition-colors duration-300 group-hover/row:text-(--brc-primary)">{r.car.title}</span>
+                          </td>
                           <td style={{ ...tdStyle, textAlign: "center" }}>{r.request_type === "rent" ? "Rent" : "Buy"}</td>
                           <td style={tdStyle}>{r.customer.first_name} {r.customer.last_name}</td>
                           <td style={{ ...tdStyle, textAlign: "right" }}>{formatPrice(r.price_offered, r.currency)}</td>
@@ -224,7 +230,7 @@ export default function OwnerRequestsPage() {
                           <td style={{ ...tdStyle, overflow: "visible" }}>
                             <StatusBadge status={r.status} />
                           </td>
-                          <td style={{ ...tdStyle, overflow: "visible", textAlign: "center" }}>
+                          <td style={{ ...tdStyle, overflow: "visible", textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
                             <RowMenu
                               items={[
                                 {
