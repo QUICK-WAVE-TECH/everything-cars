@@ -25,6 +25,9 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+# Render terminates SSL at the proxy — trust X-Forwarded-Proto so Django
+# knows the original request was HTTPS and doesn't redirect in a loop.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = bool(os.environ.get("SECURE_SSL_REDIRECT", "1"))
 
 # S3 storage
