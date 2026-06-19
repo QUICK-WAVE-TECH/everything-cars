@@ -125,7 +125,7 @@ class CarListSerializer(serializers.ModelSerializer):
 
         today = date.today()
         for req in in_progress:
-            # Buy request in progress → reserved
+            # Buy request in progress → reserved (car is off the market)
             if req.request_type == "buy":
                 return "reserved"
             # Active rental currently in period → rented
@@ -133,13 +133,8 @@ class CarListSerializer(serializers.ModelSerializer):
                 end = req.start_date + timedelta(days=req.duration_days)
                 if req.start_date <= today < end:
                     return "rented"
-            # Future approved/paid rental → reserved
-            if req.status in (
-                RequestStatus.APPROVED,
-                RequestStatus.PAYMENT_SUBMITTED,
-                RequestStatus.PAID,
-            ) and req.start_date and req.start_date > today:
-                return "reserved"
+            # Future rental bookings → still "available" (other dates are open)
+            # The calendar shows blocked dates, overlap check prevents conflicts
 
         return "available"
 
@@ -235,17 +230,12 @@ class CarDetailSerializer(serializers.ModelSerializer):
 
         today = date.today()
         for req in self._get_booked_requests(obj):
+            # Active rental currently in period → rented
             if req.status == RequestStatus.ACTIVE and req.start_date and req.duration_days:
                 end = req.start_date + timedelta(days=req.duration_days)
                 if req.start_date <= today < end:
                     return "rented"
-            # Future approved/paid rental → reserved
-            if req.status in (
-                RequestStatus.APPROVED,
-                RequestStatus.PAYMENT_SUBMITTED,
-                RequestStatus.PAID,
-            ) and req.start_date and req.start_date > today:
-                return "reserved"
+            # Future rental bookings → still "available" (other dates are open)
 
         return "available"
 
