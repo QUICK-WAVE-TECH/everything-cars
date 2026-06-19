@@ -8,9 +8,16 @@ import type {
   RequestAction,
 } from "./types";
 
+type RequestQueryOptions = {
+  enabled?: boolean;
+};
+
 // ── Customer hooks ──
 
-export function useCustomerRequests(params?: { status?: string }) {
+export function useCustomerRequests(
+  params?: { status?: string },
+  options?: RequestQueryOptions,
+) {
   const searchParams = new URLSearchParams();
   if (params?.status) searchParams.set("status", params.status);
   const query = searchParams.toString();
@@ -21,6 +28,7 @@ export function useCustomerRequests(params?: { status?: string }) {
       apiClient.get<PaginatedResponse<RequestListItem>>(
         `/listings/requests${query ? `?${query}` : ""}`,
       ),
+    enabled: options?.enabled ?? true,
   });
 }
 

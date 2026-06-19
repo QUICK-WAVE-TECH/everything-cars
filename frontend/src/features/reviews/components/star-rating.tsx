@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { cn } from "@/lib/utils";
 
 type StarRatingProps = {
@@ -15,12 +15,13 @@ type StarRatingProps = {
 function StarSvg({
   fill,
   size,
+  pct = 100,
 }: {
   fill: "full" | "partial" | "empty";
   size: number;
   pct?: number;
 }) {
-  const id = `star-clip-${Math.random().toString(36).slice(2, 8)}`;
+  const id = useId();
 
   if (fill === "full") {
     return (
@@ -55,7 +56,7 @@ function StarSvg({
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
       <defs>
         <clipPath id={id}>
-          <rect x="0" y="0" width="24" height="24" />
+          <rect x="0" y="0" width={(24 * pct) / 100} height="24" />
         </clipPath>
       </defs>
       {/* Empty background */}
@@ -149,7 +150,12 @@ export function StarRating({
       className={cn("flex items-center gap-0.5", className)}
     >
       {Array.from({ length: maxStars }, (_, i) => (
-        <StarSvg key={i} fill={computeFill(i, displayRating)} size={size} />
+        <StarSvg
+          key={i}
+          fill={computeFill(i, displayRating)}
+          size={size}
+          pct={Math.max(0, Math.min(100, (displayRating - i) * 100))}
+        />
       ))}
     </div>
   );

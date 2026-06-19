@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Icon } from "@/features/auth/components/icon";
@@ -17,6 +17,14 @@ import { useCustomerRequests, useCreateRequest } from "@/features/requests/api";
 import { toast } from "sonner";
 import { AvailabilityBadge } from "./availability-badge";
 import { AvailabilityCalendar } from "./availability-calendar";
+
+const ACTIVE_REQUEST_STATUSES = [
+  "pending",
+  "approved",
+  "payment_submitted",
+  "paid",
+  "active",
+];
 
 // ── Helpers ──
 
@@ -47,7 +55,11 @@ export function CarDetailPage({ carId }: { carId: string }) {
 
   const { isAuthenticated, userRole } = useAuthStore();
   const { data: me } = useMe();
-  const { data: myRequests } = useCustomerRequests();
+  const shouldFetchCustomerRequests =
+    isAuthenticated && userRole === "customer";
+  const { data: myRequests } = useCustomerRequests(undefined, {
+    enabled: shouldFetchCustomerRequests,
+  });
 
   const createRequest = useCreateRequest();
 
@@ -66,16 +78,18 @@ export function CarDetailPage({ carId }: { carId: string }) {
 
   // Find existing ACTIVE request for this car from the current customer
   // Cancelled/rejected/completed requests don't block new requests
-  const ACTIVE_STATUSES = ["pending", "approved", "payment_submitted", "paid", "active"];
-  const myRequestForCar = useMemo(() => {
-    if (!isCustomer || !myRequests?.results || !car) return null;
-    // First check for an active request
-    const active = myRequests.results.find((r) => r.car.id === car.id && ACTIVE_STATUSES.includes(r.status));
-    if (active) return active;
-    // Then check for a completed request (for the "Write a Review" CTA)
-    const completed = myRequests.results.find((r) => r.car.id === car.id && r.status === "completed");
-    return completed ?? null;
-  }, [isCustomer, myRequests?.results, car]);
+  const customerRequests = myRequests?.results ?? [];
+  const myRequestForCar =
+    isCustomer && car
+      ? (customerRequests.find(
+          (r) =>
+            r.car.id === car.id && ACTIVE_REQUEST_STATUSES.includes(r.status),
+        ) ??
+        customerRequests.find(
+          (r) => r.car.id === car.id && r.status === "completed",
+        ) ??
+        null)
+      : null;
 
   const isSold = car?.availability_status === "sold";
 

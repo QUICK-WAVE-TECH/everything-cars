@@ -1,19 +1,20 @@
+from datetime import date, timedelta
+
 from rest_framework import serializers
 from django.utils import timezone
 
-from apps.users.models import User
 from .models import (
     Car,
     CarImage,
+    CarStatus,
     Currency,
     ListingFeature,
     ListingType,
     Request,
+    RequestStatus,
     RequestStatusEvent,
     Transaction,
 )
-from datetime import date, timedelta
-from .models import CarStatus, RequestStatus
 
 
 class CarImageSerializer(serializers.ModelSerializer):
@@ -191,11 +192,15 @@ class CarDetailSerializer(serializers.ModelSerializer):
         periods = []
         for req in self._get_booked_requests(obj):
             if req.start_date and req.duration_days:
-                periods.append({
-                    "start_date": req.start_date.isoformat(),
-                    "end_date": (req.start_date + timedelta(days=req.duration_days)).isoformat(),
-                    "status": req.status,
-                })
+                periods.append(
+                    {
+                        "start_date": req.start_date.isoformat(),
+                        "end_date": (
+                            req.start_date + timedelta(days=req.duration_days)
+                        ).isoformat(),
+                        "status": req.status,
+                    }
+                )
         periods.sort(key=lambda p: p["start_date"])
         return periods
 

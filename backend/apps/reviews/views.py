@@ -1,13 +1,17 @@
+from django.db import IntegrityError, transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 from django.db.models import Avg, Count
 from common.pagination import StandardPagination
-from common.permissions import IsCustomer
 from apps.listings.models import Car
 from .models import Review
-from .serializers import ReviewSerializer, ReviewCreateSerializer
+from .serializers import (
+    ReviewCreateSerializer,
+    ReviewSerializer,
+    ReviewUpdateSerializer,
+)
 
 
 class CarReviewListCreateView(APIView):
@@ -60,7 +64,14 @@ class CarReviewListCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        review = serializer.save()
+        try:
+            with transaction.atomic():
+                review = serializer.save()
+        except IntegrityError:
+            return Response(
+                {"detail": "You have already reviewed this request."},
+                status=status.HTTP_409_CONFLICT,
+            )
         return Response(ReviewSerializer(review).data, status=status.HTTP_201_CREATED)
 
 
@@ -70,7 +81,7 @@ class ReviewDetailView(APIView):
     DELETE /reviews/{id} — author can delete
     """
 
-    permission_classes = [IsCustomer]
+    permission_classes = [IsAuthenticated]
 
     def patch(self, request, review_id):
         try:
@@ -80,20 +91,9 @@ class ReviewDetailView(APIView):
                 {"detail": "Review not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
-        rating = request.data.get("rating")
-        comment = request.data.get("comment")
-
-        if rating is not None:
-            if not isinstance(rating, int) or rating < 1 or rating > 5:
-                return Response(
-                    {"detail": "Rating must be between 1 and 5."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            review.rating = rating
-        if comment is not None:
-            review.comment = comment
-
-        review.save(update_fields=["rating", "comment", "updated_at"])
+        serializer = ReviewUpdateSerializer(review, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
         return Response(ReviewSerializer(review).data)
 
     def delete(self, request, review_id):

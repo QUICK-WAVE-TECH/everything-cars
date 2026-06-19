@@ -78,7 +78,9 @@ export function useUploadCarImages() {
     },
     onSuccess: (_data, variables) => {
       const { carId } = variables;
+      queryClient.invalidateQueries({ queryKey: ["my-cars"] });
       queryClient.invalidateQueries({ queryKey: ["my-cars", carId] });
+      queryClient.invalidateQueries({ queryKey: ["cars"] });
       queryClient.invalidateQueries({ queryKey: ["cars", carId] });
     },
   });
