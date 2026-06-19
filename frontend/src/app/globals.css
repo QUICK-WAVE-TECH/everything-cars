@@ -565,3 +565,15 @@ canvas {
     @apply font-sans;
   }
 }
+
+/* Transaction detail responsive grid */
+@media (max-width: 920px) {
+  .txn-grid { grid-template-columns: 1fr !important; }
+  .txn-grid aside { position: static !important; }
+}
+
+/* Payment page responsive grid */
+@media (max-width: 920px) {
+  .pay-grid { grid-template-columns: 1fr !important; }
+  .pay-grid aside { position: static !important; }
+}

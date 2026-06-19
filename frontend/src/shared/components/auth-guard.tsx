@@ -26,6 +26,7 @@ export function AuthGuard({ children, requiredRole }: AuthGuardProps) {
   const { data: user, isLoading, isError } = useMe();
   const isReadyAuthenticated = Boolean(user) || isAuthenticated;
   const currentRole = user?.role ?? userRole;
+  const isStaff = user?.is_staff ?? false;
 
   useEffect(() => {
     // Still loading — wait
@@ -37,16 +38,27 @@ export function AuthGuard({ children, requiredRole }: AuthGuardProps) {
       return;
     }
 
+    // Staff users always go to admin dashboard
+    if (isStaff) {
+      router.replace("/admin/approvals");
+      return;
+    }
+
     // Wrong role
     if (requiredRole && currentRole !== requiredRole) {
       const correctDashboard =
         currentRole === "owner" ? "/owner/dashboard" : "/customer/dashboard";
       router.replace(correctDashboard);
     }
-  }, [currentRole, isReadyAuthenticated, isLoading, isError, requiredRole, router]);
+  }, [currentRole, isStaff, isReadyAuthenticated, isLoading, isError, requiredRole, router]);
 
   // Show nothing while loading or redirecting
   if (isLoading || !isReadyAuthenticated || isError) {
+    return null;
+  }
+
+  // Staff users are handled by admin layout
+  if (isStaff) {
     return null;
   }
 

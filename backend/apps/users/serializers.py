@@ -199,11 +199,12 @@ class MeSerializer(serializers.ModelSerializer):
             "last_name",
             "phone",
             "role",
+            "is_staff",
             "date_joined",
             "customer_profile",
             "owner_profile",
         ]
-        read_only_fields = ["id", "email", "role", "date_joined"]
+        read_only_fields = ["id", "email", "role", "is_staff", "date_joined"]
 
 
 class ForgotPasswordSerializer(serializers.Serializer):
@@ -218,7 +219,7 @@ class ResetPasswordSerializer(serializers.Serializer):
         try:
             validate_password(value)
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(list(exc.message)) from exc
+            raise serializers.ValidationError(list(exc.messages)) from exc
 
         return value
 

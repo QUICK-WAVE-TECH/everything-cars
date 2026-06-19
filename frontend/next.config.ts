@@ -3,7 +3,7 @@ import path from "node:path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  allowedDevOrigins: ["192.168.1.30"],
+  allowedDevOrigins: ["192.168.1.30", "127.0.0.1:8000", "localhost"],
 
   // Pin the workspace root to this directory so Next/Turbopack never infers it
   // from a stray lockfile in a parent directory (which left dev requests hanging).
@@ -12,7 +12,13 @@ const nextConfig: NextConfig = {
   },
 
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "flagcdn.com" }],
+    unoptimized: true,
+    remotePatterns: [
+      { protocol: "https", hostname: "flagcdn.com" },
+      { protocol: "http", hostname: "localhost" },
+      { protocol: "https", hostname: "**.amazonaws.com" },
+      { protocol: "https", hostname: "**.onrender.com" },
+    ],
   },
 
   async headers() {

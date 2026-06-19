@@ -5,7 +5,7 @@ function isAuthError(error: unknown) {
   return error instanceof ApiError && (error.status === 401 || error.status === 403);
 }
 
-export function makeQueryClient() {
+function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
@@ -24,3 +24,6 @@ export function makeQueryClient() {
     },
   });
 }
+
+// Singleton — shared between QueryProvider and the WebSocket handler
+export const queryClient = makeQueryClient();

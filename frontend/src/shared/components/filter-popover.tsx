@@ -1,6 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export type FilterOption = { value: string; label: string };
 export type FilterField = { key: string; label: string; options: FilterOption[] };
@@ -33,9 +38,11 @@ export function FilterPopover({ fields, values, onApply }: FilterPopoverProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<FilterValues>(values);
 
-  function openPopover() {
-    setDraft(values);
-    setOpen((o) => !o);
+  function handleOpenChange(nextOpen: boolean) {
+    if (nextOpen) {
+      setDraft(values);
+    }
+    setOpen(nextOpen);
   }
 
   function apply() {
@@ -51,54 +58,42 @@ export function FilterPopover({ fields, values, onApply }: FilterPopoverProps) {
   }
 
   return (
-    <div style={{ position: "relative" }}>
-      <button
-        onClick={openPopover}
-        className="brc-button-motion-subtle"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          height: 44,
-          padding: "0 18px",
-          borderRadius: "var(--brc-radius-pill)",
-          border: "1px solid var(--brc-border)",
-          background: "#fff",
-          cursor: "pointer",
-          fontFamily: "var(--brc-font-ui)",
-          fontSize: 14,
-          fontWeight: 600,
-          color: "var(--brc-text)",
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <line x1="4" y1="6" x2="20" y2="6" />
-          <line x1="7" y1="12" x2="17" y2="12" />
-          <line x1="10" y1="18" x2="14" y2="18" />
-        </svg>
-        Filter
-      </button>
-
-      {open && (
-        <>
-          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-          <div
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className="brc-button-motion-subtle"
             style={{
-              position: "absolute",
-              top: "calc(100% + 10px)",
-              right: 0,
-              zIndex: 50,
-              width: 260,
-              background: "#fff",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              height: 44,
+              padding: "0 18px",
+              borderRadius: "var(--brc-radius-pill)",
               border: "1px solid var(--brc-border)",
-              borderRadius: "var(--brc-radius-md)",
-              boxShadow: "var(--brc-shadow-md)",
-              padding: 18,
-              display: "flex",
-              flexDirection: "column",
-              gap: 16,
+              background: "#fff",
+              cursor: "pointer",
+              fontFamily: "var(--brc-font-ui)",
+              fontSize: 14,
+              fontWeight: 600,
+              color: "var(--brc-text)",
             }}
           >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="4" y1="6" x2="20" y2="6" />
+              <line x1="7" y1="12" x2="17" y2="12" />
+              <line x1="10" y1="18" x2="14" y2="18" />
+            </svg>
+            Filter
+          </button>
+        }
+      />
+      <PopoverContent
+        align="end"
+        sideOffset={10}
+        className="z-[100] w-[260px] gap-4 rounded-lg border border-(--brc-border) bg-white p-[18px] text-(--brc-text) shadow-md"
+      >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 15, color: "var(--brc-text)" }}>Filter</span>
               <button onClick={() => setOpen(false)} aria-label="Close filter" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--brc-text-muted)", display: "flex" }}>
@@ -168,9 +163,7 @@ export function FilterPopover({ fields, values, onApply }: FilterPopoverProps) {
                 Apply
               </button>
             </div>
-          </div>
-        </>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }

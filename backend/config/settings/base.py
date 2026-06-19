@@ -32,6 +32,7 @@ ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").sp
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -43,8 +44,11 @@ INSTALLED_APPS = [
     "django_countries",
     "corsheaders",
     "storages",
+    "djmoney",
     # Local
     "apps.users",
+    "apps.listings",
+    "apps.notifications",
 ]
 
 
@@ -78,6 +82,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"
+ASGI_APPLICATION = "config.asgi.application"
 
 
 # Database
@@ -212,6 +217,16 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@everythingcar
 # Celery
 CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+
+# Channel Layers (WebSocket via Redis PubSub — persistent subscription, no BRPOP timeouts)
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.pubsub.RedisPubSubChannelLayer",
+        "CONFIG": {
+            "hosts": [os.environ.get("REDIS_URL", "redis://localhost:6379/0")],
+        },
+    },
+}
 
 # Media (file uploads)
 MEDIA_URL = "media/"

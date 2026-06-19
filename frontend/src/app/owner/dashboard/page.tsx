@@ -15,6 +15,9 @@ import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
 import { useMe } from "@/features/auth/api";
 import { PromoBanner } from "@/shared/components";
+import { useOwnerRequests } from "@/features/requests/api";
+import { useMyCarsList } from "@/features/listings/api";
+import { useTransactions } from "@/features/payments/api";
 
 type DashboardStyle = CSSProperties & Record<`--${string}`, string | number>;
 
@@ -27,11 +30,11 @@ type QuickLink = {
   fg: string;
 };
 
-const OWNER_STATS = [
-  { icon: "car" as IconName, label: "Listed Cars", value: "5", color: "var(--brc-primary)", href: "/owner/my-cars" },
-  { icon: "clock" as IconName, label: "Pending Requests", value: "3", color: "var(--brc-warning)" },
-  { icon: "check" as IconName, label: "Approved", value: "8", color: "var(--brc-success)" },
-  { icon: "banknote" as IconName, label: "Earnings", value: "₦1.2M", color: "var(--brc-accent)" },
+const OWNER_STAT_DEFS = [
+  { icon: "car" as IconName, label: "Listed Cars", key: "listed", color: "var(--brc-primary)", href: "/owner/my-cars" },
+  { icon: "clock" as IconName, label: "Pending Requests", key: "pending", color: "var(--brc-warning)" },
+  { icon: "check" as IconName, label: "Approved", key: "approved", color: "var(--brc-success)" },
+  { icon: "banknote" as IconName, label: "Earnings", key: "earnings", color: "var(--brc-accent)" },
 ];
 
 const OWNER_QUICK_LINKS: QuickLink[] = [
@@ -41,10 +44,10 @@ const OWNER_QUICK_LINKS: QuickLink[] = [
   { label: "Rewards", description: "Loyalty points and owner perks.", icon: "gift", href: "/owner/loyalty", bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)" },
 ];
 
-type RequestStatus = "approved" | "pending";
+type RequestStatus = "approved" | "pending" | "rejected" | "cancelled" | "paid" | "active" | "completed";
 
 type IncomingRequest = {
-  id: number;
+  id: string;
   car: string;
   party: string;
   mode: "Rent" | "Buy";
@@ -55,20 +58,20 @@ type IncomingRequest = {
   action?: { label: string; href: string };
 };
 
-const RECENT_REQUESTS: IncomingRequest[] = [
-  { id: 1, car: "Lexus NX 300h", party: "Chika Akor", mode: "Rent", days: 5, price: 175000, status: "approved", note: "Renter confirmed. Awaiting pickup.", action: { label: "View details", href: "/owner/requests/1" } },
-  { id: 2, car: "Toyota RAV4", party: "John Adewara", mode: "Rent", days: 3, price: 126000, status: "pending", note: "New request — review and respond." },
-  { id: 3, car: "Mercedes C300", party: "Aisha Bello", mode: "Buy", price: 24000000, status: "pending", note: "Purchase inquiry received." },
-];
 
 const TOP_CARS = [
   { id: 1, name: "Lexus NX 300h", location: "Lekki, Lagos", tag: "5 rentals", price: 35000, suffix: "per day", href: "/owner/my-cars/1" },
   { id: 2, name: "Toyota RAV4", location: "Victoria Island", tag: "3 rentals", price: 42000, suffix: "per day", href: "/owner/my-cars/2" },
 ];
 
-const STATUS_STYLES: Record<RequestStatus, { label: string; bg: string; fg: string; ring: string }> = {
-  approved: { label: "Approved", bg: "var(--brc-success-bg)", fg: "var(--brc-success)", ring: "rgba(32,184,88,0.22)" },
+const STATUS_STYLES: Record<string, { label: string; bg: string; fg: string; ring: string }> = {
   pending: { label: "Pending", bg: "var(--brc-warning-bg)", fg: "#9a7400", ring: "rgba(255,192,1,0.26)" },
+  approved: { label: "Approved", bg: "var(--brc-success-bg)", fg: "var(--brc-success)", ring: "rgba(32,184,88,0.22)" },
+  rejected: { label: "Rejected", bg: "var(--brc-danger-bg)", fg: "var(--brc-danger)", ring: "rgba(239,68,68,0.22)" },
+  cancelled: { label: "Cancelled", bg: "var(--brc-bg-muted)", fg: "var(--brc-text-muted)", ring: "rgba(18,18,18,0.1)" },
+  paid: { label: "Paid", bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)", ring: "rgba(195,101,35,0.22)" },
+  active: { label: "Active", bg: "var(--brc-primary-tint)", fg: "var(--brc-primary)", ring: "rgba(0,0,139,0.16)" },
+  completed: { label: "Completed", bg: "var(--brc-success-bg)", fg: "var(--brc-success)", ring: "rgba(32,184,88,0.22)" },
 };
 
 const noopSubscribe = () => () => {};
@@ -147,7 +150,7 @@ function DashboardButton({ href, children, variant = "primary" }: { href: string
   );
 }
 
-function StatCard({ stat, delay }: { stat: (typeof OWNER_STATS)[number]; delay: number }) {
+function StatCard({ stat, delay }: { stat: (typeof OWNER_STAT_DEFS)[number] & { value: string }; delay: number }) {
   const inner = (
     <>
       <div className="mb-5 flex items-start justify-between gap-3">
@@ -227,7 +230,7 @@ function QuickActionTile({ link, delay }: { link: QuickLink; delay: number }) {
 }
 
 function StatusBadge({ status }: { status: RequestStatus }) {
-  const tone = STATUS_STYLES[status];
+  const tone = STATUS_STYLES[status] || STATUS_STYLES.pending!;
   return (
     <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold [font-family:var(--brc-font-ui)]" style={{ background: tone.bg, color: tone.fg }}>
       <span className="brc-status-dot size-2 rounded-full" style={{ background: tone.fg, "--status-ring": tone.ring } as DashboardStyle} />
@@ -237,10 +240,34 @@ function StatusBadge({ status }: { status: RequestStatus }) {
 }
 
 function RequestProgress({ status, delay = 0 }: { status: RequestStatus; delay?: number }) {
-  const steps = ["Requested", status === "approved" ? "Approved" : "Review", "Completed"];
-  const activeUntil = status === "approved" ? 1 : 0;
+  const steps = ["Requested", "Approved", "Paid", "Active", "Completed"];
+  const statusIndex: Record<string, number> = {
+    pending: 0,
+    approved: 1,
+    paid: 2,
+    active: 3,
+    completed: 4,
+    rejected: -1,
+    cancelled: -1,
+  };
+  const activeUntil = statusIndex[status] ?? -1;
+  const isTerminalFail = status === "rejected" || status === "cancelled";
+
+  if (isTerminalFail) {
+    return (
+      <div className="mt-4 flex items-center gap-2">
+        <div className="h-1 flex-1 overflow-hidden rounded-full bg-(--brc-danger-bg)">
+          <span className="brc-progress-fill block h-full w-full rounded-full bg-(--brc-danger)" style={{ "--delay": `${delay}ms` } as DashboardStyle} />
+        </div>
+        <span className="text-[11px] font-bold text-(--brc-danger) [font-family:var(--brc-font-ui)]">
+          {status === "rejected" ? "Rejected" : "Cancelled"}
+        </span>
+      </div>
+    );
+  }
+
   return (
-    <div className="mt-4 grid grid-cols-3 gap-2">
+    <div className="mt-4 grid grid-cols-5 gap-1.5">
       {steps.map((step, index) => {
         const active = index <= activeUntil;
         return (
@@ -340,11 +367,57 @@ function EarningsSnapshot() {
   );
 }
 
+function statusNote(status: string): string {
+  const notes: Record<string, string> = {
+    pending: "New request — review and respond.",
+    approved: "Approved. Awaiting payment.",
+    paid: "Payment confirmed. Ready for handover.",
+    active: "Rental in progress.",
+    completed: "Rental completed.",
+    rejected: "Request was rejected.",
+    cancelled: "Request was cancelled.",
+  };
+  return notes[status] ?? "";
+}
+
 export default function OwnerDashboard() {
   const greeting = useGreeting();
   const { data: user } = useMe();
+  const { data: requestsData } = useOwnerRequests();
+  const { data: carsData } = useMyCarsList();
+  const { data: txnData } = useTransactions();
   const firstName = user?.first_name || "";
   const greetingText = firstName ? `${greeting}, ${firstName}` : `${greeting}, welcome back`;
+
+  const recentRequests: IncomingRequest[] = useMemo(() => {
+    const items = requestsData?.results ?? [];
+    return items.slice(0, 3).map((r) => ({
+      id: r.id,
+      car: r.car.title,
+      party: `${r.customer.first_name} ${r.customer.last_name}`,
+      mode: r.request_type === "rent" ? "Rent" as const : "Buy" as const,
+      days: r.duration_days ?? undefined,
+      price: Number(r.price_offered),
+      status: r.status as RequestStatus,
+      note: statusNote(r.status),
+      action: { label: "View details", href: `/owner/requests/${r.id}` },
+    }));
+  }, [requestsData]);
+
+  const cars = carsData?.results ?? [];
+  const requests = requestsData?.results ?? [];
+  const transactions = txnData?.results ?? [];
+  const totalEarnings = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const ownerStats = useMemo(() => {
+    const values: Record<string, string> = {
+      listed: String(cars.length),
+      pending: String(requests.filter((r) => r.status === "pending").length),
+      approved: String(requests.filter((r) => r.status === "approved" || r.status === "paid" || r.status === "active").length),
+      earnings: totalEarnings > 0 ? `₦${totalEarnings.toLocaleString("en-NG")}` : "₦0",
+    };
+    return OWNER_STAT_DEFS.map((def) => ({ ...def, value: values[def.key] ?? "0" }));
+  }, [cars, requests, totalEarnings]);
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#FAFAFA_0%,#FFFFFF_46%,#FAFAFA_100%)]">
@@ -360,7 +433,9 @@ export default function OwnerDashboard() {
                 </span>
                 <h1 className="m-0 max-w-2xl text-[clamp(2rem,6vw,3.4rem)] font-black leading-[1.04] text-(--brc-text) [font-family:var(--brc-font-display)]">{greetingText}</h1>
               </div>
-              <p className="max-w-xl text-base leading-7 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">You have 3 pending rental requests and 5 cars listed for rent.</p>
+              <p className="max-w-xl text-base leading-7 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                You have {requests.filter((r) => r.status === "pending").length} pending request{requests.filter((r) => r.status === "pending").length !== 1 ? "s" : ""} and {cars.length} car{cars.length !== 1 ? "s" : ""} listed.
+              </p>
             </div>
             <div className="relative z-10 flex flex-col justify-between gap-6">
               <div className="brc-dashboard-badge-pop self-start rounded-2xl border border-(--brc-border) bg-(--brc-bg-subtle) px-4 py-3 text-sm font-bold text-(--brc-text-secondary) shadow-[var(--brc-shadow-xs)] [font-family:var(--brc-font-ui)] lg:self-end">Verified owner</div>
@@ -374,7 +449,7 @@ export default function OwnerDashboard() {
 
         {/* Stats */}
         <section aria-label="Owner summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {OWNER_STATS.map((stat, index) => (
+          {ownerStats.map((stat, index) => (
             <StatCard key={stat.label} stat={stat} delay={80 + index * 70} />
           ))}
         </section>
@@ -403,7 +478,7 @@ export default function OwnerDashboard() {
                 }
               />
               <div className="flex flex-col gap-4">
-                {RECENT_REQUESTS.map((request, index) => (
+                {recentRequests.map((request, index) => (
                   <RequestCard key={request.id} req={request} delay={380 + index * 70} />
                 ))}
               </div>

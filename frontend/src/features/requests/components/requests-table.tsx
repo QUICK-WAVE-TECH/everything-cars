@@ -4,26 +4,29 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/features/auth/components/icon";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { FilterPopover, Pagination, RowMenu, type FilterField, type FilterValues } from "@/shared/components";
-import { CUSTOMER_REQUESTS, naira } from "../data";
+import { useCustomerRequests, useCancelRequest } from "@/features/requests/api";
 import { StatusBadge } from "./status-badge";
+import { toast } from "sonner";
 
 const PAGE_SIZE = 7;
 const COLUMNS = ["Car", "Type", "Request date", "Owner", "Price", "Duration", "Status"];
 const COLUMN_WIDTHS = [180, 86, 132, 168, 126, 102, 128];
 
-const CAR_OPTIONS = Array.from(new Set(CUSTOMER_REQUESTS.map((r) => r.car)));
-
 const FILTER_FIELDS: FilterField[] = [
-  { key: "car", label: "Car", options: CAR_OPTIONS.map((c) => ({ value: c, label: c })) },
-  { key: "type", label: "Type", options: [{ value: "Rent", label: "Rent" }, { value: "Buy", label: "Buy" }] },
+  { key: "type", label: "Type", options: [{ value: "rent", label: "Rent" }, { value: "buy", label: "Buy" }] },
   {
     key: "status",
     label: "Status",
     options: [
-      { value: "approved", label: "Approved" },
       { value: "pending", label: "Pending" },
+      { value: "approved", label: "Approved" },
       { value: "rejected", label: "Rejected" },
+      { value: "cancelled", label: "Cancelled" },
+      { value: "paid", label: "Paid" },
+      { value: "active", label: "Active" },
+      { value: "completed", label: "Completed" },
     ],
   },
 ];
@@ -52,35 +55,65 @@ const tdStyle: React.CSSProperties = {
   verticalAlign: "middle",
 };
 
-const closeIcon = (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--brc-danger)" strokeWidth="2.2" strokeLinecap="round">
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
+function formatPrice(amount: string, currency: string): string {
+  const symbol = currency === "NGN" ? "₦" : currency === "USD" ? "$" : currency;
+  return `${symbol}${Number(amount).toLocaleString("en-NG")}`;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export function RequestsTable() {
   const router = useRouter();
+  const { data: paginatedData, isLoading } = useCustomerRequests();
+  const cancelRequest = useCancelRequest();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<FilterValues>({});
 
+  const requests = paginatedData?.results ?? [];
+
   const filtered = useMemo(() => {
-    return CUSTOMER_REQUESTS.filter((r) => {
+    return requests.filter((r) => {
       if (search) {
         const q = search.toLowerCase();
-        if (!r.car.toLowerCase().includes(q) && !r.owner.toLowerCase().includes(q)) return false;
+        const carName = `${r.car.brand} ${r.car.model}`.toLowerCase();
+        if (!carName.includes(q) && !r.car.title.toLowerCase().includes(q)) return false;
       }
-      if (filters.car && r.car !== filters.car) return false;
-      if (filters.type && r.type !== filters.type) return false;
+      if (filters.type && r.request_type !== filters.type) return false;
       if (filters.status && r.status !== filters.status) return false;
       return true;
     });
-  }, [search, filters]);
+  }, [requests, search, filters]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  async function handleCancel(requestId: string) {
+    try {
+      await cancelRequest.mutateAsync(requestId);
+      toast.success("Request cancelled");
+    } catch {
+      toast.error("Failed to cancel request");
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <section style={{ background: "#fff", border: "1px solid var(--brc-border)", borderRadius: "var(--brc-radius-lg)", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
+        <Skeleton className="h-6 w-36" />
+        <Skeleton className="h-11 w-full" />
+        <div className="flex flex-col gap-1">
+          <Skeleton className="h-10 w-full rounded-lg" />
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 w-full" />
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section
@@ -176,17 +209,17 @@ export function RequestsTable() {
               </tr>
             ) : (
               rows.map((r) => (
-                <tr key={r.id}>
-                  <td style={tdStyle}>{r.car}</td>
-                  <td style={{ ...tdStyle, textAlign: "center" }}>{r.type}</td>
-                  <td style={{ ...tdStyle, color: "var(--brc-text-secondary)" }}>{r.requestDate}</td>
-                  <td style={tdStyle}>{r.owner}</td>
-                  <td style={{ ...tdStyle, textAlign: "right" }}>{naira(r.price)}</td>
-                  <td style={{ ...tdStyle, color: "var(--brc-text-secondary)", textAlign: "center" }}>{r.duration}</td>
+                <tr key={r.id} onClick={() => router.push(`/customer/requests/${r.id}`)} className="group/row cursor-pointer transition-[background-color,box-shadow,transform] duration-300 ease-out hover:-translate-y-0.5 hover:bg-[rgba(0,0,139,0.035)] hover:shadow-[0_16px_34px_rgba(0,0,139,0.10)]">
+                  <td style={tdStyle}><span className="font-semibold transition-colors duration-300 group-hover/row:text-(--brc-primary)">{r.car.title}</span></td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{r.request_type === "rent" ? "Rent" : "Buy"}</td>
+                  <td style={{ ...tdStyle, color: "var(--brc-text-secondary)" }}>{formatDate(r.created_at)}</td>
+                  <td style={tdStyle}>{r.car.owner.first_name} {r.car.owner.last_name}</td>
+                  <td style={{ ...tdStyle, textAlign: "right" }}>{formatPrice(r.price_offered, r.currency)}</td>
+                  <td style={{ ...tdStyle, color: "var(--brc-text-secondary)", textAlign: "center" }}>{r.duration_days ? `${r.duration_days} days` : "—"}</td>
                   <td style={{ ...tdStyle, overflow: "visible" }}>
                     <StatusBadge status={r.status} />
                   </td>
-                  <td style={{ ...tdStyle, overflow: "visible", textAlign: "center" }}>
+                  <td style={{ ...tdStyle, overflow: "visible", textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
                     <RowMenu
                       items={[
                         {
@@ -194,7 +227,13 @@ export function RequestsTable() {
                           icon: <Icon name="car" size={16} stroke="var(--brc-text-secondary)" />,
                           onClick: () => router.push(`/customer/requests/${r.id}`),
                         },
-                        { label: "Close", icon: closeIcon },
+                        ...(r.status === "pending" || r.status === "approved"
+                          ? [{
+                              label: "Cancel",
+                              icon: <Icon name="plus" size={16} stroke="var(--brc-danger)" />,
+                              onClick: () => handleCancel(r.id),
+                            }]
+                          : []),
                       ]}
                     />
                   </td>
