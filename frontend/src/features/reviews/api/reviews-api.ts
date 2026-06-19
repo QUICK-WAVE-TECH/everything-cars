@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { requestKeys } from "@/features/requests/api/requests-api";
 import type { ReviewsResponse, CreateReviewInput, UpdateReviewInput } from "./types";
 
 export function useCarReviews(carId: string) {
@@ -17,7 +18,7 @@ export function useCreateReview() {
       apiClient.post(`/listings/cars/${carId}/reviews`, { request, rating, comment }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reviews"] });
-      queryClient.invalidateQueries({ queryKey: ["customer-requests"] });
+      queryClient.invalidateQueries({ queryKey: requestKeys.customer });
     },
   });
 }

@@ -49,6 +49,8 @@ type ApiCarCardProps = {
 export function ApiCarCard({ car, displayMode }: ApiCarCardProps) {
   const [hover, setHover] = useState(false);
   const isSold = car.availability_status === "sold";
+  const isReserved = car.availability_status === "reserved";
+  const isUnavailable = isSold || isReserved;
 
   return (
     <Link
@@ -66,7 +68,7 @@ export function ApiCarCard({ car, displayMode }: ApiCarCardProps) {
         transform: hover ? "translateY(-4px)" : "none",
         textDecoration: "none",
         color: "inherit",
-        opacity: isSold ? 0.65 : 1,
+        opacity: isUnavailable ? 0.65 : 1,
       }}
     >
       {/* Image */}
@@ -82,7 +84,7 @@ export function ApiCarCard({ car, displayMode }: ApiCarCardProps) {
           justifyContent: "center",
           boxShadow: hover ? "var(--brc-shadow-md)" : "var(--brc-shadow-xs)",
           transition: "box-shadow .2s ease",
-          filter: isSold ? "grayscale(0.4)" : "none",
+          filter: isUnavailable ? "grayscale(0.3)" : "none",
         }}
       >
         {car.primary_image ? (
@@ -92,7 +94,6 @@ export function ApiCarCard({ car, displayMode }: ApiCarCardProps) {
             width={258}
             height={160}
             style={{ width: "86%", height: "auto", objectFit: "contain" }}
-            unoptimized
           />
         ) : (
           <Icon name="car" size={48} stroke="var(--brc-border)" />
@@ -180,8 +181,8 @@ export function ApiCarCard({ car, displayMode }: ApiCarCardProps) {
             height: 38,
             borderRadius: 8,
             padding: "0 16px",
-            background: isSold ? "var(--brc-bg-muted)" : "var(--brc-secondary)",
-            color: isSold ? "var(--brc-text-muted)" : "#FAFAFA",
+            background: isUnavailable ? "var(--brc-bg-muted)" : "var(--brc-secondary)",
+            color: isUnavailable ? "var(--brc-text-muted)" : "#FAFAFA",
             fontFamily: "var(--brc-font-ui)",
             fontWeight: 700,
             fontSize: 13,
@@ -189,7 +190,7 @@ export function ApiCarCard({ car, displayMode }: ApiCarCardProps) {
             alignItems: "center",
           }}
         >
-          {isSold ? "Sold" : "View Details"}
+          {isSold ? "Sold" : isReserved ? "Reserved" : "View Details"}
         </span>
       </div>
     </Link>

@@ -22,19 +22,23 @@ function deriveWsBaseUrl(): string {
 }
 
 const NOTIFICATION_QUERY_DEPS: Partial<Record<NotificationType, string[][]>> = {
-  request_received: [["owner-requests"]],
-  request_cancelled: [["owner-requests"]],
-  request_approved: [["customer-requests"]],
-  request_rejected: [["customer-requests"]],
-  requests_auto_rejected: [["customer-requests"]],
-  payment_submitted: [["admin-requests"]],
-  payment_confirmed: [["customer-requests"], ["owner-requests"], ["transactions"]],
-  rental_active: [["customer-requests"], ["owner-requests"]],
-  rental_completed: [["customer-requests"], ["owner-requests"]],
-  listing_submitted: [["admin-cars"], ["my-cars"]],
-  listing_approved: [["admin-cars"], ["my-cars"]],
-  listing_rejected: [["admin-cars"], ["my-cars"]],
-  listing_needs_changes: [["admin-cars"], ["my-cars"]],
+  request_received: [["requests", "owner"]],
+  request_cancelled: [["requests", "owner"]],
+  request_approved: [["requests", "customer"]],
+  request_rejected: [["requests", "customer"]],
+  requests_auto_rejected: [["requests", "customer"]],
+  payment_submitted: [["requests", "admin"]],
+  payment_confirmed: [
+    ["requests", "customer"],
+    ["requests", "owner"],
+    ["transactions"],
+  ],
+  rental_active: [["requests", "customer"], ["requests", "owner"]],
+  rental_completed: [["requests", "customer"], ["requests", "owner"]],
+  listing_submitted: [["cars", "admin"], ["cars", "owner"]],
+  listing_approved: [["cars", "admin"], ["cars", "owner"], ["cars", "public"]],
+  listing_rejected: [["cars", "admin"], ["cars", "owner"], ["cars", "public"]],
+  listing_needs_changes: [["cars", "admin"], ["cars", "owner"]],
 };
 
 const PING_INTERVAL_MS = 25_000;

@@ -18,7 +18,6 @@ function Flag({ iso, name }: { iso: string; name: string }) {
       alt={`${name} flag`}
       width={24}
       height={18}
-      unoptimized
       style={{ borderRadius: 2, flexShrink: 0, objectFit: "cover" }}
     />
   );

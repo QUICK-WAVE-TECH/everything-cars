@@ -86,8 +86,9 @@ export default function OwnerRequestDetailPage() {
     try {
       await requestAction.mutateAsync({ requestId, action, note });
       toast.success(ACTION_LABELS[action]);
-    } catch {
-      toast.error(`Failed to ${action} request`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : `Failed to ${action} request`;
+      toast.error(message);
     }
   }
 

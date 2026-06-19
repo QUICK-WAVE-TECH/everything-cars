@@ -21,7 +21,7 @@ class CarImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CarImage
-        fields = ["id", "image", "is_primary", "created_at"]
+        fields = ["id", "image", "thumbnail", "is_primary", "created_at"]
         read_only_fields = fields
 
 
@@ -89,28 +89,57 @@ class CarListSerializer(serializers.ModelSerializer):
             primary = images[0]
 
         if primary:
+            image = primary.thumbnail or primary.image
             request = self.context.get("request")
             if request:
-                return request.build_absolute_uri(primary.image.url)
-            return primary.image.url
+                return request.build_absolute_uri(image.url)
+            return image.url
         return None
 
     def get_availability_status(self, obj):
-
         if obj.status == CarStatus.ARCHIVED:
             return "sold"
 
-        active_rentals = getattr(obj, "_active_rentals", None)
-        if active_rentals is None:
-            active_rentals = obj.requests.filter(
-                request_type="rent", status=RequestStatus.ACTIVE
+        has_buy_in_progress = getattr(obj, "_has_buy_in_progress", None)
+        has_active_current_rental = getattr(obj, "_has_active_current_rental", None)
+        has_reserved_future_rental = getattr(obj, "_has_reserved_future_rental", None)
+        if has_buy_in_progress is not None:
+            if has_buy_in_progress:
+                return "reserved"
+            if has_active_current_rental:
+                return "rented"
+            if has_reserved_future_rental:
+                return "reserved"
+            return "available"
+
+        in_progress = getattr(obj, "_in_progress_requests", None)
+        if in_progress is None:
+            in_progress = obj.requests.filter(
+                status__in=[
+                    RequestStatus.APPROVED,
+                    RequestStatus.PAYMENT_SUBMITTED,
+                    RequestStatus.PAID,
+                    RequestStatus.ACTIVE,
+                ],
             )
+
         today = date.today()
-        for req in active_rentals:
-            if req.start_date and req.duration_days:
+        for req in in_progress:
+            # Buy request in progress → reserved
+            if req.request_type == "buy":
+                return "reserved"
+            # Active rental currently in period → rented
+            if req.status == RequestStatus.ACTIVE and req.start_date and req.duration_days:
                 end = req.start_date + timedelta(days=req.duration_days)
                 if req.start_date <= today < end:
                     return "rented"
+            # Future approved/paid rental → reserved
+            if req.status in (
+                RequestStatus.APPROVED,
+                RequestStatus.PAYMENT_SUBMITTED,
+                RequestStatus.PAID,
+            ) and req.start_date and req.start_date > today:
+                return "reserved"
 
         return "available"
 
@@ -177,12 +206,47 @@ class CarDetailSerializer(serializers.ModelSerializer):
         if obj.status == CarStatus.ARCHIVED:
             return "sold"
 
+        has_buy_in_progress = getattr(obj, "_has_buy_in_progress", None)
+        has_active_current_rental = getattr(obj, "_has_active_current_rental", None)
+        has_reserved_future_rental = getattr(obj, "_has_reserved_future_rental", None)
+        if has_buy_in_progress is not None:
+            if has_buy_in_progress:
+                return "reserved"
+            if has_active_current_rental:
+                return "rented"
+            if has_reserved_future_rental:
+                return "reserved"
+            return "available"
+
+        # Also check buy requests in progress
+        buy_in_progress = getattr(obj, "_buy_in_progress", None)
+        if buy_in_progress is None:
+            buy_in_progress = obj.requests.filter(
+                request_type="buy",
+                status__in=[
+                    RequestStatus.APPROVED,
+                    RequestStatus.PAYMENT_SUBMITTED,
+                    RequestStatus.PAID,
+                    RequestStatus.ACTIVE,
+                ],
+            ).exists()
+        if buy_in_progress:
+            return "reserved"
+
         today = date.today()
         for req in self._get_booked_requests(obj):
-            if req.start_date and req.duration_days and req.status == RequestStatus.ACTIVE:
+            if req.status == RequestStatus.ACTIVE and req.start_date and req.duration_days:
                 end = req.start_date + timedelta(days=req.duration_days)
                 if req.start_date <= today < end:
                     return "rented"
+            # Future approved/paid rental → reserved
+            if req.status in (
+                RequestStatus.APPROVED,
+                RequestStatus.PAYMENT_SUBMITTED,
+                RequestStatus.PAID,
+            ) and req.start_date and req.start_date > today:
+                return "reserved"
+
         return "available"
 
     def get_booked_periods(self, obj):
@@ -339,10 +403,11 @@ class RequestCarSummarySerializer(serializers.ModelSerializer):
         if primary is None and images:
             primary = images[0]
         if primary:
+            image = primary.thumbnail or primary.image
             request = self.context.get("request")
             if request:
-                return request.build_absolute_uri(primary.image.url)
-            return primary.image.url
+                return request.build_absolute_uri(image.url)
+            return image.url
         return None
 
 

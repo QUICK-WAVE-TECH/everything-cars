@@ -496,7 +496,6 @@ function RequestCard({ req, delay }: { req: RecentRequest; delay: number }) {
               src={req.carImage}
               alt={req.car}
               fill
-              unoptimized
               sizes="(max-width: 640px) 88vw, 84px"
               className="brc-dashboard-car-thumb object-contain p-2 transition-transform duration-300 hover:scale-105"
             />
@@ -606,7 +605,6 @@ function RecommendedCard({
             src={car.image}
             alt={car.name}
             fill
-            unoptimized
             sizes="(max-width: 640px) 76px, 88px"
             className="brc-dashboard-car-thumb object-contain p-2 transition-transform duration-300 group-hover:scale-105"
           />
@@ -701,7 +699,10 @@ export default function CustomerDashboard() {
   const { data: transactionsData } = useTransactions();
   const { data: publicCarsData } = usePublicCars();
 
-  const allRequests = requestsData?.results ?? [];
+  const allRequests = useMemo(
+    () => requestsData?.results ?? [],
+    [requestsData?.results],
+  );
 
   const stats = useMemo((): StatItem[] => {
     const activeCount = allRequests.filter((r) =>

@@ -121,7 +121,7 @@ function VerifyContent() {
         },
       });
     },
-    [verify, router, form],
+    [verify, router, form, isExpired, isThrottled, throttledUntil],
   );
 
   const handleResend = useCallback(async () => {
@@ -149,7 +149,7 @@ function VerifyContent() {
     } finally {
       setIsResending(false);
     }
-  }, [cooldown, email, form, isResending]);
+  }, [cooldown, email, form, isResending, purpose]);
 
   // No auto-submit — user presses Enter or clicks Verify button
 

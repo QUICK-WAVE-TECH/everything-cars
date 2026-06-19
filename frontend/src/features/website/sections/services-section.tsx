@@ -8,7 +8,7 @@ import { usePublicCars } from "@/features/listings/api";
 
 export function ServicesSection() {
   const { data, isLoading } = usePublicCars();
-  const cars = data?.results ?? [];
+  const cars = useMemo(() => data?.results ?? [], [data?.results]);
 
   const rentCars = useMemo(
     () => cars.filter((c) => (c.listing_type === "rent" || c.listing_type === "both") && c.availability_status !== "sold").slice(0, 8),

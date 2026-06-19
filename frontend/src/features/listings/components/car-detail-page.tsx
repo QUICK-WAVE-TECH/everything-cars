@@ -1,13 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { Icon } from "@/features/auth/components/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { CarReviewsSection } from "@/features/reviews/components/car-reviews-section";
 import { usePublicCarDetail } from "@/features/listings/api";
 import { useCarReviews } from "@/features/reviews/api";
 import { StarRating } from "@/features/reviews/components/star-rating";
@@ -16,7 +16,6 @@ import { useMe } from "@/features/auth/api";
 import { useCustomerRequests, useCreateRequest } from "@/features/requests/api";
 import { toast } from "sonner";
 import { AvailabilityBadge } from "./availability-badge";
-import { AvailabilityCalendar } from "./availability-calendar";
 
 const ACTIVE_REQUEST_STATUSES = [
   "pending",
@@ -25,6 +24,25 @@ const ACTIVE_REQUEST_STATUSES = [
   "paid",
   "active",
 ];
+
+const AvailabilityCalendar = dynamic(
+  () => import("./availability-calendar").then((mod) => mod.AvailabilityCalendar),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-44 w-full rounded-xl" />,
+  },
+);
+
+const CarReviewsSection = dynamic(
+  () =>
+    import("@/features/reviews/components/car-reviews-section").then(
+      (mod) => mod.CarReviewsSection,
+    ),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-48 w-full rounded-xl" />,
+  },
+);
 
 // ── Helpers ──
 
@@ -92,6 +110,7 @@ export function CarDetailPage({ carId }: { carId: string }) {
       : null;
 
   const isSold = car?.availability_status === "sold";
+  const isReserved = car?.availability_status === "reserved";
 
   // Once car loads, set mode to what's available
   const effectiveMode = mode === "rent" && !canRent ? "buy" : mode === "buy" && !canBuy ? "rent" : mode;
@@ -183,7 +202,7 @@ export function CarDetailPage({ carId }: { carId: string }) {
         <section aria-label="Car gallery" style={{ minWidth: 0 }}>
           <div className="car-detail-main-image" style={{ position: "relative", height: "clamp(300px, 58vw, 460px)", borderRadius: "var(--brc-radius-lg)", background: "var(--brc-bg-subtle)", overflow: "hidden", border: "1px solid var(--brc-border)" }}>
             {sortedImages.length > 0 && sortedImages[activeImage] ? (
-              <Image src={sortedImages[activeImage].image} alt={car.title} fill style={{ objectFit: "contain", padding: 24 }} priority unoptimized />
+              <Image src={sortedImages[activeImage].image} alt={car.title} fill style={{ objectFit: "contain", padding: 24 }} priority />
             ) : (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
                 <Icon name="car" size={64} stroke="var(--brc-border)" />
@@ -207,7 +226,7 @@ export function CarDetailPage({ carId }: { carId: string }) {
                 return (
                   <button key={img.id} onClick={() => setActiveImage(i)} aria-current={activeImage === i}
                     style={{ flex: 1, minWidth: 80, maxWidth: 160, height: 90, borderRadius: "var(--brc-radius-md)", border: activeImage === i ? "2px solid var(--brc-primary)" : "2px solid var(--brc-border)", background: "var(--brc-bg-subtle)", overflow: "hidden", cursor: "pointer", padding: 0, position: "relative" }}>
-                    <Image src={img.image} alt="" fill style={{ objectFit: "contain", padding: 8 }} unoptimized />
+                    <Image src={img.thumbnail ?? img.image} alt="" fill style={{ objectFit: "contain", padding: 8 }} />
                   </button>
                 );
               })}
@@ -297,7 +316,7 @@ export function CarDetailPage({ carId }: { carId: string }) {
           {/* Location */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--brc-text-secondary)", marginBottom: 20 }}>
             <Icon name="pin" size={16} stroke="var(--brc-accent)" />
-            {car.city && <span>{car.city},</span>} <span>{car.state}</span> {car.country && <span>· {new Intl.DisplayNames(["en"], { type: "region" }).of(car.country.toUpperCase()) ?? car.country}</span>}
+            {car.city && <span>{car.city},</span>} <span>{car.state}</span> {car.country && <span>· {car.country.length === 2 ? (new Intl.DisplayNames(["en"], { type: "region" }).of(car.country.toUpperCase()) ?? car.country) : car.country}</span>}
           </div>
 
           {/* CTA — context-aware */}
@@ -305,6 +324,11 @@ export function CarDetailPage({ carId }: { carId: string }) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 52, width: "100%", borderRadius: "var(--brc-radius-sm)", background: "var(--brc-bg-muted)", color: "var(--brc-text-muted)", fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 15 }}>
               <Icon name="check" size={17} stroke="var(--brc-text-muted)" />
               This car has been sold
+            </div>
+          ) : isReserved && !myRequestForCar ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 52, width: "100%", borderRadius: "var(--brc-radius-sm)", background: "var(--brc-accent-bg)", border: "1px solid var(--brc-accent)", color: "var(--brc-accent)", fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 15 }}>
+              <Icon name="clock" size={17} stroke="var(--brc-accent)" />
+              This car is currently reserved
             </div>
           ) : isOwner ? (
             <Link

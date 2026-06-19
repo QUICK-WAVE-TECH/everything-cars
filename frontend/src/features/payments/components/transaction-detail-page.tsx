@@ -517,7 +517,7 @@ export function TransactionDetailPage({ backHref }: { backHref: string }) {
               {/* Car image */}
               <div className="flex flex-col items-center gap-3.5 border-b border-(--brc-border) bg-(--brc-bg-subtle) px-6 pb-5 pt-7">
                 {carImage ? (
-                  <Image src={carImage} alt={carTitle} width={260} height={160} className="w-4/5 max-w-[260px] object-contain" unoptimized />
+                  <Image src={carImage} alt={carTitle} width={260} height={160} className="w-4/5 max-w-[260px] object-contain" />
                 ) : (
                   <div className="flex h-[120px] w-4/5 items-center justify-center">
                     <Icon name="car" size={48} stroke="var(--brc-text-muted)" />

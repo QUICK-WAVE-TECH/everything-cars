@@ -176,7 +176,6 @@ function ServiceCarCard({ car, mode, cta }: { car: CarListItem; mode: Mode; cta:
             src={car.primary_image}
             alt={car.title}
             fill
-            unoptimized
             style={{
               objectFit: "contain",
               padding: 20,
@@ -313,7 +312,6 @@ function SoldCarCard({ car }: { car: CarListItem }) {
             src={car.primary_image}
             alt={car.title}
             fill
-            unoptimized
             style={{ objectFit: "contain", padding: 16, filter: "grayscale(0.6)" }}
           />
         ) : (
@@ -681,7 +679,7 @@ export function ServicesListing() {
     search: search || undefined,
   });
 
-  const allCars = carsData?.results ?? [];
+  const allCars = useMemo(() => carsData?.results ?? [], [carsData?.results]);
 
   // Split into published (available/rented) and sold
   const publishedCars = useMemo(
@@ -765,7 +763,6 @@ export function ServicesListing() {
           fill
           priority
           sizes="100vw"
-          unoptimized
           style={{ objectFit: "cover", zIndex: 0 }}
         />
         <div aria-hidden="true" style={{

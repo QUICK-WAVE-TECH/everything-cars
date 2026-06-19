@@ -1,84 +1,47 @@
 "use client";
 
 type AvailabilityBadgeProps = {
-  status: "available" | "rented" | "sold";
+  status: "available" | "rented" | "reserved" | "sold";
   availableFrom?: string | null;
 };
 
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString("en-GB", {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 }
 
+const BADGE_CONFIG: Record<
+  AvailabilityBadgeProps["status"],
+  { dot: string; fg: string; bg: string; border?: string }
+> = {
+  available: { dot: "var(--brc-success)", fg: "var(--brc-success)", bg: "var(--brc-success-bg)" },
+  rented: { dot: "#9a7400", fg: "#9a7400", bg: "var(--brc-warning-bg)" },
+  reserved: { dot: "var(--brc-accent)", fg: "var(--brc-accent)", bg: "var(--brc-accent-bg)" },
+  sold: { dot: "var(--brc-text-muted)", fg: "var(--brc-text-muted)", bg: "var(--brc-bg-subtle)", border: "1px solid var(--brc-border)" },
+};
+
+const BADGE_LABELS: Record<AvailabilityBadgeProps["status"], string> = {
+  available: "Available",
+  rented: "Currently Rented",
+  reserved: "Reserved",
+  sold: "Sold",
+};
+
 export function AvailabilityBadge({ status, availableFrom }: AvailabilityBadgeProps) {
-  if (status === "available") {
-    return (
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          fontFamily: "var(--brc-font-ui)",
-          fontSize: 12,
-          fontWeight: 600,
-          color: "var(--brc-success)",
-          background: "var(--brc-success-bg)",
-          borderRadius: "var(--brc-radius-pill)",
-          padding: "3px 10px",
-        }}
-      >
-        <span
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: "50%",
-            background: "var(--brc-success)",
-            flexShrink: 0,
-          }}
-        />
-        Available
-      </span>
-    );
+  const cfg = BADGE_CONFIG[status];
+  let label = BADGE_LABELS[status];
+
+  if (status === "rented" && availableFrom) {
+    label = `Rented until ${formatDate(availableFrom)}`;
+  }
+  if (status === "reserved" && availableFrom) {
+    label = `Reserved until ${formatDate(availableFrom)}`;
   }
 
-  if (status === "rented") {
-    const label = availableFrom
-      ? `Rented until ${formatDate(availableFrom)}`
-      : "Currently Rented";
-    return (
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          fontFamily: "var(--brc-font-ui)",
-          fontSize: 12,
-          fontWeight: 600,
-          color: "#9a7400",
-          background: "var(--brc-warning-bg)",
-          borderRadius: "var(--brc-radius-pill)",
-          padding: "3px 10px",
-        }}
-      >
-        <span
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: "50%",
-            background: "#9a7400",
-            flexShrink: 0,
-          }}
-        />
-        {label}
-      </span>
-    );
-  }
-
-  // sold
   return (
     <span
       style={{
@@ -88,11 +51,11 @@ export function AvailabilityBadge({ status, availableFrom }: AvailabilityBadgePr
         fontFamily: "var(--brc-font-ui)",
         fontSize: 12,
         fontWeight: 600,
-        color: "var(--brc-text-muted)",
-        background: "var(--brc-bg-subtle)",
+        color: cfg.fg,
+        background: cfg.bg,
         borderRadius: "var(--brc-radius-pill)",
         padding: "3px 10px",
-        border: "1px solid var(--brc-border)",
+        border: cfg.border ?? "none",
       }}
     >
       <span
@@ -100,11 +63,11 @@ export function AvailabilityBadge({ status, availableFrom }: AvailabilityBadgePr
           width: 7,
           height: 7,
           borderRadius: "50%",
-          background: "var(--brc-text-muted)",
+          background: cfg.dot,
           flexShrink: 0,
         }}
       />
-      Sold
+      {label}
     </span>
   );
 }

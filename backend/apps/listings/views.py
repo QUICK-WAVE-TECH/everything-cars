@@ -1,8 +1,23 @@
 from datetime import timedelta
+from io import BytesIO
+from pathlib import Path
 
 import uuid as uuid_lib
+from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
-from django.db.models import Prefetch
+from django.db.models import (
+    DateField,
+    Exists,
+    ExpressionWrapper,
+    F,
+    OuterRef,
+    Prefetch,
+    Q,
+)
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
+from PIL import Image, ImageOps
 
 from rest_framework import status
 from rest_framework.views import APIView
@@ -61,6 +76,56 @@ REQUEST_APPROVAL_BLOCKING_STATUSES = [
     RequestStatus.PAID,
     RequestStatus.ACTIVE,
 ]
+RESERVED_RENTAL_STATUSES = [
+    RequestStatus.APPROVED,
+    RequestStatus.PAYMENT_SUBMITTED,
+    RequestStatus.PAID,
+]
+MAX_OPTIMIZED_CAR_IMAGE_SIZE = (1600, 1200)
+MAX_CAR_IMAGE_THUMBNAIL_SIZE = (480, 360)
+CAR_IMAGE_WEBP_QUALITY = 82
+CAR_IMAGE_THUMBNAIL_WEBP_QUALITY = 76
+
+
+def schedule_notification(notify_func, get_payload):
+    transaction.on_commit(lambda: notify_func(get_payload()), robust=True)
+
+
+def request_end_date_expression():
+    return ExpressionWrapper(
+        F("start_date") + F("duration_days"),
+        output_field=DateField(),
+    )
+
+
+def availability_annotations():
+    today = timezone.localdate()
+    buy_in_progress = Request.objects.filter(
+        car_id=OuterRef("id"),
+        request_type=ListingType.BUY,
+        status__in=REQUEST_APPROVAL_BLOCKING_STATUSES,
+    )
+    active_current_rental = (
+        Request.objects.filter(
+            car_id=OuterRef("id"),
+            request_type=ListingType.RENT,
+            status=RequestStatus.ACTIVE,
+            start_date__lte=today,
+        )
+        .annotate(end_date=request_end_date_expression())
+        .filter(end_date__gt=today)
+    )
+    reserved_future_rental = Request.objects.filter(
+        car_id=OuterRef("id"),
+        request_type=ListingType.RENT,
+        status__in=RESERVED_RENTAL_STATUSES,
+        start_date__gt=today,
+    )
+    return {
+        "_has_buy_in_progress": Exists(buy_in_progress),
+        "_has_active_current_rental": Exists(active_current_rental),
+        "_has_reserved_future_rental": Exists(reserved_future_rental),
+    }
 
 
 def car_has_active_requests(car_id):
@@ -96,6 +161,41 @@ def rental_dates_overlap(first, second):
     return first.start_date < second_end and second.start_date < first_end
 
 
+def find_rental_overlap_conflict(
+    car_id,
+    start_date,
+    duration_days,
+    exclude_request_id=None,
+):
+    if not start_date or not duration_days:
+        return None
+
+    requested_end = start_date + timedelta(days=duration_days)
+    overlapping = (
+        Request.objects.filter(
+            car_id=car_id,
+            request_type=ListingType.RENT,
+            status__in=REQUEST_APPROVAL_BLOCKING_STATUSES,
+            start_date__lt=requested_end,
+        )
+        .annotate(end_date=request_end_date_expression())
+        .filter(end_date__gt=start_date)
+    )
+    if exclude_request_id is not None:
+        overlapping = overlapping.exclude(id=exclude_request_id)
+
+    existing = overlapping.only("start_date", "duration_days").first()
+    if not existing:
+        return None
+
+    existing_end = existing.start_date + timedelta(days=existing.duration_days)
+    return (
+        "This car is already booked from "
+        f"{existing.start_date.isoformat()} to {existing_end.isoformat()}. "
+        "Please pick different dates."
+    )
+
+
 def find_request_approval_conflict(req):
     competing_requests = Request.objects.filter(
         car_id=req.car_id,
@@ -112,16 +212,31 @@ def find_request_approval_conflict(req):
     if buy_conflict:
         return "This car already has an approved, paid, or active buy request."
 
-    rent_conflicts = competing_requests.filter(request_type=ListingType.RENT).only(
-        "id",
-        "start_date",
-        "duration_days",
+    rent_conflict = find_rental_overlap_conflict(
+        req.car_id,
+        req.start_date,
+        req.duration_days,
+        exclude_request_id=req.id,
     )
-    for existing_request in rent_conflicts:
-        if rental_dates_overlap(req, existing_request):
-            return "This car already has an approved, paid, or active rental for those dates."
+    if rent_conflict:
+        return "This car already has an approved, paid, or active rental for those dates."
 
     return None
+
+
+def optimize_car_image(file, max_size, suffix="", quality=CAR_IMAGE_WEBP_QUALITY):
+    file.seek(0)
+    with Image.open(file) as image:
+        image = ImageOps.exif_transpose(image)
+        if image.mode not in ("RGB", "RGBA"):
+            image = image.convert("RGB")
+        image.thumbnail(max_size, Image.Resampling.LANCZOS)
+
+        output = BytesIO()
+        image.save(output, format="WEBP", quality=quality, method=6)
+
+    name = f"{Path(file.name).stem}{suffix}.webp"
+    return ContentFile(output.getvalue(), name=name)
 
 
 def request_detail_queryset():
@@ -319,9 +434,20 @@ class CarImageUploadView(APIView):
                 created_images = []
 
                 for i, file in enumerate(files):
+                    optimized_file = optimize_car_image(
+                        file,
+                        MAX_OPTIMIZED_CAR_IMAGE_SIZE,
+                    )
+                    thumbnail_file = optimize_car_image(
+                        file,
+                        MAX_CAR_IMAGE_THUMBNAIL_SIZE,
+                        suffix="-thumb",
+                        quality=CAR_IMAGE_THUMBNAIL_WEBP_QUALITY,
+                    )
                     image = CarImage.objects.create(
                         car=car,
-                        image=file,
+                        image=optimized_file,
+                        thumbnail=thumbnail_file,
                         is_primary=(not has_existing_images and i == 0),
                     )
                     created_images.append(image)
@@ -346,19 +472,11 @@ class PublicCarListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        active_rentals_prefetch = Prefetch(
-            "requests",
-            queryset=Request.objects.filter(
-                request_type="rent",
-                status=RequestStatus.ACTIVE,
-            ).only("id", "start_date", "duration_days", "status"),
-            to_attr="_active_rentals",
-        )
-
         cars = (
             Car.objects.filter(status__in=[CarStatus.PUBLISHED, CarStatus.ARCHIVED])
             .select_related("owner__owner_profile")
-            .prefetch_related("images", active_rentals_prefetch)
+            .prefetch_related("images")
+            .annotate(**availability_annotations())
         )
 
         # Basic filters
@@ -384,8 +502,6 @@ class PublicCarListView(APIView):
 
         search = request.query_params.get("search")
         if search:
-            from django.db.models import Q
-
             cars = cars.filter(
                 Q(title__icontains=search)
                 | Q(brand__icontains=search)
@@ -400,30 +516,30 @@ class PublicCarListView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
+@method_decorator(cache_page(60 * 5), name="dispatch")
 class PublicCarFilterOptionsView(APIView):
     """Returns available filter options (states, cities, body types, brands) from published cars."""
     permission_classes = [AllowAny]
 
     def get(self, request):
         published = Car.objects.filter(status=CarStatus.PUBLISHED)
-        states = sorted(set(
-            published.exclude(state="").values_list("state", flat=True)
-        ))
-        cities = sorted(set(
-            published.exclude(city="").values_list("city", flat=True)
-        ))
-        body_types = sorted(set(
-            published.exclude(body_type="").values_list("body_type", flat=True)
-        ))
-        brands = sorted(set(
-            published.exclude(brand="").values_list("brand", flat=True)
-        ))
-        return Response({
-            "states": states,
-            "cities": cities,
-            "body_types": body_types,
-            "brands": brands,
-        })
+
+        def distinct_values(field):
+            return list(
+                published.exclude(**{field: ""})
+                .order_by(field)
+                .values_list(field, flat=True)
+                .distinct()
+            )
+
+        return Response(
+            {
+                "states": distinct_values("state"),
+                "cities": distinct_values("city"),
+                "body_types": distinct_values("body_type"),
+                "brands": distinct_values("brand"),
+            }
+        )
 
 
 class PublicCarDetailView(APIView):
@@ -448,6 +564,7 @@ class PublicCarDetailView(APIView):
             car = (
                 Car.objects.select_related("owner__owner_profile")
                 .prefetch_related("images", "features", booked_prefetch)
+                .annotate(**availability_annotations())
                 .get(
                     id=car_id,
                     status__in=[CarStatus.PUBLISHED, CarStatus.ARCHIVED],
@@ -503,17 +620,19 @@ class MyCarStatusView(APIView):
 
             car.status = new_status
             if new_status == CarStatus.PUBLISHED and not car.published_at:
-                from django.utils import timezone
-
                 car.published_at = timezone.now()
             if new_status == CarStatus.PENDING_REVIEW:
                 car.admin_note = ""  # Clear admin note on resubmit
             car.save(
                 update_fields=["status", "admin_note", "published_at", "updated_at"]
             )
-        if new_status == CarStatus.PENDING_REVIEW:
-            car_with_owner = Car.objects.select_related("owner").get(id=car.id)
-            notify_listing_submitted(car_with_owner)
+            if new_status == CarStatus.PENDING_REVIEW:
+                schedule_notification(
+                    notify_listing_submitted,
+                    lambda car_id=car.id: Car.objects.select_related("owner").get(
+                        id=car_id
+                    ),
+                )
 
         return Response(
             CarDetailSerializer(
@@ -561,6 +680,11 @@ class CustomerRequestListCreateView(APIView):
 
         try:
             with transaction.atomic():
+                requested_car = Car.objects.select_for_update().get(
+                    id=requested_car.id
+                )
+                serializer.validated_data["car"] = requested_car
+
                 duplicate_exists = Request.objects.filter(
                     car=requested_car,
                     customer=request.user,
@@ -573,6 +697,18 @@ class CustomerRequestListCreateView(APIView):
                         status=status.HTTP_409_CONFLICT,
                     )
 
+                if requested_type == ListingType.RENT:
+                    overlap_detail = find_rental_overlap_conflict(
+                        requested_car.id,
+                        serializer.validated_data.get("start_date"),
+                        serializer.validated_data.get("duration_days"),
+                    )
+                    if overlap_detail:
+                        return Response(
+                            {"start_date": overlap_detail},
+                            status=status.HTTP_409_CONFLICT,
+                        )
+
                 req = serializer.save(customer=request.user)
                 RequestStatusEvent.objects.create(
                     request=req,
@@ -580,6 +716,10 @@ class CustomerRequestListCreateView(APIView):
                     to_status=RequestStatus.PENDING,
                     actor=request.user,
                     note="Request created",
+                )
+                schedule_notification(
+                    notify_new_request,
+                    lambda req_id=req.id: request_detail_queryset().get(id=req_id),
                 )
 
         except IntegrityError:
@@ -597,7 +737,6 @@ class CustomerRequestListCreateView(APIView):
             )
 
         detail = request_detail_queryset().get(id=req.id)
-        notify_new_request(detail)
         return Response(
             RequestDetailSerializer(detail, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
@@ -648,11 +787,13 @@ class CustomerRequestCancelView(APIView):
                 actor=request.user,
                 note="Request cancelled by customer",
             )
+            schedule_notification(
+                notify_request_cancelled,
+                lambda req_id=req.id: Request.objects.select_related(
+                    "car__owner", "customer"
+                ).get(id=req_id),
+            )
 
-        req = Request.objects.select_related("car__owner", "customer").get(
-            id=request_id
-        )
-        notify_request_cancelled(req)
         return Response({"detail": "Request cancelled."})
 
 
@@ -786,15 +927,18 @@ class OwnerRequestActionView(APIView):
             if action == "complete" and req.request_type == "buy":
                 Car.objects.filter(id=req.car_id).update(status=CarStatus.ARCHIVED)
 
+            notification_map = {
+                "approve": notify_request_approved,
+                "reject": notify_request_rejected,
+                "mark_active": notify_rental_active,
+                "complete": notify_rental_completed,
+            }
+            schedule_notification(
+                notification_map[action],
+                lambda req_id=req.id: request_detail_queryset().get(id=req_id),
+            )
+
         detail = request_detail_queryset().get(id=req.id)
-        if action == "approve":
-            notify_request_approved(detail)
-        elif action == "reject":
-            notify_request_rejected(detail)
-        elif action == "mark_active":
-            notify_rental_active(detail)
-        elif action == "complete":
-            notify_rental_completed(detail)
         return Response(
             RequestDetailSerializer(detail, context={"request": request}).data
         )
@@ -814,8 +958,6 @@ class AdminCarListView(APIView):
 
         search = request.query_params.get("search")
         if search:
-            from django.db.models import Q
-
             cars = cars.filter(
                 Q(title__icontains=search)
                 | Q(brand__icontains=search)
@@ -902,8 +1044,6 @@ class AdminCarStatusView(APIView):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            from django.utils import timezone
-
             car.status = new_status
             if new_status == CarStatus.PUBLISHED:
                 car.published_at = timezone.now()
@@ -913,18 +1053,25 @@ class AdminCarStatusView(APIView):
             car.save(
                 update_fields=["status", "admin_note", "updated_at", "published_at"]
             )
+            notification_map = {
+                CarStatus.PUBLISHED: notify_listing_approved,
+                CarStatus.SUSPENDED: notify_listing_rejected,
+                CarStatus.NEEDS_CHANGES: notify_listing_needs_changes,
+            }
+            notify_func = notification_map.get(new_status)
+            if notify_func:
+                schedule_notification(
+                    notify_func,
+                    lambda car_id=car.id: Car.objects.select_related("owner").get(
+                        id=car_id
+                    ),
+                )
 
         car = (
             Car.objects.select_related("owner__owner_profile")
             .prefetch_related("images", "features")
             .get(id=car_id)
         )
-        if new_status == CarStatus.PUBLISHED:
-            notify_listing_approved(car)
-        elif new_status == CarStatus.SUSPENDED:
-            notify_listing_rejected(car)
-        elif new_status == CarStatus.NEEDS_CHANGES:
-            notify_listing_needs_changes(car)
         return Response(CarDetailSerializer(car, context={"request": request}).data)
 
 
@@ -1076,9 +1223,12 @@ class CustomerPaymentSubmitView(APIView):
                 actor=request.user,
                 note=f"Payment submitted via {method}",
             )
+            schedule_notification(
+                notify_payment_submitted,
+                lambda req_id=req.id: request_detail_queryset().get(id=req_id),
+            )
 
         detail = request_detail_queryset().get(id=req.id)
-        notify_payment_submitted(detail)
         return Response(
             RequestDetailSerializer(detail, context={"request": request}).data,
         )
@@ -1097,8 +1247,6 @@ class AdminRequestListView(APIView):
 
         search = request.query_params.get("search")
         if search:
-            from django.db.models import Q
-
             qs = qs.filter(
                 Q(car__title__icontains=search)
                 | Q(customer__first_name__icontains=search)
@@ -1199,10 +1347,19 @@ class StaffConfirmPaymentView(APIView):
                         actor=request.user,
                         note="Auto-rejected — car has been sold",
                     )
-                    notify_auto_rejected(other)
+                    schedule_notification(
+                        notify_auto_rejected,
+                        lambda req_id=other.id: Request.objects.select_related(
+                            "car", "customer"
+                        ).get(id=req_id),
+                    )
+
+            schedule_notification(
+                notify_payment_confirmed,
+                lambda req_id=req.id: request_detail_queryset().get(id=req_id),
+            )
 
         detail = request_detail_queryset().get(id=req.id)
-        notify_payment_confirmed(detail)
         return Response(
             RequestDetailSerializer(detail, context={"request": request}).data,
         )

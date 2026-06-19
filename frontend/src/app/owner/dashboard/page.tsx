@@ -403,9 +403,15 @@ export default function OwnerDashboard() {
     }));
   }, [requestsData]);
 
-  const cars = carsData?.results ?? [];
-  const requests = requestsData?.results ?? [];
-  const transactions = txnData?.results ?? [];
+  const cars = useMemo(() => carsData?.results ?? [], [carsData?.results]);
+  const requests = useMemo(
+    () => requestsData?.results ?? [],
+    [requestsData?.results],
+  );
+  const transactions = useMemo(
+    () => txnData?.results ?? [],
+    [txnData?.results],
+  );
   const totalEarnings = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
   const ownerStats = useMemo(() => {

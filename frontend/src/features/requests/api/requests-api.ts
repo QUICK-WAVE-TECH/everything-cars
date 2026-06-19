@@ -12,32 +12,62 @@ type RequestQueryOptions = {
   enabled?: boolean;
 };
 
+type RequestListParams = {
+  status?: string;
+  page?: number;
+  page_size?: number;
+};
+
+export const requestKeys = {
+  all: ["requests"] as const,
+  customer: ["requests", "customer"] as const,
+  customerList: (params?: RequestListParams) =>
+    ["requests", "customer", params ?? {}] as const,
+  customerDetail: (requestId: string) =>
+    ["requests", "customer", "detail", requestId] as const,
+  owner: ["requests", "owner"] as const,
+  ownerList: (params?: RequestListParams) =>
+    ["requests", "owner", params ?? {}] as const,
+  ownerDetail: (requestId: string) =>
+    ["requests", "owner", "detail", requestId] as const,
+};
+
+function buildQuery(params?: RequestListParams) {
+  const searchParams = new URLSearchParams();
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") {
+      searchParams.set(key, String(value));
+    }
+  });
+  return searchParams.toString();
+}
+
 // ── Customer hooks ──
 
 export function useCustomerRequests(
-  params?: { status?: string },
+  params?: RequestListParams,
   options?: RequestQueryOptions,
 ) {
-  const searchParams = new URLSearchParams();
-  if (params?.status) searchParams.set("status", params.status);
-  const query = searchParams.toString();
+  const query = buildQuery(params);
 
   return useQuery({
-    queryKey: ["customer-requests", params],
+    queryKey: requestKeys.customerList(params),
     queryFn: () =>
       apiClient.get<PaginatedResponse<RequestListItem>>(
         `/listings/requests${query ? `?${query}` : ""}`,
       ),
     enabled: options?.enabled ?? true,
+    staleTime: 15 * 1000,
   });
 }
 
 export function useCustomerRequestDetail(requestId: string) {
   return useQuery({
-    queryKey: ["customer-requests", requestId],
+    queryKey: requestKeys.customerDetail(requestId),
     queryFn: () =>
       apiClient.get<RequestDetail>(`/listings/requests/${requestId}`),
     enabled: !!requestId,
+    staleTime: 10 * 1000,
   });
 }
 
@@ -47,7 +77,7 @@ export function useCreateRequest() {
     mutationFn: (data: CreateRequestData) =>
       apiClient.post<RequestDetail>("/listings/requests", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customer-requests"] });
+      queryClient.invalidateQueries({ queryKey: requestKeys.customer });
     },
   });
 }
@@ -60,36 +90,36 @@ export function useCancelRequest() {
         `/listings/requests/${requestId}/cancel`,
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customer-requests"] });
-      queryClient.invalidateQueries({ queryKey: ["owner-requests"] });
+      queryClient.invalidateQueries({ queryKey: requestKeys.customer });
+      queryClient.invalidateQueries({ queryKey: requestKeys.owner });
     },
   });
 }
 
 // ── Owner hooks ──
 
-export function useOwnerRequests(params?: { status?: string }) {
-  const searchParams = new URLSearchParams();
-  if (params?.status) searchParams.set("status", params.status);
-  const query = searchParams.toString();
+export function useOwnerRequests(params?: RequestListParams) {
+  const query = buildQuery(params);
 
   return useQuery({
-    queryKey: ["owner-requests", params],
+    queryKey: requestKeys.ownerList(params),
     queryFn: () =>
       apiClient.get<PaginatedResponse<RequestListItem>>(
         `/listings/owner-requests${query ? `?${query}` : ""}`,
       ),
+    staleTime: 15 * 1000,
   });
 }
 
 export function useOwnerRequestDetail(requestId: string) {
   return useQuery({
-    queryKey: ["owner-requests", requestId],
+    queryKey: requestKeys.ownerDetail(requestId),
     queryFn: () =>
       apiClient.get<RequestDetail>(
         `/listings/owner-requests/${requestId}`,
       ),
     enabled: !!requestId,
+    staleTime: 10 * 1000,
   });
 }
 
@@ -110,8 +140,8 @@ export function useRequestAction() {
         { action, note: note ?? "" },
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["owner-requests"] });
-      queryClient.invalidateQueries({ queryKey: ["customer-requests"] });
+      queryClient.invalidateQueries({ queryKey: requestKeys.owner });
+      queryClient.invalidateQueries({ queryKey: requestKeys.customer });
     },
   });
 }
