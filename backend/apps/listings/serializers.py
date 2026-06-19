@@ -133,12 +133,8 @@ class CarListSerializer(serializers.ModelSerializer):
                 end = req.start_date + timedelta(days=req.duration_days)
                 if req.start_date <= today < end:
                     return "rented"
-            # Future approved/paid rental → reserved
-            if req.status in (
-                RequestStatus.APPROVED,
-                RequestStatus.PAYMENT_SUBMITTED,
-                RequestStatus.PAID,
-            ) and req.start_date and req.start_date > today:
+            # Future rental (approved/paid/active but not started) → reserved
+            if req.start_date and req.start_date > today:
                 return "reserved"
 
         return "available"
@@ -239,12 +235,8 @@ class CarDetailSerializer(serializers.ModelSerializer):
                 end = req.start_date + timedelta(days=req.duration_days)
                 if req.start_date <= today < end:
                     return "rented"
-            # Future approved/paid rental → reserved
-            if req.status in (
-                RequestStatus.APPROVED,
-                RequestStatus.PAYMENT_SUBMITTED,
-                RequestStatus.PAID,
-            ) and req.start_date and req.start_date > today:
+            # Future rental (approved/paid/active but not started) → reserved
+            if req.start_date and req.start_date > today:
                 return "reserved"
 
         return "available"

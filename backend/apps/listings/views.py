@@ -118,7 +118,7 @@ def availability_annotations():
     reserved_future_rental = Request.objects.filter(
         car_id=OuterRef("id"),
         request_type=ListingType.RENT,
-        status__in=RESERVED_RENTAL_STATUSES,
+        status__in=[*RESERVED_RENTAL_STATUSES, RequestStatus.ACTIVE],
         start_date__gt=today,
     )
     return {
