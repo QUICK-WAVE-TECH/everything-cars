@@ -345,10 +345,19 @@ class PublicCarListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        active_rentals_prefetch = Prefetch(
+            "requests",
+            queryset=Request.objects.filter(
+                request_type="rent",
+                status=RequestStatus.ACTIVE,
+            ).only("id", "start_date", "duration_days", "status"),
+            to_attr="_active_rentals",
+        )
+
         cars = (
-            Car.objects.filter(status=CarStatus.PUBLISHED)
+            Car.objects.filter(status__in=[CarStatus.PUBLISHED, CarStatus.ARCHIVED])
             .select_related("owner__owner_profile")
-            .prefetch_related("images")
+            .prefetch_related("images", active_rentals_prefetch)
         )
 
         # Basic filters
@@ -360,9 +369,17 @@ class PublicCarListView(APIView):
         if state:
             cars = cars.filter(state__icontains=state)
 
+        city = request.query_params.get("city")
+        if city:
+            cars = cars.filter(city__icontains=city)
+
         brand = request.query_params.get("brand")
         if brand:
             cars = cars.filter(brand__icontains=brand)
+
+        body_type = request.query_params.get("body_type")
+        if body_type:
+            cars = cars.filter(body_type__icontains=body_type)
 
         search = request.query_params.get("search")
         if search:
@@ -372,6 +389,8 @@ class PublicCarListView(APIView):
                 Q(title__icontains=search)
                 | Q(brand__icontains=search)
                 | Q(model__icontains=search)
+                | Q(state__icontains=search)
+                | Q(city__icontains=search)
             )
 
         paginator = StandardPagination()
@@ -380,15 +399,58 @@ class PublicCarListView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
+class PublicCarFilterOptionsView(APIView):
+    """Returns available filter options (states, cities, body types, brands) from published cars."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        published = Car.objects.filter(status=CarStatus.PUBLISHED)
+        states = sorted(set(
+            published.exclude(state="").values_list("state", flat=True)
+        ))
+        cities = sorted(set(
+            published.exclude(city="").values_list("city", flat=True)
+        ))
+        body_types = sorted(set(
+            published.exclude(body_type="").values_list("body_type", flat=True)
+        ))
+        brands = sorted(set(
+            published.exclude(brand="").values_list("brand", flat=True)
+        ))
+        return Response({
+            "states": states,
+            "cities": cities,
+            "body_types": body_types,
+            "brands": brands,
+        })
+
+
 class PublicCarDetailView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, car_id):
+        booked_prefetch = Prefetch(
+            "requests",
+            queryset=Request.objects.filter(
+                request_type="rent",
+                status__in=[
+                    RequestStatus.APPROVED,
+                    RequestStatus.PAYMENT_SUBMITTED,
+                    RequestStatus.PAID,
+                    RequestStatus.ACTIVE,
+                ],
+            ).only("id", "start_date", "duration_days", "status"),
+            to_attr="_booked_requests",
+        )
+
         try:
             car = (
                 Car.objects.select_related("owner__owner_profile")
-                .prefetch_related("images", "features")
-                .get(id=car_id, status=CarStatus.PUBLISHED)
+                .prefetch_related("images", "features", booked_prefetch)
+                .get(
+                    id=car_id,
+                    status__in=[CarStatus.PUBLISHED, CarStatus.ARCHIVED],
+                )
             )
         except Car.DoesNotExist:
             return Response(
@@ -696,19 +758,32 @@ class OwnerRequestActionView(APIView):
             if note:
                 req.owner_note = note
             req.save(update_fields=["status", "owner_note", "updated_at"])
+            is_buy = req.request_type == "buy"
+            default_notes = {
+                "approve": "Request approved by owner",
+                "reject": "Request rejected by owner",
+                "mark_active": (
+                    "Ownership transferred — purchase is now active"
+                    if is_buy
+                    else "Car handed over — rental is now active"
+                ),
+                "complete": (
+                    "Purchase completed — car sold"
+                    if is_buy
+                    else "Rental completed — car returned"
+                ),
+            }
             RequestStatusEvent.objects.create(
                 request=req,
                 from_status=old_status,
                 to_status=new_status,
                 actor=request.user,
-                note=note
-                or {
-                    "approve": "Request approved by owner",
-                    "reject": "Request rejected by owner",
-                    "mark_active": "Car handed over — rental is now active",
-                    "complete": "Rental completed — car returned",
-                }.get(action, ""),
+                note=note or default_notes.get(action, ""),
             )
+
+            # Auto-archive car when a buy request completes (car is sold)
+            if action == "complete" and req.request_type == "buy":
+                Car.objects.filter(id=req.car_id).update(status=CarStatus.ARCHIVED)
 
         detail = request_detail_queryset().get(id=req.id)
         if action == "approve":

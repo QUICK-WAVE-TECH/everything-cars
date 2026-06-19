@@ -1,9 +1,20 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { SearchBar } from "@/shared/components/search-bar";
 
 export function HeroSection() {
+  const router = useRouter();
+
+  function handleSearch(query: { loc: string; type: string; price: string }) {
+    const params = new URLSearchParams();
+    if (query.loc) params.set("search", query.loc);
+    if (query.type && query.type !== "All") params.set("body_type", query.type.toLowerCase());
+    const qs = params.toString();
+    router.push(qs ? `/services?${qs}` : "/services");
+  }
+
   return (
     <section style={{
       position: "relative", minHeight: "clamp(560px, 82vh, 720px)", display: "flex", flexDirection: "column",
@@ -39,7 +50,7 @@ export function HeroSection() {
         </p>
       </div>
       <div style={{ position: "relative", zIndex: 2, width: "100%", display: "flex", justifyContent: "center" }}>
-        <SearchBar />
+        <SearchBar onSearch={handleSearch} />
       </div>
     </section>
   );

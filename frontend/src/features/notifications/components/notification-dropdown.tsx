@@ -59,7 +59,7 @@ function resolveHref(notification: NotificationItem, role: UserRole): string {
     case "listing_approved":
     case "listing_rejected":
     case "listing_needs_changes":
-      return data.car_id ? `/owner/cars/${data.car_id}` : `/${role}/dashboard`;
+      return data.car_id ? `/owner/my-cars/${data.car_id}` : `/${role}/dashboard`;
 
     case "system":
     default:

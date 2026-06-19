@@ -156,6 +156,227 @@ function MetaRow({ icon, label, value }: { icon: IconName; label: string; value:
   );
 }
 
+// ── PDF Receipt Generator ──
+import { RECEIPT_LOGO } from "./receipt-logo";
+
+function generateReceiptHTML(txn: NonNullable<ReturnType<typeof useTransactionDetail>["data"]>) {
+  const isRent = txn.request_type === "rent";
+  const carTitle = txn.car_detail;
+  const sym = txn.currency === "NGN" ? "\u20A6" : txn.currency === "USD" ? "$" : txn.currency;
+  const amount = `${sym}${Number(txn.amount).toLocaleString("en-NG")}`;
+  const date = new Date(txn.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+  const time = new Date(txn.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  const statusLabel = txn.status === "completed" ? "Paid" : capitalize(txn.status);
+  const statusColor = txn.status === "completed" ? "#1A9346" : "#9a7400";
+  const statusBg = txn.status === "completed" ? "#e8f5e9" : "#fff8e1";
+  const location = txn.request?.car ? `${txn.request.car.state}${txn.request.car.city ? `, ${txn.request.car.city}` : ""}` : "";
+
+  return `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<title>Receipt - ${txn.reference}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, sans-serif; color: #1a1a2e; background: #f8f9fc; }
+  .page { max-width: 640px; margin: 0 auto; background: #fff; }
+  @media print {
+    body { background: #fff; }
+    .page { box-shadow: none; }
+    .no-print { display: none !important; }
+  }
+  @media screen {
+    .page { margin: 24px auto; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,40,0.08); overflow: hidden; }
+  }
+
+  /* Header band */
+  .header-band {
+    background: linear-gradient(135deg, #00008B 0%, #1a1a6e 50%, #2d1b69 100%);
+    padding: 36px 40px 32px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  .header-band::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -40px;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+  }
+  .header-band::after {
+    content: '';
+    position: absolute;
+    bottom: -30px; left: 50%;
+    width: 140px; height: 140px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+  }
+  .header-top { display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 1; margin-bottom: 28px; }
+  .logo img { height: 36px; width: auto; }
+  .logo-sub { font-size: 11px; font-weight: 500; opacity: 0.7; margin-top: 4px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .badge { background: ${statusBg}; color: ${statusColor}; padding: 6px 18px; border-radius: 100px; font-size: 12px; font-weight: 700; letter-spacing: 0.03em; }
+  .amount-section { position: relative; z-index: 1; text-align: center; }
+  .amount-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; opacity: 0.6; margin-bottom: 10px; }
+  .amount-value { font-size: 44px; font-weight: 900; letter-spacing: -0.02em; line-height: 1; }
+  .amount-sub { font-size: 13px; opacity: 0.7; margin-top: 10px; font-weight: 500; }
+
+  /* Body */
+  .body { padding: 32px 40px 36px; }
+
+  /* Reference pill */
+  .ref-pill { display: inline-flex; align-items: center; gap: 8px; background: #f0f1f5; border-radius: 100px; padding: 8px 20px; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 28px; }
+  .ref-pill strong { color: #1a1a2e; font-weight: 800; letter-spacing: 0.02em; }
+
+  /* Details grid */
+  .details { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid #eef0f4; border-radius: 14px; overflow: hidden; margin-bottom: 28px; }
+  .detail-cell { padding: 16px 20px; border-bottom: 1px solid #eef0f4; }
+  .detail-cell:nth-child(odd) { border-right: 1px solid #eef0f4; }
+  .detail-cell:nth-last-child(-n+2) { border-bottom: none; }
+  .detail-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #666; margin-bottom: 5px; }
+  .detail-value { font-size: 14px; font-weight: 700; color: #121212; }
+
+  /* Parties */
+  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+  .party-card { background: #f8f9fc; border-radius: 12px; padding: 18px 20px; }
+  .party-role { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #666; margin-bottom: 6px; }
+  .party-name { font-size: 15px; font-weight: 800; color: #121212; }
+
+  /* Divider */
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, #dde0e8, transparent); margin: 4px 0 28px; }
+
+  /* Footer */
+  .footer { text-align: center; padding: 24px 40px; background: #f8f9fc; border-top: 1px solid #eef0f4; }
+  .footer-brand { font-size: 14px; font-weight: 800; color: #00008B; margin-bottom: 4px; }
+  .footer-note { font-size: 12px; color: #555; line-height: 1.6; }
+  .footer-ref { margin-top: 12px; font-size: 11px; color: #777; letter-spacing: 0.04em; }
+</style>
+</head><body>
+<div class="page">
+  <!-- Header with gradient -->
+  <div class="header-band">
+    <div class="header-top">
+      <div>
+        <div class="logo"><img src="${RECEIPT_LOGO}" alt="Buy & Rent Cars" /></div>
+        <div class="logo-sub">Transaction Receipt</div>
+      </div>
+      <span class="badge">${statusLabel}</span>
+    </div>
+    <div class="amount-section">
+      <div class="amount-label">Total Amount Paid</div>
+      <div class="amount-value">${amount}</div>
+      <div class="amount-sub">${capitalize(txn.transaction_type)} &middot; ${carTitle}</div>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="body">
+    <!-- Reference pill -->
+    <div class="ref-pill">
+      Receipt &nbsp;<strong>#${txn.reference}</strong>
+    </div>
+
+    <!-- Transaction details grid -->
+    <div class="details">
+      <div class="detail-cell">
+        <div class="detail-label">Vehicle</div>
+        <div class="detail-value">${carTitle}</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">Transaction Type</div>
+        <div class="detail-value">${capitalize(txn.transaction_type)}</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">Payment Method</div>
+        <div class="detail-value">${capitalize(txn.payment_method)}</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">Date</div>
+        <div class="detail-value">${date} at ${time}</div>
+      </div>
+      ${isRent && txn.request?.duration_days ? `
+      <div class="detail-cell">
+        <div class="detail-label">Duration</div>
+        <div class="detail-value">${txn.request.duration_days} days</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">Start Date</div>
+        <div class="detail-value">${txn.request.start_date ? new Date(txn.request.start_date).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }) : "\u2014"}</div>
+      </div>
+      ` : `
+      <div class="detail-cell">
+        <div class="detail-label">Currency</div>
+        <div class="detail-value">${txn.currency}</div>
+      </div>
+      <div class="detail-cell">
+        <div class="detail-label">Location</div>
+        <div class="detail-value">${location || "\u2014"}</div>
+      </div>
+      `}
+    </div>
+
+    <!-- Parties -->
+    <div class="parties">
+      <div class="party-card">
+        <div class="party-role">Paid By</div>
+        <div class="party-name">${txn.payer_name.trim()}</div>
+      </div>
+      <div class="party-card">
+        <div class="party-role">Car Owner</div>
+        <div class="party-name">${txn.receiver_name.trim()}</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <p style="text-align:center;font-size:13px;color:#333;line-height:1.7;">
+      This receipt confirms that payment of <strong style="color:#121212">${amount}</strong> has been received and verified.<br>
+      The transaction is complete and both parties have been notified.
+    </p>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-brand">Buy & Rent Cars Ltd.</div>
+    <div class="footer-note">EverythingCars Marketplace<br>For inquiries, contact support@everythingcars.com</div>
+    <div class="footer-ref">REF: ${txn.reference} &middot; ${date}</div>
+  </div>
+</div>
+</body></html>`;
+}
+
+function openReceiptWindow(txn: NonNullable<ReturnType<typeof useTransactionDetail>["data"]>): Window | null {
+  const html = generateReceiptHTML(txn);
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, "_blank");
+  // Clean up the object URL after a delay to allow the window to load
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  return win;
+}
+
+function handlePrint(txn: NonNullable<ReturnType<typeof useTransactionDetail>["data"]>) {
+  const win = openReceiptWindow(txn);
+  if (!win) {
+    toast.error("Popup blocked — allow popups and try again");
+    return;
+  }
+  win.onload = () => win.print();
+}
+
+function handleDownloadPDF(txn: NonNullable<ReturnType<typeof useTransactionDetail>["data"]>) {
+  const win = openReceiptWindow(txn);
+  if (!win) {
+    toast.error("Popup blocked — allow popups and try again");
+    return;
+  }
+  win.onload = () => {
+    win.print();
+    toast.success("Use 'Save as PDF' in the print dialog to download");
+  };
+}
+
 // ── Page ──
 export function TransactionDetailPage({ backHref }: { backHref: string }) {
   const params = useParams();
@@ -226,10 +447,10 @@ export function TransactionDetailPage({ backHref }: { backHref: string }) {
             </p>
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={() => toast.success("Print view")} className="flex size-11 cursor-pointer items-center justify-center rounded-[10px] border border-(--brc-border) bg-white transition-colors hover:bg-(--brc-bg-subtle)">
+            <button type="button" onClick={() => handlePrint(txn)} title="Print receipt" className="flex size-11 cursor-pointer items-center justify-center rounded-[10px] border border-(--brc-border) bg-white transition-colors hover:bg-(--brc-bg-subtle)">
               <PrinterIcon size={19} className="text-(--brc-text-secondary)" />
             </button>
-            <button type="button" onClick={() => toast.success("Downloading receipt")} className="flex size-11 cursor-pointer items-center justify-center rounded-[10px] border border-(--brc-border) bg-white transition-colors hover:bg-(--brc-bg-subtle)">
+            <button type="button" onClick={() => handleDownloadPDF(txn)} title="Download as PDF" className="flex size-11 cursor-pointer items-center justify-center rounded-[10px] border border-(--brc-border) bg-white transition-colors hover:bg-(--brc-bg-subtle)">
               <DownloadIcon size={19} className="text-(--brc-text-secondary)" />
             </button>
             <button type="button" className="flex size-11 cursor-pointer items-center justify-center rounded-[10px] border border-(--brc-border) bg-white transition-colors hover:bg-(--brc-bg-subtle)">
@@ -328,7 +549,7 @@ export function TransactionDetailPage({ backHref }: { backHref: string }) {
                 </div>
 
                 <div className="mt-[22px] flex flex-col gap-3">
-                  <button type="button" onClick={() => toast.success(`Downloading receipt — ${txn.reference}.pdf`)}
+                  <button type="button" onClick={() => handleDownloadPDF(txn)}
                     className="brc-button-motion flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) text-sm font-bold text-(--brc-text-on-primary) hover:bg-(--brc-primary-hover) [font-family:var(--brc-font-ui)]">
                     <DownloadIcon size={17} />
                     Download Receipt

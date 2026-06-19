@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "apps.users",
     "apps.listings",
     "apps.notifications",
+    "apps.reviews",
 ]
 
 

@@ -8,7 +8,10 @@ export {
   useCarStatus,
   usePublicCars,
   usePublicCarDetail,
+  useFilterOptions,
 } from "./listings-api";
+
+export type { PublicCarsParams, FilterOptions } from "./listings-api";
 
 export type {
   CarListItem,
@@ -16,4 +19,5 @@ export type {
   CarImage,
   ListingFeature,
   CarOwner,
+  BookedPeriod,
 } from "./types";

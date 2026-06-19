@@ -12,7 +12,8 @@ type UploadCarImagesInput = {
 export function useMyCarsList() {
   return useQuery({
     queryKey: ["my-cars"],
-    queryFn: () => apiClient.get<PaginatedResponse<CarListItem>>("/listings/my-cars"),
+    queryFn: () =>
+      apiClient.get<PaginatedResponse<CarListItem>>("/listings/my-cars"),
   });
 }
 
@@ -88,7 +89,9 @@ export function useCarStatus() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ carId, status }: { carId: string; status: string }) =>
-      apiClient.post<CarDetail>(`/listings/my-cars/${carId}/status`, { status }),
+      apiClient.post<CarDetail>(`/listings/my-cars/${carId}/status`, {
+        status,
+      }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["my-cars"] });
       queryClient.invalidateQueries({ queryKey: ["my-cars", variables.carId] });
@@ -96,11 +99,46 @@ export function useCarStatus() {
   });
 }
 
-// Public — browse published cars
-export function usePublicCars() {
+// Public — browse published cars (with optional filter params)
+export type PublicCarsParams = {
+  listing_type?: string;
+  state?: string;
+  city?: string;
+  brand?: string;
+  body_type?: string;
+  search?: string;
+};
+
+export function usePublicCars(params?: PublicCarsParams) {
+  const query = new URLSearchParams();
+  if (params?.listing_type) query.set("listing_type", params.listing_type);
+  if (params?.state) query.set("state", params.state);
+  if (params?.city) query.set("city", params.city);
+  if (params?.brand) query.set("brand", params.brand);
+  if (params?.body_type) query.set("body_type", params.body_type);
+  if (params?.search) query.set("search", params.search);
+  const queryString = query.toString();
+  const url = queryString ? `/listings/cars?${queryString}` : "/listings/cars";
+
   return useQuery({
-    queryKey: ["cars"],
-    queryFn: () => apiClient.get<PaginatedResponse<CarListItem>>("/listings/cars"),
+    queryKey: ["cars", params ?? {}],
+    queryFn: () => apiClient.get<PaginatedResponse<CarListItem>>(url),
+  });
+}
+
+// Public — filter dropdown options
+export type FilterOptions = {
+  states: string[];
+  cities: string[];
+  body_types: string[];
+  brands: string[];
+};
+
+export function useFilterOptions() {
+  return useQuery({
+    queryKey: ["filter-options"],
+    queryFn: () => apiClient.get<FilterOptions>("/listings/cars/filter-options"),
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 }
 

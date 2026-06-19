@@ -17,6 +17,7 @@ import { OwnerStats } from "@/features/requests";
 import { useOwnerRequestDetail, useRequestAction } from "@/features/requests/api";
 import { useMe } from "@/features/auth/api";
 import type { RequestAction } from "@/features/requests/api";
+import { WriteReviewSection } from "@/features/reviews";
 
 function toDetailStatus(s: string): RequestDetailStatus {
   const map: Record<string, RequestDetailStatus> = {
@@ -158,14 +159,14 @@ export default function OwnerRequestDetailPage() {
       case "paid":
         return (
           <ActionButton kind="dark" onClick={() => handleAction("mark_active")}>
-            Mark as Active (Handover)
+            {request.request_type === "buy" ? "Confirm Ownership Transfer" : "Mark as Active (Handover)"}
           </ActionButton>
         );
       case "active":
         return (
           <ActionButton kind="success" onClick={() => handleAction("complete")}>
             <Icon name="check" size={17} stroke="#fff" />
-            Mark Complete
+            {request.request_type === "buy" ? "Complete Sale" : "Mark Complete"}
           </ActionButton>
         );
       case "completed":
@@ -237,6 +238,11 @@ export default function OwnerRequestDetailPage() {
                 </div>
               </div>
             </section>
+          )}
+
+          {/* Write / view review — only for completed requests */}
+          {request.status === "completed" && (
+            <WriteReviewSection carId={car.id} requestId={requestId} />
           )}
 
           {/* Status history — collapsible */}

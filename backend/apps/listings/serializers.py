@@ -12,6 +12,8 @@ from .models import (
     RequestStatusEvent,
     Transaction,
 )
+from datetime import date, timedelta
+from .models import CarStatus, RequestStatus
 
 
 class CarImageSerializer(serializers.ModelSerializer):
@@ -54,6 +56,7 @@ class CarOwnerSerializer(CarOwnerSummarySerializer):
 class CarListSerializer(serializers.ModelSerializer):
     primary_image = serializers.SerializerMethodField()
     owner = CarOwnerSummarySerializer(read_only=True)
+    availability_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Car
@@ -73,6 +76,7 @@ class CarListSerializer(serializers.ModelSerializer):
             "status",
             "owner",
             "primary_image",
+            "availability_status",
             "created_at",
         ]
 
@@ -90,11 +94,33 @@ class CarListSerializer(serializers.ModelSerializer):
             return primary.image.url
         return None
 
+    def get_availability_status(self, obj):
+
+        if obj.status == CarStatus.ARCHIVED:
+            return "sold"
+
+        active_rentals = getattr(obj, "_active_rentals", None)
+        if active_rentals is None:
+            active_rentals = obj.requests.filter(
+                request_type="rent", status=RequestStatus.ACTIVE
+            )
+        today = date.today()
+        for req in active_rentals:
+            if req.start_date and req.duration_days:
+                end = req.start_date + timedelta(days=req.duration_days)
+                if req.start_date <= today < end:
+                    return "rented"
+
+        return "available"
+
 
 class CarDetailSerializer(serializers.ModelSerializer):
     owner = CarOwnerSerializer(read_only=True)
     images = CarImageSerializer(many=True, read_only=True)
     features = ListingFeatureSerializer(many=True, read_only=True)
+    availability_status = serializers.SerializerMethodField()
+    booked_periods = serializers.SerializerMethodField()
+    available_from = serializers.SerializerMethodField()
 
     class Meta:
         model = Car
@@ -126,7 +152,69 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "owner",
             "images",
             "features",
+            "availability_status",
+            "booked_periods",
+            "available_from",
         ]
+
+    def _get_booked_requests(self, obj):
+        """Get booked requests — use prefetched if available."""
+        booked = getattr(obj, "_booked_requests", None)
+        if booked is None:
+            booked = obj.requests.filter(
+                request_type="rent",
+                status__in=[
+                    RequestStatus.APPROVED,
+                    RequestStatus.PAYMENT_SUBMITTED,
+                    RequestStatus.PAID,
+                    RequestStatus.ACTIVE,
+                ],
+            )
+        return booked
+
+    def get_availability_status(self, obj):
+        if obj.status == CarStatus.ARCHIVED:
+            return "sold"
+
+        today = date.today()
+        for req in self._get_booked_requests(obj):
+            if req.start_date and req.duration_days and req.status == RequestStatus.ACTIVE:
+                end = req.start_date + timedelta(days=req.duration_days)
+                if req.start_date <= today < end:
+                    return "rented"
+        return "available"
+
+    def get_booked_periods(self, obj):
+        if obj.status == CarStatus.ARCHIVED:
+            return []
+
+        periods = []
+        for req in self._get_booked_requests(obj):
+            if req.start_date and req.duration_days:
+                periods.append({
+                    "start_date": req.start_date.isoformat(),
+                    "end_date": (req.start_date + timedelta(days=req.duration_days)).isoformat(),
+                    "status": req.status,
+                })
+        periods.sort(key=lambda p: p["start_date"])
+        return periods
+
+    def get_available_from(self, obj):
+        if obj.status == CarStatus.ARCHIVED:
+            return None
+
+        today = date.today()
+        latest_end = None
+        for req in self._get_booked_requests(obj):
+            if req.start_date and req.duration_days:
+                end = req.start_date + timedelta(days=req.duration_days)
+                if end > today:
+                    if latest_end is None or end > latest_end:
+                        latest_end = end
+
+        if latest_end is None:
+            return None
+        return latest_end.isoformat()
 
 
 class CarCreateSerializer(serializers.ModelSerializer):
@@ -399,6 +487,37 @@ class RequestCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"start_date": "Start date cannot be in the past."}
                 )
+
+            # Check for overlapping bookings
+            if duration_days and start_date:
+                new_end = start_date + timedelta(days=duration_days)
+                blocking_rentals = Request.objects.filter(
+                    car=car,
+                    request_type="rent",
+                    status__in=[
+                        RequestStatus.APPROVED,
+                        RequestStatus.PAYMENT_SUBMITTED,
+                        RequestStatus.PAID,
+                        RequestStatus.ACTIVE,
+                    ],
+                ).only("start_date", "duration_days")
+
+                for existing in blocking_rentals:
+                    if existing.start_date and existing.duration_days:
+                        existing_end = existing.start_date + timedelta(
+                            days=existing.duration_days
+                        )
+                        if start_date < existing_end and existing.start_date < new_end:
+                            raise serializers.ValidationError(
+                                {
+                                    "start_date": (
+                                        f"This car is already booked from "
+                                        f"{existing.start_date.isoformat()} to "
+                                        f"{existing_end.isoformat()}. "
+                                        f"Please pick different dates."
+                                    )
+                                }
+                            )
 
         return data
 

@@ -4,7 +4,6 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Icon } from "@/features/auth/components/icon";
-import { Star } from "@/shared/components/star";
 import { Chip } from "@/shared/components/chip";
 import {
   Accordion,
@@ -15,9 +14,13 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { usePublicCars, useFilterOptions } from "@/features/listings/api";
+import { AvailabilityBadge } from "@/features/listings/components/availability-badge";
+import type { CarListItem } from "@/features/listings/api";
 
 // ---------------------------------------------------------------------------
-// Data
+// Constants
 // ---------------------------------------------------------------------------
 
 const SERVICE_MODES = {
@@ -27,7 +30,6 @@ const SERVICE_MODES = {
     title: "Experience Hassle-Free Car Rentals",
     sub: "Enjoy discounted rates on premium rentals across major cities.",
     cta: "Rent Now",
-    avail: ["Available", "Currently Rented"],
   },
   buy: {
     label: "Buy",
@@ -35,37 +37,13 @@ const SERVICE_MODES = {
     title: "Quality Cars Ready For You to Buy",
     sub: "Explore a wide range of cars from reliable dealers and private owners.",
     cta: "Buy Now",
-    avail: ["Available", "Sold"],
   },
 } as const;
 
 type Mode = keyof typeof SERVICE_MODES;
 
-const BASE_CARS = [
-  { id: 1,  name: "Lexus NX 300h",      type: "SUV",    location: "Lagos, Nigeria",      rating: 4, rentPrice: 35000,  buyPrice: 35000000, available: true,  year: 2022, mileage: 25000 },
-  { id: 2,  name: "Toyota Camry",        type: "Sedan",  location: "Abuja, Nigeria",      rating: 5, rentPrice: 28000,  buyPrice: 18000000, available: true,  year: 2021, mileage: 32000 },
-  { id: 3,  name: "Honda Accord",        type: "Sedan",  location: "Lagos, Nigeria",      rating: 4, rentPrice: 30000,  buyPrice: 20000000, available: false, year: 2020, mileage: 41000 },
-  { id: 4,  name: "Mercedes-Benz GLE",   type: "Luxury", location: "Lagos, Nigeria",      rating: 5, rentPrice: 85000,  buyPrice: 78000000, available: true,  year: 2024, mileage: 0 },
-  { id: 5,  name: "Toyota RAV4",         type: "SUV",    location: "Port Harcourt",       rating: 4, rentPrice: 42000,  buyPrice: 28000000, available: true,  year: 2022, mileage: 28000 },
-  { id: 6,  name: "Hyundai Elantra",     type: "Sedan",  location: "Ibadan, Nigeria",     rating: 3, rentPrice: 22000,  buyPrice: 15000000, available: false, year: 2019, mileage: 55000 },
-  { id: 7,  name: "Lexus RX 350",        type: "SUV",    location: "Lagos, Nigeria",      rating: 5, rentPrice: 60000,  buyPrice: 52000000, available: true,  year: 2024, mileage: 0 },
-  { id: 8,  name: "Kia Sportage",        type: "SUV",    location: "Abuja, Nigeria",      rating: 4, rentPrice: 38000,  buyPrice: 24000000, available: false, year: 2021, mileage: 30000 },
-  { id: 9,  name: "Toyota Corolla",      type: "Sedan",  location: "Lagos, Nigeria",      rating: 4, rentPrice: 25000,  buyPrice: 16000000, available: true,  year: 2020, mileage: 47000 },
-  { id: 10, name: "Ford Explorer",       type: "SUV",    location: "Lagos, Nigeria",      rating: 4, rentPrice: 48000,  buyPrice: 33000000, available: true,  year: 2022, mileage: 22000 },
-  { id: 11, name: "Mercedes C-Class",    type: "Luxury", location: "Abuja, Nigeria",      rating: 5, rentPrice: 70000,  buyPrice: 45000000, available: false, year: 2023, mileage: 12000 },
-  { id: 12, name: "Honda CR-V",          type: "SUV",    location: "Lagos, Nigeria",      rating: 4, rentPrice: 40000,  buyPrice: 26000000, available: true,  year: 2024, mileage: 0 },
-];
-
-const CAR_TYPES_LIST = ["Camry", "Chevrolet", "Ford", "Honda Accord", "Honda CRV", "Hyundai", "Kia", "Lexus"];
-const LOCATIONS_STATE = ["All States", "Lagos", "Abuja (FCT)", "Rivers", "Oyo", "Kano"];
-const LOCATIONS_CITY: Record<string, string[]> = {
-  "All States": ["All Cities"],
-  "Lagos": ["All Cities", "Ikeja", "Lekki", "Victoria Island", "Surulere"],
-  "Abuja (FCT)": ["All Cities", "Garki", "Maitama", "Wuse", "Asokoro"],
-  "Rivers": ["All Cities", "Port Harcourt", "Obio-Akpor"],
-  "Oyo": ["All Cities", "Ibadan", "Ogbomoso"],
-  "Kano": ["All Cities", "Kano City", "Nasarawa"],
-};
+const ALL_STATES_LABEL = "All States";
+const ALL_CITIES_LABEL = "All Cities";
 
 const CARS_PER_PAGE = 9;
 
@@ -73,14 +51,13 @@ const CARS_PER_PAGE = 9;
 // Helpers
 // ---------------------------------------------------------------------------
 
-function fmt(n: number): string {
-  return n.toLocaleString("en-NG");
+function currencySymbol(code: string) {
+  const map: Record<string, string> = { NGN: "\u20A6", USD: "$", GBP: "\u00A3", EUR: "\u20AC" };
+  return map[code] ?? code;
 }
 
-function fmtPrice(car: typeof BASE_CARS[0], mode: Mode): string {
-  return mode === "rent"
-    ? `₦${fmt(car.rentPrice)}/day`
-    : `₦${fmt(car.buyPrice)}`;
+function fmtMoney(amount: string | number, currency: string) {
+  return `${currencySymbol(currency)}${Number(amount).toLocaleString("en-NG")}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -132,71 +109,48 @@ function PriceSlider({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ position: "relative", height: 20, display: "flex", alignItems: "center" }}>
-        {/* Track */}
-        <div style={{
-          position: "absolute", left: 0, right: 0, height: 4,
-          background: "var(--brc-border)", borderRadius: 4,
-        }} />
-        {/* Fill */}
-        <div style={{
-          position: "absolute",
-          left: `${leftPct}%`, width: `${rightPct - leftPct}%`,
-          height: 4, background: "var(--brc-primary)", borderRadius: 4,
-        }} />
-        {/* Min thumb */}
+        <div style={{ position: "absolute", left: 0, right: 0, height: 4, background: "var(--brc-border)", borderRadius: 4 }} />
+        <div style={{ position: "absolute", left: `${leftPct}%`, width: `${rightPct - leftPct}%`, height: 4, background: "var(--brc-primary)", borderRadius: 4 }} />
         <input
           type="range" min={min} max={max} step={1000} value={value[0]}
           onChange={(e) => {
             const v = Math.min(Number(e.target.value), value[1] - 1000);
             onChange([v, value[1]]);
           }}
-          style={{
-            position: "absolute", width: "100%", appearance: "none",
-            background: "transparent", cursor: "pointer", zIndex: 2,
-          }}
+          style={{ position: "absolute", width: "100%", appearance: "none", background: "transparent", cursor: "pointer", zIndex: 2 }}
         />
-        {/* Max thumb */}
         <input
           type="range" min={min} max={max} step={1000} value={value[1]}
           onChange={(e) => {
             const v = Math.max(Number(e.target.value), value[0] + 1000);
             onChange([value[0], v]);
           }}
-          style={{
-            position: "absolute", width: "100%", appearance: "none",
-            background: "transparent", cursor: "pointer", zIndex: 2,
-          }}
+          style={{ position: "absolute", width: "100%", appearance: "none", background: "transparent", cursor: "pointer", zIndex: 2 }}
         />
       </div>
-      <div style={{
-        display: "flex", justifyContent: "space-between",
-        fontFamily: "var(--brc-font-ui)", fontSize: 12,
-        color: "var(--brc-text-secondary)",
-      }}>
-        <span>₦{fmt(value[0])}</span>
-        <span>₦{fmt(value[1])}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--brc-font-ui)", fontSize: 12, color: "var(--brc-text-secondary)" }}>
+        <span>&#x20A6;{value[0].toLocaleString("en-NG")}</span>
+        <span>&#x20A6;{value[1].toLocaleString("en-NG")}</span>
       </div>
     </div>
   );
 }
 
-function ServiceCarCard({
-  car, mode, cta,
-}: {
-  car: typeof BASE_CARS[0];
-  mode: Mode;
-  cta: string;
-}) {
+// ---------------------------------------------------------------------------
+// Car card (real API data)
+// ---------------------------------------------------------------------------
+
+function ServiceCarCard({ car, mode, cta }: { car: CarListItem; mode: Mode; cta: string }) {
   const [hover, setHover] = useState(false);
-  const available = car.available;
-  const inactiveLabel = mode === "buy" ? "Sold" : "Currently Rented";
-  const statusLabel = available ? "Available" : inactiveLabel;
-  const statusBg = available
-    ? "var(--brc-success-bg)"
-    : mode === "buy" ? "var(--brc-danger-bg)" : "var(--brc-warning-bg)";
-  const statusFg = available
-    ? "var(--brc-success)"
-    : mode === "buy" ? "var(--brc-danger)" : "#9a7400";
+  const isSold = car.availability_status === "sold";
+  const isRented = car.availability_status === "rented";
+  const isUnavailable = isSold || isRented;
+
+  const price = mode === "rent" && car.rent_price_per_day
+    ? `${fmtMoney(car.rent_price_per_day, car.currency)}/day`
+    : car.sale_price
+      ? fmtMoney(car.sale_price, car.currency)
+      : null;
 
   const specChipStyle: React.CSSProperties = {
     display: "inline-flex", alignItems: "center", gap: 5,
@@ -213,35 +167,29 @@ function ServiceCarCard({
         position: "relative", height: 200, borderRadius: "var(--brc-radius-lg)",
         background: "var(--brc-bg-subtle)", overflow: "hidden",
         display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: hover && available ? "var(--brc-shadow-md)" : "var(--brc-shadow-xs)",
+        boxShadow: hover && !isUnavailable ? "var(--brc-shadow-md)" : "var(--brc-shadow-xs)",
         transition: "box-shadow .2s ease",
+        opacity: isSold ? 0.7 : 1,
       }}>
-        <Image
-          src="/car-lexus.png"
-          alt={car.name}
-          width={258}
-          height={160}
-          style={{
-            width: "86%", height: "auto", objectFit: "contain",
-            opacity: available ? 1 : 0.5,
-            filter: available ? "none" : "grayscale(0.7)",
-          }}
-        />
-        {/* Star rating badge */}
-        <div style={{
-          position: "absolute", top: 12, left: 12,
-          background: "#fff", borderRadius: 100,
-          padding: "3px 8px", display: "flex", gap: 1,
-        }}>
-          {[0, 1, 2, 3, 4].map((i) => <Star key={i} filled={i < car.rating} />)}
-        </div>
-        {/* Availability badge */}
-        <div style={{
-          position: "absolute", top: 12, right: 12,
-          background: statusBg, color: statusFg, borderRadius: "var(--brc-radius-pill)",
-          padding: "4px 10px", fontFamily: "var(--brc-font-ui)", fontWeight: 600, fontSize: 12,
-        }}>
-          {statusLabel}
+        {car.primary_image ? (
+          <Image
+            src={car.primary_image}
+            alt={car.title}
+            fill
+            unoptimized
+            style={{
+              objectFit: "contain",
+              padding: 20,
+              filter: isRented ? "grayscale(0.3)" : isSold ? "grayscale(0.7)" : "none",
+            }}
+          />
+        ) : (
+          <Icon name="car" size={56} stroke="var(--brc-border)" />
+        )}
+
+        {/* Availability badge overlay */}
+        <div style={{ position: "absolute", top: 10, right: 10 }}>
+          <AvailabilityBadge status={car.availability_status} />
         </div>
       </div>
 
@@ -251,40 +199,55 @@ function ServiceCarCard({
           display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8,
           borderBottom: "1px solid var(--brc-border)", paddingBottom: 10,
         }}>
-          <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 15, fontWeight: 600, color: "var(--brc-text)" }}>
-            {car.name}
+          <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 15, fontWeight: 600, color: isUnavailable ? "var(--brc-text-muted)" : "var(--brc-text)" }}>
+            {car.title}
           </span>
-          <Chip>{car.type}</Chip>
+          <Chip>{car.body_type || car.brand}</Chip>
         </div>
+
         <div style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--brc-text-muted)", fontSize: 12, fontFamily: "var(--brc-font-ui)" }}>
           <Icon name="pin" size={14} stroke="var(--brc-text-muted)" />
-          {car.location}
+          {car.city ? `${car.city}, ${car.state}` : car.state}
         </div>
-        {/* Price + car specs on one line (year for rent & buy; mileage/condition buy-only) */}
+
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 20, color: available ? "var(--brc-text)" : "var(--brc-text-muted)" }}>
-            {fmtPrice(car, mode)}
+          <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 20, color: isUnavailable ? "var(--brc-text-muted)" : "var(--brc-text)" }}>
+            {price ?? "—"}
           </span>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <span style={specChipStyle}>
               <Icon name="calendar" size={13} stroke="var(--brc-text-secondary)" />
               {car.year}
             </span>
-            {mode === "buy" &&
-              (car.mileage === 0 ? (
-                <span style={{ ...specChipStyle, background: "var(--brc-success-bg)", borderColor: "var(--brc-success-bg)", color: "var(--brc-success)" }}>
-                  Brand New
-                </span>
-              ) : (
-                <span style={specChipStyle}>
-                  <Icon name="car" size={13} stroke="var(--brc-text-secondary)" />
-                  {fmt(car.mileage)} km
-                </span>
-              ))}
           </div>
         </div>
-        {/* Full-width CTA */}
-        {available ? (
+
+        {/* CTA */}
+        {isSold ? (
+          <div
+            style={{
+              width: "100%", height: 46, borderRadius: "var(--brc-radius-sm)",
+              border: "1px solid var(--brc-border)", background: "var(--brc-bg-muted)",
+              color: "var(--brc-text-muted)",
+              fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            Sold
+          </div>
+        ) : isRented ? (
+          <div
+            style={{
+              width: "100%", height: 46, borderRadius: "var(--brc-radius-sm)",
+              border: "1px solid var(--brc-border)", background: "var(--brc-warning-bg, #fffbeb)",
+              color: "#9a7400",
+              fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            Currently Rented
+          </div>
+        ) : (
           <button
             className="brc-button-motion"
             style={{
@@ -296,27 +259,12 @@ function ServiceCarCard({
           >
             {cta}
           </button>
-        ) : (
-          <button
-            disabled
-            aria-disabled="true"
-            style={{
-              width: "100%", height: 46, borderRadius: "var(--brc-radius-sm)",
-              border: "1px solid var(--brc-border)", background: "var(--brc-bg-muted)",
-              color: "var(--brc-text-muted)",
-              fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14,
-              cursor: "not-allowed",
-            }}
-          >
-            {inactiveLabel}
-          </button>
         )}
       </div>
     </>
   );
 
-  // Unavailable cars are inactive: not clickable, no hover lift.
-  if (!available) {
+  if (isUnavailable) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14, cursor: "default" }}>
         {content}
@@ -342,11 +290,84 @@ function ServiceCarCard({
 }
 
 // ---------------------------------------------------------------------------
+// Sold car card (carousel)
+// ---------------------------------------------------------------------------
+
+function SoldCarCard({ car }: { car: CarListItem }) {
+  return (
+    <Link
+      href={`/cars/${car.id}`}
+      style={{
+        display: "flex", flexDirection: "column", gap: 10,
+        textDecoration: "none", color: "inherit",
+        width: 220, flexShrink: 0, opacity: 0.75,
+      }}
+    >
+      <div style={{
+        position: "relative", height: 150, borderRadius: "var(--brc-radius-lg)",
+        background: "var(--brc-bg-subtle)", overflow: "hidden",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        {car.primary_image ? (
+          <Image
+            src={car.primary_image}
+            alt={car.title}
+            fill
+            unoptimized
+            style={{ objectFit: "contain", padding: 16, filter: "grayscale(0.6)" }}
+          />
+        ) : (
+          <Icon name="car" size={40} stroke="var(--brc-border)" />
+        )}
+        <div style={{ position: "absolute", top: 8, right: 8 }}>
+          <AvailabilityBadge status="sold" />
+        </div>
+      </div>
+      <div>
+        <p style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 600, fontSize: 13, color: "var(--brc-text-muted)", margin: "0 0 2px" }}>
+          {car.title}
+        </p>
+        <p style={{ fontFamily: "var(--brc-font-ui)", fontSize: 12, color: "var(--brc-text-muted)", margin: 0 }}>
+          {car.city ? `${car.city}, ${car.state}` : car.state}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Loading skeleton
+// ---------------------------------------------------------------------------
+
+function CarGridSkeleton() {
+  return (
+    <div
+      className="services-car-grid"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+        gap: "clamp(16px, 3vw, 28px)",
+      }}
+    >
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <Skeleton className="h-[200px] w-full rounded-xl" />
+          <Skeleton className="h-5 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Filter sidebar
 // ---------------------------------------------------------------------------
 
 type Filters = {
-  types: string[];
+  brands: string[];
+  bodyType: string;
   availability: string;
   state: string;
   city: string;
@@ -355,31 +376,42 @@ type Filters = {
 
 function FilterSidebar({
   mode, filters, onChange,
+  availableStates, availableCities, availableBodyTypes, availableBrands,
 }: {
   mode: Mode;
   filters: Filters;
   onChange: (f: Filters) => void;
+  availableStates: string[];
+  availableCities: string[];
+  availableBodyTypes: string[];
+  availableBrands: string[];
 }) {
-  const [showAllTypes, setShowAllTypes] = useState(false);
-  const visibleTypes = showAllTypes ? CAR_TYPES_LIST : CAR_TYPES_LIST.slice(0, 5);
-  const modeData = SERVICE_MODES[mode];
+  const [showAllBrands, setShowAllBrands] = useState(false);
+  const visibleBrands = showAllBrands ? availableBrands : availableBrands.slice(0, 5);
 
   const maxPrice = mode === "rent" ? 200000 : 100000000;
   const minPrice = 0;
 
+  const availOptions = mode === "rent"
+    ? ["All", "Available", "Currently Rented"]
+    : ["All", "Available", "Sold"];
+
   const activeFilterChips: { label: string; clear: () => void }[] = [
-    ...filters.types.map((t) => ({
+    ...filters.brands.map((t) => ({
       label: t,
-      clear: () => onChange({ ...filters, types: filters.types.filter((x) => x !== t) }),
+      clear: () => onChange({ ...filters, brands: filters.brands.filter((x) => x !== t) }),
     })),
+    ...(filters.bodyType !== "All"
+      ? [{ label: filters.bodyType, clear: () => onChange({ ...filters, bodyType: "All" }) }]
+      : []),
     ...(filters.availability !== "All"
       ? [{ label: filters.availability, clear: () => onChange({ ...filters, availability: "All" }) }]
       : []),
-    ...(filters.state !== "All States"
-      ? [{ label: filters.state, clear: () => onChange({ ...filters, state: "All States", city: "All Cities" }) }]
+    ...(filters.state !== ALL_STATES_LABEL
+      ? [{ label: filters.state, clear: () => onChange({ ...filters, state: ALL_STATES_LABEL, city: ALL_CITIES_LABEL }) }]
       : []),
-    ...(filters.city !== "All Cities"
-      ? [{ label: filters.city, clear: () => onChange({ ...filters, city: "All Cities" }) }]
+    ...(filters.city !== ALL_CITIES_LABEL
+      ? [{ label: filters.city, clear: () => onChange({ ...filters, city: ALL_CITIES_LABEL }) }]
       : []),
   ];
 
@@ -425,8 +457,8 @@ function FilterSidebar({
         </span>
         <button
           onClick={() => onChange({
-            types: [], availability: "All",
-            state: "All States", city: "All Cities",
+            brands: [], bodyType: "All", availability: "All",
+            state: ALL_STATES_LABEL, city: ALL_CITIES_LABEL,
             price: [minPrice, maxPrice],
           })}
           style={{
@@ -439,7 +471,7 @@ function FilterSidebar({
         </button>
       </div>
 
-      <Accordion multiple defaultValue={["active", "type", "avail", "location", "price"]}>
+      <Accordion multiple defaultValue={["active", "brand", "bodytype", "avail", "location", "price"]}>
 
         {/* Active Filters */}
         {activeFilterChips.length > 0 && (
@@ -457,22 +489,22 @@ function FilterSidebar({
           </AccordionItem>
         )}
 
-        {/* Car Type */}
-        <AccordionItem value="type">
+        {/* Car Brand */}
+        <AccordionItem value="brand">
           <AccordionTrigger className="px-[18px] py-3 text-[13px] font-semibold" style={{ color: "var(--brc-text)" }}>
-            Car Type
+            Car Brand
           </AccordionTrigger>
           <AccordionContent className="px-[18px] pb-4">
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {visibleTypes.map((t) => (
+              {visibleBrands.map((t) => (
                 <label key={t} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
                   <Checkbox
-                    checked={filters.types.includes(t)}
+                    checked={filters.brands.includes(t)}
                     onCheckedChange={(checked) => {
                       const next = checked
-                        ? [...filters.types, t]
-                        : filters.types.filter((x) => x !== t);
-                      onChange({ ...filters, types: next });
+                        ? [...filters.brands, t]
+                        : filters.brands.filter((x) => x !== t);
+                      onChange({ ...filters, brands: next });
                     }}
                   />
                   <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 13, color: "var(--brc-text-secondary)" }}>
@@ -480,21 +512,58 @@ function FilterSidebar({
                   </span>
                 </label>
               ))}
-              <button
-                onClick={() => setShowAllTypes((s) => !s)}
-                style={{
-                  background: "none", border: "none", cursor: "pointer", padding: 0,
-                  fontFamily: "var(--brc-font-ui)", fontSize: 12, fontWeight: 600,
-                  color: "var(--brc-primary)", textAlign: "left" as const,
-                  display: "flex", alignItems: "center", gap: 4,
-                }}
-              >
-                {showAllTypes ? "Less" : `+${CAR_TYPES_LIST.length - 5} More`}
-                <Icon name={showAllTypes ? "chevup" : "chevdown"} size={12} stroke="var(--brc-primary)" />
-              </button>
+              {availableBrands.length > 5 && (
+                <button
+                  onClick={() => setShowAllBrands((s) => !s)}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer", padding: 0,
+                    fontFamily: "var(--brc-font-ui)", fontSize: 12, fontWeight: 600,
+                    color: "var(--brc-primary)", textAlign: "left" as const,
+                    display: "flex", alignItems: "center", gap: 4,
+                  }}
+                >
+                  {showAllBrands ? "Less" : `+${availableBrands.length - 5} More`}
+                  <Icon name={showAllBrands ? "chevup" : "chevdown"} size={12} stroke="var(--brc-primary)" />
+                </button>
+              )}
             </div>
           </AccordionContent>
         </AccordionItem>
+
+        {/* Body Type */}
+        {availableBodyTypes.length > 0 && (
+          <AccordionItem value="bodytype">
+            <AccordionTrigger className="px-[18px] py-3 text-[13px] font-semibold" style={{ color: "var(--brc-text)" }}>
+              Body Type
+            </AccordionTrigger>
+            <AccordionContent className="px-[18px] pb-4">
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                  <input
+                    type="radio" name="bodytype" value="All"
+                    checked={filters.bodyType === "All"}
+                    onChange={() => onChange({ ...filters, bodyType: "All" })}
+                    style={radioStyle}
+                  />
+                  <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 13, color: "var(--brc-text-secondary)" }}>All</span>
+                </label>
+                {availableBodyTypes.map((bt) => (
+                  <label key={bt} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                    <input
+                      type="radio" name="bodytype" value={bt}
+                      checked={filters.bodyType === bt}
+                      onChange={() => onChange({ ...filters, bodyType: bt })}
+                      style={radioStyle}
+                    />
+                    <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 13, color: "var(--brc-text-secondary)" }}>
+                      {bt}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        )}
 
         {/* Availability */}
         <AccordionItem value="avail">
@@ -503,7 +572,7 @@ function FilterSidebar({
           </AccordionTrigger>
           <AccordionContent className="px-[18px] pb-4">
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {["All", ...modeData.avail].map((a) => (
+              {availOptions.map((a) => (
                 <label key={a} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
                   <input
                     type="radio" name="availability" value={a}
@@ -531,10 +600,11 @@ function FilterSidebar({
                 <span style={labelStyle}>State</span>
                 <select
                   value={filters.state}
-                  onChange={(e) => onChange({ ...filters, state: e.target.value, city: "All Cities" })}
+                  onChange={(e) => onChange({ ...filters, state: e.target.value, city: ALL_CITIES_LABEL })}
                   style={selectStyle}
                 >
-                  {LOCATIONS_STATE.map((s) => <option key={s}>{s}</option>)}
+                  <option value={ALL_STATES_LABEL}>{ALL_STATES_LABEL}</option>
+                  {availableStates.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -544,7 +614,8 @@ function FilterSidebar({
                   onChange={(e) => onChange({ ...filters, city: e.target.value })}
                   style={selectStyle}
                 >
-                  {(LOCATIONS_CITY[filters.state] || ["All Cities"]).map((c) => <option key={c}>{c}</option>)}
+                  <option value={ALL_CITIES_LABEL}>{ALL_CITIES_LABEL}</option>
+                  {availableCities.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
             </div>
@@ -580,66 +651,94 @@ export function ServicesListing() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<Filters>({
-    types: [],
+    brands: [],
+    bodyType: "All",
     availability: "All",
-    state: "All States",
-    city: "All Cities",
+    state: ALL_STATES_LABEL,
+    city: ALL_CITIES_LABEL,
     price: [0, 200000],
   });
 
   const modeData = SERVICE_MODES[mode];
 
-  // Reset page and price range when mode changes
-  function handleModeSwitch(m: Mode) {
-    setMode(m);
-    setPage(1);
-    setFilters({
-      types: [],
-      availability: "All",
-      state: "All States",
-      city: "All Cities",
-      price: m === "rent" ? [0, 200000] : [0, 100000000],
-    });
-  }
+  // Fetch filter dropdown options from backend
+  const { data: filterOptions } = useFilterOptions();
+  const availableStates = filterOptions?.states ?? [];
+  const availableBodyTypes = filterOptions?.body_types ?? [];
+  const availableBrands = filterOptions?.brands ?? [];
 
+  // Derive city list: if a specific state is selected, show all cities from the API
+  // (backend returns all cities; we rely on the state API param to narrow results)
+  const availableCities = filterOptions?.cities ?? [];
+
+  // Fetch from real API — pass all server-side filterable params
+  const { data: carsData, isLoading } = usePublicCars({
+    listing_type: mode,
+    state: filters.state !== ALL_STATES_LABEL ? filters.state : undefined,
+    city: filters.city !== ALL_CITIES_LABEL ? filters.city : undefined,
+    brand: filters.brands.length === 1 ? filters.brands[0] : undefined,
+    body_type: filters.bodyType !== "All" ? filters.bodyType : undefined,
+    search: search || undefined,
+  });
+
+  const allCars = carsData?.results ?? [];
+
+  // Split into published (available/rented) and sold
+  const publishedCars = useMemo(
+    () => allCars.filter((c) => c.availability_status !== "sold"),
+    [allCars],
+  );
+  const soldCars = useMemo(
+    () => allCars.filter((c) => c.availability_status === "sold"),
+    [allCars],
+  );
+
+  // Client-side filters on published cars (multi-brand, availability, price)
   const filtered = useMemo(() => {
-    return BASE_CARS.filter((car) => {
-      // search
-      if (search && !car.name.toLowerCase().includes(search.toLowerCase()) &&
-          !car.location.toLowerCase().includes(search.toLowerCase()) &&
-          !car.type.toLowerCase().includes(search.toLowerCase())) {
-        return false;
-      }
-      // type filter — match against brand names loosely
-      if (filters.types.length > 0) {
-        const nameUpper = car.name.toLowerCase();
-        const matched = filters.types.some((t) => {
-          const first = t.toLowerCase().split(" ")[0];
-          return first !== undefined && nameUpper.includes(first);
+    return publishedCars.filter((car) => {
+      // multi-brand filter (client-side when >1 brand selected)
+      if (filters.brands.length > 1) {
+        const titleLower = car.title.toLowerCase();
+        const brandLower = car.brand.toLowerCase();
+        const matched = filters.brands.some((b) => {
+          const first = b.toLowerCase().split(" ")[0];
+          return first !== undefined && (titleLower.includes(first) || brandLower.includes(first));
         });
         if (!matched) return false;
       }
-      // availability ("All" | "Available" | "Currently Rented"/"Sold")
+      // availability
       if (filters.availability !== "All") {
-        const wantAvailable = filters.availability === "Available";
-        if (car.available !== wantAvailable) return false;
+        if (filters.availability === "Available" && car.availability_status !== "available") return false;
+        if (filters.availability === "Currently Rented" && car.availability_status !== "rented") return false;
+        if (filters.availability === "Sold" && car.availability_status !== "sold") return false;
       }
-      // price range
-      const price = mode === "rent" ? car.rentPrice : car.buyPrice;
+      // price
+      const price = mode === "rent"
+        ? Number(car.rent_price_per_day ?? 0)
+        : Number(car.sale_price ?? 0);
       if (price < filters.price[0] || price > filters.price[1]) return false;
-      // location (rough match by state key word)
-      if (filters.state !== "All States") {
-        const stateKey = filters.state.replace(" (FCT)", "").toLowerCase();
-        if (!car.location.toLowerCase().includes(stateKey)) return false;
-      }
       return true;
     });
-  }, [search, filters, mode]);
+  }, [publishedCars, filters, mode]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / CARS_PER_PAGE));
   const currentCars = filtered.slice((page - 1) * CARS_PER_PAGE, page * CARS_PER_PAGE);
   const startResult = filtered.length === 0 ? 0 : (page - 1) * CARS_PER_PAGE + 1;
   const endResult = Math.min(page * CARS_PER_PAGE, filtered.length);
+
+  // Reset page when mode changes
+  function handleModeSwitch(m: Mode) {
+    setMode(m);
+    setPage(1);
+    setFilters({
+      brands: [],
+      bodyType: "All",
+      availability: "All",
+      state: ALL_STATES_LABEL,
+      city: ALL_CITIES_LABEL,
+      price: m === "rent" ? [0, 200000] : [0, 100000000],
+    });
+  }
 
   function handleFiltersChange(f: Filters) {
     setFilters(f);
@@ -666,6 +765,7 @@ export function ServicesListing() {
           fill
           priority
           sizes="100vw"
+          unoptimized
           style={{ objectFit: "cover", zIndex: 0 }}
         />
         <div aria-hidden="true" style={{
@@ -700,7 +800,15 @@ export function ServicesListing() {
       }}>
 
         {/* Filter sidebar */}
-        <FilterSidebar mode={mode} filters={filters} onChange={handleFiltersChange} />
+        <FilterSidebar
+          mode={mode}
+          filters={filters}
+          onChange={handleFiltersChange}
+          availableStates={availableStates}
+          availableCities={availableCities}
+          availableBodyTypes={availableBodyTypes}
+          availableBrands={availableBrands}
+        />
 
         {/* Main content */}
         <div className="services-listing-main" style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 24 }}>
@@ -716,7 +824,7 @@ export function ServicesListing() {
                 <Icon name="search" size={16} stroke="var(--brc-text-muted)" />
               </span>
               <Input
-                placeholder="Search by name, type, or location…"
+                placeholder="Search by name, brand, or location…"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 className="pl-9 h-11 text-sm"
@@ -750,19 +858,20 @@ export function ServicesListing() {
           </div>
 
           {/* Result count */}
-          <p style={{
-            fontFamily: "var(--brc-font-ui)", fontSize: 13,
-            color: "var(--brc-text-muted)", margin: 0,
-          }}>
-            Showing{" "}
-            <strong style={{ color: "var(--brc-text)" }}>
-              {startResult}–{endResult}
-            </strong>
-            {" "}of <strong style={{ color: "var(--brc-text)" }}>{filtered.length}</strong> results
-          </p>
+          {!isLoading && (
+            <p style={{ fontFamily: "var(--brc-font-ui)", fontSize: 13, color: "var(--brc-text-muted)", margin: 0 }}>
+              Showing{" "}
+              <strong style={{ color: "var(--brc-text)" }}>
+                {startResult}&ndash;{endResult}
+              </strong>
+              {" "}of <strong style={{ color: "var(--brc-text)" }}>{filtered.length}</strong> results
+            </p>
+          )}
 
           {/* Car grid */}
-          {currentCars.length > 0 ? (
+          {isLoading ? (
+            <CarGridSkeleton />
+          ) : currentCars.length > 0 ? (
             <div className="services-car-grid" style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
@@ -776,15 +885,15 @@ export function ServicesListing() {
             <div style={{
               padding: "60px 20px", textAlign: "center",
               color: "var(--brc-text-muted)", fontFamily: "var(--brc-font-ui)", fontSize: 15,
+              border: "1px dashed var(--brc-border)", borderRadius: "var(--brc-radius-md)",
             }}>
               No cars match your current filters.
             </div>
           )}
 
           {/* Pagination */}
-          {totalPages > 1 && (
+          {!isLoading && totalPages > 1 && (
             <div className="services-pagination" style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center", marginTop: 8 }}>
-              {/* Prev */}
               <Button
                 variant="outline"
                 size="icon"
@@ -795,7 +904,6 @@ export function ServicesListing() {
                 <Icon name="chevleft" size={16} />
               </Button>
 
-              {/* Page numbers */}
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                 <button
                   key={p}
@@ -816,7 +924,6 @@ export function ServicesListing() {
                 </button>
               ))}
 
-              {/* Next */}
               <Button
                 variant="outline"
                 size="icon"
@@ -827,6 +934,41 @@ export function ServicesListing() {
                 <Icon name="chevright" size={16} />
               </Button>
             </div>
+          )}
+
+          {/* ------------------------------------------------------------------ */}
+          {/* Recently Sold — horizontal scroll carousel                          */}
+          {/* ------------------------------------------------------------------ */}
+          {!isLoading && soldCars.length > 0 && (
+            <section style={{ marginTop: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <h2 style={{
+                  fontFamily: "var(--brc-font-display)", fontSize: 20, fontWeight: 800,
+                  color: "var(--brc-text)", margin: 0,
+                }}>
+                  Recently Sold
+                </h2>
+                <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 13, color: "var(--brc-text-muted)" }}>
+                  {soldCars.length} car{soldCars.length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 16,
+                  overflowX: "auto",
+                  paddingBottom: 12,
+                  scrollSnapType: "x mandatory",
+                  WebkitOverflowScrolling: "touch",
+                }}
+              >
+                {soldCars.map((car) => (
+                  <div key={car.id} style={{ scrollSnapAlign: "start" }}>
+                    <SoldCarCard car={car} />
+                  </div>
+                ))}
+              </div>
+            </section>
           )}
         </div>
       </div>
