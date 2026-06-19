@@ -115,12 +115,9 @@ def availability_annotations():
         .annotate(end_date=request_end_date_expression())
         .filter(end_date__gt=today)
     )
-    reserved_future_rental = Request.objects.filter(
-        car_id=OuterRef("id"),
-        request_type=ListingType.RENT,
-        status__in=[*RESERVED_RENTAL_STATUSES, RequestStatus.ACTIVE],
-        start_date__gt=today,
-    )
+    # No reserved status for rentals — they show as "available" with
+    # blocked dates on the calendar. Only buy requests reserve the car.
+    reserved_future_rental = Request.objects.none()
     return {
         "_has_buy_in_progress": Exists(buy_in_progress),
         "_has_active_current_rental": Exists(active_current_rental),
