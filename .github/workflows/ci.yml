@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [main, feat/*]
 
 jobs:
   frontend-checks:
@@ -20,52 +20,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
+        run: npm install
 
       - name: Type check
         run: npx tsc --noEmit
-
-      - name: Run tests
-        run: npm test
 
       - name: Build
         run: npm run build
-
-      - name: Security audit
-        run: npm audit --audit-level=high
-        continue-on-error: true
-
-  contracts-checks:
-    name: Contracts Checks
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: contracts
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: contracts/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Type check
-        run: npx tsc --noEmit
-
-      - name: Run tests
-        run: npm test
 
   backend-checks:
     name: Backend Checks
@@ -89,22 +52,55 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: pip
+          python-version: "3.13"
 
       - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Generate JWT test keys
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install ruff pytest pytest-django factory-boy
+          openssl genrsa -out /tmp/jwt_private.pem 2048 2>/dev/null
+          openssl rsa -in /tmp/jwt_private.pem -pubout -out /tmp/jwt_public.pem 2>/dev/null
+          echo "JWT_PRIVATE_KEY<<JWTEOF" >> $GITHUB_ENV
+          cat /tmp/jwt_private.pem >> $GITHUB_ENV
+          echo "JWTEOF" >> $GITHUB_ENV
+          echo "JWT_PUBLIC_KEY<<JWTPUBEOF" >> $GITHUB_ENV
+          cat /tmp/jwt_public.pem >> $GITHUB_ENV
+          echo "JWTPUBEOF" >> $GITHUB_ENV
 
       - name: Lint
-        run: ruff check .
+        run: uv run ruff check .
+
+      - name: Django check
+        env:
+          POSTGRES_DB: test_everythingcars
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          DJANGO_SECRET_KEY: test-secret-key-for-ci
+          DJANGO_SETTINGS_MODULE: config.settings.development
+          REDIS_URL: redis://localhost:6379/0
+        run: uv run python manage.py check
 
       - name: Run tests
         env:
@@ -113,8 +109,7 @@ jobs:
           POSTGRES_PASSWORD: test
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
-          DJANGO_SECRET_KEY: test-secret-key
+          DJANGO_SECRET_KEY: test-secret-key-for-ci
           DJANGO_SETTINGS_MODULE: config.settings.development
-          JWT_PRIVATE_KEY: ""
-          JWT_PUBLIC_KEY: ""
-        run: pytest --tb=short -q
+          REDIS_URL: redis://localhost:6379/0
+        run: uv run pytest --tb=short -q

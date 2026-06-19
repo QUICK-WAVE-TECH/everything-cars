@@ -7,11 +7,10 @@ import { SearchBar } from "@/shared/components/search-bar";
 export function HeroSection() {
   const router = useRouter();
 
-  function handleSearch({ loc, type, price }: { loc: string; type: string; price: string }) {
+  function handleSearch(query: { loc: string; type: string; price: string }) {
     const params = new URLSearchParams();
-    if (loc.trim()) params.set("location", loc.trim());
-    if (type && type !== "All") params.set("type", type);
-    if (price && price !== "All") params.set("price", price);
+    if (query.loc) params.set("search", query.loc);
+    if (query.type && query.type !== "All") params.set("body_type", query.type.toLowerCase());
     const qs = params.toString();
     router.push(qs ? `/services?${qs}` : "/services");
   }

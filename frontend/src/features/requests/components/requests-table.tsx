@@ -72,7 +72,10 @@ export function RequestsTable() {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<FilterValues>({});
 
-  const requests = paginatedData?.results ?? [];
+  const requests = useMemo(
+    () => paginatedData?.results ?? [],
+    [paginatedData?.results],
+  );
 
   const filtered = useMemo(() => {
     return requests.filter((r) => {

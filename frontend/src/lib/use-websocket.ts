@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { queryClient } from "./query-client";
 import { config } from "./config";
 import { useAuthStore } from "@/features/auth/store";
@@ -22,19 +22,23 @@ function deriveWsBaseUrl(): string {
 }
 
 const NOTIFICATION_QUERY_DEPS: Partial<Record<NotificationType, string[][]>> = {
-  request_received: [["owner-requests"]],
-  request_cancelled: [["owner-requests"]],
-  request_approved: [["customer-requests"]],
-  request_rejected: [["customer-requests"]],
-  requests_auto_rejected: [["customer-requests"]],
-  payment_submitted: [["admin-requests"]],
-  payment_confirmed: [["customer-requests"], ["owner-requests"], ["transactions"]],
-  rental_active: [["customer-requests"], ["owner-requests"]],
-  rental_completed: [["customer-requests"], ["owner-requests"]],
-  listing_submitted: [["admin-cars"], ["my-cars"]],
-  listing_approved: [["admin-cars"], ["my-cars"]],
-  listing_rejected: [["admin-cars"], ["my-cars"]],
-  listing_needs_changes: [["admin-cars"], ["my-cars"]],
+  request_received: [["requests", "owner"]],
+  request_cancelled: [["requests", "owner"]],
+  request_approved: [["requests", "customer"]],
+  request_rejected: [["requests", "customer"]],
+  requests_auto_rejected: [["requests", "customer"]],
+  payment_submitted: [["requests", "admin"]],
+  payment_confirmed: [
+    ["requests", "customer"],
+    ["requests", "owner"],
+    ["transactions"],
+  ],
+  rental_active: [["requests", "customer"], ["requests", "owner"]],
+  rental_completed: [["requests", "customer"], ["requests", "owner"]],
+  listing_submitted: [["cars", "admin"], ["cars", "owner"]],
+  listing_approved: [["cars", "admin"], ["cars", "owner"], ["cars", "public"]],
+  listing_rejected: [["cars", "admin"], ["cars", "owner"], ["cars", "public"]],
+  listing_needs_changes: [["cars", "admin"], ["cars", "owner"]],
 };
 
 const PING_INTERVAL_MS = 25_000;
@@ -47,6 +51,7 @@ export function useNotificationsWebSocket() {
   const pingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const backoffRef = useRef(INITIAL_BACKOFF_MS);
   const unmountedRef = useRef(false);
+  const connectRef = useRef<(() => void) | null>(null);
 
   // Subscribe to auth state so we reconnect when token appears/changes
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -75,7 +80,7 @@ export function useNotificationsWebSocket() {
     }
   }
 
-  function handleMessage(event: MessageEvent) {
+  const handleMessage = useCallback((event: MessageEvent) => {
     if (event.data === "pong") return;
 
     let payload: WsPayload;
@@ -98,7 +103,7 @@ export function useNotificationsWebSocket() {
         queryClient.invalidateQueries({ queryKey });
       });
     }
-  }
+  }, []);
 
   const connect = useCallback(() => {
     if (unmountedRef.current) return;
@@ -148,7 +153,7 @@ export function useNotificationsWebSocket() {
 
       reconnectTimerRef.current = setTimeout(() => {
         if (!unmountedRef.current) {
-          connect();
+          connectRef.current?.();
         }
       }, delay);
     };
@@ -157,8 +162,11 @@ export function useNotificationsWebSocket() {
       console.log(`[WS] Error (${new Date().toLocaleTimeString()})`);
       ws.close();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [handleMessage]);
+
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   useEffect(() => {
     unmountedRef.current = false;

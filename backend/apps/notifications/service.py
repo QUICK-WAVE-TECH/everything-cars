@@ -175,12 +175,17 @@ def notify_payment_confirmed(request_obj):
 
 
 def notify_rental_active(request_obj):
-    """Customer gets notified when rental becomes active."""
+    """Customer gets notified when rental/purchase becomes active."""
+    is_buy = request_obj.request_type == "buy"
     _create_notification(
         recipient=request_obj.customer,
         notification_type=NotificationType.RENTAL_ACTIVE,
-        title="Rental is active",
-        message=f"Your rental of {request_obj.car.title} is now active. Enjoy your drive!",
+        title="Purchase is active" if is_buy else "Rental is active",
+        message=(
+            f"Your purchase of {request_obj.car.title} is now being processed. Ownership transfer in progress!"
+            if is_buy
+            else f"Your rental of {request_obj.car.title} is now active. Enjoy your drive!"
+        ),
         data={
             "request_id": str(request_obj.id),
             "car_id": str(request_obj.car_id),
@@ -190,12 +195,17 @@ def notify_rental_active(request_obj):
 
 
 def notify_rental_completed(request_obj):
-    """Customer gets notified when rental is complete."""
+    """Customer gets notified when rental/purchase is complete."""
+    is_buy = request_obj.request_type == "buy"
     _create_notification(
         recipient=request_obj.customer,
         notification_type=NotificationType.RENTAL_COMPLETED,
-        title="Rental completed",
-        message=f"Your rental of {request_obj.car.title} is now complete. Consider leaving a review!",
+        title="Purchase completed" if is_buy else "Rental completed",
+        message=(
+            f"Your purchase of {request_obj.car.title} is complete. Congratulations on your new car!"
+            if is_buy
+            else f"Your rental of {request_obj.car.title} is now complete. Consider leaving a review!"
+        ),
         data={
             "request_id": str(request_obj.id),
             "car_id": str(request_obj.car_id),

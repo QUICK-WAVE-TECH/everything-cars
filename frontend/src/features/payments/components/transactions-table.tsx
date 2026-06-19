@@ -123,7 +123,10 @@ export function TransactionsTable() {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<FilterValues>({});
 
-  const transactions = paginatedData?.results ?? [];
+  const transactions = useMemo(
+    () => paginatedData?.results ?? [],
+    [paginatedData?.results],
+  );
 
   const filtered = useMemo(() => {
     return transactions.filter((t) => {

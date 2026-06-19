@@ -1,28 +1,55 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import type { PaginatedResponse } from "@/shared/types/api";
+import { requestKeys } from "@/features/requests/api/requests-api";
+import { adminListingKeys } from "@/features/listings/api/admin-api";
 import type { RequestDetail } from "@/features/requests/api/types";
 import type {
   TransactionListItem,
   TransactionDetail,
 } from "@/features/payments/api/type";
 
-export function useTransactions() {
+type TransactionParams = {
+  status?: string;
+  page?: number;
+  page_size?: number;
+};
+
+export const transactionKeys = {
+  all: ["transactions"] as const,
+  list: (params?: TransactionParams) => ["transactions", params ?? {}] as const,
+  detail: (id: string) => ["transactions", "detail", id] as const,
+};
+
+function buildQuery(params?: TransactionParams) {
+  const searchParams = new URLSearchParams();
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") {
+      searchParams.set(key, String(value));
+    }
+  });
+  return searchParams.toString();
+}
+
+export function useTransactions(params?: TransactionParams) {
+  const query = buildQuery(params);
   return useQuery({
-    queryKey: ["transactions"],
+    queryKey: transactionKeys.list(params),
     queryFn: () =>
       apiClient.get<PaginatedResponse<TransactionListItem>>(
-        `/listings/transactions`,
+        `/listings/transactions${query ? `?${query}` : ""}`,
       ),
+    staleTime: 20 * 1000,
   });
 }
 
 export function useTransactionDetail(id: string) {
   return useQuery({
-    queryKey: ["transactions", id],
+    queryKey: transactionKeys.detail(id),
     queryFn: () =>
       apiClient.get<TransactionDetail>(`/listings/transactions/${id}`),
     enabled: !!id,
+    staleTime: 15 * 1000,
   });
 }
 
@@ -49,8 +76,8 @@ export function useSubmitPayment() {
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["customer-requests"] });
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: requestKeys.customer });
+      queryClient.invalidateQueries({ queryKey: transactionKeys.all });
     },
   });
 }
@@ -63,10 +90,10 @@ export function useStaffConfirmPayment() {
         `/listings/admin/requests/${requestId}/confirm-payment`,
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-requests"] });
-      queryClient.invalidateQueries({ queryKey: ["customer-requests"] });
-      queryClient.invalidateQueries({ queryKey: ["owner-requests"] });
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: adminListingKeys.requests });
+      queryClient.invalidateQueries({ queryKey: requestKeys.customer });
+      queryClient.invalidateQueries({ queryKey: requestKeys.owner });
+      queryClient.invalidateQueries({ queryKey: transactionKeys.all });
     },
   });
 }

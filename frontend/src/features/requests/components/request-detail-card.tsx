@@ -262,7 +262,6 @@ export function RequestDetailCard({
             alt={carName}
             width={260}
             height={170}
-            unoptimized
             style={{ width: "90%", height: "auto", objectFit: "contain" }}
           />
         </div>
