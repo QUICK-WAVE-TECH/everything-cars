@@ -12,6 +12,7 @@ export type CarOwner = {
 export type CarImage = {
   id: string;
   image: string;
+  thumbnail: string | null;
   is_primary: boolean;
   created_at: string;
 };
@@ -21,6 +22,12 @@ export type ListingFeature = {
   name: string;
   value: string;
   sort_order?: number;
+};
+
+export type BookedPeriod = {
+  start_date: string;
+  end_date: string;
+  status: string;
 };
 
 export type CarListItem = {
@@ -37,6 +44,7 @@ export type CarListItem = {
   state: string;
   city: string;
   status: string;
+  availability_status: "available" | "rented" | "reserved" | "sold";
   owner: CarOwner;
   primary_image: string | null;
   created_at: string;
@@ -55,4 +63,6 @@ export type CarDetail = CarListItem & {
   updated_at: string;
   images: CarImage[];
   features: ListingFeature[];
+  booked_periods: BookedPeriod[];
+  available_from: string | null;
 };

@@ -133,7 +133,17 @@ function UploadZone({ file, onFile, onClear }: { file: File | null; onFile: (f: 
     return (
       <div className="flex items-center gap-4 rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle) p-3.5">
         <span className="flex size-[54px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-(--brc-border) bg-white">
-          {preview ? <img src={preview} alt="" className="size-full object-cover" /> : <Icon name="file" size={24} stroke="var(--brc-accent)" />}
+          {preview ? (
+            <Image
+              src={preview}
+              alt=""
+              width={54}
+              height={54}
+              className="size-full object-cover"
+            />
+          ) : (
+            <Icon name="file" size={24} stroke="var(--brc-accent)" />
+          )}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -400,7 +410,7 @@ function OrderAside({ req }: { req: RequestDetail }) {
       <div className="overflow-hidden rounded-2xl border border-(--brc-border) bg-white shadow-[var(--brc-shadow-xs)]">
         <div className="flex flex-col items-center gap-3 border-b border-(--brc-border) bg-(--brc-bg-subtle) px-6 pb-4 pt-6">
           {primaryImage ? (
-            <Image src={primaryImage} alt={req.car.title} width={240} height={150} className="w-4/5 max-w-[240px] object-contain" unoptimized />
+            <Image src={primaryImage} alt={req.car.title} width={240} height={150} className="w-4/5 max-w-[240px] object-contain" />
           ) : (
             <div className="flex h-[150px] w-4/5 max-w-[240px] items-center justify-center rounded-lg bg-(--brc-bg-muted)">
               <Icon name="car" size={40} stroke="var(--brc-text-muted)" />

@@ -16,6 +16,7 @@ import {
 import { CustomerStats } from "@/features/requests";
 import { useCustomerRequestDetail, useCancelRequest } from "@/features/requests/api";
 import { useMe } from "@/features/auth/api";
+import { WriteReviewSection } from "@/features/reviews";
 
 function toDetailStatus(s: string): RequestDetailStatus {
   const map: Record<string, RequestDetailStatus> = {
@@ -151,12 +152,21 @@ export default function CustomerRequestDetailPage() {
       case "paid":
         return (
           <ActionButton kind="dark" onClick={() => router.push("/customer/transactions")}>
-            View Transactions
+            {request.request_type === "buy" ? "Purchase Confirmed — Awaiting Transfer" : "Payment Confirmed — Awaiting Handover"}
+          </ActionButton>
+        );
+      case "active":
+        return (
+          <ActionButton kind="dark" onClick={() => router.push("/customer/transactions")}>
+            {request.request_type === "buy" ? "Ownership Transfer in Progress" : "Rental Active"}
           </ActionButton>
         );
       case "completed":
         return (
-          <ActionButton kind="accent" onClick={() => router.push(`/cars/${car.id}`)}>
+          <ActionButton kind="accent" onClick={() => {
+            // Scroll to the review section on this same page
+            document.getElementById("write-review-section")?.scrollIntoView({ behavior: "smooth" });
+          }}>
             Write a Review
           </ActionButton>
         );
@@ -219,6 +229,13 @@ export default function CustomerRequestDetailPage() {
                 </div>
               </div>
             </section>
+          )}
+
+          {/* Write / view review — only for completed requests */}
+          {request.status === "completed" && (
+            <div id="write-review-section">
+              <WriteReviewSection carId={car.id} requestId={requestId} />
+            </div>
           )}
 
           {/* Status history — collapsible */}

@@ -7,7 +7,7 @@ import type { StatItem } from "../data";
 
 export function CustomerStats() {
   const { data } = useCustomerRequests();
-  const requests = data?.results ?? [];
+  const requests = useMemo(() => data?.results ?? [], [data?.results]);
 
   const stats: StatItem[] = useMemo(() => [
     { label: "Total Requests", value: String(requests.length), icon: "car", color: "var(--brc-primary)" },

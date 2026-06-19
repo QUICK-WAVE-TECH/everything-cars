@@ -724,7 +724,6 @@ export default function CarDetailPage() {
                     alt={car.title}
                     fill
                     className="object-cover"
-                    unoptimized
                     sizes="(max-width: 768px) 100vw, 600px"
                   />
 
@@ -795,11 +794,10 @@ export default function CarDetailPage() {
                         )}
                       >
                         <Image
-                          src={img.image}
+                          src={img.thumbnail ?? img.image}
                           alt={`${car.title} ${i + 1}`}
                           fill
                           className="object-cover"
-                          unoptimized
                           sizes="120px"
                         />
                       </button>

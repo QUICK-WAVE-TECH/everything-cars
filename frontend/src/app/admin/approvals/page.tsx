@@ -206,7 +206,7 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
               {images.length > 0 && (
                 <div className="flex flex-col gap-2.5">
                   <div className="relative h-[240px] overflow-hidden rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle)">
-                    <Image src={images[activeImg]?.image ?? ""} alt={car.title} fill className="object-cover" unoptimized />
+                    <Image src={images[activeImg]?.image ?? ""} alt={car.title} fill className="object-cover" />
                     {images.length > 1 && (
                       <>
                         <button type="button" onClick={() => setActiveImg((i) => (i === 0 ? images.length - 1 : i - 1))} className="absolute left-2.5 top-1/2 flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-(--brc-border) bg-white/95 shadow-sm">
@@ -224,7 +224,7 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
                       {images.map((img, i) => (
                         <button key={img.id} type="button" onClick={() => setActiveImg(i)}
                           className={cn("relative h-[46px] w-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border-2 bg-(--brc-bg-subtle) p-0 transition-all", i === activeImg ? "border-(--brc-primary) opacity-100" : "border-(--brc-border) opacity-75 hover:opacity-100")}>
-                          <Image src={img.image} alt="" fill className="object-cover" unoptimized />
+                          <Image src={img.thumbnail ?? img.image} alt="" fill className="object-cover" />
                         </button>
                       ))}
                     </div>
@@ -601,7 +601,7 @@ export default function AdminApprovalsPage() {
                         <div className="flex items-center gap-3">
                           <span className="relative flex size-[52px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-transparent bg-(--brc-bg-subtle) transition-all duration-300 group-hover/listing-row:border-(--brc-primary) group-hover/listing-row:bg-(--brc-primary-tint) group-hover/listing-row:shadow-[0_10px_24px_rgba(0,0,139,0.14)]">
                             <span className="pointer-events-none absolute inset-x-1 top-1 h-px bg-white/80 opacity-0 transition-opacity duration-300 group-hover/listing-row:opacity-100" />
-                            {car.primary_image ? <Image src={car.primary_image} alt="" width={48} height={36} className="object-contain transition-transform duration-500 ease-out group-hover/listing-row:scale-110" unoptimized /> : <Icon name="car" size={20} stroke="var(--brc-text-muted)" />}
+                            {car.primary_image ? <Image src={car.primary_image} alt="" width={48} height={36} className="object-contain transition-transform duration-500 ease-out group-hover/listing-row:scale-110" /> : <Icon name="car" size={20} stroke="var(--brc-text-muted)" />}
                           </span>
                           <div className="min-w-0">
                             <span className="block truncate text-sm font-semibold text-(--brc-text) transition-colors duration-300 group-hover/listing-row:text-(--brc-primary) [font-family:var(--brc-font-ui)]">{car.title}</span>

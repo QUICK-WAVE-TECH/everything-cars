@@ -118,7 +118,7 @@ function PaymentDrawer({ requestId, open, onClose, onConfirmed }: {
               {/* Car info */}
               <section className="flex items-center gap-4 rounded-xl border border-(--brc-border) p-4">
                 {primaryImage ? (
-                  <Image src={primaryImage} alt={car?.title ?? ""} width={80} height={60} className="rounded-lg object-cover" unoptimized />
+                  <Image src={primaryImage} alt={car?.title ?? ""} width={80} height={60} className="rounded-lg object-cover" />
                 ) : (
                   <span className="flex size-[60px] items-center justify-center rounded-lg bg-(--brc-bg-subtle)">
                     <Icon name="car" size={24} stroke="var(--brc-text-muted)" />
@@ -182,7 +182,7 @@ function PaymentDrawer({ requestId, open, onClose, onConfirmed }: {
                   <h3 className="m-0 text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Payment Receipt</h3>
                   <div className="overflow-hidden rounded-xl border border-(--brc-border)">
                     {req.payment_receipt.match(/\.(jpg|jpeg|png|webp)$/i) ? (
-                      <Image src={req.payment_receipt} alt="Payment receipt" width={500} height={300} className="w-full object-contain" unoptimized />
+                      <Image src={req.payment_receipt} alt="Payment receipt" width={500} height={300} className="w-full object-contain" />
                     ) : (
                       <a href={req.payment_receipt} target="_blank" rel="noopener noreferrer"
                         className="flex items-center gap-3 p-4 text-sm font-semibold text-(--brc-primary) no-underline hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]">
@@ -414,7 +414,7 @@ export default function AdminPaymentsPage() {
                         <div className="flex items-center gap-3">
                           <span className="relative flex size-[48px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-transparent bg-(--brc-bg-subtle) transition-all duration-300 group-hover/row:border-(--brc-primary) group-hover/row:bg-(--brc-primary-tint)">
                             {req.car.primary_image ? (
-                              <Image src={req.car.primary_image} alt="" width={44} height={33} className="object-contain transition-transform duration-500 group-hover/row:scale-110" unoptimized />
+                              <Image src={req.car.primary_image} alt="" width={44} height={33} className="object-contain transition-transform duration-500 group-hover/row:scale-110" />
                             ) : (
                               <Icon name="car" size={18} stroke="var(--brc-text-muted)" />
                             )}

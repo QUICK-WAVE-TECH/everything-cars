@@ -1,31 +1,28 @@
 "use client";
 
+import { useMemo } from "react";
 import { SectionHead } from "@/shared/components/section-head";
-import { CarRow } from "@/shared/components/car-row";
-
-const RENTED = [
-  { id: 1, name: "Lexus NX 300h", type: "Sedan", location: "Lagos, Nigeria", price: "₦35,000/day", rating: 4, mode: "rent" as const },
-  { id: 2, name: "Toyota RAV4", type: "SUV", location: "Abuja, Nigeria", price: "₦42,000/day", rating: 5, mode: "rent" as const },
-  { id: 3, name: "Mercedes C300", type: "Luxury", location: "Lagos, Nigeria", price: "₦80,000/day", rating: 4, mode: "rent" as const },
-  { id: 4, name: "Honda Accord", type: "Sedan", location: "Port Harcourt", price: "₦30,000/day", rating: 4, mode: "rent" as const },
-  { id: 5, name: "Range Rover Velar", type: "Luxury", location: "Lagos, Nigeria", price: "₦150,000/day", rating: 5, mode: "rent" as const },
-];
-
-const PURCHASED = [
-  { id: 11, name: "Lexus NX 300h", type: "Sedan", location: "Lagos, Nigeria", price: "₦20,000,000", rating: 4, mode: "buy" as const },
-  { id: 12, name: "BMW X5", type: "SUV", location: "Abuja, Nigeria", price: "₦54,000,000", rating: 5, mode: "buy" as const },
-  { id: 13, name: "Toyota Corolla", type: "Sedan", location: "Ibadan, Nigeria", price: "₦13,000,000", rating: 4, mode: "buy" as const },
-  { id: 14, name: "Audi Q7", type: "SUV", location: "Lagos, Nigeria", price: "₦62,000,000", rating: 5, mode: "buy" as const },
-];
-
-const LISTED = [
-  { id: 21, name: "Lexus NX 300h", type: "Sedan", location: "Lagos, Nigeria", price: "₦35,000/day", rating: 4, mode: "list" as const },
-  { id: 22, name: "Kia Sportage", type: "SUV", location: "Abuja, Nigeria", price: "₦38,000/day", rating: 4, mode: "list" as const },
-  { id: 23, name: "Ford Ranger", type: "Pickup", location: "Kano, Nigeria", price: "₦45,000/day", rating: 4, mode: "list" as const },
-  { id: 24, name: "Hyundai Elantra", type: "Sedan", location: "Lagos, Nigeria", price: "₦28,000/day", rating: 5, mode: "list" as const },
-];
+import { ApiCarRow } from "@/shared/components/car-row";
+import { Skeleton } from "@/components/ui/skeleton";
+import { usePublicCars } from "@/features/listings/api";
 
 export function ServicesSection() {
+  const { data, isLoading } = usePublicCars();
+  const cars = useMemo(() => data?.results ?? [], [data?.results]);
+
+  const rentCars = useMemo(
+    () => cars.filter((c) => (c.listing_type === "rent" || c.listing_type === "both") && c.availability_status !== "sold").slice(0, 8),
+    [cars],
+  );
+  const buyCars = useMemo(
+    () => cars.filter((c) => (c.listing_type === "buy" || c.listing_type === "both") && c.availability_status !== "sold").slice(0, 8),
+    [cars],
+  );
+  const recentlySold = useMemo(
+    () => cars.filter((c) => c.availability_status === "sold").slice(0, 6),
+    [cars],
+  );
+
   return (
     <section style={{ background: "#fff", padding: "var(--brc-section-y, 104px) var(--brc-space-10, 104px)" }}>
       <div style={{ maxWidth: 1232, margin: "0 auto", display: "flex", flexDirection: "column", gap: "clamp(48px, 8vw, 80px)" }}>
@@ -37,9 +34,29 @@ export function ServicesSection() {
             center
           />
         </div>
-        <CarRow title="MOST RENTED CARS" cars={RENTED} />
-        <CarRow title="MOST PURCHASED CARS" cars={PURCHASED} />
-        <CarRow title="MOST LISTED CARS" cars={LISTED} />
+
+        {isLoading ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>
+            {[1, 2].map((i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <Skeleton className="h-5 w-48" />
+                <div style={{ display: "flex", gap: 28 }}>
+                  {[1, 2, 3, 4].map((j) => (
+                    <Skeleton key={j} className="h-[320px] w-[300px] shrink-0 rounded-2xl" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            <ApiCarRow title="AVAILABLE FOR RENT" cars={rentCars} displayMode="rent" />
+            <ApiCarRow title="AVAILABLE FOR PURCHASE" cars={buyCars} displayMode="buy" />
+            {recentlySold.length > 0 && (
+              <ApiCarRow title="RECENTLY SOLD" cars={recentlySold} />
+            )}
+          </>
+        )}
       </div>
     </section>
   );

@@ -1,14 +1,17 @@
+from datetime import date, timedelta
+
 from rest_framework import serializers
 from django.utils import timezone
 
-from apps.users.models import User
 from .models import (
     Car,
     CarImage,
+    CarStatus,
     Currency,
     ListingFeature,
     ListingType,
     Request,
+    RequestStatus,
     RequestStatusEvent,
     Transaction,
 )
@@ -18,7 +21,7 @@ class CarImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CarImage
-        fields = ["id", "image", "is_primary", "created_at"]
+        fields = ["id", "image", "thumbnail", "is_primary", "created_at"]
         read_only_fields = fields
 
 
@@ -54,6 +57,7 @@ class CarOwnerSerializer(CarOwnerSummarySerializer):
 class CarListSerializer(serializers.ModelSerializer):
     primary_image = serializers.SerializerMethodField()
     owner = CarOwnerSummarySerializer(read_only=True)
+    availability_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Car
@@ -73,6 +77,7 @@ class CarListSerializer(serializers.ModelSerializer):
             "status",
             "owner",
             "primary_image",
+            "availability_status",
             "created_at",
         ]
 
@@ -84,17 +89,68 @@ class CarListSerializer(serializers.ModelSerializer):
             primary = images[0]
 
         if primary:
+            image = primary.thumbnail or primary.image
             request = self.context.get("request")
             if request:
-                return request.build_absolute_uri(primary.image.url)
-            return primary.image.url
+                return request.build_absolute_uri(image.url)
+            return image.url
         return None
+
+    def get_availability_status(self, obj):
+        if obj.status == CarStatus.ARCHIVED:
+            return "sold"
+
+        has_buy_in_progress = getattr(obj, "_has_buy_in_progress", None)
+        has_active_current_rental = getattr(obj, "_has_active_current_rental", None)
+        has_reserved_future_rental = getattr(obj, "_has_reserved_future_rental", None)
+        if has_buy_in_progress is not None:
+            if has_buy_in_progress:
+                return "reserved"
+            if has_active_current_rental:
+                return "rented"
+            if has_reserved_future_rental:
+                return "reserved"
+            return "available"
+
+        in_progress = getattr(obj, "_in_progress_requests", None)
+        if in_progress is None:
+            in_progress = obj.requests.filter(
+                status__in=[
+                    RequestStatus.APPROVED,
+                    RequestStatus.PAYMENT_SUBMITTED,
+                    RequestStatus.PAID,
+                    RequestStatus.ACTIVE,
+                ],
+            )
+
+        today = date.today()
+        for req in in_progress:
+            # Buy request in progress → reserved
+            if req.request_type == "buy":
+                return "reserved"
+            # Active rental currently in period → rented
+            if req.status == RequestStatus.ACTIVE and req.start_date and req.duration_days:
+                end = req.start_date + timedelta(days=req.duration_days)
+                if req.start_date <= today < end:
+                    return "rented"
+            # Future approved/paid rental → reserved
+            if req.status in (
+                RequestStatus.APPROVED,
+                RequestStatus.PAYMENT_SUBMITTED,
+                RequestStatus.PAID,
+            ) and req.start_date and req.start_date > today:
+                return "reserved"
+
+        return "available"
 
 
 class CarDetailSerializer(serializers.ModelSerializer):
     owner = CarOwnerSerializer(read_only=True)
     images = CarImageSerializer(many=True, read_only=True)
     features = ListingFeatureSerializer(many=True, read_only=True)
+    availability_status = serializers.SerializerMethodField()
+    booked_periods = serializers.SerializerMethodField()
+    available_from = serializers.SerializerMethodField()
 
     class Meta:
         model = Car
@@ -126,7 +182,108 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "owner",
             "images",
             "features",
+            "availability_status",
+            "booked_periods",
+            "available_from",
         ]
+
+    def _get_booked_requests(self, obj):
+        """Get booked requests — use prefetched if available."""
+        booked = getattr(obj, "_booked_requests", None)
+        if booked is None:
+            booked = obj.requests.filter(
+                request_type="rent",
+                status__in=[
+                    RequestStatus.APPROVED,
+                    RequestStatus.PAYMENT_SUBMITTED,
+                    RequestStatus.PAID,
+                    RequestStatus.ACTIVE,
+                ],
+            )
+        return booked
+
+    def get_availability_status(self, obj):
+        if obj.status == CarStatus.ARCHIVED:
+            return "sold"
+
+        has_buy_in_progress = getattr(obj, "_has_buy_in_progress", None)
+        has_active_current_rental = getattr(obj, "_has_active_current_rental", None)
+        has_reserved_future_rental = getattr(obj, "_has_reserved_future_rental", None)
+        if has_buy_in_progress is not None:
+            if has_buy_in_progress:
+                return "reserved"
+            if has_active_current_rental:
+                return "rented"
+            if has_reserved_future_rental:
+                return "reserved"
+            return "available"
+
+        # Also check buy requests in progress
+        buy_in_progress = getattr(obj, "_buy_in_progress", None)
+        if buy_in_progress is None:
+            buy_in_progress = obj.requests.filter(
+                request_type="buy",
+                status__in=[
+                    RequestStatus.APPROVED,
+                    RequestStatus.PAYMENT_SUBMITTED,
+                    RequestStatus.PAID,
+                    RequestStatus.ACTIVE,
+                ],
+            ).exists()
+        if buy_in_progress:
+            return "reserved"
+
+        today = date.today()
+        for req in self._get_booked_requests(obj):
+            if req.status == RequestStatus.ACTIVE and req.start_date and req.duration_days:
+                end = req.start_date + timedelta(days=req.duration_days)
+                if req.start_date <= today < end:
+                    return "rented"
+            # Future approved/paid rental → reserved
+            if req.status in (
+                RequestStatus.APPROVED,
+                RequestStatus.PAYMENT_SUBMITTED,
+                RequestStatus.PAID,
+            ) and req.start_date and req.start_date > today:
+                return "reserved"
+
+        return "available"
+
+    def get_booked_periods(self, obj):
+        if obj.status == CarStatus.ARCHIVED:
+            return []
+
+        periods = []
+        for req in self._get_booked_requests(obj):
+            if req.start_date and req.duration_days:
+                periods.append(
+                    {
+                        "start_date": req.start_date.isoformat(),
+                        "end_date": (
+                            req.start_date + timedelta(days=req.duration_days)
+                        ).isoformat(),
+                        "status": req.status,
+                    }
+                )
+        periods.sort(key=lambda p: p["start_date"])
+        return periods
+
+    def get_available_from(self, obj):
+        if obj.status == CarStatus.ARCHIVED:
+            return None
+
+        today = date.today()
+        latest_end = None
+        for req in self._get_booked_requests(obj):
+            if req.start_date and req.duration_days:
+                end = req.start_date + timedelta(days=req.duration_days)
+                if end > today:
+                    if latest_end is None or end > latest_end:
+                        latest_end = end
+
+        if latest_end is None:
+            return None
+        return latest_end.isoformat()
 
 
 class CarCreateSerializer(serializers.ModelSerializer):
@@ -246,10 +403,11 @@ class RequestCarSummarySerializer(serializers.ModelSerializer):
         if primary is None and images:
             primary = images[0]
         if primary:
+            image = primary.thumbnail or primary.image
             request = self.context.get("request")
             if request:
-                return request.build_absolute_uri(primary.image.url)
-            return primary.image.url
+                return request.build_absolute_uri(image.url)
+            return image.url
         return None
 
 
@@ -399,6 +557,37 @@ class RequestCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"start_date": "Start date cannot be in the past."}
                 )
+
+            # Check for overlapping bookings
+            if duration_days and start_date:
+                new_end = start_date + timedelta(days=duration_days)
+                blocking_rentals = Request.objects.filter(
+                    car=car,
+                    request_type="rent",
+                    status__in=[
+                        RequestStatus.APPROVED,
+                        RequestStatus.PAYMENT_SUBMITTED,
+                        RequestStatus.PAID,
+                        RequestStatus.ACTIVE,
+                    ],
+                ).only("start_date", "duration_days")
+
+                for existing in blocking_rentals:
+                    if existing.start_date and existing.duration_days:
+                        existing_end = existing.start_date + timedelta(
+                            days=existing.duration_days
+                        )
+                        if start_date < existing_end and existing.start_date < new_end:
+                            raise serializers.ValidationError(
+                                {
+                                    "start_date": (
+                                        f"This car is already booked from "
+                                        f"{existing.start_date.isoformat()} to "
+                                        f"{existing_end.isoformat()}. "
+                                        f"Please pick different dates."
+                                    )
+                                }
+                            )
 
         return data
 

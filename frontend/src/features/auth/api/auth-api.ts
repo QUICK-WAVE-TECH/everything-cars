@@ -170,10 +170,10 @@ export function useMe() {
   });
 
   useEffect(() => {
-    if (query.data) {
+    if (query.data && hasSession) {
       setAuth(query.data.id, query.data.role);
     }
-  }, [query.data, setAuth]);
+  }, [query.data, hasSession, setAuth]);
 
   useEffect(() => {
     if (isAuthError(query.error)) {
@@ -191,7 +191,10 @@ export function useSignOut() {
   return useMutation({
     mutationFn: () => apiClient.post<SignOutResponse>("/auth/sign-out"),
     onSettled: () => {
+      // Clear auth state FIRST so useMe's enabled=hasSession becomes false
       clearAuth();
+      // Remove me query before clearing everything — prevents stale data re-triggering setAuth
+      queryClient.removeQueries({ queryKey: ["me"] });
       queryClient.clear();
     },
   });

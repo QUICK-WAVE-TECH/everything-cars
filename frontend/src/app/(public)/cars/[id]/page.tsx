@@ -1,18 +1,13 @@
-import { CarDetailPage } from "@/features/listings/components";
-import { DETAIL_CAR } from "@/features/listings/components/car-detail-data";
+"use client";
 
-export function generateMetadata() {
-  return {
-    title: `${DETAIL_CAR.name} — Rent or Buy | EverythingCars`,
-    description: DETAIL_CAR.intro.slice(0, 160),
-    openGraph: {
-      title: `${DETAIL_CAR.name} — EverythingCars`,
-      description: DETAIL_CAR.intro.slice(0, 160),
-      images: ["/car-lexus.png"],
-    },
-  };
-}
+import { useParams } from "next/navigation";
+import { CarDetailPage } from "@/features/listings/components";
 
 export default function CarDetailRoutePage() {
-  return <CarDetailPage />;
+  const params = useParams();
+  const carId = params?.id as string;
+
+  if (!carId) return null;
+
+  return <CarDetailPage carId={carId} />;
 }

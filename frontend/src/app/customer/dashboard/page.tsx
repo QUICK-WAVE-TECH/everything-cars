@@ -14,7 +14,10 @@ import Link from "next/link";
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
 import { useMe } from "@/features/auth/api";
-import { CUSTOMER_STATS } from "@/features/requests/data";
+import { useCustomerRequests } from "@/features/requests/api";
+import { useTransactions } from "@/features/payments/api";
+import { usePublicCars } from "@/features/listings/api";
+import type { RequestStatus } from "@/features/requests/api";
 
 type DashboardStyle = CSSProperties & Record<`--${string}`, string | number>;
 
@@ -32,7 +35,7 @@ const QUICK_LINKS: QuickLink[] = [
     label: "Browse Cars",
     description: "Find verified cars for rent or purchase.",
     icon: "car",
-    href: "/customer/listings",
+    href: "/services",
     bg: "var(--brc-primary-tint)",
     fg: "var(--brc-primary)",
   },
@@ -62,76 +65,58 @@ const QUICK_LINKS: QuickLink[] = [
   },
 ];
 
-type RequestStatus = "approved" | "pending";
+type DashboardRequestStatus =
+  | "pending"
+  | "approved"
+  | "payment_submitted"
+  | "paid"
+  | "active"
+  | "completed"
+  | "rejected"
+  | "cancelled";
 
 type RecentRequest = {
-  id: number;
+  id: string;
   car: string;
+  carImage: string | null;
   party: string;
   mode: "Rent" | "Buy";
-  days?: number;
+  days?: number | null;
   price: number;
-  status: RequestStatus;
+  status: DashboardRequestStatus;
   note: string;
   action?: { label: string; href: string };
 };
 
-const RECENT_REQUESTS: RecentRequest[] = [
-  {
-    id: 1,
-    car: "Lexus NX 300h",
-    party: "Hilary Emmanuel",
-    mode: "Rent",
-    days: 5,
-    price: 175000,
-    status: "approved",
-    note: "Approved by owner. Payment is ready.",
-    action: { label: "Proceed to payment", href: "/customer/payments" },
-  },
-  {
-    id: 2,
-    car: "Lexus NX 300h",
-    party: "Hilary Emmanuel",
-    mode: "Rent",
-    days: 5,
-    price: 175000,
-    status: "pending",
-    note: "Waiting for owner approval.",
-  },
-  {
-    id: 3,
-    car: "Lexus NX 300h",
-    party: "Premium Auto Gallery",
-    mode: "Buy",
-    price: 16000000,
-    status: "pending",
-    note: "Dealer review in progress.",
-  },
-];
+type RecommendedCar = {
+  id: string;
+  name: string;
+  location: string;
+  tag: string;
+  price: number;
+  suffix: string;
+  href: string;
+  image: string | null;
+};
 
-const RECOMMENDED_CARS = [
-  {
-    id: 1,
-    name: "Lexus NX 300h",
-    location: "Lekki, Lagos",
-    tag: "Rent",
-    price: 35000,
-    suffix: "per day",
-    href: "/customer/listings/1",
-  },
-  {
-    id: 2,
-    name: "Lexus NX 300h",
-    location: "Victoria Island",
-    tag: "Buy",
-    price: 16000000,
-    suffix: "asking price",
-    href: "/customer/listings/2",
-  },
+type StatItem = {
+  label: string;
+  value: string;
+  unit?: string;
+  icon: IconName;
+  color: string;
+};
+
+const ACTIVE_STATUSES: RequestStatus[] = [
+  "pending",
+  "approved",
+  "payment_submitted",
+  "paid",
+  "active",
 ];
 
 const STATUS_STYLES: Record<
-  RequestStatus,
+  DashboardRequestStatus,
   { label: string; bg: string; fg: string; ring: string }
 > = {
   approved: {
@@ -146,7 +131,90 @@ const STATUS_STYLES: Record<
     fg: "#9a7400",
     ring: "rgba(255, 192, 1, 0.26)",
   },
+  payment_submitted: {
+    label: "Payment Submitted",
+    bg: "rgba(245, 158, 11, 0.12)",
+    fg: "#b45309",
+    ring: "rgba(245, 158, 11, 0.22)",
+  },
+  paid: {
+    label: "Paid",
+    bg: "rgba(59, 130, 246, 0.12)",
+    fg: "#1d4ed8",
+    ring: "rgba(59, 130, 246, 0.22)",
+  },
+  active: {
+    label: "Active",
+    bg: "var(--brc-primary-tint)",
+    fg: "var(--brc-primary)",
+    ring: "rgba(0, 0, 139, 0.18)",
+  },
+  completed: {
+    label: "Completed",
+    bg: "var(--brc-success-bg)",
+    fg: "var(--brc-success)",
+    ring: "rgba(32, 184, 88, 0.22)",
+  },
+  rejected: {
+    label: "Rejected",
+    bg: "rgba(239, 68, 68, 0.1)",
+    fg: "#dc2626",
+    ring: "rgba(239, 68, 68, 0.2)",
+  },
+  cancelled: {
+    label: "Cancelled",
+    bg: "var(--brc-bg-muted)",
+    fg: "var(--brc-text-muted)",
+    ring: "rgba(100, 100, 100, 0.18)",
+  },
 };
+
+const PROGRESS_STEPS = ["Requested", "Review", "Payment", "Active", "Complete"];
+
+function statusToProgressStep(status: DashboardRequestStatus): number {
+  switch (status) {
+    case "pending":
+      return 0;
+    case "approved":
+      return 1;
+    case "payment_submitted":
+      return 2;
+    case "paid":
+      return 2;
+    case "active":
+      return 3;
+    case "completed":
+      return 4;
+    case "rejected":
+    case "cancelled":
+      return 0;
+    default:
+      return 0;
+  }
+}
+
+function noteForStatus(status: DashboardRequestStatus): string {
+  switch (status) {
+    case "pending":
+      return "Waiting for owner approval.";
+    case "approved":
+      return "Approved by owner. Payment is ready.";
+    case "payment_submitted":
+      return "Payment submitted. Awaiting confirmation.";
+    case "paid":
+      return "Payment confirmed. Getting ready.";
+    case "active":
+      return "Your booking is active.";
+    case "completed":
+      return "This request has been completed.";
+    case "rejected":
+      return "This request was declined by the owner.";
+    case "cancelled":
+      return "This request was cancelled.";
+    default:
+      return "";
+  }
+}
 
 const noopSubscribe = () => () => {};
 
@@ -258,11 +326,26 @@ function DashboardButton({
   );
 }
 
+function StatCardSkeleton({ delay }: { delay: number }) {
+  return (
+    <div
+      className="brc-dashboard-card brc-dashboard-reveal relative overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] sm:p-5"
+      style={{ "--delay": `${delay}ms` } as DashboardStyle}
+    >
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <span className="flex size-11 animate-pulse rounded-full bg-(--brc-bg-muted)" />
+      </div>
+      <div className="mb-2 h-3 w-24 animate-pulse rounded-full bg-(--brc-bg-muted)" />
+      <div className="h-8 w-16 animate-pulse rounded-full bg-(--brc-bg-muted)" />
+    </div>
+  );
+}
+
 function StatCard({
   stat,
   delay,
 }: {
-  stat: (typeof CUSTOMER_STATS)[number];
+  stat: StatItem;
   delay: number;
 }) {
   return (
@@ -333,7 +416,7 @@ function QuickActionTile({ link, delay }: { link: QuickLink; delay: number }) {
   );
 }
 
-function StatusBadge({ status }: { status: RequestStatus }) {
+function StatusBadge({ status }: { status: DashboardRequestStatus }) {
   const tone = STATUS_STYLES[status];
 
   return (
@@ -359,16 +442,16 @@ function RequestProgress({
   status,
   delay = 0,
 }: {
-  status: RequestStatus;
+  status: DashboardRequestStatus;
   delay?: number;
 }) {
-  const steps = ["Requested", status === "approved" ? "Approved" : "Review", "Payment"];
-  const activeUntil = status === "approved" ? 1 : 0;
+  const activeUntil = statusToProgressStep(status);
+  const isTerminal = status === "rejected" || status === "cancelled";
 
   return (
-    <div className="mt-4 grid grid-cols-3 gap-2">
-      {steps.map((step, index) => {
-        const active = index <= activeUntil;
+    <div className="mt-4 grid grid-cols-5 gap-2">
+      {PROGRESS_STEPS.map((step, index) => {
+        const active = !isTerminal && index <= activeUntil;
         return (
           <div key={step} className="min-w-0">
             <div className="mb-2 h-1 overflow-hidden rounded-full bg-(--brc-bg-muted)">
@@ -408,13 +491,19 @@ function RequestCard({ req, delay }: { req: RecentRequest; delay: number }) {
           className="relative flex items-center justify-center overflow-hidden rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle)"
           style={{ height: "clamp(5rem, 25vw, 6rem)" }}
         >
-          <Image
-            src="/car-lexus.png"
-            alt={req.car}
-            fill
-            sizes="(max-width: 640px) 88vw, 84px"
-            className="brc-dashboard-car-thumb object-contain p-2 transition-transform duration-300 hover:scale-105"
-          />
+          {req.carImage ? (
+            <Image
+              src={req.carImage}
+              alt={req.car}
+              fill
+              sizes="(max-width: 640px) 88vw, 84px"
+              className="brc-dashboard-car-thumb object-contain p-2 transition-transform duration-300 hover:scale-105"
+            />
+          ) : (
+            <span className="flex items-center justify-center text-(--brc-text-muted)">
+              <Icon name="car" size={36} stroke="currentColor" />
+            </span>
+          )}
         </div>
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -473,11 +562,32 @@ function RequestCard({ req, delay }: { req: RecentRequest; delay: number }) {
   );
 }
 
+function RequestCardSkeleton({ delay }: { delay: number }) {
+  return (
+    <div
+      className="brc-dashboard-card brc-dashboard-reveal rounded-2xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] sm:p-5"
+      style={{ "--delay": `${delay}ms` } as DashboardStyle}
+    >
+      <div className="grid gap-4 sm:grid-cols-[84px_1fr]">
+        <div
+          className="animate-pulse rounded-xl bg-(--brc-bg-muted)"
+          style={{ height: "clamp(5rem, 25vw, 6rem)" }}
+        />
+        <div className="flex flex-col gap-3">
+          <div className="h-5 w-40 animate-pulse rounded-full bg-(--brc-bg-muted)" />
+          <div className="h-4 w-28 animate-pulse rounded-full bg-(--brc-bg-muted)" />
+          <div className="h-3 w-full animate-pulse rounded-full bg-(--brc-bg-muted)" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RecommendedCard({
   car,
   delay,
 }: {
-  car: (typeof RECOMMENDED_CARS)[number];
+  car: RecommendedCar;
   delay: number;
 }) {
   return (
@@ -490,13 +600,19 @@ function RecommendedCard({
         className="relative flex items-center justify-center overflow-hidden rounded-xl bg-(--brc-primary-tint)"
         style={{ height: "clamp(4.5rem, 18vw, 5rem)" }}
       >
-        <Image
-          src="/car-lexus.png"
-          alt={car.name}
-          fill
-          sizes="(max-width: 640px) 76px, 88px"
-          className="brc-dashboard-car-thumb object-contain p-2 transition-transform duration-300 group-hover:scale-105"
-        />
+        {car.image ? (
+          <Image
+            src={car.image}
+            alt={car.name}
+            fill
+            sizes="(max-width: 640px) 76px, 88px"
+            className="brc-dashboard-car-thumb object-contain p-2 transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <span className="flex items-center justify-center text-(--brc-primary)">
+            <Icon name="car" size={28} stroke="currentColor" />
+          </span>
+        )}
       </div>
       <div className="min-w-0">
         <div className="mb-2 flex items-center gap-2">
@@ -578,6 +694,145 @@ export default function CustomerDashboard() {
     ? `${greeting}, ${firstName}`
     : `${greeting}, welcome back`;
 
+  const { data: requestsData, isLoading: requestsLoading } =
+    useCustomerRequests();
+  const { data: transactionsData } = useTransactions();
+  const { data: publicCarsData } = usePublicCars();
+
+  const allRequests = useMemo(
+    () => requestsData?.results ?? [],
+    [requestsData?.results],
+  );
+
+  const stats = useMemo((): StatItem[] => {
+    const activeCount = allRequests.filter((r) =>
+      ACTIVE_STATUSES.includes(r.status),
+    ).length;
+    const completedCount = allRequests.filter(
+      (r) => r.status === "completed",
+    ).length;
+    const pendingCount = allRequests.filter(
+      (r) => r.status === "pending",
+    ).length;
+
+    const completedTransactions = transactionsData?.results?.filter(
+      (t) => t.status === "completed",
+    ) ?? [];
+    const totalSpend = completedTransactions.reduce(
+      (sum, t) => sum + Number(t.amount),
+      0,
+    );
+
+    return [
+      {
+        label: "Active Requests",
+        value: String(activeCount),
+        icon: "car",
+        color: "var(--brc-primary)",
+      },
+      {
+        label: "Completed",
+        value: String(completedCount),
+        icon: "check",
+        color: "var(--brc-success)",
+      },
+      {
+        label: "Total Spend",
+        value: naira(totalSpend),
+        icon: "banknote",
+        color: "var(--brc-accent)",
+      },
+      {
+        label: "Pending Approvals",
+        value: String(pendingCount),
+        icon: "clock",
+        color: "var(--brc-warning)",
+      },
+    ];
+  }, [allRequests, transactionsData]);
+
+  const recentRequests = useMemo((): RecentRequest[] => {
+    return allRequests.slice(0, 3).map((r) => {
+      const status = r.status as DashboardRequestStatus;
+      const action =
+        status === "approved"
+          ? {
+              label: "Proceed to payment",
+              href: `/customer/payments?requestId=${r.id}`,
+            }
+          : undefined;
+      return {
+        id: r.id,
+        car: r.car.title,
+        carImage: r.car.primary_image,
+        party: `${r.car.owner.first_name} ${r.car.owner.last_name}`,
+        mode: r.request_type === "rent" ? "Rent" : "Buy",
+        days: r.duration_days,
+        price: Number(r.price_offered),
+        status,
+        note: noteForStatus(status),
+        action,
+      };
+    });
+  }, [allRequests]);
+
+  const requestedCarIds = useMemo(
+    () => new Set(allRequests.map((r) => r.car.id)),
+    [allRequests],
+  );
+
+  const recommendedCars = useMemo((): RecommendedCar[] => {
+    const allCars = publicCarsData?.results ?? [];
+    return allCars
+      .filter((c) => !requestedCarIds.has(c.id))
+      .slice(0, 3)
+      .map((c) => {
+        let tag: string;
+        let price: number;
+        let suffix: string;
+        if (c.listing_type === "rent") {
+          tag = "Rent";
+          price = Number(c.rent_price_per_day ?? 0);
+          suffix = "per day";
+        } else if (c.listing_type === "buy") {
+          tag = "Buy";
+          price = Number(c.sale_price ?? 0);
+          suffix = "asking price";
+        } else {
+          tag = "Rent / Buy";
+          price = Number(c.rent_price_per_day ?? c.sale_price ?? 0);
+          suffix = c.rent_price_per_day ? "per day" : "asking price";
+        }
+        return {
+          id: c.id,
+          name: c.title,
+          location: `${c.city}, ${c.state}`,
+          tag,
+          price,
+          suffix,
+          href: `/cars/${c.id}`,
+          image: c.primary_image,
+        };
+      });
+  }, [publicCarsData, requestedCarIds]);
+
+  const heroSubtitle = useMemo(() => {
+    const activeCount = allRequests.filter((r) =>
+      ACTIVE_STATUSES.includes(r.status),
+    ).length;
+    const approvedCount = allRequests.filter(
+      (r) => r.status === "approved",
+    ).length;
+
+    if (allRequests.length === 0) {
+      return "Browse verified cars and submit your first request to get started.";
+    }
+    if (approvedCount > 0) {
+      return `You have ${activeCount} active ${activeCount === 1 ? "request" : "requests"} and ${approvedCount} approved ${approvedCount === 1 ? "request" : "requests"} ready for payment.`;
+    }
+    return `You have ${activeCount} active ${activeCount === 1 ? "request" : "requests"} awaiting owner updates.`;
+  }, [allRequests]);
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#FAFAFA_0%,#FFFFFF_46%,#FAFAFA_100%)]">
       <div className="mx-auto flex w-full max-w-[1232px] flex-col gap-6 px-4 py-6 sm:gap-7 sm:px-8 sm:py-9 lg:px-[104px] lg:py-12">
@@ -593,11 +848,11 @@ export default function CustomerDashboard() {
                   {greetingText}
                 </h1>
                 <p className="mt-4 max-w-xl text-base leading-7 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                  You have 2 active requests awaiting owner updates and 1 approved request ready for payment.
+                  {heroSubtitle}
                 </p>
               </div>
               <div className="grid gap-3 sm:flex sm:flex-wrap">
-                <DashboardButton href="/customer/listings">Browse Cars</DashboardButton>
+                <DashboardButton href="/services">Browse Cars</DashboardButton>
                 <DashboardButton href="/customer/requests" variant="soft">
                   View Requests
                 </DashboardButton>
@@ -626,9 +881,13 @@ export default function CustomerDashboard() {
           aria-label="Customer summary"
           className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
         >
-          {CUSTOMER_STATS.map((stat, index) => (
-            <StatCard key={stat.label} stat={stat} delay={80 + index * 70} />
-          ))}
+          {requestsLoading
+            ? [0, 1, 2, 3].map((i) => (
+                <StatCardSkeleton key={i} delay={80 + i * 70} />
+              ))
+            : stats.map((stat, index) => (
+                <StatCard key={stat.label} stat={stat} delay={80 + index * 70} />
+              ))}
         </section>
 
         <div className="grid gap-7 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -663,30 +922,57 @@ export default function CustomerDashboard() {
                 }
               />
               <div className="flex flex-col gap-4">
-                {RECENT_REQUESTS.map((request, index) => (
-                  <RequestCard
-                    key={request.id}
-                    req={request}
-                    delay={380 + index * 70}
-                  />
-                ))}
+                {requestsLoading ? (
+                  [0, 1, 2].map((i) => (
+                    <RequestCardSkeleton key={i} delay={380 + i * 70} />
+                  ))
+                ) : recentRequests.length === 0 ? (
+                  <div
+                    className="brc-dashboard-card brc-dashboard-reveal rounded-2xl border border-(--brc-border) bg-white p-8 text-center shadow-[var(--brc-shadow-xs)]"
+                    style={{ "--delay": "380ms" } as DashboardStyle}
+                  >
+                    <span className="mb-3 flex justify-center text-(--brc-text-muted)">
+                      <Icon name="car" size={40} stroke="currentColor" />
+                    </span>
+                    <p className="m-0 text-sm font-medium text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                      No requests yet — browse cars to get started
+                    </p>
+                    <Link
+                      href="/services"
+                      className="mt-4 inline-flex items-center gap-2 text-sm font-extrabold text-(--brc-primary) no-underline [font-family:var(--brc-font-ui)]"
+                    >
+                      Browse Cars
+                      <Icon name="arrow" size={14} stroke="currentColor" />
+                    </Link>
+                  </div>
+                ) : (
+                  recentRequests.map((request, index) => (
+                    <RequestCard
+                      key={request.id}
+                      req={request}
+                      delay={380 + index * 70}
+                    />
+                  ))
+                )}
               </div>
             </section>
           </div>
 
           <aside className="flex min-w-0 flex-col gap-7">
-            <section className="flex flex-col gap-4">
-              <SectionHeader eyebrow="For you" title="Recommended Cars" />
-              <div className="flex flex-col gap-4">
-                {RECOMMENDED_CARS.map((car, index) => (
-                  <RecommendedCard
-                    key={car.id}
-                    car={car}
-                    delay={430 + index * 70}
-                  />
-                ))}
-              </div>
-            </section>
+            {recommendedCars.length > 0 && (
+              <section className="flex flex-col gap-4">
+                <SectionHeader eyebrow="For you" title="Recommended Cars" />
+                <div className="flex flex-col gap-4">
+                  {recommendedCars.map((car, index) => (
+                    <RecommendedCard
+                      key={car.id}
+                      car={car}
+                      delay={430 + index * 70}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
             <LoyaltySnapshot />
           </aside>
         </div>

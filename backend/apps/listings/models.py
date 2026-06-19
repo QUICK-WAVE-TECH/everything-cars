@@ -147,10 +147,18 @@ def car_image_path(instance, filename):
     return f"car_images/{instance.car_id}/{filename}"
 
 
+def car_image_thumbnail_path(instance, filename):
+    return f"car_images/{instance.car_id}/thumbnails/{filename}"
+
+
 class CarImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     car = models.ForeignKey(Car, on_delete=models.CASCADE, related_name="images")
     image = models.ImageField(upload_to=car_image_path)
+    thumbnail = models.ImageField(
+        upload_to=car_image_thumbnail_path,
+        blank=True,
+    )
     is_primary = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
