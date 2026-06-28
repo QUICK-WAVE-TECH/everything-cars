@@ -4,7 +4,9 @@ import { useMemo, useState, useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { CheckIcon } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { IconName } from "@/features/auth/components/icon";
@@ -20,9 +22,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { BookingModal } from "@/features/inspections/components/booking-modal";
+import { useMyBookings } from "@/features/inspections/api/inspections-api";
+import type { InspectionBooking } from "@/features/inspections/api/types";
 
 // ---------- Types ----------
-type ListingStatus = "draft" | "pending_review" | "needs_changes" | "published" | "paused" | "suspended" | "archived";
+type ListingStatus =
+  | "draft"
+  | "pending_review"
+  | "needs_changes"
+  | "published"
+  | "paused"
+  | "suspended"
+  | "archived"
+  | "inspection_pending"
+  | "inspection_approved"
+  | "inspection_rejected"
+  | "inspection_no_show";
 
 type Listing = {
   id: string;
@@ -104,7 +120,7 @@ const STATS: { icon: IconName; label: string; key: string; color: string; iconCo
 ];
 
 const PER_PAGE = 10;
-const LISTING_TABLE_COLUMNS = "minmax(220px,1.6fr) 90px 130px 150px 120px 56px";
+const LISTING_TABLE_COLUMNS = "minmax(200px,1.5fr) 90px 130px 130px 120px minmax(140px,1fr) 56px";
 
 // ---------- Status badge ----------
 const STATUS_MAP: Record<ListingStatus, { bg: string; fg: string; dot: string; label: string }> = {
@@ -115,6 +131,10 @@ const STATUS_MAP: Record<ListingStatus, { bg: string; fg: string; dot: string; l
   paused: { bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)", dot: "var(--brc-accent)", label: "Paused" },
   suspended: { bg: "var(--brc-danger-bg)", fg: "var(--brc-danger)", dot: "var(--brc-danger)", label: "Suspended" },
   archived: { bg: "var(--brc-bg-muted)", fg: "var(--brc-text-secondary)", dot: "var(--brc-text-secondary)", label: "Archived" },
+  inspection_pending: { bg: "var(--brc-warning-bg)", fg: "#9a7400", dot: "var(--brc-warning)", label: "Inspection Booked" },
+  inspection_approved: { bg: "var(--brc-success-bg)", fg: "var(--brc-success)", dot: "var(--brc-success)", label: "Inspection Passed" },
+  inspection_rejected: { bg: "var(--brc-danger-bg)", fg: "var(--brc-danger)", dot: "var(--brc-danger)", label: "Inspection Failed" },
+  inspection_no_show: { bg: "#fff3e0", fg: "#c25800", dot: "#e65100", label: "No Show" },
 };
 
 function StatusBadge({ status }: { status: ListingStatus }) {
@@ -270,11 +290,15 @@ function ListingDetail({ label, value, valueClassName }: { label: string; value:
 
 function MobileListingCard({
   listing,
+  booking,
   onClose,
+  onBook,
   isClosing,
 }: {
   listing: Listing;
+  booking: InspectionBooking | undefined;
   onClose: (listingId: string) => void;
+  onBook: (carId: string) => void;
   isClosing: boolean;
 }) {
   return (
@@ -316,6 +340,18 @@ function MobileListingCard({
         <ListingDetail label="Price" value={listing.price} />
       </div>
 
+      {/* Inspection action row (when applicable) */}
+      {(listing.status === "draft" ||
+        listing.status === "inspection_pending" ||
+        listing.status === "inspection_approved" ||
+        listing.status === "inspection_rejected" ||
+        listing.status === "inspection_no_show" ||
+        listing.status === "needs_changes") && (
+        <div className="mt-3">
+          <ActionCell listing={listing} booking={booking} onBook={onBook} />
+        </div>
+      )}
+
       <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-(--brc-bg-subtle) p-1.5">
         <Link
           href={`/owner/my-cars/${listing.id}`}
@@ -353,6 +389,102 @@ function EmptyListings() {
       No listings match your filters.
     </div>
   );
+}
+
+// ---------- Inspection booking helpers ----------
+
+function formatSlotDate(date: string): string {
+  return new Date(date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatSlotTime(time: string): string {
+  const [hourStr, minuteStr] = time.split(":");
+  const hour = parseInt(hourStr ?? "0", 10);
+  const minute = minuteStr ?? "00";
+  const period = hour >= 12 ? "PM" : "AM";
+  const h = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h}:${minute} ${period}`;
+}
+
+// ---------- Action cell ----------
+
+function ActionCell({
+  listing,
+  booking,
+  onBook,
+}: {
+  listing: Listing;
+  booking: InspectionBooking | undefined;
+  onBook: (carId: string) => void;
+}) {
+  const router = useRouter();
+  const { status } = listing;
+
+  if (status === "draft") {
+    return (
+      <button
+        type="button"
+        onClick={() => onBook(listing.id)}
+        className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border-none bg-(--brc-primary) px-3 text-[12px] font-bold text-(--brc-text-on-primary) transition-all duration-150 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) hover:shadow-md [font-family:var(--brc-font-ui)]"
+      >
+        Book Inspection
+      </button>
+    );
+  }
+
+  if (status === "inspection_pending" && booking) {
+    return (
+      <span className="flex flex-col gap-0.5 [font-family:var(--brc-font-ui)]">
+        <span className="text-[12px] font-semibold text-(--brc-text)">
+          {formatSlotDate(booking.slot.date)}
+        </span>
+        <span className="text-[11px] text-(--brc-text-muted)">
+          {formatSlotTime(booking.slot.start_time)} – {formatSlotTime(booking.slot.end_time)}
+        </span>
+      </span>
+    );
+  }
+
+  if (status === "inspection_approved" && booking) {
+    return (
+      <span className="flex items-center gap-1.5 [font-family:var(--brc-font-ui)]">
+        <CheckIcon size={13} className="shrink-0 text-(--brc-success)" />
+        <span className="flex flex-col gap-0.5">
+          <span className="text-[12px] font-semibold text-(--brc-success)">
+            {formatSlotDate(booking.slot.date)}
+          </span>
+          <span className="text-[11px] text-(--brc-text-muted)">Confirmed</span>
+        </span>
+      </span>
+    );
+  }
+
+  if (status === "inspection_rejected" || status === "inspection_no_show") {
+    return (
+      <button
+        type="button"
+        onClick={() => onBook(listing.id)}
+        className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-(--brc-warning) bg-(--brc-warning-bg) px-3 text-[12px] font-bold text-(--brc-text) transition-all duration-150 hover:-translate-y-0.5 hover:brightness-95 [font-family:var(--brc-font-ui)]"
+        style={{ color: "#9a7400" }}
+      >
+        Rebook
+      </button>
+    );
+  }
+
+  if (status === "needs_changes") {
+    return (
+      <button
+        type="button"
+        onClick={() => router.push(`/owner/my-cars/${listing.id}`)}
+        className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-(--brc-accent) bg-(--brc-accent-bg) px-3 text-[12px] font-bold text-(--brc-accent) transition-all duration-150 hover:-translate-y-0.5 hover:brightness-95 [font-family:var(--brc-font-ui)]"
+      >
+        Edit & Rebook
+      </button>
+    );
+  }
+
+  return null;
 }
 
 // ---------- Row action menu ----------
@@ -436,13 +568,36 @@ function Pagination({ page, setPage, totalPages }: { page: number; setPage: (p: 
 // ---------- Main page ----------
 export default function MyCarsPage() {
   const { data: rawListings, isLoading } = useMyCarsList();
+  const { data: bookingsData } = useMyBookings();
   const deleteCar = useDeleteCar();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState({ type: "", status: "" });
   const [applied, setApplied] = useState({ type: "", status: "" });
+  const [bookingCarId, setBookingCarId] = useState<string | null>(null);
+  const [bookingOpen, setBookingOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Build a map of car_id → most recent active booking for fast lookup
+  const bookingByCarId = useMemo<Record<string, InspectionBooking>>(() => {
+    if (!bookingsData?.results) return {};
+    return bookingsData.results.reduce<Record<string, InspectionBooking>>((acc, b) => {
+      // Keep the most recently created booking per car (first in list = most recent)
+      if (!acc[b.car_id]) acc[b.car_id] = b;
+      return acc;
+    }, {});
+  }, [bookingsData]);
+
+  function handleOpenBooking(carId: string) {
+    setBookingCarId(carId);
+    setBookingOpen(true);
+  }
+
+  function handleCloseBooking() {
+    setBookingOpen(false);
+    setBookingCarId(null);
+  }
 
   const listings = useMemo(() => (rawListings?.results ?? []).map(toListing), [rawListings]);
 
@@ -633,7 +788,9 @@ export default function MyCarsPage() {
                 <MobileListingCard
                   key={listing.id}
                   listing={listing}
+                  booking={bookingByCarId[listing.id]}
                   onClose={handleCloseListing}
+                  onBook={handleOpenBooking}
                   isClosing={deleteCar.isPending}
                 />
               ))
@@ -653,6 +810,7 @@ export default function MyCarsPage() {
                 <div className="px-3 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Listed</span></div>
                 <div className="px-3 py-3 text-right"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Price</span></div>
                 <div className="px-3 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Status</span></div>
+                <div className="px-3 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Action</span></div>
                 <div />
               </div>
 
@@ -702,6 +860,13 @@ export default function MyCarsPage() {
                       <div className="flex min-w-0 items-center px-3 py-3">
                         <StatusBadge status={r.status} />
                       </div>
+                      <div className="flex min-w-0 items-center px-3 py-3">
+                        <ActionCell
+                          listing={r}
+                          booking={bookingByCarId[r.id]}
+                          onBook={handleOpenBooking}
+                        />
+                      </div>
                       <div className="flex min-w-0 items-center justify-center px-2 py-3">
                         <RowMenu
                           listingId={r.id}
@@ -723,6 +888,15 @@ export default function MyCarsPage() {
         </div>
       </div>
       </div>
+
+      {bookingCarId && (
+        <BookingModal
+          carId={bookingCarId}
+          open={bookingOpen}
+          onClose={handleCloseBooking}
+          onSuccess={handleCloseBooking}
+        />
+      )}
     </>
   );
 }
