@@ -62,6 +62,14 @@ def create_car(owner, **extra):
     return Car.objects.create(**defaults)
 
 
+def create_test_image(name="test.jpg", size=(100, 100)):
+    img = Image.new("RGB", size, color="red")
+    buffer = BytesIO()
+    img.save(buffer, format="JPEG")
+    buffer.seek(0)
+    return SimpleUploadedFile(name, buffer.read(), content_type="image/jpeg")
+
+
 def image_upload(name="car.jpg", size=(16, 16), image_format="JPEG"):
     buffer = BytesIO()
     Image.new("RGB", size, color=(0, 0, 139)).save(buffer, format=image_format)
@@ -71,6 +79,92 @@ def image_upload(name="car.jpg", size=(16, 16), image_format="JPEG"):
         buffer.getvalue(),
         content_type=f"image/{image_format.lower()}",
     )
+
+
+class CarStatusChoicesTest(APITestCase):
+    def test_new_inspection_statuses_exist(self):
+        """New inspection statuses are valid CarStatus choices."""
+        self.assertEqual(CarStatus.INSPECTION_PENDING, "inspection_pending")
+        self.assertEqual(CarStatus.INSPECTION_APPROVED, "inspection_approved")
+        self.assertEqual(CarStatus.INSPECTION_REJECTED, "inspection_rejected")
+        self.assertEqual(CarStatus.INSPECTION_NO_SHOW, "inspection_no_show")
+
+    def test_pending_review_removed(self):
+        """PENDING_REVIEW is no longer a valid status."""
+        status_values = [choice[0] for choice in CarStatus.choices]
+        self.assertNotIn("pending_review", status_values)
+
+
+class EditLockdownTest(APITestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.TEMP_MEDIA = tempfile.mkdtemp()
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.TEMP_MEDIA, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        self.owner = create_user("lockdown@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner)
+        self.client.force_authenticate(user=self.owner)
+
+    def test_edit_allowed_in_draft(self):
+        self.car.status = CarStatus.DRAFT
+        self.car.save(update_fields=["status"])
+        res = self.client.patch(f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"})
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_edit_allowed_in_needs_changes(self):
+        self.car.status = CarStatus.NEEDS_CHANGES
+        self.car.save(update_fields=["status"])
+        res = self.client.patch(f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Blue"})
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_edit_allowed_in_inspection_rejected(self):
+        self.car.status = CarStatus.INSPECTION_REJECTED
+        self.car.save(update_fields=["status"])
+        res = self.client.patch(f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Green"})
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_edit_allowed_in_inspection_no_show(self):
+        self.car.status = CarStatus.INSPECTION_NO_SHOW
+        self.car.save(update_fields=["status"])
+        res = self.client.patch(f"/api/v1/listings/my-cars/{self.car.id}", {"color": "White"})
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_edit_blocked_in_inspection_pending(self):
+        self.car.status = CarStatus.INSPECTION_PENDING
+        self.car.save(update_fields=["status"])
+        res = self.client.patch(f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"})
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_edit_blocked_in_inspection_approved(self):
+        self.car.status = CarStatus.INSPECTION_APPROVED
+        self.car.save(update_fields=["status"])
+        res = self.client.patch(f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"})
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_edit_blocked_in_published(self):
+        self.car.status = CarStatus.PUBLISHED
+        self.car.save(update_fields=["status"])
+        res = self.client.patch(f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"})
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    @override_settings(MEDIA_ROOT=None)
+    def test_image_upload_blocked_in_inspection_pending(self):
+        self.car.status = CarStatus.INSPECTION_PENDING
+        self.car.save(update_fields=["status"])
+        img = create_test_image()
+        res = self.client.post(
+            f"/api/v1/listings/my-cars/{self.car.id}/images",
+            {"front": img, "back": img, "left_side": img, "right_side": img},
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class BuyRequestConflictTests(APITestCase):
@@ -136,6 +230,7 @@ class CarImageUploadTests(APITestCase):
             listing_type=ListingType.RENT,
             rent_price_per_day="35000.00",
             sale_price=None,
+            status=CarStatus.DRAFT,
         )
         self.client.force_authenticate(user=self.owner)
 
@@ -199,7 +294,7 @@ class CarImageUploadTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("up to 10", response.data["detail"])
 
-    def test_first_upload_becomes_primary_and_published_car_returns_to_review(self):
+    def test_first_upload_becomes_primary_and_optimizes_to_webp(self):
         response = self.client.post(
             self.upload_url(),
             {"images": [image_upload("front.jpg"), image_upload("side.jpg")]},
@@ -218,7 +313,7 @@ class CarImageUploadTests(APITestCase):
         self.assertTrue(first_image.thumbnail.name.endswith("-thumb.webp"))
 
         self.car.refresh_from_db()
-        self.assertEqual(self.car.status, CarStatus.PENDING_REVIEW)
+        self.assertEqual(self.car.status, CarStatus.DRAFT)
 
     def test_respects_total_image_limit_per_car(self):
         CarImage.objects.bulk_create(

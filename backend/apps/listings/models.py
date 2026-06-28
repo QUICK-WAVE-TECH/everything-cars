@@ -38,7 +38,10 @@ class FuelType(models.TextChoices):
 
 class CarStatus(models.TextChoices):
     DRAFT = "draft", "Draft"
-    PENDING_REVIEW = "pending_review", "Pending Review"
+    INSPECTION_PENDING = "inspection_pending", "Inspection Pending"
+    INSPECTION_APPROVED = "inspection_approved", "Inspection Approved"
+    INSPECTION_REJECTED = "inspection_rejected", "Inspection Rejected"
+    INSPECTION_NO_SHOW = "inspection_no_show", "Inspection No Show"
     NEEDS_CHANGES = "needs_changes", "Needs Changes"
     PUBLISHED = "published", "Published"
     PAUSED = "paused", "Paused"

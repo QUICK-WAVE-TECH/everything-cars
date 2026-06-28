@@ -60,16 +60,19 @@ from apps.notifications.service import (
     notify_rental_active,
     notify_rental_completed,
     notify_auto_rejected,
-    notify_listing_submitted,
-    notify_listing_approved,
     notify_listing_rejected,
-    notify_listing_needs_changes,
 )
 
 
 MAX_CAR_IMAGES_PER_REQUEST = 10
 MAX_CAR_IMAGES_PER_CAR = 20
 MAX_CAR_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+EDITABLE_CAR_STATUSES = [
+    CarStatus.DRAFT,
+    CarStatus.NEEDS_CHANGES,
+    CarStatus.INSPECTION_REJECTED,
+    CarStatus.INSPECTION_NO_SHOW,
+]
 REQUEST_APPROVAL_BLOCKING_STATUSES = [
     RequestStatus.APPROVED,
     RequestStatus.PAYMENT_SUBMITTED,
@@ -328,20 +331,14 @@ class MyCarDetailView(APIView):
                     {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
                 )
 
-            if car.status == CarStatus.ARCHIVED:
+            if car.status not in EDITABLE_CAR_STATUSES:
                 return Response(
-                    {"detail": "Archived cars cannot be updated."},
-                    status=status.HTTP_400_BAD_REQUEST,
+                    {"detail": "Car details cannot be edited in this status."},
+                    status=status.HTTP_403_FORBIDDEN,
                 )
-            was_published = car.status == CarStatus.PUBLISHED
             serializer = CarCreateSerializer(car, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             car = serializer.save()
-
-            if was_published:
-                car.status = CarStatus.PENDING_REVIEW
-                car.published_at = None
-                car.save(update_fields=["status", "published_at", "updated_at"])
 
         car.refresh_from_db()
         car = self._get_car(car_id, request.user)
@@ -369,6 +366,21 @@ class CarImageUploadView(APIView):
     parser_classes = [MultiPartParser]
 
     def post(self, request, car_id):
+        # Check car ownership and edit lockdown before file validation so
+        # we return 403/404 even when no files are sent.
+        try:
+            with transaction.atomic():
+                car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
+                if car.status not in EDITABLE_CAR_STATUSES:
+                    return Response(
+                        {"detail": "Car images cannot be uploaded in this status."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+        except Car.DoesNotExist:
+            return Response(
+                {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+
         files = request.FILES.getlist("images")
         if not files:
             return Response(
@@ -410,11 +422,6 @@ class CarImageUploadView(APIView):
         try:
             with transaction.atomic():
                 car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
-                if car.status == CarStatus.ARCHIVED:
-                    return Response(
-                        {"detail": "Archived cars cannot receive new images."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
 
                 existing_image_count = car.images.count()
                 if existing_image_count + len(files) > MAX_CAR_IMAGES_PER_CAR:
@@ -449,10 +456,6 @@ class CarImageUploadView(APIView):
                     )
                     created_images.append(image)
 
-                if car.status == CarStatus.PUBLISHED:
-                    car.status = CarStatus.PENDING_REVIEW
-                    car.published_at = None
-                    car.save(update_fields=["status", "published_at", "updated_at"])
         except Car.DoesNotExist:
             return Response(
                 {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
@@ -578,12 +581,15 @@ class MyCarStatusView(APIView):
     permission_classes = [IsOwner]
 
     OWNER_TRANSITIONS = {
-        "draft": ["pending_review"],
-        "pending_review": [],  # Only admin can transition from here
-        "needs_changes": ["pending_review"],  # Owner fixes and resubmits
+        "draft": [],  # No direct status change — booking triggers inspection_pending
+        "inspection_pending": [],  # Only staff can transition
+        "inspection_approved": [],  # Only staff can transition
+        "inspection_rejected": [],  # Owner rebooks via inspections app
+        "inspection_no_show": [],  # Owner rebooks via inspections app
+        "needs_changes": [],  # Owner rebooks via inspections app
         "published": ["paused", "archived"],
         "paused": ["published", "archived"],
-        "suspended": [],  # Only admin can transition from here
+        "suspended": [],  # Only staff can transition
         "archived": [],  # Terminal
     }
 
@@ -618,18 +624,9 @@ class MyCarStatusView(APIView):
             car.status = new_status
             if new_status == CarStatus.PUBLISHED and not car.published_at:
                 car.published_at = timezone.now()
-            if new_status == CarStatus.PENDING_REVIEW:
-                car.admin_note = ""  # Clear admin note on resubmit
             car.save(
                 update_fields=["status", "admin_note", "published_at", "updated_at"]
             )
-            if new_status == CarStatus.PENDING_REVIEW:
-                schedule_notification(
-                    notify_listing_submitted,
-                    lambda car_id=car.id: Car.objects.select_related("owner").get(
-                        id=car_id
-                    ),
-                )
 
         return Response(
             CarDetailSerializer(
@@ -1001,10 +998,7 @@ class AdminCarStatusView(APIView):
     permission_classes = [IsStaff]
 
     ADMIN_TRANSITIONS = {
-        ("pending_review", "published"),
-        ("pending_review", "suspended"),
-        ("pending_review", "needs_changes"),
-        ("needs_changes", "published"),
+        ("inspection_pending", "suspended"),
         ("needs_changes", "suspended"),
         ("published", "suspended"),
         ("suspended", "published"),
@@ -1016,12 +1010,6 @@ class AdminCarStatusView(APIView):
         if not new_status:
             return Response(
                 {"detail": "Status is required."}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if new_status == "needs_changes" and not note:
-            return Response(
-                {"detail": "A note is required when requesting changes."},
-                status=status.HTTP_400_BAD_REQUEST,
             )
 
         with transaction.atomic():
@@ -1045,15 +1033,11 @@ class AdminCarStatusView(APIView):
             if new_status == CarStatus.PUBLISHED:
                 car.published_at = timezone.now()
                 car.admin_note = ""  # Clear note on publish
-            elif new_status == CarStatus.NEEDS_CHANGES:
-                car.admin_note = note
             car.save(
                 update_fields=["status", "admin_note", "updated_at", "published_at"]
             )
             notification_map = {
-                CarStatus.PUBLISHED: notify_listing_approved,
                 CarStatus.SUSPENDED: notify_listing_rejected,
-                CarStatus.NEEDS_CHANGES: notify_listing_needs_changes,
             }
             notify_func = notification_map.get(new_status)
             if notify_func:
