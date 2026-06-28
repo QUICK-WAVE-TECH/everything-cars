@@ -21,10 +21,14 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
   request_rejected: "car",
   request_cancelled: "car",
   requests_auto_rejected: "car",
-  listing_submitted: "file",
-  listing_approved: "check",
-  listing_rejected: "file",
-  listing_needs_changes: "file",
+  listing_suspended: "file",
+  inspection_booked: "clock",
+  inspection_booking_approved: "check",
+  inspection_booking_rejected: "file",
+  inspection_passed: "check",
+  inspection_failed: "file",
+  inspection_no_show: "clock",
+  inspection_rescheduled: "clock",
   payment_submitted: "banknote",
   payment_confirmed: "banknote",
   rental_active: "car",
@@ -55,11 +59,17 @@ function resolveHref(notification: NotificationItem, role: UserRole): string {
     case "rental_completed":
       return data.request_id ? `/customer/requests/${data.request_id}` : `/${role}/dashboard`;
 
-    case "listing_submitted":
-    case "listing_approved":
-    case "listing_rejected":
-    case "listing_needs_changes":
-      return data.car_id ? `/owner/my-cars/${data.car_id}` : `/${role}/dashboard`;
+    case "listing_suspended":
+    case "inspection_booking_approved":
+    case "inspection_booking_rejected":
+    case "inspection_passed":
+    case "inspection_failed":
+    case "inspection_no_show":
+      return `/owner/my-cars`;
+
+    case "inspection_booked":
+    case "inspection_rescheduled":
+      return `/admin/approvals`;
 
     case "system":
     default:
