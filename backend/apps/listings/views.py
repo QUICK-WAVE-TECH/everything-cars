@@ -60,7 +60,7 @@ from apps.notifications.service import (
     notify_rental_active,
     notify_rental_completed,
     notify_auto_rejected,
-    notify_listing_rejected,
+    notify_listing_suspended,
 )
 
 
@@ -1037,7 +1037,7 @@ class AdminCarStatusView(APIView):
                 update_fields=["status", "admin_note", "updated_at", "published_at"]
             )
             notification_map = {
-                CarStatus.SUSPENDED: notify_listing_rejected,
+                CarStatus.SUSPENDED: notify_listing_suspended,
             }
             notify_func = notification_map.get(new_status)
             if notify_func:
