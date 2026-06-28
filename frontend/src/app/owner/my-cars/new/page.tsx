@@ -431,7 +431,7 @@ export default function ListCarPage() {
                   Car Listed Successfully
                 </h2>
                 <p className="mx-auto mt-3 max-w-[460px] text-base text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                  <strong className="text-(--brc-text)">{title || brand}</strong> is now {isBuy ? "up for sale" : "available to rent"}. We&apos;ll notify you when a request comes in.
+                  <strong className="text-(--brc-text)">{title || brand}</strong> is now {isBuy ? "up for sale" : "available to rent"}. Head to your listings to book an inspection date.
                 </p>
               </div>
               <div className="mt-2 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
