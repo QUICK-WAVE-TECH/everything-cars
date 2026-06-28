@@ -1,8 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 
-from .models import InspectionSlot, InspectionBooking, ACTIVE_BOOKING_STATUSES
-from apps.listings.models import Car, CarStatus
+from .models import InspectionSlot, InspectionBooking
 from apps.listings.serializers import CarDetailSerializer
 
 

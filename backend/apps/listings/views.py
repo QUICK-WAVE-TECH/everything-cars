@@ -1006,7 +1006,6 @@ class AdminCarStatusView(APIView):
 
     def post(self, request, car_id):
         new_status = request.data.get("status")
-        note = request.data.get("note", "")
         if not new_status:
             return Response(
                 {"detail": "Status is required."}, status=status.HTTP_400_BAD_REQUEST

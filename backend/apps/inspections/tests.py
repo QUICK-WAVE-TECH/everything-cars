@@ -1,4 +1,4 @@
-from datetime import date, time, timedelta
+from datetime import time, timedelta
 
 from django.utils import timezone
 from rest_framework import status
@@ -9,8 +9,8 @@ from apps.inspections.models import (
     InspectionBooking,
     InspectionSlot,
 )
-from apps.listings.models import Car, CarStatus
-from apps.listings.tests import create_car, create_customer_profile, create_owner_profile, create_user
+from apps.listings.models import CarStatus
+from apps.listings.tests import create_car, create_owner_profile, create_user
 
 
 def create_slot(staff, days_ahead=7, **overrides):
