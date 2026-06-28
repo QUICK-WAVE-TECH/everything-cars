@@ -18,11 +18,27 @@ from .models import (
 
 
 class CarImageSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+    thumbnail = serializers.SerializerMethodField()
 
     class Meta:
         model = CarImage
         fields = ["id", "image", "thumbnail", "is_primary", "created_at"]
         read_only_fields = fields
+
+    def _absolute_file_url(self, file):
+        if not file:
+            return None
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(file.url)
+        return file.url
+
+    def get_image(self, obj):
+        return self._absolute_file_url(obj.image)
+
+    def get_thumbnail(self, obj):
+        return self._absolute_file_url(obj.thumbnail)
 
 
 class ListingFeatureSerializer(serializers.ModelSerializer):

@@ -1,3 +1,5 @@
+from datetime import time
+
 from rest_framework import serializers
 from django.utils import timezone
 
@@ -44,6 +46,34 @@ class InspectionSlotCreateSerializer(serializers.Serializer):
     capacity = serializers.IntegerField(min_value=1, default=1)
     location = serializers.CharField(max_length=200)
 
+    def _parse_time(self, value):
+        if isinstance(value, time):
+            return value
+        if not isinstance(value, str):
+            raise serializers.ValidationError("Time must be a string.")
+
+        raw = value.strip().upper()
+        is_pm = "PM" in raw
+        is_am = "AM" in raw
+        cleaned = raw.replace("AM", "").replace("PM", "").strip()
+        parts = cleaned.split(":")
+
+        try:
+            hour = int(parts[0])
+            minute = int(parts[1]) if len(parts) > 1 else 0
+        except (TypeError, ValueError, IndexError):
+            raise serializers.ValidationError("Use HH:MM format.")
+
+        if is_pm and hour != 12:
+            hour += 12
+        if is_am and hour == 12:
+            hour = 0
+
+        if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+            raise serializers.ValidationError("Use a valid time.")
+
+        return time(hour, minute)
+
     def validate(self, data):
         if data["date_from"] > data["date_to"]:
             raise serializers.ValidationError(
@@ -53,11 +83,23 @@ class InspectionSlotCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {"date_from": "Start date cannot be in the past."}
             )
+        normalized_slots = []
         for slot in data["time_slots"]:
             if "start_time" not in slot or "end_time" not in slot:
                 raise serializers.ValidationError(
                     {"time_slots": "Each slot must have start_time and end_time."}
                 )
+            try:
+                start = self._parse_time(slot["start_time"])
+                end = self._parse_time(slot["end_time"])
+            except serializers.ValidationError as exc:
+                raise serializers.ValidationError({"time_slots": exc.detail})
+            if start >= end:
+                raise serializers.ValidationError(
+                    {"time_slots": "End time must be after start time."}
+                )
+            normalized_slots.append({"start_time": start, "end_time": end})
+        data["time_slots"] = normalized_slots
         return data
 
 

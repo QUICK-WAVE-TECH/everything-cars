@@ -49,6 +49,34 @@ class StaffSlotManagementTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertGreater(res.data["created_count"], 0)
 
+    def test_create_slots_rejects_past_start_date(self):
+        yesterday = timezone.localdate() - timedelta(days=1)
+        res = self.client.post("/api/v1/inspections/slots/", {
+            "date_from": yesterday.isoformat(),
+            "date_to": yesterday.isoformat(),
+            "days": [yesterday.weekday()],
+            "time_slots": [{"start_time": "09:00", "end_time": "10:00"}],
+            "capacity": 1,
+            "location": "Lekki Inspection Center",
+        }, format="json")
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("date_from", res.data)
+
+    def test_create_slots_rejects_end_time_before_start_time(self):
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        res = self.client.post("/api/v1/inspections/slots/", {
+            "date_from": tomorrow.isoformat(),
+            "date_to": tomorrow.isoformat(),
+            "days": [tomorrow.weekday()],
+            "time_slots": [{"start_time": "10:00", "end_time": "09:00"}],
+            "capacity": 1,
+            "location": "Lekki Inspection Center",
+        }, format="json")
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("time_slots", res.data)
+
     def test_list_slots(self):
         create_slot(self.staff)
         res = self.client.get("/api/v1/inspections/slots/")

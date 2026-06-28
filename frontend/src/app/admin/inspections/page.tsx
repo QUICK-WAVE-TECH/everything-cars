@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, XIcon, Loader2Icon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ApiError } from "@/lib/api-client";
 import {
   Dialog,
   DialogContent,
@@ -167,6 +168,7 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
   const [location, setLocation] = useState("");
 
   const createSlots = useCreateSlots();
+  const todayIso = toIsoDate(new Date());
 
   const previewCount = useMemo(
     () => countPreviewSlots(dateFrom, dateTo, selectedDays, timeSlots),
@@ -189,6 +191,13 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
 
   function updateTimeSlot(i: number, field: "start_time" | "end_time", value: string) {
     setTimeSlots((prev) => prev.map((s, idx) => (idx === i ? { ...s, [field]: value } : s)));
+  }
+
+  function handleDateFromChange(value: string) {
+    setDateFrom(value);
+    if (dateTo && value && dateTo < value) {
+      setDateTo(value);
+    }
   }
 
   function resetForm() {
@@ -218,8 +227,12 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
       toast.success(`${result.created_count} slot${result.created_count !== 1 ? "s" : ""} created successfully`);
       resetForm();
       onClose();
-    } catch {
-      toast.error("Failed to create slots. Please try again.");
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError
+          ? error.message
+          : "Failed to create slots. Please try again.",
+      );
     }
   }
 
@@ -334,8 +347,9 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
               <input
                 type="date"
                 required
+                min={todayIso}
                 value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
+                onChange={(e) => handleDateFromChange(e.target.value)}
                 style={inputStyle}
               />
             </div>
@@ -345,7 +359,7 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
                 type="date"
                 required
                 value={dateTo}
-                min={dateFrom || undefined}
+                min={dateFrom || todayIso}
                 onChange={(e) => setDateTo(e.target.value)}
                 style={inputStyle}
               />

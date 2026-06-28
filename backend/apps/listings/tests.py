@@ -308,6 +308,10 @@ class CarImageUploadTests(APITestCase):
             1,
         )
         self.assertTrue(response.data[0]["is_primary"])
+        self.assertTrue(response.data[0]["image"].startswith("http://testserver/media/"))
+        self.assertTrue(
+            response.data[0]["thumbnail"].startswith("http://testserver/media/")
+        )
         first_image = CarImage.objects.filter(car=self.car, is_primary=True).get()
         self.assertTrue(first_image.image.name.endswith(".webp"))
         self.assertTrue(first_image.thumbnail.name.endswith("-thumb.webp"))

@@ -15,6 +15,7 @@ import {
   Trash2Icon,
   ImageIcon,
   ChevronDownIcon,
+  CalendarIcon,
 } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import {
@@ -40,6 +41,7 @@ import {
   type CreateCarInput,
 } from "@/features/listings/schemas";
 import { ApiError } from "@/lib/api-client";
+import { BookingModal } from "@/features/inspections/components/booking-modal";
 
 // ---------- Shared form fields (same as new page) ----------
 
@@ -320,11 +322,35 @@ const STATUS_STYLES: Record<
     dot: "var(--brc-text-muted)",
     label: "Draft",
   },
-  pending_review: {
+  inspection_pending: {
     bg: "var(--brc-warning-bg)",
     fg: "#9a7400",
     dot: "var(--brc-warning)",
-    label: "In Review",
+    label: "Inspection Pending",
+  },
+  inspection_approved: {
+    bg: "var(--brc-accent-bg)",
+    fg: "var(--brc-accent)",
+    dot: "var(--brc-accent)",
+    label: "Inspection Approved",
+  },
+  inspection_rejected: {
+    bg: "var(--brc-danger-bg)",
+    fg: "var(--brc-danger)",
+    dot: "var(--brc-danger)",
+    label: "Inspection Failed",
+  },
+  inspection_no_show: {
+    bg: "var(--brc-danger-bg)",
+    fg: "var(--brc-danger)",
+    dot: "var(--brc-danger)",
+    label: "No Show",
+  },
+  needs_changes: {
+    bg: "var(--brc-warning-bg)",
+    fg: "#9a7400",
+    dot: "var(--brc-warning)",
+    label: "Needs Changes",
   },
   published: {
     bg: "var(--brc-success-bg)",
@@ -412,6 +438,7 @@ export default function CarDetailPage() {
   const [editing, setEditing] = useState(false);
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [activeImage, setActiveImage] = useState(0);
+  const [bookingOpen, setBookingOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<CreateCarFormValues, unknown, CreateCarInput>({
@@ -544,6 +571,7 @@ export default function CarDetailPage() {
   }
 
   return (
+    <>
     <div className="bg-(--brc-bg-subtle)">
       <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-6 px-4 py-6 sm:gap-8 sm:px-6 sm:py-10 lg:px-[var(--brc-space-10,40px)] lg:py-14">
         {/* Back arrow */}
@@ -575,20 +603,14 @@ export default function CarDetailPage() {
           <div className="flex gap-2">
             {!editing ? (
               <>
-                {car.status === "draft" && (
+                {["draft", "needs_changes", "inspection_rejected", "inspection_no_show"].includes(car.status) && (
                   <button
                     type="button"
-                    onClick={() =>
-                      handleStatusChange(
-                        "pending_review",
-                        "Submitted for review",
-                      )
-                    }
-                    disabled={carStatus.isPending}
+                    onClick={() => setBookingOpen(true)}
                     className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border-none bg-(--brc-primary) px-4 text-sm font-semibold text-(--brc-text-on-primary) transition-colors hover:bg-(--brc-primary-hover) disabled:opacity-60 [font-family:var(--brc-font-ui)]"
                   >
-                    <Icon name="arrow" size={15} stroke="currentColor" />
-                    Submit for Review
+                    <CalendarIcon size={15} />
+                    Book Inspection
                   </button>
                 )}
                 {car.status === "published" && (
@@ -617,27 +639,16 @@ export default function CarDetailPage() {
                     Republish
                   </button>
                 )}
-                {car.status === "needs_changes" && (
+                {["draft", "needs_changes", "inspection_rejected", "inspection_no_show"].includes(car.status) && (
                   <button
                     type="button"
-                    onClick={() =>
-                      handleStatusChange("pending_review", "Resubmitted for review")
-                    }
-                    disabled={carStatus.isPending}
-                    className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border-none bg-(--brc-primary) px-4 text-sm font-semibold text-(--brc-text-on-primary) transition-colors hover:bg-(--brc-primary-hover) disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+                    onClick={startEditing}
+                    className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-4 text-sm font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
                   >
-                    <Icon name="arrow" size={15} stroke="currentColor" />
-                    Resubmit for Review
+                    <PencilIcon size={15} />
+                    Edit
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={startEditing}
-                  className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-4 text-sm font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
-                >
-                  <PencilIcon size={15} />
-                  Edit
-                </button>
                 {car.status !== "archived" && (
                   <button
                     type="button"
@@ -663,8 +674,8 @@ export default function CarDetailPage() {
           </div>
         </div>
 
-        {/* Admin note — collapsible accordion when status is needs_changes */}
-        {car.status === "needs_changes" && car.admin_note && (
+        {/* Admin note — collapsible accordion */}
+        {["needs_changes", "inspection_rejected"].includes(car.status) && car.admin_note && (
           <AdminNoteAccordion note={car.admin_note} />
         )}
 
@@ -1130,6 +1141,13 @@ export default function CarDetailPage() {
         </Card>
       </div>
     </div>
+      <BookingModal
+        carId={car.id}
+        open={bookingOpen}
+        onClose={() => setBookingOpen(false)}
+        onSuccess={() => setBookingOpen(false)}
+      />
+    </>
   );
 }
 
@@ -1186,7 +1204,7 @@ function AdminNoteAccordion({ note }: { note: string }) {
             </p>
           </div>
           <span className="mt-3 block text-xs text-[#9a7400]/60 [font-family:var(--brc-font-ui)]">
-            Please make the requested changes and click &quot;Resubmit for Review&quot; above.
+            Please make the requested changes and book a new inspection above.
           </span>
         </div>
       )}
