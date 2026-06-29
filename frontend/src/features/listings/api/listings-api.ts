@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import type { PaginatedResponse } from "@/shared/types/api";
-import { CarDetail, CarImage, CarListItem } from "./types";
+import { CarDetail, CarImage, CarImageFiles, CarListItem } from "./types";
 
 type UploadCarImagesInput = {
   carId: string;
-  files: File[];
+  files: CarImageFiles;
 };
 
 type PaginationParams = {
@@ -105,7 +105,9 @@ export function useUploadCarImages() {
   return useMutation({
     mutationFn: ({ carId, files }: UploadCarImagesInput) => {
       const formData = new FormData();
-      files.forEach((file) => formData.append("images", file));
+      Object.entries(files).forEach(([imageType, file]) => {
+        if (file) formData.append(imageType, file);
+      });
       return apiClient.post<CarImage[]>(
         `/listings/my-cars/${carId}/images`,
         formData,

@@ -1,3 +1,12 @@
+export type CarImageType =
+  | "front"
+  | "back"
+  | "left_side"
+  | "right_side"
+  | "interior";
+
+export type CarImageFiles = Partial<Record<CarImageType, File>>;
+
 export type CarOwner = {
   id: string;
   first_name: string;
@@ -13,6 +22,7 @@ export type CarImage = {
   id: string;
   image: string;
   thumbnail: string | null;
+  image_type: CarImageType | "";
   is_primary: boolean;
   created_at: string;
 };

@@ -49,6 +49,14 @@ class CarStatus(models.TextChoices):
     ARCHIVED = "archived", "Archived"
 
 
+class CarImageType(models.TextChoices):
+    FRONT = "front", "Front"
+    BACK = "back", "Back"
+    LEFT_SIDE = "left_side", "Left Side"
+    RIGHT_SIDE = "right_side", "Right Side"
+    INTERIOR = "interior", "Interior"
+
+
 class Currency(models.TextChoices):
     NGN = "NGN", "Nigerian Naira (₦)"
     USD = "USD", "US Dollar ($)"
@@ -157,6 +165,12 @@ def car_image_thumbnail_path(instance, filename):
 class CarImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     car = models.ForeignKey(Car, on_delete=models.CASCADE, related_name="images")
+    image_type = models.CharField(
+        max_length=20,
+        choices=CarImageType.choices,
+        blank=True,
+        default="",
+    )
     image = models.ImageField(upload_to=car_image_path)
     thumbnail = models.ImageField(
         upload_to=car_image_thumbnail_path,
@@ -172,6 +186,11 @@ class CarImage(models.Model):
                 fields=["car"],
                 condition=models.Q(is_primary=True),
                 name="one_primary_image_per_car",
+            ),
+            models.UniqueConstraint(
+                fields=["car", "image_type"],
+                condition=~models.Q(image_type=""),
+                name="one_image_per_type_per_car",
             )
         ]
 

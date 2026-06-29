@@ -11,7 +11,6 @@ import {
   ArrowLeftIcon,
   PencilIcon,
   XIcon,
-  UploadIcon,
   Trash2Icon,
   ImageIcon,
   ChevronDownIcon,
@@ -35,6 +34,8 @@ import {
   useCarStatus,
 } from "@/features/listings/api";
 import type { CarDetail } from "@/features/listings/api";
+import type { CarImageFiles } from "@/features/listings/api/types";
+import { CarPhotoSlotsField } from "@/features/listings/components/car-photo-slots-field";
 import {
   createCarSchema,
   type CreateCarFormValues,
@@ -436,10 +437,9 @@ export default function CarDetailPage() {
   const carStatus = useCarStatus();
 
   const [editing, setEditing] = useState(false);
-  const [newFiles, setNewFiles] = useState<File[]>([]);
+  const [newFiles, setNewFiles] = useState<CarImageFiles>({});
   const [activeImage, setActiveImage] = useState(0);
   const [bookingOpen, setBookingOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<CreateCarFormValues, unknown, CreateCarInput>({
     resolver: zodResolver(createCarSchema),
@@ -470,7 +470,7 @@ export default function CarDetailPage() {
 
   function cancelEditing() {
     if (car) form.reset(populateForm(car));
-    setNewFiles([]);
+    setNewFiles({});
     setEditing(false);
   }
 
@@ -488,9 +488,9 @@ export default function CarDetailPage() {
 
       await updateCar.mutateAsync(payload);
 
-      if (newFiles.length > 0) {
+      if (Object.keys(newFiles).length > 0) {
         await uploadImages.mutateAsync({ carId, files: newFiles });
-        setNewFiles([]);
+        setNewFiles({});
       }
 
       setEditing(false);
@@ -686,37 +686,15 @@ export default function CarDetailPage() {
               <h2 className="text-lg font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
                 Images
               </h2>
-              {editing && (
-                <div className="flex items-center gap-3">
-                  <input
-                    ref={inputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/heic"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files?.length)
-                        setNewFiles(Array.from(e.target.files));
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => inputRef.current?.click()}
-                    className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-3 text-xs font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
-                  >
-                    <UploadIcon size={14} />
-                    Add Images
-                  </button>
-                  {newFiles.length > 0 && (
-                    <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                      +{newFiles.length} new
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
 
-            {car.images.length === 0 && newFiles.length === 0 ? (
+            {editing ? (
+              <CarPhotoSlotsField
+                value={newFiles}
+                onChange={setNewFiles}
+                existingImages={car.images}
+              />
+            ) : car.images.length === 0 ? (
               <div className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-(--brc-border) py-10 text-(--brc-text-muted)">
                 <ImageIcon size={32} strokeWidth={1.5} />
                 <span className="text-sm [font-family:var(--brc-font-ui)]">

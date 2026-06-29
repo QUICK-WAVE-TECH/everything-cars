@@ -23,7 +23,7 @@ class CarImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CarImage
-        fields = ["id", "image", "thumbnail", "is_primary", "created_at"]
+        fields = ["id", "image", "thumbnail", "image_type", "is_primary", "created_at"]
         read_only_fields = fields
 
     def _absolute_file_url(self, file):
@@ -386,10 +386,11 @@ class CarCreateSerializer(serializers.ModelSerializer):
 
 
 class CarImageUploadSerializer(serializers.Serializer):
-    images = serializers.ListField(
-        child=serializers.ImageField(),
-        allow_empty=False,
-    )
+    front = serializers.ImageField(required=False)
+    back = serializers.ImageField(required=False)
+    left_side = serializers.ImageField(required=False)
+    right_side = serializers.ImageField(required=False)
+    interior = serializers.ImageField(required=False)
 
 
 # ---------- Request serializers ----------

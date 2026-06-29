@@ -11,6 +11,7 @@ from rest_framework.test import APITestCase
 from apps.listings.models import (
     Car,
     CarImage,
+    CarImageType,
     CarStatus,
     ListingType,
     Request,
@@ -241,17 +242,25 @@ class CarImageUploadTests(APITestCase):
     def upload_url(self, car=None):
         return f"/api/v1/listings/my-cars/{(car or self.car).id}/images"
 
+    def typed_images_payload(self, **overrides):
+        payload = {
+            CarImageType.FRONT: image_upload("front.jpg"),
+            CarImageType.BACK: image_upload("back.jpg"),
+            CarImageType.LEFT_SIDE: image_upload("left-side.jpg"),
+            CarImageType.RIGHT_SIDE: image_upload("right-side.jpg"),
+        }
+        payload.update(overrides)
+        return payload
+
     def test_rejects_non_image_uploads(self):
         response = self.client.post(
             self.upload_url(),
             {
-                "images": [
-                    SimpleUploadedFile(
-                        "not-an-image.txt",
-                        b"plain text",
-                        content_type="text/plain",
-                    )
-                ]
+                CarImageType.FRONT: SimpleUploadedFile(
+                    "not-an-image.txt",
+                    b"plain text",
+                    content_type="text/plain",
+                )
             },
             format="multipart",
         )
@@ -268,74 +277,79 @@ class CarImageUploadTests(APITestCase):
 
         response = self.client.post(
             self.upload_url(),
-            {"images": [oversized]},
+            self.typed_images_payload(front=oversized),
             format="multipart",
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("too large", response.data["detail"])
 
-    def test_rejects_too_many_files_per_request(self):
-        files = [
-            SimpleUploadedFile(
-                f"file-{index}.txt",
-                b"not checked because count fails first",
-                content_type="text/plain",
-            )
-            for index in range(11)
-        ]
-
+    def test_rejects_missing_required_views(self):
         response = self.client.post(
             self.upload_url(),
-            {"images": files},
+            {
+                CarImageType.FRONT: image_upload("front.jpg"),
+                CarImageType.BACK: image_upload("back.jpg"),
+            },
             format="multipart",
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("up to 10", response.data["detail"])
+        self.assertIn(CarImageType.LEFT_SIDE, response.data["missing_types"])
+        self.assertIn(CarImageType.RIGHT_SIDE, response.data["missing_types"])
 
     def test_first_upload_becomes_primary_and_optimizes_to_webp(self):
         response = self.client.post(
             self.upload_url(),
-            {"images": [image_upload("front.jpg"), image_upload("side.jpg")]},
+            self.typed_images_payload(interior=image_upload("interior.jpg")),
             format="multipart",
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(CarImage.objects.filter(car=self.car).count(), 2)
+        self.assertEqual(CarImage.objects.filter(car=self.car).count(), 5)
         self.assertEqual(
             CarImage.objects.filter(car=self.car, is_primary=True).count(),
             1,
         )
-        self.assertTrue(response.data[0]["is_primary"])
-        self.assertTrue(response.data[0]["image"].startswith("http://testserver/media/"))
+        front_response = next(
+            item for item in response.data if item["image_type"] == CarImageType.FRONT
+        )
+        self.assertTrue(front_response["is_primary"])
         self.assertTrue(
-            response.data[0]["thumbnail"].startswith("http://testserver/media/")
+            front_response["image"].startswith("http://testserver/media/")
+        )
+        self.assertTrue(
+            front_response["thumbnail"].startswith("http://testserver/media/")
         )
         first_image = CarImage.objects.filter(car=self.car, is_primary=True).get()
+        self.assertEqual(first_image.image_type, CarImageType.FRONT)
         self.assertTrue(first_image.image.name.endswith(".webp"))
         self.assertTrue(first_image.thumbnail.name.endswith("-thumb.webp"))
 
         self.car.refresh_from_db()
         self.assertEqual(self.car.status, CarStatus.DRAFT)
 
-    def test_respects_total_image_limit_per_car(self):
-        CarImage.objects.bulk_create(
-            [
-                CarImage(
-                    car=self.car,
-                    image=f"car_images/{self.car.id}/existing-{index}.jpg",
-                    is_primary=index == 0,
-                )
-                for index in range(19)
-            ]
+    def test_replaces_existing_typed_image(self):
+        self.client.post(
+            self.upload_url(),
+            self.typed_images_payload(),
+            format="multipart",
+        )
+        original_front = CarImage.objects.get(
+            car=self.car, image_type=CarImageType.FRONT
         )
 
         response = self.client.post(
             self.upload_url(),
-            {"images": [image_upload("new-1.jpg"), image_upload("new-2.jpg")]},
+            {CarImageType.FRONT: image_upload("new-front.jpg")},
             format="multipart",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("up to 20 images", response.data["detail"])
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(CarImage.objects.filter(car=self.car).count(), 4)
+        self.assertFalse(CarImage.objects.filter(id=original_front.id).exists())
+        self.assertTrue(
+            CarImage.objects.get(
+                car=self.car, image_type=CarImageType.FRONT
+            ).is_primary
+        )

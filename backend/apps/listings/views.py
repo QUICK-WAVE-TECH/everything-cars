@@ -30,6 +30,7 @@ from .models import (
     ACTIVE_REQUEST_STATUSES,
     Car,
     CarImage,
+    CarImageType,
     CarStatus,
     ListingType,
     Request,
@@ -64,8 +65,16 @@ from apps.notifications.service import (
 )
 
 
-MAX_CAR_IMAGES_PER_REQUEST = 10
-MAX_CAR_IMAGES_PER_CAR = 20
+REQUIRED_CAR_IMAGE_TYPES = [
+    CarImageType.FRONT,
+    CarImageType.BACK,
+    CarImageType.LEFT_SIDE,
+    CarImageType.RIGHT_SIDE,
+]
+OPTIONAL_CAR_IMAGE_TYPES = [CarImageType.INTERIOR]
+CAR_IMAGE_TYPES = REQUIRED_CAR_IMAGE_TYPES + OPTIONAL_CAR_IMAGE_TYPES
+MAX_CAR_IMAGES_PER_REQUEST = len(CAR_IMAGE_TYPES)
+MAX_CAR_IMAGES_PER_CAR = len(CAR_IMAGE_TYPES)
 MAX_CAR_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
 EDITABLE_CAR_STATUSES = [
     CarStatus.DRAFT,
@@ -381,21 +390,16 @@ class CarImageUploadView(APIView):
                 {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
-        files = request.FILES.getlist("images")
-        if not files:
+        upload_data = {
+            image_type: request.FILES.get(image_type)
+            for image_type in CAR_IMAGE_TYPES
+            if request.FILES.get(image_type) is not None
+        }
+        files = list(upload_data.values())
+        if not upload_data:
             return Response(
                 {
                     "detail": "No images provided",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if len(files) > MAX_CAR_IMAGES_PER_REQUEST:
-            return Response(
-                {
-                    "detail": (
-                        f"You can upload up to {MAX_CAR_IMAGES_PER_REQUEST} "
-                        "images at a time."
-                    )
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -415,29 +419,43 @@ class CarImageUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        upload_serializer = CarImageUploadSerializer(data={"images": files})
+        upload_serializer = CarImageUploadSerializer(data=upload_data)
         upload_serializer.is_valid(raise_exception=True)
-        files = upload_serializer.validated_data["images"]
+        uploads_by_type = upload_serializer.validated_data
 
         try:
             with transaction.atomic():
                 car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
 
-                existing_image_count = car.images.count()
-                if existing_image_count + len(files) > MAX_CAR_IMAGES_PER_CAR:
+                existing_types = set(
+                    car.images.exclude(image_type="").values_list(
+                        "image_type", flat=True
+                    )
+                )
+                missing_required_types = [
+                    image_type
+                    for image_type in REQUIRED_CAR_IMAGE_TYPES
+                    if image_type not in uploads_by_type and image_type not in existing_types
+                ]
+                if missing_required_types:
                     return Response(
                         {
                             "detail": (
-                                f"A car can have up to {MAX_CAR_IMAGES_PER_CAR} images."
-                            )
+                                "Please upload front, back, left side, and right side "
+                                "photos before continuing."
+                            ),
+                            "missing_types": missing_required_types,
                         },
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-                has_existing_images = existing_image_count > 0
                 created_images = []
 
-                for i, file in enumerate(files):
+                for image_type in CAR_IMAGE_TYPES:
+                    file = uploads_by_type.get(image_type)
+                    if file is None:
+                        continue
+
                     optimized_file = optimize_car_image(
                         file,
                         MAX_OPTIMIZED_CAR_IMAGE_SIZE,
@@ -448,11 +466,15 @@ class CarImageUploadView(APIView):
                         suffix="-thumb",
                         quality=CAR_IMAGE_THUMBNAIL_WEBP_QUALITY,
                     )
+                    car.images.filter(image_type=image_type).delete()
+                    if image_type == CarImageType.FRONT:
+                        car.images.filter(is_primary=True).update(is_primary=False)
                     image = CarImage.objects.create(
                         car=car,
+                        image_type=image_type,
                         image=optimized_file,
                         thumbnail=thumbnail_file,
-                        is_primary=(not has_existing_images and i == 0),
+                        is_primary=(image_type == CarImageType.FRONT),
                     )
                     created_images.append(image)
 
