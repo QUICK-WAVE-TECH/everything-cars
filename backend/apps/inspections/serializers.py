@@ -3,7 +3,7 @@ from datetime import time
 from rest_framework import serializers
 from django.utils import timezone
 
-from .models import InspectionSlot, InspectionBooking
+from .models import InspectionSlot, InspectionBooking, InspectionCenter
 from apps.listings.serializers import CarDetailSerializer
 
 
@@ -172,3 +172,39 @@ class BookingCreateSerializer(serializers.Serializer):
 
 class StaffNoteSerializer(serializers.Serializer):
     staff_note = serializers.CharField(min_length=1)
+
+
+class InspectionCenterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InspectionCenter
+        fields = [
+            "id",
+            "company_name",
+            "address",
+            "country",
+            "country_code",
+            "state",
+            "city",
+            "city_code",
+            "phone",
+            "email",
+            "max_reschedules",
+            "is_active",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+    def validate_city_code(self, value):
+        value = value.strip().upper()
+        if len(value) != 3 or not value.isalpha():
+            raise serializers.ValidationError(
+                "City code must be exactly 3 letters, e.g LOS."
+            )
+
+        return value
+
+    def validate_country_code(self, value):
+        value = value.strip().upper()
+        if not (2 <= len(value) <= 3) or not value.isalpha():
+            raise serializers.ValidationError("Country Code must be 2-3 letters")
+        return value

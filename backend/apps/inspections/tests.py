@@ -457,3 +457,66 @@ class TrackingIdTest(TestCase):
         car.tracking_id = generate_tracking_id(self.center)
         car.save(update_fields=["tracking_id"])
         self.assertNotEqual(generate_tracking_id(self.center), car.tracking_id)
+
+
+class StaffCenterCrudTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user("staff-center@test.com", "owner", is_staff=True)
+        self.client.force_authenticate(user=self.staff)
+
+    def _payload(self, **overrides):
+        base = {
+            "company_name": "Car 45",
+            "address": "12 Marina Rd",
+            "country": "NG",
+            "country_code": "ng",
+            "state": "Lagos",
+            "city": "Lagos",
+            "city_code": "los",
+            "max_reschedules": 2,
+        }
+        return {**base, **overrides}
+
+    def test_create_center_normalizes_codes(self):
+        res = self.client.post(
+            "/api/v1/inspections/admin/centers/", self._payload(), format="json"
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data["country_code"], "NG")
+        self.assertEqual(res.data["city_code"], "LOS")
+
+    def test_create_rejects_bad_city_code(self):
+        res = self.client.post(
+            "/api/v1/inspections/admin/centers/",
+            self._payload(city_code="LAGOS"),
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("city_code", res.data)
+
+    def test_non_staff_forbidden(self):
+        owner = create_user("owner@test.com", "owner")
+        self.client.force_authenticate(user=owner)
+        res = self.client.post(
+            "/api/v1/inspections/admin/centers/",
+            self._payload(),
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_list_centers(self):
+        create_center(self.staff)
+        create_center(self.staff, company_name="AutoHub", city="Abuja", city_code="ABJ")
+        res = self.client.get("/api/v1/inspections/admin/centers/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["count"], 2)
+
+    def test_deactivate_center(self):
+        center = create_center(self.staff)
+        res = self.client.patch(
+            f"/api/v1/inspections/admin/centers/{center.id}/",
+            {"is_active": False},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertFalse(res.data["is_active"])

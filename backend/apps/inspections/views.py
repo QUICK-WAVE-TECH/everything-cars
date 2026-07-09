@@ -25,6 +25,7 @@ from .models import (
     InspectionBooking,
     InspectionSlot,
     MAX_RESCHEDULES,
+    InspectionCenter,
 )
 from .serializers import (
     AvailableSlotSerializer,
@@ -34,6 +35,7 @@ from .serializers import (
     InspectionSlotCreateSerializer,
     InspectionSlotSerializer,
     StaffNoteSerializer,
+    InspectionCenterSerializer,
 )
 
 
@@ -694,3 +696,76 @@ class StaffBookingNoShowView(APIView):
 
         detail = booking_detail_queryset().get(id=booking.id)
         return Response(InspectionBookingDetailSerializer(detail).data)
+
+
+class StaffCenterListCreateView(APIView):
+    permission_classes = [IsStaff]
+
+    def get(self, request):
+        qs = InspectionCenter.objects.all()
+
+        is_active = request.query_params.get("is_active")
+        if is_active is not None:
+            qs = qs.filter(is_active=is_active.lower() == "true")
+
+            # Get the search request
+
+        search = request.query_params.get("search")
+        if search:
+            qs = qs.filter(
+                Q(company_name__icontains=search)
+                | Q(state__icontains=search)
+                | Q(city__icontains=search)
+            )
+
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = InspectionCenterSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+    def post(self, request):
+
+        serializer = InspectionCenterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        center = serializer.save(created_by=request.user)
+        return Response(
+            InspectionCenterSerializer(center).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class StaffCenterDetailView(APIView):
+    permission_classes = [IsStaff]
+
+    def get_query(self, center_id):
+        try:
+            return InspectionCenter.objects.get(id=center_id)
+        except InspectionCenter.DoesNotExist:
+            return None
+
+        return Response(
+            {"detail": "Center not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    def get(self, request, center_id):
+
+        center = self.get_query(center_id)
+        if center is None:
+            return Response(
+                {"detail": "Center not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response(InspectionCenterSerializer(center).data)
+
+    def patch(self, request, center_id):
+        center = self.get_query(center_id)
+        if center is None:
+            return Response(
+                {"detail": "Center not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = InspectionCenterSerializer(center, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(InspectionCenterSerializer(center).data)
