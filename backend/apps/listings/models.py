@@ -39,7 +39,9 @@ class FuelType(models.TextChoices):
 class CarStatus(models.TextChoices):
     DRAFT = "draft", "Draft"
     INSPECTION_PENDING = "inspection_pending", "Inspection Pending"
-    INSPECTION_APPROVED = "inspection_approved", "Inspection Approved"
+    LISTING_APPROVED = "listing_approved", "Listing Approved"
+    INSPECTION_IN_PROGRESS = "inspection_in_progress", "Inspection In Progress"
+    NEEDS_CLEARANCE = "needs_clearance", "Needs Clearance"
     INSPECTION_REJECTED = "inspection_rejected", "Inspection Rejected"
     INSPECTION_NO_SHOW = "inspection_no_show", "Inspection No Show"
     NEEDS_CHANGES = "needs_changes", "Needs Changes"
@@ -135,9 +137,12 @@ class Car(models.Model):
     description = models.TextField(blank=True)
 
     status = models.CharField(
-        max_length=20, choices=CarStatus.choices, default=CarStatus.DRAFT, db_index=True
+        max_length=30, choices=CarStatus.choices, default=CarStatus.DRAFT, db_index=True
     )
     admin_note = models.TextField(blank=True)
+    tracking_id = models.CharField(
+        max_length=20, unique=True, null=True, blank=True, db_index=True
+    )
     published_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -191,7 +196,7 @@ class CarImage(models.Model):
                 fields=["car", "image_type"],
                 condition=~models.Q(image_type=""),
                 name="one_image_per_type_per_car",
-            )
+            ),
         ]
 
 

@@ -117,7 +117,9 @@ class StaffSlotListCreateView(APIView):
                     end = ts["end_time"]
                     # Parse time strings if needed
                     if isinstance(start, str):
-                        parts = start.replace("AM", "").replace("PM", "").strip().split(":")
+                        parts = (
+                            start.replace("AM", "").replace("PM", "").strip().split(":")
+                        )
                         hour = int(parts[0])
                         minute = int(parts[1]) if len(parts) > 1 else 0
                         if "PM" in ts["start_time"] and hour != 12:
@@ -126,7 +128,9 @@ class StaffSlotListCreateView(APIView):
                             hour = 0
                         start = time(hour, minute)
                     if isinstance(end, str):
-                        parts = end.replace("AM", "").replace("PM", "").strip().split(":")
+                        parts = (
+                            end.replace("AM", "").replace("PM", "").strip().split(":")
+                        )
                         hour = int(parts[0])
                         minute = int(parts[1]) if len(parts) > 1 else 0
                         if "PM" in ts["end_time"] and hour != 12:
@@ -242,9 +246,7 @@ class OwnerBookingCreateView(APIView):
 
         with transaction.atomic():
             try:
-                car = Car.objects.select_for_update().get(
-                    id=car_id, owner=request.user
-                )
+                car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
             except Car.DoesNotExist:
                 return Response(
                     {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
@@ -514,10 +516,6 @@ class StaffBookingApproveView(APIView):
 
             booking.status = BookingStatus.APPROVED
             booking.save(update_fields=["status", "updated_at"])
-
-            car = Car.objects.select_for_update().get(id=booking.car_id)
-            car.status = CarStatus.INSPECTION_APPROVED
-            car.save(update_fields=["status", "updated_at"])
 
         schedule_notification(
             notify_inspection_booking_approved,

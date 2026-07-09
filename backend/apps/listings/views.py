@@ -603,9 +603,11 @@ class MyCarStatusView(APIView):
     permission_classes = [IsOwner]
 
     OWNER_TRANSITIONS = {
-        "draft": [],  # No direct status change — booking triggers inspection_pending
+        "draft": [],  # Admin approves listing → listing_approved
+        "listing_approved": [],  # Owner books via inspections app → inspection_pending
         "inspection_pending": [],  # Only staff can transition
-        "inspection_approved": [],  # Only staff can transition
+        "inspection_in_progress": [],  # Only staff can transition
+        "needs_clearance": [],  # Owner addresses issues; staff transitions
         "inspection_rejected": [],  # Owner rebooks via inspections app
         "inspection_no_show": [],  # Owner rebooks via inspections app
         "needs_changes": [],  # Owner rebooks via inspections app
