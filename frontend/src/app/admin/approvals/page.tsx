@@ -253,9 +253,17 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
   const failInspection = useFailInspection();
   const markNoShow = useMarkNoShow();
 
-  const allChecked = checks.length === CHECKLIST.length;
   const isInspectionPending = car?.status === "inspection_pending";
   const isInspectionApproved = car?.status === "inspection_approved";
+
+  // Fetch the booking for this car so we can call inspection hooks with bookingId
+  const { data: bookingsData } = useStaffBookings({ status: isInspectionPending ? "pending" : "approved" });
+  const booking = useMemo(() => {
+    if (!bookingsData?.results || !carId) return null;
+    return bookingsData.results.find((b) => b.car_id === carId) ?? null;
+  }, [bookingsData?.results, carId]);
+
+  const allChecked = checks.length === CHECKLIST.length;
   const reviewable = isInspectionPending;
 
   useEffect(() => {
@@ -291,32 +299,48 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
 
   // ── Inspection booking action handlers ──
   async function handleApproveBooking() {
-    if (!car) return;
-    // Find the booking for this car via the onAction flow — we use carId to approve
-    // The approve booking hook needs a bookingId; we surface via onAction for now
-    // and let the parent handle it, but inspection hooks need booking ID.
-    // We use onAction with a special status to delegate to the parent.
-    onAction(car.id, "inspection_approved");
+    if (!car || !booking) return;
+    try {
+      await approveBooking.mutateAsync({ bookingId: booking.id });
+      toast.success("Inspection booking approved");
+      onClose();
+    } catch { toast.error("Failed to approve booking"); }
   }
 
   async function handleRejectBooking() {
-    if (!car || !staffNote.trim()) return;
-    onAction(car.id, "inspection_rejected", staffNote.trim());
+    if (!car || !booking || !staffNote.trim()) return;
+    try {
+      await rejectBooking.mutateAsync({ bookingId: booking.id, staff_note: staffNote.trim() });
+      toast.success("Inspection booking rejected");
+      onClose();
+    } catch { toast.error("Failed to reject booking"); }
   }
 
   async function handlePassInspection() {
-    if (!car) return;
-    onAction(car.id, "published");
+    if (!car || !booking) return;
+    try {
+      await passInspection.mutateAsync({ bookingId: booking.id });
+      toast.success("Inspection passed — listing published");
+      onClose();
+    } catch { toast.error("Failed to pass inspection"); }
   }
 
   async function handleFailInspection() {
-    if (!car || !staffNote.trim()) return;
-    onAction(car.id, "inspection_failed", staffNote.trim());
+    if (!car || !booking || !staffNote.trim()) return;
+    try {
+      await failInspection.mutateAsync({ bookingId: booking.id, staff_note: staffNote.trim() });
+      toast.success("Inspection marked as failed");
+      onClose();
+    } catch { toast.error("Failed to record inspection failure"); }
   }
 
   async function handleNoShow() {
-    if (!car) return;
-    onAction(car.id, "inspection_no_show");
+    if (!car || !booking) return;
+    try {
+      await markNoShow.mutateAsync({ bookingId: booking.id });
+      toast.success("Marked as no-show");
+      onClose();
+    } catch { toast.error("Failed to mark no-show"); }
   }
 
   const isInspectionActing = approveBooking.isPending || rejectBooking.isPending || passInspection.isPending || failInspection.isPending || markNoShow.isPending;
