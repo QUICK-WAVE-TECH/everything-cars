@@ -116,43 +116,57 @@ class EditLockdownTest(APITestCase):
     def test_edit_allowed_in_draft(self):
         self.car.status = CarStatus.DRAFT
         self.car.save(update_fields=["status"])
-        res = self.client.patch(f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"})
+        res = self.client.patch(
+            f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"}
+        )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
     def test_edit_allowed_in_needs_changes(self):
         self.car.status = CarStatus.NEEDS_CHANGES
         self.car.save(update_fields=["status"])
-        res = self.client.patch(f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Blue"})
+        res = self.client.patch(
+            f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Blue"}
+        )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
     def test_edit_allowed_in_inspection_rejected(self):
         self.car.status = CarStatus.INSPECTION_REJECTED
         self.car.save(update_fields=["status"])
-        res = self.client.patch(f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Green"})
+        res = self.client.patch(
+            f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Green"}
+        )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
     def test_edit_allowed_in_inspection_no_show(self):
         self.car.status = CarStatus.INSPECTION_NO_SHOW
         self.car.save(update_fields=["status"])
-        res = self.client.patch(f"/api/v1/listings/my-cars/{self.car.id}", {"color": "White"})
+        res = self.client.patch(
+            f"/api/v1/listings/my-cars/{self.car.id}", {"color": "White"}
+        )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
     def test_edit_blocked_in_inspection_pending(self):
         self.car.status = CarStatus.INSPECTION_PENDING
         self.car.save(update_fields=["status"])
-        res = self.client.patch(f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"})
+        res = self.client.patch(
+            f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"}
+        )
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_edit_blocked_in_inspection_approved(self):
         self.car.status = CarStatus.INSPECTION_APPROVED
         self.car.save(update_fields=["status"])
-        res = self.client.patch(f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"})
+        res = self.client.patch(
+            f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"}
+        )
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_edit_blocked_in_published(self):
         self.car.status = CarStatus.PUBLISHED
         self.car.save(update_fields=["status"])
-        res = self.client.patch(f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"})
+        res = self.client.patch(
+            f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"}
+        )
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
     @override_settings(MEDIA_ROOT=None)
@@ -315,9 +329,7 @@ class CarImageUploadTests(APITestCase):
             item for item in response.data if item["image_type"] == CarImageType.FRONT
         )
         self.assertTrue(front_response["is_primary"])
-        self.assertTrue(
-            front_response["image"].startswith("http://testserver/media/")
-        )
+        self.assertTrue(front_response["image"].startswith("http://testserver/media/"))
         self.assertTrue(
             front_response["thumbnail"].startswith("http://testserver/media/")
         )
@@ -349,7 +361,62 @@ class CarImageUploadTests(APITestCase):
         self.assertEqual(CarImage.objects.filter(car=self.car).count(), 4)
         self.assertFalse(CarImage.objects.filter(id=original_front.id).exists())
         self.assertTrue(
-            CarImage.objects.get(
-                car=self.car, image_type=CarImageType.FRONT
-            ).is_primary
+            CarImage.objects.get(car=self.car, image_type=CarImageType.FRONT).is_primary
         )
+
+
+class ListingApprovalTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user("staff-appr@test.com", "owner", is_staff=True)
+        self.owner = create_user("owner-appr@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner, status=CarStatus.DRAFT)
+        self.client.force_authenticate(user=self.staff)
+
+    def test_approve_draft_listing(self):
+        res = self.client.post(
+            f"/api/v1/listings/admin/cars/{self.car.id}/approve-listing"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.car.refresh_from_db()
+        self.assertEqual(self.car.status, CarStatus.LISTING_APPROVED)
+
+    def test_approve_writes_history(self):
+        self.client.post(f"/api/v1/listings/admin/cars/{self.car.id}/approve-listing")
+        entry = self.car.status_history.get()
+        self.assertEqual(entry.from_status, CarStatus.DRAFT)
+        self.assertEqual(entry.to_status, CarStatus.LISTING_APPROVED)
+        self.assertEqual(entry.actor_role, "staff")
+
+    def test_approve_resubmitted_listing(self):
+        self.car.status = CarStatus.NEEDS_CHANGES
+        self.car.save()
+        res = self.client.post(
+            f"/api/v1/listings/admin/cars/{self.car.id}/approve-listing"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_approve_published_rejected(self):
+        self.car.status = CarStatus.PUBLISHED
+        self.car.save()
+        res = self.client.post(
+            f"/api/v1/listings/admin/cars/{self.car.id}/approve-listing"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_non_staff_forbidden(self):
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.post(
+            f"/api/v1/listings/admin/cars/{self.car.id}/approve-listing"
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_request_changes_from_draft(self):
+        res = self.client.post(
+            f"/api/v1/listings/admin/cars/{self.car.id}/status",
+            {"status": "needs_changes", "note": "Photos are blurry"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.car.refresh_from_db()
+        self.assertEqual(self.car.status, CarStatus.NEEDS_CHANGES)

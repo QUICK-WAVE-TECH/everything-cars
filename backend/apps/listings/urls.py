@@ -14,6 +14,7 @@ from .views import (
     OwnerRequestListView,
     OwnerRequestDetailView,
     OwnerRequestActionView,
+    AdminApproveListingView,
     AdminCarListView,
     AdminCarDetailView,
     AdminCarStatusView,
@@ -92,6 +93,11 @@ urlpatterns = [
         "admin/cars/<uuid:car_id>/status",
         AdminCarStatusView.as_view(),
         name="admin-car-status",
+    ),
+    path(
+        "admin/cars/<uuid:car_id>/approve-listing",
+        AdminApproveListingView.as_view(),
+        name="admin-approve-listing",
     ),
     path(
         "admin/requests/<uuid:request_id>/confirm-payment",

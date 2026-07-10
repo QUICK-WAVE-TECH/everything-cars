@@ -240,6 +240,20 @@ def notify_listing_suspended(car):
     )
 
 
+def notify_listing_approved(car):
+    """Owner gets notified when staff approves their listing for inspection."""
+    _create_notification(
+        recipient=car.owner,
+        notification_type=NotificationType.LISTING_APPROVED,
+        title="Listing approved",
+        message=(
+            f"Your listing '{car.title}' has been approved — "
+            "you can now book an inspection."
+        ),
+        data={"car_id": str(car.id), "car_title": car.title},
+    )
+
+
 # ── Inspection notifications ──
 
 
