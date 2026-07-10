@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useId, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   CameraIcon,
   CheckCircle2Icon,
@@ -37,8 +38,26 @@ type Props = {
   disabled?: boolean;
 };
 
+// Mirrors the backend's MAX_CAR_IMAGE_SIZE_BYTES — oversized files are
+// rejected at pick time so a listing is never created with doomed photos.
+export const MAX_CAR_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+
+function fileSizeMb(file: File) {
+  return file.size / (1024 * 1024);
+}
+
+export function findOversizedCarImage(
+  files: Record<string, File | undefined>,
+): File | null {
+  return (
+    Object.values(files).find(
+      (f): f is File => !!f && f.size > MAX_CAR_IMAGE_SIZE_BYTES,
+    ) ?? null
+  );
+}
+
 function fileLabel(file: File) {
-  const sizeMb = file.size / (1024 * 1024);
+  const sizeMb = fileSizeMb(file);
   return `${file.name} - ${sizeMb.toFixed(sizeMb >= 1 ? 1 : 2)} MB`;
 }
 
@@ -76,7 +95,14 @@ function SlotTile({
 
   function pick(files: FileList | null) {
     const nextFile = files?.[0];
-    if (nextFile) onPick(nextFile);
+    if (!nextFile) return;
+    if (nextFile.size > MAX_CAR_IMAGE_SIZE_BYTES) {
+      toast.error(
+        `${nextFile.name} is ${fileSizeMb(nextFile).toFixed(1)} MB — photos must be 5 MB or smaller.`,
+      );
+      return;
+    }
+    onPick(nextFile);
   }
 
   return (

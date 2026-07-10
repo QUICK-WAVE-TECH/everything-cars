@@ -18,7 +18,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useCreateCar, useUploadCarImages } from "@/features/listings/api";
 import type { CarImageFiles, CarImageType } from "@/features/listings/api/types";
-import { CarPhotoSlotsField } from "@/features/listings/components/car-photo-slots-field";
+import {
+  CarPhotoSlotsField,
+  findOversizedCarImage,
+} from "@/features/listings/components/car-photo-slots-field";
+import { useRouter } from "next/navigation";
 import {
   createCarSchema,
   type CreateCarFormValues,
@@ -232,6 +236,7 @@ const REQUIRED_IMAGE_TYPES: CarImageType[] = [
 ];
 
 export default function ListCarPage() {
+  const router = useRouter();
   const createCar = useCreateCar();
   const uploadImages = useUploadCarImages();
   const [files, setFiles] = useState<CarImageFiles>({});
@@ -273,6 +278,19 @@ export default function ListCarPage() {
 
   async function handleSubmit(values: CreateCarInput) {
     try {
+      // Validate photos BEFORE creating the car — otherwise a failed upload
+      // leaves an orphaned photo-less draft (and retries create duplicates).
+      const missingImages = REQUIRED_IMAGE_TYPES.filter((type) => !files[type]);
+      if (missingImages.length > 0) {
+        toast.error("Please add front, back, left side, and right side photos.");
+        return;
+      }
+      const oversized = findOversizedCarImage(files);
+      if (oversized) {
+        toast.error(`${oversized.name} is over 5 MB — please use a smaller photo.`);
+        return;
+      }
+
       const payload: Record<string, unknown> = {
         ...values,
         year: parseInt(values.year, 10),
@@ -285,14 +303,20 @@ export default function ListCarPage() {
 
       const car = await createCar.mutateAsync(payload);
 
-      const missingImages = REQUIRED_IMAGE_TYPES.filter((type) => !files[type]);
-      if (missingImages.length > 0) {
-        toast.error("Please add front, back, left side, and right side photos.");
-        return;
-      }
-
-      if (Object.keys(files).length > 0) {
+      try {
         await uploadImages.mutateAsync({ carId: car.id, files });
+      } catch (uploadError) {
+        // The car exists but has no photos — send the owner to the listing
+        // to retry instead of leaving a mystery draft (or duplicating it).
+        const message =
+          uploadError instanceof ApiError
+            ? uploadError.message
+            : "Photo upload failed.";
+        toast.error(
+          `Your listing was saved as a draft, but the photos didn't upload: ${message} Add photos from the listing page.`,
+        );
+        router.push(`/owner/my-cars/${car.id}`);
+        return;
       }
 
       setDone(true);
