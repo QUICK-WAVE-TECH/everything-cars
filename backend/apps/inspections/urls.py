@@ -17,6 +17,8 @@ from .views import (
     StaffSlotListCreateView,
     StaffCenterListCreateView,
     StaffCenterDetailView,
+    LocationsView,
+    PublicCentersView,
 )
 
 urlpatterns = [
@@ -78,4 +80,6 @@ urlpatterns = [
         StaffCenterDetailView.as_view(),
         name="staff-center-detail",
     ),
+    path("locations/", LocationsView.as_view(), name="locations"),
+    path("centers/", PublicCentersView.as_view(), name="public-centers"),
 ]

@@ -520,3 +520,51 @@ class StaffCenterCrudTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertFalse(res.data["is_active"])
+
+
+class LocationDiscoveryTest(APITestCase):
+
+    def setUp(self):
+        self.owner = create_user("owner-loc@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.client.force_authenticate(user=self.owner)
+
+        staff = create_user("staff-loc@test.com", "owner", is_staff=True)
+        self.lagos = create_center(staff)
+        self.abuja = create_center(staff, state="FCT", city="Abuja", city_code="ABJ")
+
+        self.inactive = create_center(
+            staff,
+            company_name="Closed Co",
+            state="Kano",
+            is_active=False,
+            city="kano",
+            city_code="KAN",
+        )
+
+    def test_location_tree_excludes_inactive(self):
+        res = self.client.get("/api/v1/inspections/locations/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)  # one country: NG
+        ng = res.data[0]
+        self.assertEqual(ng["country"], "NG")
+        states = {s["state"] for s in ng["states"]}
+        self.assertEqual(states, {"Lagos", "FCT"})  # Kano absent — inactive center
+        lagos_state = next(s for s in ng["states"] if s["state"] == "Lagos")
+        self.assertIn("Lagos", lagos_state["cities"])
+
+    def test_centers_filtered_by_city(self):
+        res = self.client.get("/api/v1/inspections/centers/?city=Lagos")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.data[0]["company_name"], "Car 45")
+
+    def test_centers_city_filter_case_insensitive(self):
+        res = self.client.get("/api/v1/inspections/centers/?city=lagos")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+
+    def test_inactive_centers_hidden(self):
+        res = self.client.get("/api/v1/inspections/centers/?city=Kano")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 0)

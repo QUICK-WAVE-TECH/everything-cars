@@ -769,3 +769,48 @@ class StaffCenterDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(InspectionCenterSerializer(center).data)
+
+
+class LocationsView(APIView):
+    permission_classes = [IsOwner]
+
+    def get(self, request):
+        rows = (
+            InspectionCenter.objects.filter(is_active=True)
+            .values("country", "state", "city")
+            .distinct()
+            .order_by("country", "state", "city")
+        )
+
+        tree = {}
+        for row in rows:
+            country = tree.setdefault(str(row["country"]), {})
+            country.setdefault(row["state"], []).append(row["city"])
+
+        return Response(
+            [
+                {
+                    "country": country,
+                    "states": [
+                        {"state": state, "cities": cities}
+                        for state, cities in states.items()
+                    ],
+                }
+                for country, states in tree.items()
+            ]
+        )
+
+
+class PublicCentersView(APIView):
+
+    permission_classes = [IsOwner]
+
+    def get(self, request):
+        qs = InspectionCenter.objects.filter(is_active=True)
+
+        for param in ("country", "state", "city"):
+            value = request.query_params.get(param)
+            if value:
+                qs = qs.filter(**{f"{param}__iexact": value})
+
+        return Response(InspectionCenterSerializer(qs, many=True).data)
