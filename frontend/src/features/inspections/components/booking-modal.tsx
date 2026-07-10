@@ -273,35 +273,34 @@ function SlotButton({
       disabled={isFull}
       onClick={onSelect}
       className={cn(
-        "group flex min-h-[56px] min-w-0 cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-200 [font-family:var(--brc-font-ui)] disabled:cursor-not-allowed disabled:opacity-50",
+        "group relative flex min-h-[56px] min-w-0 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition-all duration-200 [font-family:var(--brc-font-ui)] disabled:cursor-not-allowed disabled:opacity-50",
         selected
           ? "border-(--brc-primary) bg-(--brc-primary-tint) shadow-[0_10px_26px_rgba(0,0,139,0.10)]"
           : "border-(--brc-border) bg-white shadow-[var(--brc-shadow-xs)] hover:-translate-y-0.5 hover:border-(--brc-primary)/40 hover:shadow-[0_14px_32px_rgba(18,18,18,0.10)]",
       )}
     >
-      <span className="flex min-w-0 items-center gap-2">
-        <span
-          className={cn(
-            "flex size-8 shrink-0 items-center justify-center rounded-full",
-            selected
-              ? "bg-(--brc-primary) text-white"
-              : "bg-(--brc-primary-tint) text-(--brc-primary)",
-          )}
-        >
-          <ClockIcon size={15} />
-        </span>
-        <span
-          className={cn(
-            "whitespace-nowrap text-[13px] font-extrabold",
-            selected ? "text-(--brc-primary)" : "text-(--brc-text)",
-          )}
-        >
-          {timeLabel}
-        </span>
+      <span
+        className={cn(
+          "flex size-8 shrink-0 items-center justify-center rounded-full",
+          selected
+            ? "bg-(--brc-primary) text-white"
+            : "bg-(--brc-primary-tint) text-(--brc-primary)",
+        )}
+      >
+        <ClockIcon size={15} />
       </span>
       <span
         className={cn(
-          "inline-flex shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold",
+          "whitespace-nowrap text-[13px] font-extrabold",
+          selected ? "text-(--brc-primary)" : "text-(--brc-text)",
+        )}
+      >
+        {timeLabel}
+      </span>
+      {/* Floating spots badge on the top-right corner so it never covers the time */}
+      <span
+        className={cn(
+          "absolute -top-2 right-2 inline-flex shrink-0 whitespace-nowrap rounded-full border border-white px-2 py-0.5 text-[10px] font-bold shadow-sm",
           selected
             ? "bg-(--brc-primary) text-white"
             : isFull
@@ -763,7 +762,7 @@ export function BookingModal({
                         </div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
                         {daySlots.map((slot) => (
                           <SlotButton
                             key={slot.id}
