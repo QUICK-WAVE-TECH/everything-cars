@@ -177,7 +177,7 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
 
   const createSlots = useCreateSlots();
   const { data: centersData, isLoading: centersLoading } = useAdminCenters({ is_active: "true" });
-  const centers = centersData?.results ?? [];
+  const centers = useMemo(() => centersData?.results ?? [], [centersData?.results]);
   const todayIso = toIsoDate(new Date());
 
   // Base UI's Select.Value renders the raw value (the center id) unless the
