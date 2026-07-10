@@ -140,8 +140,17 @@ const STATUS_MAP: Record<ListingStatus, { bg: string; fg: string; dot: string; l
   inspection_no_show: { bg: "#fff3e0", fg: "#c25800", dot: "#e65100", label: "No Show" },
 };
 
+const UNKNOWN_STATUS_STYLE = {
+  bg: "var(--brc-bg-muted)",
+  fg: "var(--brc-text-muted)",
+  dot: "var(--brc-text-muted)",
+  label: "Unknown",
+} as const;
+
 function StatusBadge({ status }: { status: ListingStatus }) {
-  const s = STATUS_MAP[status];
+  // Statuses come from the API — never crash the whole page on one the
+  // frontend doesn't know yet (e.g. mid-deploy or legacy data).
+  const s = STATUS_MAP[status] ?? UNKNOWN_STATUS_STYLE;
   return (
     <span
       className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold [font-family:var(--brc-font-ui)]"
