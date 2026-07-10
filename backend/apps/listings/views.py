@@ -3,6 +3,7 @@ from io import BytesIO
 from pathlib import Path
 
 import uuid as uuid_lib
+from PIL import Image, ImageOps
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
 from django.db.models import (
@@ -65,6 +66,7 @@ from apps.notifications.service import (
     notify_listing_approved,
 )
 from apps.inspections.models import ActorRole
+from apps.inspections.serializers import CarStatusHistorySerializer
 from apps.inspections.services import record_status_change
 
 
@@ -79,11 +81,12 @@ CAR_IMAGE_TYPES = REQUIRED_CAR_IMAGE_TYPES + OPTIONAL_CAR_IMAGE_TYPES
 MAX_CAR_IMAGES_PER_REQUEST = len(CAR_IMAGE_TYPES)
 MAX_CAR_IMAGES_PER_CAR = len(CAR_IMAGE_TYPES)
 MAX_CAR_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+# Editable: pre-approval states and the clearance loop. inspection_rejected
+# is terminal (owner relists); inspection_no_show rebooks without editing.
 EDITABLE_CAR_STATUSES = [
     CarStatus.DRAFT,
     CarStatus.NEEDS_CHANGES,
-    CarStatus.INSPECTION_REJECTED,
-    CarStatus.INSPECTION_NO_SHOW,
+    CarStatus.NEEDS_CLEARANCE,
 ]
 REQUEST_APPROVAL_BLOCKING_STATUSES = [
     RequestStatus.APPROVED,
@@ -604,6 +607,23 @@ class PublicCarDetailView(APIView):
                 {"detail": "Car does not exist"}, status=status.HTTP_404_NOT_FOUND
             )
         return Response(CarDetailSerializer(car, context={"request": request}).data)
+
+
+class MyCarHistoryView(APIView):
+    """Owner-facing status timeline. The serializer excludes staff identity —
+    owners see roles and notes, never who acted."""
+
+    permission_classes = [IsOwner]
+
+    def get(self, request, car_id):
+        try:
+            car = Car.objects.get(id=car_id, owner=request.user)
+        except Car.DoesNotExist:
+            return Response(
+                {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        history = car.status_history.all()
+        return Response(CarStatusHistorySerializer(history, many=True).data)
 
 
 class MyCarStatusView(APIView):

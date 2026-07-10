@@ -744,3 +744,56 @@ class LocationDiscoveryTest(APITestCase):
         res = self.client.get("/api/v1/inspections/centers/?city=Kano")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(len(res.data), 0)
+
+
+class ClearanceResponseTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user("staff-clr@test.com", "owner", is_staff=True)
+        self.owner = create_user("owner-clr@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner, status=CarStatus.INSPECTION_PENDING)
+        self.slot = create_slot(self.staff)
+        self.booking = InspectionBooking.objects.create(
+            car=self.car, slot=self.slot, booked_by=self.owner
+        )
+        # run the inspection to needs_clearance
+        self.client.force_authenticate(user=self.staff)
+        self.client.post(f"/api/v1/inspections/admin/bookings/{self.booking.id}/start/")
+        self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/inspection/",
+            inspection_form_payload(
+                result="needs_clearance", staff_notes="Customs papers missing"
+            ),
+            format="json",
+        )
+        self.client.force_authenticate(user=self.owner)
+
+    def test_clearance_response_recorded(self):
+        res = self.client.post(
+            f"/api/v1/inspections/bookings/{self.booking.id}/clearance-response/",
+            {"message": "Uploaded the customs papers to my listing."},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        entry = self.car.status_history.latest("created_at")
+        self.assertEqual(entry.actor_role, ActorRole.OWNER)
+        self.assertEqual(entry.from_status, CarStatus.NEEDS_CLEARANCE)
+        self.assertEqual(entry.to_status, CarStatus.NEEDS_CLEARANCE)
+
+    def test_message_required(self):
+        res = self.client.post(
+            f"/api/v1/inspections/bookings/{self.booking.id}/clearance-response/",
+            {},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_rejected_when_not_needs_clearance(self):
+        self.car.status = CarStatus.PUBLISHED
+        self.car.save(update_fields=["status"])
+        res = self.client.post(
+            f"/api/v1/inspections/bookings/{self.booking.id}/clearance-response/",
+            {"message": "done"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)

@@ -7,6 +7,7 @@ from .views import (
     OwnerBookingCreateView,
     OwnerBookingListView,
     OwnerBookingRescheduleView,
+    OwnerClearanceResponseView,
     PublicCentersView,
     StaffBookingDetailView,
     StaffBookingListView,
@@ -49,6 +50,11 @@ urlpatterns = [
         "bookings/<uuid:booking_id>/reschedule/",
         OwnerBookingRescheduleView.as_view(),
         name="reschedule-booking",
+    ),
+    path(
+        "bookings/<uuid:booking_id>/clearance-response/",
+        OwnerClearanceResponseView.as_view(),
+        name="clearance-response",
     ),
     # Staff booking management & physical inspection
     path("admin/bookings/", StaffBookingListView.as_view(), name="staff-bookings"),

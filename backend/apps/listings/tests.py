@@ -86,7 +86,9 @@ class CarStatusChoicesTest(APITestCase):
     def test_new_inspection_statuses_exist(self):
         """New inspection statuses are valid CarStatus choices."""
         self.assertEqual(CarStatus.INSPECTION_PENDING, "inspection_pending")
-        self.assertEqual(CarStatus.INSPECTION_APPROVED, "inspection_approved")
+        self.assertEqual(CarStatus.LISTING_APPROVED, "listing_approved")
+        self.assertEqual(CarStatus.INSPECTION_IN_PROGRESS, "inspection_in_progress")
+        self.assertEqual(CarStatus.NEEDS_CLEARANCE, "needs_clearance")
         self.assertEqual(CarStatus.INSPECTION_REJECTED, "inspection_rejected")
         self.assertEqual(CarStatus.INSPECTION_NO_SHOW, "inspection_no_show")
 
@@ -129,21 +131,31 @@ class EditLockdownTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
-    def test_edit_allowed_in_inspection_rejected(self):
-        self.car.status = CarStatus.INSPECTION_REJECTED
+    def test_edit_allowed_in_needs_clearance(self):
+        self.car.status = CarStatus.NEEDS_CLEARANCE
         self.car.save(update_fields=["status"])
         res = self.client.patch(
             f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Green"}
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
-    def test_edit_allowed_in_inspection_no_show(self):
+    def test_edit_blocked_in_inspection_rejected(self):
+        # inspection_rejected is terminal — owner must relist, not edit
+        self.car.status = CarStatus.INSPECTION_REJECTED
+        self.car.save(update_fields=["status"])
+        res = self.client.patch(
+            f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Green"}
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_edit_blocked_in_inspection_no_show(self):
+        # no_show cars rebook the inspection; the listing itself stays locked
         self.car.status = CarStatus.INSPECTION_NO_SHOW
         self.car.save(update_fields=["status"])
         res = self.client.patch(
             f"/api/v1/listings/my-cars/{self.car.id}", {"color": "White"}
         )
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_edit_blocked_in_inspection_pending(self):
         self.car.status = CarStatus.INSPECTION_PENDING
@@ -153,8 +165,16 @@ class EditLockdownTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_edit_blocked_in_inspection_approved(self):
-        self.car.status = CarStatus.INSPECTION_APPROVED
+    def test_edit_blocked_in_listing_approved(self):
+        self.car.status = CarStatus.LISTING_APPROVED
+        self.car.save(update_fields=["status"])
+        res = self.client.patch(
+            f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"}
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_edit_blocked_in_inspection_in_progress(self):
+        self.car.status = CarStatus.INSPECTION_IN_PROGRESS
         self.car.save(update_fields=["status"])
         res = self.client.patch(
             f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"}
@@ -420,3 +440,33 @@ class ListingApprovalTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.car.refresh_from_db()
         self.assertEqual(self.car.status, CarStatus.NEEDS_CHANGES)
+
+
+class MyCarHistoryTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user("staff-hist@test.com", "owner", is_staff=True)
+        self.owner = create_user("owner-hist@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner, status=CarStatus.DRAFT)
+        self.client.force_authenticate(user=self.staff)
+        self.client.post(f"/api/v1/listings/admin/cars/{self.car.id}/approve-listing")
+        self.client.force_authenticate(user=self.owner)
+
+    def test_history_returned_oldest_first(self):
+        res = self.client.get(f"/api/v1/listings/my-cars/{self.car.id}/history")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.data[0]["to_status"], CarStatus.LISTING_APPROVED)
+
+    def test_history_hides_staff_identity(self):
+        res = self.client.get(f"/api/v1/listings/my-cars/{self.car.id}/history")
+        for entry in res.data:
+            self.assertNotIn("actor", entry)
+            self.assertIn(entry["actor_role"], ["owner", "staff", "system"])
+
+    def test_other_owners_car_is_404(self):
+        other = create_user("other-hist@test.com", "owner")
+        create_owner_profile(other)
+        self.client.force_authenticate(user=other)
+        res = self.client.get(f"/api/v1/listings/my-cars/{self.car.id}/history")
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)

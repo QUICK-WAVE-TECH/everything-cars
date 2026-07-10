@@ -13,6 +13,7 @@ from apps.listings.models import Car, CarStatus
 from rest_framework.parsers import FormParser, MultiPartParser
 
 from apps.notifications.service import (
+    notify_clearance_response,
     notify_inspection_booked,
     notify_inspection_started,
     notify_needs_clearance,
@@ -722,6 +723,60 @@ class StaffInspectionDocumentsView(APIView):
             InspectionDocumentSerializer(documents).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class OwnerClearanceResponseView(APIView):
+    """Owner confirms clearance issues are addressed. The car stays in
+    needs_clearance (staff has final say) — the response is recorded as a
+    same-status history row so it appears on the timeline, and staff are
+    notified to re-review."""
+
+    permission_classes = [IsOwner]
+
+    def post(self, request, booking_id):
+        message = (request.data.get("message") or "").strip()
+        if not message:
+            return Response(
+                {"detail": "A message describing what was addressed is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            try:
+                booking = InspectionBooking.objects.select_for_update().get(
+                    id=booking_id, booked_by=request.user
+                )
+            except InspectionBooking.DoesNotExist:
+                return Response(
+                    {"detail": "Booking not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            car = Car.objects.select_for_update().get(id=booking.car_id)
+            if car.status != CarStatus.NEEDS_CLEARANCE:
+                return Response(
+                    {
+                        "detail": (
+                            "Clearance responses are only accepted while the car "
+                            "needs clearance."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            record_status_change(
+                car,
+                CarStatus.NEEDS_CLEARANCE,
+                actor=request.user,
+                actor_role=ActorRole.OWNER,
+                note=message,
+            )
+
+        schedule_notification(
+            notify_clearance_response,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
+        return Response({"detail": "Response recorded — staff will re-review."})
 
 
 class StaffBookingNoShowView(APIView):

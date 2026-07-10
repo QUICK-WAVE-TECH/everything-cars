@@ -3,6 +3,7 @@ from .views import (
     CustomerPaymentSubmitView,
     MyCarListCreateView,
     MyCarDetailView,
+    MyCarHistoryView,
     CarImageUploadView,
     MyCarStatusView,
     PublicCarListView,
@@ -36,6 +37,11 @@ urlpatterns = [
     ),
     path(
         "my-cars/<uuid:car_id>/status", MyCarStatusView.as_view(), name="my-car-status"
+    ),
+    path(
+        "my-cars/<uuid:car_id>/history",
+        MyCarHistoryView.as_view(),
+        name="my-car-history",
     ),
     # Public car endpoints
     path("cars", PublicCarListView.as_view(), name="public-cars-list"),
