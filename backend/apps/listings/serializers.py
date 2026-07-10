@@ -186,6 +186,7 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "city",
             "description",
             "status",
+            "tracking_id",
             "admin_note",
             "published_at",
             "created_at",

@@ -68,6 +68,7 @@ export type CarDetail = CarListItem & {
   mileage: number | null;
   country: string;
   description: string;
+  tracking_id: string | null;
   admin_note: string;
   published_at: string | null;
   updated_at: string;

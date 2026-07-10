@@ -93,3 +93,32 @@ export function useAdminCarStatus() {
     },
   });
 }
+
+// Admin — approve a draft/needs_changes listing for inspection booking
+export function useApproveListing() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (carId: string) =>
+      apiClient.post<CarDetail>(`/listings/admin/cars/${carId}/approve-listing`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminListingKeys.cars });
+      queryClient.invalidateQueries({ queryKey: listingKeys.owner });
+    },
+  });
+}
+
+// Admin — request changes on a draft listing (note required)
+export function useRequestChanges() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ carId, note }: { carId: string; note: string }) =>
+      apiClient.post<CarDetail>(`/listings/admin/cars/${carId}/status`, {
+        status: "needs_changes",
+        note,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminListingKeys.cars });
+      queryClient.invalidateQueries({ queryKey: listingKeys.owner });
+    },
+  });
+}
