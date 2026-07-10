@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -15,6 +15,8 @@ import {
   ImageIcon,
   ChevronDownIcon,
   CalendarIcon,
+  AlertTriangleIcon,
+  Loader2Icon,
 } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import {
@@ -25,6 +27,7 @@ import {
 import { COUNTRIES } from "@/features/auth/data/countries";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   useMyCarDetail,
@@ -36,6 +39,7 @@ import {
 import type { CarDetail } from "@/features/listings/api";
 import type { CarImageFiles } from "@/features/listings/api/types";
 import { CarPhotoSlotsField } from "@/features/listings/components/car-photo-slots-field";
+import { CarStatusTimeline } from "@/features/listings/components/car-status-timeline";
 import {
   createCarSchema,
   type CreateCarFormValues,
@@ -43,6 +47,10 @@ import {
 } from "@/features/listings/schemas";
 import { ApiError } from "@/lib/api-client";
 import { BookingModal } from "@/features/inspections/components/booking-modal";
+import {
+  useClearanceResponse,
+  useMyBookings,
+} from "@/features/inspections/api/inspections-api";
 
 // ---------- Shared form fields (same as new page) ----------
 
@@ -323,17 +331,29 @@ const STATUS_STYLES: Record<
     dot: "var(--brc-text-muted)",
     label: "Draft",
   },
+  listing_approved: {
+    bg: "var(--brc-success-bg)",
+    fg: "var(--brc-success)",
+    dot: "var(--brc-success)",
+    label: "Approved — Book Inspection",
+  },
   inspection_pending: {
     bg: "var(--brc-warning-bg)",
     fg: "#9a7400",
     dot: "var(--brc-warning)",
     label: "Inspection Pending",
   },
-  inspection_approved: {
+  inspection_in_progress: {
     bg: "var(--brc-accent-bg)",
     fg: "var(--brc-accent)",
     dot: "var(--brc-accent)",
-    label: "Inspection Approved",
+    label: "Inspection In Progress",
+  },
+  needs_clearance: {
+    bg: "var(--brc-warning-bg)",
+    fg: "#9a7400",
+    dot: "var(--brc-warning)",
+    label: "Needs Further Clearance",
   },
   inspection_rejected: {
     bg: "var(--brc-danger-bg)",
@@ -435,11 +455,29 @@ export default function CarDetailPage() {
   const deleteCar = useDeleteCar();
   const uploadImages = useUploadCarImages();
   const carStatus = useCarStatus();
+  const { data: myBookings } = useMyBookings();
+  const clearanceResponse = useClearanceResponse();
 
   const [editing, setEditing] = useState(false);
   const [newFiles, setNewFiles] = useState<CarImageFiles>({});
   const [activeImage, setActiveImage] = useState(0);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [clearanceMessage, setClearanceMessage] = useState("");
+
+  // Most recent pending/completed booking for this car — used to send a
+  // clearance response when staff has flagged the car as needing further
+  // clearance.
+  const clearanceBooking = useMemo(() => {
+    const results = myBookings?.results ?? [];
+    return results
+      .filter(
+        (b) =>
+          b.car_id === carId && (b.status === "pending" || b.status === "completed"),
+      )
+      .sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )[0];
+  }, [myBookings, carId]);
 
   const form = useForm<CreateCarFormValues, unknown, CreateCarInput>({
     resolver: zodResolver(createCarSchema),
@@ -509,6 +547,22 @@ export default function CarDetailPage() {
     } catch (error) {
       toast.error(
         error instanceof ApiError ? error.message : "Failed to update status",
+      );
+    }
+  }
+
+  async function handleClearanceSubmit() {
+    if (!clearanceBooking) return;
+    try {
+      await clearanceResponse.mutateAsync({
+        bookingId: clearanceBooking.id,
+        message: clearanceMessage,
+      });
+      toast.success("Response sent to staff");
+      setClearanceMessage("");
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError ? error.message : "Failed to send response",
       );
     }
   }
@@ -594,6 +648,11 @@ export default function CarDetailPage() {
                 {car.title}
               </h1>
               <StatusBadge status={car.status} />
+              {car.tracking_id && (
+                <span className="inline-flex items-center rounded-full border border-(--brc-border) bg-white px-2.5 py-1 text-xs font-bold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                  #{car.tracking_id}
+                </span>
+              )}
             </div>
             <p className="mt-1 text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
               {car.year} {car.brand} {car.model} · {car.state}
@@ -603,15 +662,21 @@ export default function CarDetailPage() {
           <div className="flex gap-2">
             {!editing ? (
               <>
-                {["draft", "needs_changes", "inspection_rejected", "inspection_no_show"].includes(car.status) && (
+                {["listing_approved", "inspection_no_show"].includes(car.status) && (
                   <button
                     type="button"
                     onClick={() => setBookingOpen(true)}
                     className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border-none bg-(--brc-primary) px-4 text-sm font-semibold text-(--brc-text-on-primary) transition-colors hover:bg-(--brc-primary-hover) disabled:opacity-60 [font-family:var(--brc-font-ui)]"
                   >
                     <CalendarIcon size={15} />
-                    Book Inspection
+                    {car.status === "inspection_no_show" ? "Rebook Inspection" : "Book Inspection"}
                   </button>
+                )}
+                {car.status === "draft" && (
+                  <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) px-4 text-sm font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                    <Icon name="clock" size={15} stroke="var(--brc-text-muted)" />
+                    Awaiting review by our team
+                  </span>
                 )}
                 {car.status === "published" && (
                   <button
@@ -639,7 +704,7 @@ export default function CarDetailPage() {
                     Republish
                   </button>
                 )}
-                {["draft", "needs_changes", "inspection_rejected", "inspection_no_show"].includes(car.status) && (
+                {["draft", "needs_changes", "needs_clearance"].includes(car.status) && (
                   <button
                     type="button"
                     onClick={startEditing}
@@ -678,6 +743,28 @@ export default function CarDetailPage() {
         {["needs_changes", "inspection_rejected"].includes(car.status) && car.admin_note && (
           <AdminNoteAccordion note={car.admin_note} />
         )}
+
+        {/* Clearance banner */}
+        {car.status === "needs_clearance" && (
+          <ClearanceBanner
+            note={car.admin_note}
+            message={clearanceMessage}
+            onMessageChange={setClearanceMessage}
+            onSubmit={handleClearanceSubmit}
+            isSubmitting={clearanceResponse.isPending}
+            disabled={!clearanceBooking}
+          />
+        )}
+
+        {/* Progress */}
+        <Card className="rounded-2xl border border-(--brc-border) p-5 shadow-none sm:p-6">
+          <CardContent className="flex flex-col gap-4 p-0">
+            <h2 className="text-lg font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+              Progress
+            </h2>
+            <CarStatusTimeline carId={car.id} />
+          </CardContent>
+        </Card>
 
         {/* Image Gallery */}
         <Card className="rounded-2xl border border-(--brc-border) p-5 shadow-none sm:p-6">
@@ -1186,6 +1273,60 @@ function AdminNoteAccordion({ note }: { note: string }) {
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Clearance banner ──
+function ClearanceBanner({
+  note,
+  message,
+  onMessageChange,
+  onSubmit,
+  isSubmitting,
+  disabled,
+}: {
+  note: string;
+  message: string;
+  onMessageChange: (value: string) => void;
+  onSubmit: () => void;
+  isSubmitting: boolean;
+  disabled: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-(--brc-warning)/30 bg-(--brc-warning-bg) p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-(--brc-warning)/20">
+          <AlertTriangleIcon size={18} className="text-[#9a7400]" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="m-0 text-sm font-bold text-[#9a7400] [font-family:var(--brc-font-ui)]">
+            Needs Further Clearance
+          </h3>
+          {note && (
+            <p className="mt-2 rounded-lg border border-(--brc-warning)/20 bg-white/60 p-3 text-sm leading-relaxed text-[#9a7400]/90 [font-family:var(--brc-font-ui)]">
+              {note}
+            </p>
+          )}
+          <div className="mt-3 flex flex-col gap-2">
+            <Textarea
+              value={message}
+              onChange={(e) => onMessageChange(e.target.value)}
+              placeholder="Describe how you've addressed the concern above..."
+              className="min-h-24 border-(--brc-warning)/30 bg-white text-sm [font-family:var(--brc-font-ui)]"
+            />
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={disabled || isSubmitting || !message.trim()}
+              className="inline-flex h-10 w-fit cursor-pointer items-center gap-2 rounded-lg border-none bg-(--brc-primary) px-4 text-sm font-semibold text-(--brc-text-on-primary) transition-colors hover:bg-(--brc-primary-hover) disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+            >
+              {isSubmitting && <Loader2Icon size={15} className="animate-spin" />}
+              I&apos;ve addressed this
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

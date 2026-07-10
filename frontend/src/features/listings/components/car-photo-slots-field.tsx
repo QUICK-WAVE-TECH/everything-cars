@@ -59,18 +59,17 @@ function SlotTile({
 }) {
   const id = useId();
   const [dragging, setDragging] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
+  // Derive the preview URL instead of mirroring it into state; the effect
+  // only handles revocation when the file changes or the component unmounts.
+  const previewUrl = useMemo(
+    () => (file ? URL.createObjectURL(file) : null),
+    [file],
+  );
   useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
-      return;
-    }
-
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   const displayUrl = previewUrl ?? existingImage?.thumbnail ?? existingImage?.image;
   const hasImage = !!displayUrl;
