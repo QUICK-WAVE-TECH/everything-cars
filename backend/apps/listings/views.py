@@ -373,8 +373,12 @@ class MyCarDetailView(APIView):
             if car_has_active_requests(car.id):
                 return active_request_archive_response()
 
-            car.status = CarStatus.ARCHIVED
-            car.save(update_fields=["status", "updated_at"])
+            record_status_change(
+                car,
+                CarStatus.ARCHIVED,
+                actor=request.user,
+                actor_role=ActorRole.OWNER,
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
