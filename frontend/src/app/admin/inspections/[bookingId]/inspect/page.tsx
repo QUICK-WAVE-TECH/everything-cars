@@ -28,8 +28,14 @@ import {
 import type { PhysicalInspectionPayload } from "@/features/inspections/api/types";
 
 // ── Helpers ──
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+function formatDate(value: string) {
+  // Date-only strings must be parsed by parts — new Date("YYYY-MM-DD") is
+  // interpreted as UTC midnight and renders a day early west of Greenwich.
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(value);
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function formatTime(time: string) {
@@ -150,6 +156,11 @@ export default function StaffInspectionFormPage() {
 
   const needsDocuments = !!booking?.car.sale_price;
   const notesRequired = result === "needs_clearance" || result === "failed";
+  // Sale-car paperwork is mandatory unless the inspection failed outright —
+  // a failed car never publishes, so missing docs can't leak a car live.
+  const documentsRequired = needsDocuments && result !== "failed" && result !== "";
+  const documentsComplete =
+    !!carDocuments && !!receiptUpload && !!customDutyStatus && !!receiptType;
 
   function addFeature() {
     const trimmed = featureInput.trim();
@@ -172,7 +183,8 @@ export default function StaffInspectionFormPage() {
     !!chassisCondition &&
     !!acCondition &&
     !!result &&
-    (!notesRequired || staffNotes.trim().length > 0);
+    (!notesRequired || staffNotes.trim().length > 0) &&
+    (!documentsRequired || documentsComplete);
 
   const isSubmitting = submitInspection.isPending || uploadDocs.isPending;
 
@@ -430,7 +442,14 @@ export default function StaffInspectionFormPage() {
 
         {/* Documents — only when sale_price is set */}
         {needsDocuments && (
-          <FormSection title="Documents" subtitle="Required for vehicles listed for sale.">
+          <FormSection
+            title="Documents"
+            subtitle={
+              documentsRequired && !documentsComplete
+                ? "Required for vehicles listed for sale — uploads, custom duty status and receipt type must be provided before submitting."
+                : "Required for vehicles listed for sale."
+            }
+          >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <FieldLabel>Car documents</FieldLabel>

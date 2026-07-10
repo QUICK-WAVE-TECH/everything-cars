@@ -327,3 +327,23 @@ export function useMarkNoShow() {
     onSuccess: () => invalidateBookingCaches(queryClient),
   });
 }
+
+export function useResolveClearance() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      bookingId,
+      action,
+      staff_note,
+    }: {
+      bookingId: string;
+      action: "publish" | "reject";
+      staff_note?: string;
+    }) =>
+      apiClient.post<InspectionBookingDetail>(
+        `/inspections/admin/bookings/${bookingId}/clearance/`,
+        { action, ...(staff_note ? { staff_note } : {}) },
+      ),
+    onSuccess: () => invalidateBookingCaches(queryClient),
+  });
+}

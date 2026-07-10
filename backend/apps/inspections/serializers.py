@@ -158,6 +158,7 @@ class AvailableSlotSerializer(serializers.ModelSerializer):
     """Public-facing slot info for owners — no internal notes."""
 
     spots_remaining = serializers.IntegerField(read_only=True)
+    center = InspectionCenterSerializer(read_only=True)
 
     class Meta:
         model = InspectionSlot

@@ -921,3 +921,20 @@ class ClearanceResolutionTest(APITestCase):
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class AvailableSlotShapeTest(APITestCase):
+    def test_available_slot_nests_center_object(self):
+        staff = create_user("staff-shape@test.com", "owner", is_staff=True)
+        owner = create_user("owner-shape@test.com", "owner")
+        create_owner_profile(owner)
+        center = create_center(staff)
+        create_slot(staff, center=center)
+        self.client.force_authenticate(user=owner)
+        res = self.client.get(
+            f"/api/v1/inspections/available-slots/?center={center.id}"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.data[0]["center"]["company_name"], "Car 45")
+        self.assertEqual(res.data[0]["center"]["city_code"], "LOS")

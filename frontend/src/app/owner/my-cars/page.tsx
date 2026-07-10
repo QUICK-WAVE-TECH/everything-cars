@@ -961,14 +961,22 @@ export default function MyCarsPage() {
       </div>
       </div>
 
-      {bookingCarId && (
-        <BookingModal
-          carId={bookingCarId}
-          open={bookingOpen}
-          onClose={handleCloseBooking}
-          onSuccess={handleCloseBooking}
-        />
-      )}
+      {bookingCarId && (() => {
+        // Rebooking after a no-show goes through the reschedule endpoint so
+        // the attempt counts toward the center's cap and history reads right.
+        const lastBooking = bookingByCarId[bookingCarId];
+        const isRebooking = lastBooking?.status === "no_show";
+        return (
+          <BookingModal
+            carId={bookingCarId}
+            mode={isRebooking ? "reschedule" : "book"}
+            bookingId={isRebooking ? lastBooking.id : undefined}
+            open={bookingOpen}
+            onClose={handleCloseBooking}
+            onSuccess={handleCloseBooking}
+          />
+        );
+      })()}
     </>
   );
 }

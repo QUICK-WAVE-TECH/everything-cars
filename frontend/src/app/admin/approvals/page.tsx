@@ -21,6 +21,7 @@ import {
   useStaffBookings,
   useStartInspection,
   useMarkNoShow,
+  useResolveClearance,
 } from "@/features/inspections/api/inspections-api";
 
 // ── Types ──
@@ -44,8 +45,14 @@ const TABS: { key: TabKey; label: string }[] = [
 ];
 
 // ── Helpers ──
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+function formatDate(value: string) {
+  // Date-only strings must be parsed by parts — new Date("YYYY-MM-DD") is
+  // interpreted as UTC midnight and renders a day early west of Greenwich.
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(value);
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function formatTime(time: string) {
@@ -274,6 +281,7 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
   const requestChanges = useRequestChanges();
   const startInspection = useStartInspection();
   const markNoShow = useMarkNoShow();
+  const resolveClearance = useResolveClearance();
 
   const isDraft = car?.status === "draft";
   const isListingApproved = car?.status === "listing_approved";
@@ -288,6 +296,15 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
     if (!drawerBookingResults || !carId) return null;
     return drawerBookingResults.find((b) => b.car_id === carId) ?? null;
   }, [drawerBookingResults, carId]);
+
+  // needs_clearance cars have a COMPLETED booking — the pending query
+  // above can't find it, so fetch completed bookings for resolution.
+  const { data: completedData } = useStaffBookings({ status: "completed" });
+  const completedResults = completedData?.results;
+  const clearanceBooking = useMemo(() => {
+    if (!completedResults || !carId) return null;
+    return completedResults.find((b) => b.car_id === carId) ?? null;
+  }, [completedResults, carId]);
 
   const allChecked = checks.length === CHECKLIST.length;
   const reviewable = isDraft;
@@ -371,7 +388,25 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
     } catch { toast.error("Failed to mark no-show"); }
   }
 
-  const isSectionActing = approveListing.isPending || requestChanges.isPending || startInspection.isPending || markNoShow.isPending;
+  async function handleResolveClearance(action: "publish" | "reject") {
+    if (!car || !clearanceBooking) return;
+    if (action === "reject" && !staffNote.trim()) return;
+    try {
+      await resolveClearance.mutateAsync({
+        bookingId: clearanceBooking.id,
+        action,
+        staff_note: staffNote.trim() || undefined,
+      });
+      toast.success(
+        action === "publish"
+          ? "Clearance resolved — listing published"
+          : "Clearance rejected — inspection failed",
+      );
+      onClose();
+    } catch { toast.error("Failed to resolve clearance"); }
+  }
+
+  const isSectionActing = approveListing.isPending || requestChanges.isPending || startInspection.isPending || markNoShow.isPending || resolveClearance.isPending;
   const anyActing = isActing || isSectionActing;
 
   return (
@@ -645,7 +680,36 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
                 </div>
 
               ) : isNeedsClearance ? (
-                <span className="block text-center text-[13px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Open the inspection history to review the clearance request in full.</span>
+                <div className="flex flex-col gap-3">
+                  {car.admin_note && (
+                    <div className="rounded-lg border border-[#f0c4a1] bg-[#ffe0cc] p-3">
+                      <span className="text-xs font-bold text-[#b34700] [font-family:var(--brc-font-ui)]">Clearance required:</span>
+                      <p className="mt-1 text-sm text-[#b34700] [font-family:var(--brc-font-ui)]">{car.admin_note}</p>
+                    </div>
+                  )}
+                  <textarea
+                    value={staffNote}
+                    onChange={(e) => setStaffNote(e.target.value)}
+                    rows={2}
+                    placeholder="Resolution note (required when rejecting)"
+                    className="w-full resize-none rounded-lg border border-(--brc-border) bg-white p-3 text-sm text-(--brc-text) outline-none transition-colors focus:border-(--brc-primary) [font-family:var(--brc-font-ui)]"
+                  />
+                  <div className="flex gap-2.5">
+                    <button type="button" disabled={anyActing || !clearanceBooking || !staffNote.trim()} onClick={() => handleResolveClearance("reject")}
+                      className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-danger) bg-white text-sm font-bold text-(--brc-danger) transition-colors hover:bg-(--brc-danger-bg) disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]">
+                      {resolveClearance.isPending ? <Loader2Icon size={16} className="animate-spin" /> : null}
+                      Reject
+                    </button>
+                    <button type="button" disabled={anyActing || !clearanceBooking} onClick={() => handleResolveClearance("publish")}
+                      className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-success) text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]">
+                      {resolveClearance.isPending ? <Loader2Icon size={16} className="animate-spin" /> : null}
+                      Clear & Publish
+                    </button>
+                  </div>
+                  {!clearanceBooking && (
+                    <span className="text-center text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Loading booking details…</span>
+                  )}
+                </div>
 
               ) : car.status === "needs_changes" ? (
                 <div className="flex flex-col gap-3">

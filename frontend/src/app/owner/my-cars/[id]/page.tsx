@@ -479,6 +479,17 @@ export default function CarDetailPage() {
       )[0];
   }, [myBookings, carId]);
 
+  // Most recent no-show booking — rebooking goes through the reschedule
+  // endpoint so the attempt counts toward the center's cap.
+  const noShowBooking = useMemo(() => {
+    const results = myBookings?.results ?? [];
+    return results
+      .filter((b) => b.car_id === carId && b.status === "no_show")
+      .sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )[0];
+  }, [myBookings, carId]);
+
   const form = useForm<CreateCarFormValues, unknown, CreateCarInput>({
     resolver: zodResolver(createCarSchema),
     defaultValues: car ? populateForm(car) : undefined,
@@ -1208,6 +1219,12 @@ export default function CarDetailPage() {
     </div>
       <BookingModal
         carId={car.id}
+        mode={car.status === "inspection_no_show" && noShowBooking ? "reschedule" : "book"}
+        bookingId={
+          car.status === "inspection_no_show" && noShowBooking
+            ? noShowBooking.id
+            : undefined
+        }
         open={bookingOpen}
         onClose={() => setBookingOpen(false)}
         onSuccess={() => setBookingOpen(false)}
