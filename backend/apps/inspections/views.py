@@ -303,13 +303,32 @@ class OwnerBookingCreateView(APIView):
                     status=status.HTTP_409_CONFLICT,
                 )
 
-            # Check reschedule count from previous bookings
+            # Rebooking after a cancel/no-show counts as a reschedule so the
+            # per-center cap can't be bypassed by cancelling and rebooking.
             last_booking = (
                 InspectionBooking.objects.filter(car=car)
                 .order_by("-created_at")
                 .first()
             )
-            reschedule_count = last_booking.reschedule_count if last_booking else 0
+            reschedule_count = 0
+            if last_booking:
+                reschedule_count = last_booking.reschedule_count
+                if last_booking.status in (
+                    BookingStatus.CANCELLED,
+                    BookingStatus.NO_SHOW,
+                ):
+                    reschedule_count += 1
+                if reschedule_count > slot.center.max_reschedules:
+                    return Response(
+                        {
+                            "detail": (
+                                "Maximum rebookings "
+                                f"({slot.center.max_reschedules}) reached. "
+                                "Contact staff to rebook."
+                            )
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
             try:
                 booking = InspectionBooking.objects.create(
@@ -384,11 +403,18 @@ class OwnerBookingCancelView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            car = Car.objects.select_for_update().get(id=booking.car_id)
+            if car.status != CarStatus.INSPECTION_PENDING:
+                # e.g. inspection already in progress — too late to cancel
+                return Response(
+                    {"detail": f"Cannot cancel — car status is '{car.status}'."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             booking.status = BookingStatus.CANCELLED
             booking.save(update_fields=["status", "updated_at"])
 
             # Back to bookable — admin's listing approval still stands.
-            car = Car.objects.select_for_update().get(id=booking.car_id)
             record_status_change(
                 car,
                 CarStatus.LISTING_APPROVED,
@@ -427,6 +453,17 @@ class OwnerBookingRescheduleView(APIView):
             if booking.status not in (BookingStatus.PENDING, BookingStatus.NO_SHOW):
                 return Response(
                     {"detail": "This booking cannot be rescheduled."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            car = Car.objects.select_for_update().get(id=booking.car_id)
+            if car.status not in (
+                CarStatus.INSPECTION_PENDING,
+                CarStatus.INSPECTION_NO_SHOW,
+            ):
+                # e.g. inspection already in progress — too late to move it
+                return Response(
+                    {"detail": f"Cannot reschedule — car status is '{car.status}'."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -480,7 +517,6 @@ class OwnerBookingRescheduleView(APIView):
                 reschedule_count=booking.reschedule_count + 1,
             )
 
-            car = Car.objects.select_for_update().get(id=booking.car_id)
             if car.status != CarStatus.INSPECTION_PENDING:
                 # e.g. rescheduling out of a no-show — a real transition
                 record_status_change(
@@ -718,11 +754,85 @@ class StaffInspectionDocumentsView(APIView):
 
         serializer = InspectionDocumentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        documents = serializer.save(inspection=inspection)
+        try:
+            documents = serializer.save(inspection=inspection)
+        except IntegrityError:
+            # concurrent upload won the OneToOne race
+            return Response(
+                {"detail": "Documents were already uploaded for this inspection."},
+                status=status.HTTP_409_CONFLICT,
+            )
         return Response(
             InspectionDocumentSerializer(documents).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class StaffClearanceResolveView(APIView):
+    """Final staff decision on a needs_clearance car: publish it or reject it."""
+
+    permission_classes = [IsStaff]
+
+    ACTIONS = {
+        "publish": (CarStatus.PUBLISHED, notify_inspection_passed),
+        "reject": (CarStatus.INSPECTION_REJECTED, notify_inspection_failed),
+    }
+
+    def post(self, request, booking_id):
+        action = request.data.get("action")
+        if action not in self.ACTIONS:
+            return Response(
+                {"detail": "action must be 'publish' or 'reject'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        note = (request.data.get("staff_note") or "").strip()
+        if action == "reject" and not note:
+            return Response(
+                {"detail": "A reason is required when rejecting."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            try:
+                booking = InspectionBooking.objects.select_for_update().get(
+                    id=booking_id
+                )
+            except InspectionBooking.DoesNotExist:
+                return Response(
+                    {"detail": "Booking not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            car = Car.objects.select_for_update().get(id=booking.car_id)
+            if car.status != CarStatus.NEEDS_CLEARANCE:
+                return Response(
+                    {"detail": f"Cannot resolve — car status is '{car.status}'."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            new_status, notify_func = self.ACTIONS[action]
+            extra = ["admin_note"]
+            if new_status == CarStatus.PUBLISHED:
+                car.published_at = timezone.now()
+                car.admin_note = ""
+                extra.append("published_at")
+            else:
+                car.admin_note = note
+            record_status_change(
+                car,
+                new_status,
+                actor=request.user,
+                actor_role=ActorRole.STAFF,
+                note=note,
+                extra_update_fields=extra,
+            )
+
+        schedule_notification(
+            notify_func,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
+        detail = booking_detail_queryset().get(id=booking.id)
+        return Response(InspectionBookingDetailSerializer(detail).data)
 
 
 class OwnerClearanceResponseView(APIView):
@@ -802,10 +912,17 @@ class StaffBookingNoShowView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            car = Car.objects.select_for_update().get(id=booking.car_id)
+            if car.status != CarStatus.INSPECTION_PENDING:
+                # e.g. inspection already started — the owner clearly showed up
+                return Response(
+                    {"detail": f"Cannot mark no-show — car status is '{car.status}'."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             booking.status = BookingStatus.NO_SHOW
             booking.save(update_fields=["status", "updated_at"])
 
-            car = Car.objects.select_for_update().get(id=booking.car_id)
             record_status_change(
                 car,
                 CarStatus.INSPECTION_NO_SHOW,

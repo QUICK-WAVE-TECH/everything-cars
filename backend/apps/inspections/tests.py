@@ -797,3 +797,127 @@ class ClearanceResponseTest(APITestCase):
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ReviewFixesTest(APITestCase):
+    """Guards for the race/dead-end fixes from code review."""
+
+    def setUp(self):
+        self.staff = create_user("staff-fix@test.com", "owner", is_staff=True)
+        self.owner = create_user("owner-fix@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.center = create_center(self.staff)
+        self.car = create_car(self.owner, status=CarStatus.INSPECTION_PENDING)
+        self.slot = create_slot(self.staff, center=self.center)
+        self.booking = InspectionBooking.objects.create(
+            car=self.car, slot=self.slot, booked_by=self.owner
+        )
+
+    def _start_inspection(self):
+        self.client.force_authenticate(user=self.staff)
+        self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/start/"
+        )
+
+    def test_cannot_cancel_mid_inspection(self):
+        self._start_inspection()
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.post(
+            f"/api/v1/inspections/bookings/{self.booking.id}/cancel/"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_cannot_reschedule_mid_inspection(self):
+        self._start_inspection()
+        self.client.force_authenticate(user=self.owner)
+        new_slot = create_slot(self.staff, days_ahead=10, center=self.center)
+        res = self.client.post(
+            f"/api/v1/inspections/bookings/{self.booking.id}/reschedule/",
+            {"slot_id": str(new_slot.id)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_cannot_mark_no_show_mid_inspection(self):
+        self._start_inspection()
+        res = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/no-show/"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_rebook_cap_blocks_cancel_rebook_loop(self):
+        self.center.max_reschedules = 0
+        self.center.save(update_fields=["max_reschedules"])
+        self.client.force_authenticate(user=self.owner)
+        # cancel the pending booking → car back to listing_approved
+        self.client.post(f"/api/v1/inspections/bookings/{self.booking.id}/cancel/")
+        self.car.refresh_from_db()
+        self.assertEqual(self.car.status, CarStatus.LISTING_APPROVED)
+        # rebooking counts as a reschedule → cap 0 blocks it
+        slot2 = create_slot(self.staff, days_ahead=9, center=self.center)
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {"car_id": str(self.car.id), "slot_id": str(slot2.id)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ClearanceResolutionTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user("staff-res@test.com", "owner", is_staff=True)
+        self.owner = create_user("owner-res@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner, status=CarStatus.INSPECTION_PENDING)
+        self.slot = create_slot(self.staff)
+        self.booking = InspectionBooking.objects.create(
+            car=self.car, slot=self.slot, booked_by=self.owner
+        )
+        self.client.force_authenticate(user=self.staff)
+        self.client.post(f"/api/v1/inspections/admin/bookings/{self.booking.id}/start/")
+        self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/inspection/",
+            inspection_form_payload(
+                result="needs_clearance", staff_notes="Customs docs missing"
+            ),
+            format="json",
+        )
+
+    def test_publish_after_clearance(self):
+        res = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/clearance/",
+            {"action": "publish"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.car.refresh_from_db()
+        self.assertEqual(self.car.status, CarStatus.PUBLISHED)
+        self.assertIsNotNone(self.car.published_at)
+
+    def test_reject_requires_note(self):
+        res = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/clearance/",
+            {"action": "reject"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_reject_with_note(self):
+        res = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/clearance/",
+            {"action": "reject", "staff_note": "Docs never provided"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.car.refresh_from_db()
+        self.assertEqual(self.car.status, CarStatus.INSPECTION_REJECTED)
+
+    def test_rejected_when_not_needs_clearance(self):
+        self.car.status = CarStatus.PUBLISHED
+        self.car.save(update_fields=["status"])
+        res = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/clearance/",
+            {"action": "publish"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)

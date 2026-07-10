@@ -13,6 +13,7 @@ from .views import (
     StaffBookingListView,
     StaffBookingNoShowView,
     StaffCenterDetailView,
+    StaffClearanceResolveView,
     StaffCenterListCreateView,
     StaffInspectionDocumentsView,
     StaffInspectionStartView,
@@ -77,6 +78,11 @@ urlpatterns = [
         "admin/bookings/<uuid:booking_id>/no-show/",
         StaffBookingNoShowView.as_view(),
         name="no-show-booking",
+    ),
+    path(
+        "admin/bookings/<uuid:booking_id>/clearance/",
+        StaffClearanceResolveView.as_view(),
+        name="resolve-clearance",
     ),
     path(
         "admin/inspections/<uuid:inspection_id>/documents/",
