@@ -38,7 +38,8 @@ export const inspectionKeys = {
   adminCentersList: (params?: Record<string, string | undefined>) =>
     ["inspections", "admin-centers", params ?? {}] as const,
   bookings: ["inspections", "bookings"] as const,
-  myBookings: ["inspections", "bookings", "my"] as const,
+  myBookings: (params?: Record<string, string | undefined>) =>
+    ["inspections", "bookings", "my", params ?? {}] as const,
   adminBookings: ["inspections", "admin-bookings"] as const,
   adminBookingsList: (params?: Record<string, string | undefined>) =>
     ["inspections", "admin-bookings", params ?? {}] as const,
@@ -194,11 +195,15 @@ export function useCreateBooking() {
   });
 }
 
-export function useMyBookings() {
+export function useMyBookings(params?: { car?: string }, options?: { enabled?: boolean }) {
+  const query = buildQuery(params);
   return useQuery({
-    queryKey: inspectionKeys.myBookings,
+    queryKey: inspectionKeys.myBookings(params),
     queryFn: () =>
-      apiClient.get<PaginatedResponse<InspectionBooking>>("/inspections/bookings/my/"),
+      apiClient.get<PaginatedResponse<InspectionBooking>>(
+        `/inspections/bookings/my/${query ? `?${query}` : ""}`,
+      ),
+    enabled: options?.enabled ?? true,
     staleTime: 15_000,
   });
 }
@@ -254,7 +259,7 @@ export function useCarHistory(carId: string | null) {
 
 // ── Staff Booking Management & Physical Inspection ──
 
-export function useStaffBookings(params?: { status?: string; date?: string }) {
+export function useStaffBookings(params?: { status?: string; date?: string; car?: string }) {
   const query = buildQuery(params);
   return useQuery({
     queryKey: inspectionKeys.adminBookingsList(params),
@@ -296,7 +301,13 @@ export function useStartInspection() {
 export function useSubmitInspection() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ bookingId, ...data }: PhysicalInspectionPayload & { bookingId: string }) =>
+    mutationFn: ({
+      bookingId,
+      data,
+    }: {
+      bookingId: string;
+      data: PhysicalInspectionPayload | FormData;
+    }) =>
       apiClient.post<PhysicalInspection>(
         `/inspections/admin/bookings/${bookingId}/inspection/`,
         data,

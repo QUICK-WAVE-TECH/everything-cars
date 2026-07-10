@@ -1,5 +1,7 @@
+import json
 from datetime import time, timedelta
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -383,6 +385,26 @@ def inspection_form_payload(**overrides):
     return base
 
 
+def inspection_document_payload():
+    return {
+        "car_documents": SimpleUploadedFile(
+            "docs.pdf", b"dummy-doc", content_type="application/pdf"
+        ),
+        "receipt_upload": SimpleUploadedFile(
+            "receipt.pdf", b"dummy-receipt", content_type="application/pdf"
+        ),
+        "custom_duty_status": "fully_paid",
+        "receipt_type": "dealership",
+    }
+
+
+def inspection_form_with_documents(**overrides):
+    payload = inspection_form_payload(**overrides)
+    payload["features"] = json.dumps(payload["features"])
+    payload.update(inspection_document_payload())
+    return payload
+
+
 class StaffInspectionFlowTest(APITestCase):
     def setUp(self):
         self.staff = create_user("staff@test.com", "owner", is_staff=True)
@@ -407,6 +429,13 @@ class StaffInspectionFlowTest(APITestCase):
             format="json",
         )
 
+    def _submit_with_documents(self, **overrides):
+        return self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/inspection/",
+            inspection_form_with_documents(**overrides),
+            format="multipart",
+        )
+
     def test_start_inspection(self):
         res = self._start()
         self.assertEqual(res.status_code, status.HTTP_200_OK)
@@ -419,7 +448,7 @@ class StaffInspectionFlowTest(APITestCase):
 
     def test_submit_passed_publishes_car(self):
         self._start()
-        res = self._submit(result="passed")
+        res = self._submit_with_documents(result="passed")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.car.refresh_from_db()
         self.assertEqual(self.car.status, CarStatus.PUBLISHED)
@@ -429,6 +458,15 @@ class StaffInspectionFlowTest(APITestCase):
         inspection = PhysicalInspection.objects.get(booking=self.booking)
         self.assertEqual(inspection.inspector, self.staff)
 
+    def test_passed_sale_car_requires_documents(self):
+        self._start()
+        res = self._submit(result="passed")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.car.refresh_from_db()
+        self.booking.refresh_from_db()
+        self.assertEqual(self.car.status, CarStatus.INSPECTION_IN_PROGRESS)
+        self.assertEqual(self.booking.status, BookingStatus.PENDING)
+
     def test_needs_clearance_requires_note(self):
         self._start()
         res = self._submit(result="needs_clearance", staff_notes="")
@@ -437,7 +475,7 @@ class StaffInspectionFlowTest(APITestCase):
 
     def test_needs_clearance_with_note(self):
         self._start()
-        res = self._submit(
+        res = self._submit_with_documents(
             result="needs_clearance", staff_notes="Customs papers missing"
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
@@ -454,14 +492,14 @@ class StaffInspectionFlowTest(APITestCase):
 
     def test_cannot_submit_twice(self):
         self._start()
-        self._submit(result="passed")
+        self._submit_with_documents(result="passed")
         # a fresh booking would be needed; same booking must 400 (completed)
-        res = self._submit(result="passed")
+        res = self._submit_with_documents(result="passed")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_submissions_write_history(self):
         self._start()
-        self._submit(result="passed")
+        self._submit_with_documents(result="passed")
         transitions = list(
             self.car.status_history.values_list("to_status", flat=True)
         )
@@ -511,24 +549,13 @@ class InspectionDocumentsTest(APITestCase):
         self.client.post(f"/api/v1/inspections/admin/bookings/{booking.id}/start/")
         res = self.client.post(
             f"/api/v1/inspections/admin/bookings/{booking.id}/inspection/",
-            inspection_form_payload(result="passed"),
+            inspection_form_payload(result="failed", staff_notes="Legacy document upload test"),
             format="json",
         )
         return res.data["id"]
 
     def _doc_payload(self):
-        from django.core.files.uploadedfile import SimpleUploadedFile
-
-        return {
-            "car_documents": SimpleUploadedFile(
-                "docs.pdf", b"dummy-doc", content_type="application/pdf"
-            ),
-            "receipt_upload": SimpleUploadedFile(
-                "receipt.pdf", b"dummy-receipt", content_type="application/pdf"
-            ),
-            "custom_duty_status": "fully_paid",
-            "receipt_type": "dealership",
-        }
+        return inspection_document_payload()
 
     def test_upload_documents_for_sale_car(self):
         car = create_car(self.owner)  # default listing has a sale price
@@ -761,10 +788,10 @@ class ClearanceResponseTest(APITestCase):
         self.client.post(f"/api/v1/inspections/admin/bookings/{self.booking.id}/start/")
         self.client.post(
             f"/api/v1/inspections/admin/bookings/{self.booking.id}/inspection/",
-            inspection_form_payload(
+            inspection_form_with_documents(
                 result="needs_clearance", staff_notes="Customs papers missing"
             ),
-            format="json",
+            format="multipart",
         )
         self.client.force_authenticate(user=self.owner)
 
@@ -877,10 +904,10 @@ class ClearanceResolutionTest(APITestCase):
         self.client.post(f"/api/v1/inspections/admin/bookings/{self.booking.id}/start/")
         self.client.post(
             f"/api/v1/inspections/admin/bookings/{self.booking.id}/inspection/",
-            inspection_form_payload(
+            inspection_form_with_documents(
                 result="needs_clearance", staff_notes="Customs docs missing"
             ),
-            format="json",
+            format="multipart",
         )
 
     def test_publish_after_clearance(self):

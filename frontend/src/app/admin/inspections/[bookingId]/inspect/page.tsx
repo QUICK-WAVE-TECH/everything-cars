@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -21,9 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   useStaffBookingDetail,
-  useStartInspection,
   useSubmitInspection,
-  useUploadInspectionDocs,
 } from "@/features/inspections/api/inspections-api";
 import type { PhysicalInspectionPayload } from "@/features/inspections/api/types";
 
@@ -109,24 +107,7 @@ export default function StaffInspectionFormPage() {
   const router = useRouter();
 
   const { data: booking, isLoading } = useStaffBookingDetail(bookingId ?? null);
-  const startInspection = useStartInspection();
   const submitInspection = useSubmitInspection();
-  const uploadDocs = useUploadInspectionDocs();
-
-  const startedRef = useRef(false);
-
-  useEffect(() => {
-    if (!booking || startedRef.current) return;
-    if (booking.car.status === "inspection_pending") {
-      startedRef.current = true;
-      startInspection.mutate(booking.id, {
-        onError: () => {
-          // Ignore — booking may already be in progress.
-        },
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [booking?.id, booking?.car.status]);
 
   // ── Vehicle section ──
   const [condition, setCondition] = useState<PhysicalInspectionPayload["condition"] | "">("");
@@ -186,7 +167,7 @@ export default function StaffInspectionFormPage() {
     (!notesRequired || staffNotes.trim().length > 0) &&
     (!documentsRequired || documentsComplete);
 
-  const isSubmitting = submitInspection.isPending || uploadDocs.isPending;
+  const isSubmitting = submitInspection.isPending;
 
   async function handleSubmit() {
     if (!booking || !isFormValid || !condition || !fuelType || !carType || !engineCondition || !chassisCondition || !acCondition || !result) {
@@ -194,39 +175,28 @@ export default function StaffInspectionFormPage() {
       return;
     }
 
-    const payload: PhysicalInspectionPayload & { bookingId: string } = {
-      bookingId: booking.id,
-      condition,
-      mileage: Number(mileage),
-      fuel_type: fuelType,
-      car_type: carType,
-      features,
-      engine_condition: engineCondition,
-      chassis_condition: chassisCondition,
-      ac_condition: acCondition,
-      is_flooded: isFlooded,
-      has_accident_history: hasAccidentHistory,
-      staff_notes: staffNotes.trim(),
-      result,
-    };
+    const formData = new FormData();
+    formData.append("condition", condition);
+    formData.append("mileage", String(Number(mileage)));
+    formData.append("fuel_type", fuelType);
+    formData.append("car_type", carType);
+    formData.append("features", JSON.stringify(features));
+    formData.append("engine_condition", engineCondition);
+    formData.append("chassis_condition", chassisCondition);
+    formData.append("ac_condition", acCondition);
+    formData.append("is_flooded", String(isFlooded));
+    formData.append("has_accident_history", String(hasAccidentHistory));
+    formData.append("staff_notes", staffNotes.trim());
+    formData.append("result", result);
+
+    if (carDocuments) formData.append("car_documents", carDocuments);
+    if (receiptUpload) formData.append("receipt_upload", receiptUpload);
+    if (customDutyStatus) formData.append("custom_duty_status", customDutyStatus);
+    if (receiptType) formData.append("receipt_type", receiptType);
+    if (additionalNotes.trim()) formData.append("additional_notes", additionalNotes.trim());
 
     try {
-      const inspection = await submitInspection.mutateAsync(payload);
-
-      const hasDocumentData = needsDocuments && (carDocuments || receiptUpload || customDutyStatus || receiptType || additionalNotes.trim());
-      if (hasDocumentData) {
-        const formData = new FormData();
-        if (carDocuments) formData.append("car_documents", carDocuments);
-        if (receiptUpload) formData.append("receipt_upload", receiptUpload);
-        if (customDutyStatus) formData.append("custom_duty_status", customDutyStatus);
-        if (receiptType) formData.append("receipt_type", receiptType);
-        if (additionalNotes.trim()) formData.append("additional_notes", additionalNotes.trim());
-        try {
-          await uploadDocs.mutateAsync({ inspectionId: inspection.id, formData });
-        } catch {
-          toast.error("Inspection recorded, but document upload failed. You can retry from the booking detail.");
-        }
-      }
+      await submitInspection.mutateAsync({ bookingId: booking.id, data: formData });
 
       const resultLabel = RESULT_OPTIONS.find((r) => r.value === result)?.label ?? result;
       toast.success(`Inspection recorded — ${resultLabel}`);

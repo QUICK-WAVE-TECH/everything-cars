@@ -644,6 +644,10 @@ export default function MyCarsPage() {
   const [bookingCarId, setBookingCarId] = useState<string | null>(null);
   const [bookingOpen, setBookingOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { data: selectedBookingsData } = useMyBookings(
+    bookingCarId ? { car: bookingCarId } : undefined,
+    { enabled: !!bookingCarId },
+  );
 
   // Build a map of car_id → most recent active booking for fast lookup
   const bookingByCarId = useMemo<Record<string, InspectionBooking>>(() => {
@@ -964,7 +968,7 @@ export default function MyCarsPage() {
       {bookingCarId && (() => {
         // Rebooking after a no-show goes through the reschedule endpoint so
         // the attempt counts toward the center's cap and history reads right.
-        const lastBooking = bookingByCarId[bookingCarId];
+        const lastBooking = selectedBookingsData?.results?.[0] ?? bookingByCarId[bookingCarId];
         const isRebooking = lastBooking?.status === "no_show";
         return (
           <BookingModal

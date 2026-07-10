@@ -455,7 +455,7 @@ export default function CarDetailPage() {
   const deleteCar = useDeleteCar();
   const uploadImages = useUploadCarImages();
   const carStatus = useCarStatus();
-  const { data: myBookings } = useMyBookings();
+  const { data: myBookings } = useMyBookings({ car: carId });
   const clearanceResponse = useClearanceResponse();
 
   const [editing, setEditing] = useState(false);

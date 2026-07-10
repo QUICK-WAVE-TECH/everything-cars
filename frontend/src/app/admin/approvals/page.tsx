@@ -180,7 +180,7 @@ const CHECKLIST = [
 
 // ── Inspection Booking Card ──
 function InspectionBookingCard({ carId, trackingId, phase }: { carId: string; trackingId: string | null; phase: "pending" | "in_progress" }) {
-  const { data: bookingsData, isLoading } = useStaffBookings({ status: "pending" });
+  const { data: bookingsData, isLoading } = useStaffBookings({ status: "pending", car: carId });
   const bookingResults = bookingsData?.results;
 
   const booking = useMemo(() => {
@@ -289,8 +289,12 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
   const isInspectionInProgress = car?.status === "inspection_in_progress";
   const isNeedsClearance = car?.status === "needs_clearance";
 
-  // Fetch pending bookings so we can resolve the booking for this car
-  const { data: bookingsData } = useStaffBookings({ status: "pending" });
+  // Fetch the relevant booking directly instead of depending on the first page
+  // of the admin booking list.
+  const { data: bookingsData } = useStaffBookings({
+    status: "pending",
+    car: carId ?? undefined,
+  });
   const drawerBookingResults = bookingsData?.results;
   const booking = useMemo(() => {
     if (!drawerBookingResults || !carId) return null;
@@ -299,7 +303,10 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
 
   // needs_clearance cars have a COMPLETED booking — the pending query
   // above can't find it, so fetch completed bookings for resolution.
-  const { data: completedData } = useStaffBookings({ status: "completed" });
+  const { data: completedData } = useStaffBookings({
+    status: "completed",
+    car: carId ?? undefined,
+  });
   const completedResults = completedData?.results;
   const clearanceBooking = useMemo(() => {
     if (!completedResults || !carId) return null;

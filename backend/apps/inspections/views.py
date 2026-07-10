@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta, time
 
 from django.db import IntegrityError, transaction
@@ -10,7 +11,7 @@ from rest_framework.views import APIView
 from common.pagination import StandardPagination
 from common.permissions import IsOwner, IsStaff
 from apps.listings.models import Car, CarStatus
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from apps.notifications.service import (
     notify_clearance_response,
@@ -376,6 +377,9 @@ class OwnerBookingListView(APIView):
             .select_related("car", "slot")
             .order_by("-created_at")
         )
+        car_filter = request.query_params.get("car")
+        if car_filter:
+            bookings = bookings.filter(car_id=car_filter)
         paginator = StandardPagination()
         page = paginator.paginate_queryset(bookings, request)
         serializer = InspectionBookingSerializer(page, many=True)
@@ -553,6 +557,10 @@ class StaffBookingListView(APIView):
         if date_filter:
             bookings = bookings.filter(slot__date=date_filter)
 
+        car_filter = request.query_params.get("car")
+        if car_filter:
+            bookings = bookings.filter(car_id=car_filter)
+
         paginator = StandardPagination()
         page = paginator.paginate_queryset(bookings, request)
         serializer = InspectionBookingSerializer(page, many=True)
@@ -641,10 +649,20 @@ class StaffInspectionSubmitView(APIView):
     failed → inspection_rejected (terminal)."""
 
     permission_classes = [IsStaff]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def post(self, request, booking_id):
-        serializer = PhysicalInspectionSerializer(data=request.data)
+        payload = request.data.dict() if hasattr(request.data, "dict") else request.data.copy()
+        features = payload.get("features")
+        if isinstance(features, str):
+            try:
+                payload["features"] = json.loads(features)
+            except json.JSONDecodeError:
+                pass
+
+        serializer = PhysicalInspectionSerializer(data=payload)
         serializer.is_valid(raise_exception=True)
+        inspection_result = serializer.validated_data["result"]
 
         with transaction.atomic():
             try:
@@ -683,6 +701,22 @@ class StaffInspectionSubmitView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            document_serializer = None
+            requires_documents = bool(car.sale_price) and inspection_result != InspectionResult.FAILED
+            has_document_payload = any(
+                payload.get(field)
+                for field in (
+                    "car_documents",
+                    "receipt_upload",
+                    "custom_duty_status",
+                    "receipt_type",
+                    "additional_notes",
+                )
+            )
+            if bool(car.sale_price) and (requires_documents or has_document_payload):
+                document_serializer = InspectionDocumentSerializer(data=payload)
+                document_serializer.is_valid(raise_exception=True)
+
             inspection = serializer.save(
                 booking=booking,
                 car=car,
@@ -694,6 +728,15 @@ class StaffInspectionSubmitView(APIView):
             booking.status = BookingStatus.COMPLETED
             booking.staff_note = inspection.staff_notes
             booking.save(update_fields=["status", "staff_note", "updated_at"])
+
+            if document_serializer is not None:
+                try:
+                    document_serializer.save(inspection=inspection)
+                except IntegrityError:
+                    return Response(
+                        {"detail": "Documents were already uploaded for this inspection."},
+                        status=status.HTTP_409_CONFLICT,
+                    )
 
             new_status, notify_func = RESULT_TRANSITIONS[inspection.result]
             extra = ["admin_note"]
