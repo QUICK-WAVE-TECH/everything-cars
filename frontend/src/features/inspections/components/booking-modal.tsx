@@ -710,9 +710,9 @@ export function BookingModal({
                               "flex h-7 items-center justify-center rounded-md text-[11px] font-black uppercase tracking-[0.08em] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]",
                             week: "grid grid-cols-7 gap-1.5",
                             day:
-                              "relative aspect-square rounded-[10px] text-center transition",
+                              "relative aspect-square rounded-[10px] text-center",
                             day_button:
-                              "relative z-10 size-[var(--cell-size)] min-w-0 rounded-[10px] text-sm font-bold text-inherit transition-all duration-150 hover:bg-(--brc-primary) hover:text-white data-[selected-single=true]:bg-(--brc-primary) data-[selected-single=true]:text-white data-[selected-single=true]:shadow-[0_10px_24px_rgba(0,0,139,0.22)] [font-family:var(--brc-font-ui)]",
+                              "relative z-10 flex size-full min-w-0 cursor-pointer items-center justify-center rounded-[10px] text-sm font-bold text-inherit transition-[background-color,color,transform,box-shadow] duration-200 ease-out hover:scale-[1.06] hover:bg-(--brc-primary) hover:text-white hover:shadow-[0_10px_24px_rgba(0,0,139,0.22)] active:scale-95 data-[selected-single=true]:bg-(--brc-primary) data-[selected-single=true]:text-white data-[selected-single=true]:shadow-[0_10px_24px_rgba(0,0,139,0.22)] [font-family:var(--brc-font-ui)]",
                             today:
                               "rounded-[10px] ring-1 ring-(--brc-primary)/40",
                             disabled:
