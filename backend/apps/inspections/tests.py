@@ -130,8 +130,9 @@ class OwnerBookingTest(APITestCase):
         self.staff = create_user("staff@test.com", "owner", is_staff=True)
         self.owner = create_user("owner@test.com", "owner")
         create_owner_profile(self.owner)
-        self.car = create_car(self.owner, status=CarStatus.DRAFT)
-        self.slot = create_slot(self.staff)
+        self.car = create_car(self.owner, status=CarStatus.LISTING_APPROVED)
+        self.center = create_center(self.staff)
+        self.slot = create_slot(self.staff, center=self.center)
         self.client.force_authenticate(user=self.owner)
 
     def test_book_inspection(self):
@@ -146,9 +147,10 @@ class OwnerBookingTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.car.refresh_from_db()
         self.assertEqual(self.car.status, CarStatus.INSPECTION_PENDING)
+        self.assertRegex(self.car.tracking_id, r"^NG-LOS-\d{6}$")
 
-    def test_cannot_book_non_draft_car(self):
-        self.car.status = CarStatus.PUBLISHED
+    def test_cannot_book_unapproved_draft(self):
+        self.car.status = CarStatus.DRAFT
         self.car.save(update_fields=["status"])
         res = self.client.post(
             "/api/v1/inspections/bookings/",
@@ -160,10 +162,70 @@ class OwnerBookingTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_can_rebook_after_no_show(self):
+        self.car.status = CarStatus.INSPECTION_NO_SHOW
+        self.car.save(update_fields=["status"])
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {
+                "car_id": str(self.car.id),
+                "slot_id": str(self.slot.id),
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    def test_rebooking_keeps_tracking_id(self):
+        self.client.post(
+            "/api/v1/inspections/bookings/",
+            {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
+            format="json",
+        )
+        self.car.refresh_from_db()
+        original_tracking_id = self.car.tracking_id
+        booking = InspectionBooking.objects.get(car=self.car)
+        self.client.post(f"/api/v1/inspections/bookings/{booking.id}/cancel/")
+        slot2 = create_slot(self.staff, days_ahead=9, center=self.center)
+        self.client.post(
+            "/api/v1/inspections/bookings/",
+            {"car_id": str(self.car.id), "slot_id": str(slot2.id)},
+            format="json",
+        )
+        self.car.refresh_from_db()
+        self.assertEqual(self.car.tracking_id, original_tracking_id)
+
+    def test_reschedule_limit_from_center_policy(self):
+        self.center.max_reschedules = 0
+        self.center.save(update_fields=["max_reschedules"])
+        self.client.post(
+            "/api/v1/inspections/bookings/",
+            {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
+            format="json",
+        )
+        booking = InspectionBooking.objects.get(car=self.car)
+        new_slot = create_slot(self.staff, days_ahead=10, center=self.center)
+        res = self.client.post(
+            f"/api/v1/inspections/bookings/{booking.id}/reschedule/",
+            {"slot_id": str(new_slot.id)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_booking_writes_history(self):
+        self.client.post(
+            "/api/v1/inspections/bookings/",
+            {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
+            format="json",
+        )
+        entry = CarStatusHistory.objects.get(car=self.car)
+        self.assertEqual(entry.from_status, CarStatus.LISTING_APPROVED)
+        self.assertEqual(entry.to_status, CarStatus.INSPECTION_PENDING)
+        self.assertEqual(entry.actor_role, ActorRole.OWNER)
+
     def test_cannot_double_book_car(self):
         # After the first booking succeeds, car moves to INSPECTION_PENDING.
         # A second booking attempt is rejected because the car is no longer
-        # in a bookable status (DRAFT / NEEDS_CHANGES / etc.).
+        # in a bookable status (LISTING_APPROVED / INSPECTION_NO_SHOW).
         self.client.post(
             "/api/v1/inspections/bookings/",
             {
@@ -192,7 +254,7 @@ class OwnerBookingTest(APITestCase):
         # Fill the slot
         other_owner = create_user("other@test.com", "owner")
         create_owner_profile(other_owner)
-        other_car = create_car(other_owner, status=CarStatus.DRAFT)
+        other_car = create_car(other_owner, status=CarStatus.LISTING_APPROVED)
         InspectionBooking.objects.create(
             car=other_car, slot=self.slot, booked_by=other_owner
         )
@@ -219,7 +281,8 @@ class OwnerBookingTest(APITestCase):
         res = self.client.post(f"/api/v1/inspections/bookings/{booking.id}/cancel/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.car.refresh_from_db()
-        self.assertEqual(self.car.status, CarStatus.DRAFT)
+        # Admin approval survives cancellation — car returns to bookable state
+        self.assertEqual(self.car.status, CarStatus.LISTING_APPROVED)
 
     def test_reschedule_booking(self):
         self.client.post(

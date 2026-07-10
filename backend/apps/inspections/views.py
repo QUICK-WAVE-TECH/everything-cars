@@ -21,12 +21,13 @@ from apps.notifications.service import (
 )
 from .models import (
     ACTIVE_BOOKING_STATUSES,
+    ActorRole,
     BookingStatus,
     InspectionBooking,
     InspectionSlot,
-    MAX_RESCHEDULES,
     InspectionCenter,
 )
+from .services import generate_tracking_id, record_status_change
 from .serializers import (
     AvailableSlotSerializer,
     BookingCreateSerializer,
@@ -39,10 +40,10 @@ from .serializers import (
 )
 
 
+# Booking requires prior admin approval of the listing. INSPECTION_NO_SHOW is
+# included because those cars were already approved — the owner rebooks directly.
 BOOKABLE_CAR_STATUSES = [
-    CarStatus.DRAFT,
-    CarStatus.NEEDS_CHANGES,
-    CarStatus.INSPECTION_REJECTED,
+    CarStatus.LISTING_APPROVED,
     CarStatus.INSPECTION_NO_SHOW,
 ]
 
@@ -269,9 +270,9 @@ class OwnerBookingCreateView(APIView):
                 )
 
             try:
-                slot = InspectionSlot.objects.select_for_update().get(
-                    id=slot_id, is_active=True
-                )
+                slot = InspectionSlot.objects.select_related(
+                    "center"
+                ).select_for_update(of=("self",)).get(id=slot_id, is_active=True)
             except InspectionSlot.DoesNotExist:
                 return Response(
                     {"detail": "Slot not found or inactive."},
@@ -315,8 +316,17 @@ class OwnerBookingCreateView(APIView):
                     status=status.HTTP_409_CONFLICT,
                 )
 
-            car.status = CarStatus.INSPECTION_PENDING
-            car.save(update_fields=["status", "updated_at"])
+            extra = []
+            if not car.tracking_id:
+                car.tracking_id = generate_tracking_id(slot.center)
+                extra.append("tracking_id")
+            record_status_change(
+                car,
+                CarStatus.INSPECTION_PENDING,
+                actor=request.user,
+                actor_role=ActorRole.OWNER,
+                extra_update_fields=extra,
+            )
 
         schedule_notification(
             notify_inspection_booked,
@@ -369,9 +379,15 @@ class OwnerBookingCancelView(APIView):
             booking.status = BookingStatus.CANCELLED
             booking.save(update_fields=["status", "updated_at"])
 
+            # Back to bookable — admin's listing approval still stands.
             car = Car.objects.select_for_update().get(id=booking.car_id)
-            car.status = CarStatus.DRAFT
-            car.save(update_fields=["status", "updated_at"])
+            record_status_change(
+                car,
+                CarStatus.LISTING_APPROVED,
+                actor=request.user,
+                actor_role=ActorRole.OWNER,
+                note="Inspection booking cancelled.",
+            )
 
         return Response({"detail": "Booking cancelled."})
 
@@ -389,8 +405,10 @@ class OwnerBookingRescheduleView(APIView):
 
         with transaction.atomic():
             try:
-                booking = InspectionBooking.objects.select_for_update().get(
-                    id=booking_id, booked_by=request.user
+                booking = (
+                    InspectionBooking.objects.select_related("slot__center")
+                    .select_for_update(of=("self",))
+                    .get(id=booking_id, booked_by=request.user)
                 )
             except InspectionBooking.DoesNotExist:
                 return Response(
@@ -404,10 +422,15 @@ class OwnerBookingRescheduleView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            if booking.reschedule_count >= MAX_RESCHEDULES:
+            # Per-center policy: the center of the appointment being moved.
+            max_reschedules = booking.slot.center.max_reschedules
+            if booking.reschedule_count >= max_reschedules:
                 return Response(
                     {
-                        "detail": f"Maximum reschedules ({MAX_RESCHEDULES}) reached. Contact staff to rebook."
+                        "detail": (
+                            f"Maximum reschedules ({max_reschedules}) reached. "
+                            "Contact staff to rebook."
+                        )
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -450,8 +473,15 @@ class OwnerBookingRescheduleView(APIView):
             )
 
             car = Car.objects.select_for_update().get(id=booking.car_id)
-            car.status = CarStatus.INSPECTION_PENDING
-            car.save(update_fields=["status", "updated_at"])
+            if car.status != CarStatus.INSPECTION_PENDING:
+                # e.g. rescheduling out of a no-show — a real transition
+                record_status_change(
+                    car,
+                    CarStatus.INSPECTION_PENDING,
+                    actor=request.user,
+                    actor_role=ActorRole.OWNER,
+                    note="Inspection rescheduled.",
+                )
 
         schedule_notification(
             notify_inspection_rescheduled,
