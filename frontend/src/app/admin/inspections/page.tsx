@@ -180,6 +180,16 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
   const centers = centersData?.results ?? [];
   const todayIso = toIsoDate(new Date());
 
+  // Base UI's Select.Value renders the raw value (the center id) unless the
+  // Root is given an items map to resolve display labels from.
+  const centerItems = useMemo(
+    () =>
+      Object.fromEntries(
+        centers.map((c) => [c.id, `${c.company_name} — ${c.city}`]),
+      ),
+    [centers],
+  );
+
   const previewCount = useMemo(
     () => countPreviewSlots(dateFrom, dateTo, selectedDays, timeSlots),
     [dateFrom, dateTo, selectedDays, timeSlots]
@@ -508,7 +518,7 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
                   No active centers found
                 </div>
               ) : (
-                <Select value={centerId} onValueChange={(value) => setCenterId(value ?? "")}>
+                <Select items={centerItems} value={centerId} onValueChange={(value) => setCenterId(value ?? "")}>
                   <SelectTrigger
                     className="w-full"
                     style={{

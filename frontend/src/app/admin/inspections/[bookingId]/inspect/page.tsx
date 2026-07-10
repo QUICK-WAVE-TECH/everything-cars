@@ -313,7 +313,11 @@ export default function StaffInspectionFormPage() {
 
             <div>
               <FieldLabel>Fuel type</FieldLabel>
-              <Select value={fuelType} onValueChange={(v) => setFuelType((v ?? "") as typeof fuelType)}>
+              <Select
+                items={{ petrol: "Petrol", diesel: "Diesel", hybrid: "Hybrid", electric: "Electric" }}
+                value={fuelType}
+                onValueChange={(v) => setFuelType((v ?? "") as typeof fuelType)}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select fuel type" />
                 </SelectTrigger>
@@ -328,7 +332,11 @@ export default function StaffInspectionFormPage() {
 
             <div>
               <FieldLabel>Car type</FieldLabel>
-              <Select value={carType} onValueChange={(v) => setCarType((v ?? "") as typeof carType)}>
+              <Select
+                items={{ foreign_used: "Foreign Used", brand_new: "Brand New", local_used: "Local Used" }}
+                value={carType}
+                onValueChange={(v) => setCarType((v ?? "") as typeof carType)}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select car type" />
                 </SelectTrigger>
@@ -441,7 +449,11 @@ export default function StaffInspectionFormPage() {
 
               <div>
                 <FieldLabel>Custom duty status</FieldLabel>
-                <Select value={customDutyStatus} onValueChange={(v) => setCustomDutyStatus(v ?? "")}>
+                <Select
+                  items={{ fully_paid: "Fully Paid", partly_paid: "Partly Paid", not_available: "Not Available" }}
+                  value={customDutyStatus}
+                  onValueChange={(v) => setCustomDutyStatus(v ?? "")}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
@@ -455,7 +467,11 @@ export default function StaffInspectionFormPage() {
 
               <div>
                 <FieldLabel>Receipt type</FieldLabel>
-                <Select value={receiptType} onValueChange={(v) => setReceiptType(v ?? "")}>
+                <Select
+                  items={{ company: "Company", dealership: "Dealership", other: "Other" }}
+                  value={receiptType}
+                  onValueChange={(v) => setReceiptType(v ?? "")}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
