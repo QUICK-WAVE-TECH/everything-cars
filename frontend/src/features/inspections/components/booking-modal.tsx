@@ -908,28 +908,6 @@ export function BookingModal({
                 </p>
               </div>
 
-              <button
-                type="button"
-                disabled={step === 4 ? !canConfirm : true}
-                onClick={handleConfirm}
-                className={cn(
-                  "hidden h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-5 text-sm font-black transition-all duration-200 [font-family:var(--brc-font-ui)]",
-                  primaryButtonClass,
-                  step === 4 && "lg:flex",
-                )}
-              >
-                {isConfirming ? (
-                  <>
-                    <Loader2Icon size={16} className="animate-spin" />
-                    {isReschedule ? "Rescheduling..." : "Booking..."}
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2Icon size={17} />
-                    {isReschedule ? "Confirm reschedule" : "Book appointment"}
-                  </>
-                )}
-              </button>
             </div>
           </aside>
         </div>
@@ -977,7 +955,11 @@ export function BookingModal({
               onClick={handleConfirm}
               className={cn("flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-5 text-sm font-black transition-all duration-200 [font-family:var(--brc-font-ui)]", primaryButtonClass)}
             >
-              {isConfirming && <Loader2Icon size={15} className="animate-spin" />}
+              {isConfirming ? (
+                <Loader2Icon size={15} className="animate-spin" />
+              ) : (
+                <CheckCircle2Icon size={16} />
+              )}
               {isConfirming
                 ? isReschedule
                   ? "Rescheduling..."
