@@ -686,8 +686,10 @@ export function BookingModal({
                             available: (date) => availableDates.has(toDateString(date)),
                           }}
                           modifiersClassNames={{
+                            // Static tint only — hover is handled on the inner
+                            // day button so the two layers never stack colors.
                             available:
-                              "bg-(--brc-primary-tint) text-(--brc-primary) font-extrabold hover:bg-(--brc-primary) hover:text-white",
+                              "rounded-[10px] bg-(--brc-primary-tint) text-(--brc-primary) font-extrabold",
                           }}
                           className="w-full bg-transparent p-0 [--cell-radius:10px] [--cell-size:2.35rem]"
                           classNames={{
@@ -710,7 +712,7 @@ export function BookingModal({
                             day:
                               "relative aspect-square rounded-[10px] text-center transition",
                             day_button:
-                              "relative z-10 size-[var(--cell-size)] min-w-0 rounded-[10px] text-sm font-bold text-(--brc-text) transition-all duration-150 hover:bg-(--brc-primary-tint) hover:text-(--brc-primary) data-[selected-single=true]:bg-(--brc-primary) data-[selected-single=true]:text-white data-[selected-single=true]:shadow-[0_10px_24px_rgba(0,0,139,0.22)] [font-family:var(--brc-font-ui)]",
+                              "relative z-10 size-[var(--cell-size)] min-w-0 rounded-[10px] text-sm font-bold text-inherit transition-all duration-150 hover:bg-(--brc-primary) hover:text-white data-[selected-single=true]:bg-(--brc-primary) data-[selected-single=true]:text-white data-[selected-single=true]:shadow-[0_10px_24px_rgba(0,0,139,0.22)] [font-family:var(--brc-font-ui)]",
                             today:
                               "rounded-[10px] ring-1 ring-(--brc-primary)/40",
                             disabled:
