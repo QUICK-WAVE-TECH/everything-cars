@@ -552,7 +552,7 @@ function ActionCell({
         onClick={() => router.push(`/owner/my-cars/${listing.id}`)}
         className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-(--brc-accent) bg-(--brc-accent-bg) px-3 text-[12px] font-bold text-(--brc-accent) transition-all duration-150 hover:-translate-y-0.5 hover:brightness-95 [font-family:var(--brc-font-ui)]"
       >
-        Edit & Rebook
+        Edit & Resubmit
       </button>
     );
   }
