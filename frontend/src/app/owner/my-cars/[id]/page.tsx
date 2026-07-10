@@ -14,9 +14,10 @@ import {
   Trash2Icon,
   ImageIcon,
   ChevronDownIcon,
-  CalendarIcon,
+  CalendarCheckIcon,
   AlertTriangleIcon,
   Loader2Icon,
+  RotateCcwIcon,
 } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import {
@@ -670,24 +671,49 @@ export default function CarDetailPage() {
               {car.city ? `, ${car.city}` : ""}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
             {!editing ? (
               <>
                 {["listing_approved", "inspection_no_show"].includes(car.status) && (
                   <button
                     type="button"
                     onClick={() => setBookingOpen(true)}
-                    className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border-none bg-(--brc-primary) px-4 text-sm font-semibold text-(--brc-text-on-primary) transition-colors hover:bg-(--brc-primary-hover) disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+                    className={cn(
+                      "group inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold shadow-[0_12px_28px_rgba(0,0,139,0.18)] transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]",
+                      car.status === "inspection_no_show"
+                        ? "border border-(--brc-warning)/50 bg-(--brc-warning-bg) text-[#9a7400] hover:bg-white hover:shadow-[0_16px_34px_rgba(154,116,0,0.16)] focus-visible:ring-(--brc-warning)"
+                        : "border border-(--brc-primary)/15 bg-(--brc-primary) text-(--brc-text-on-primary) hover:bg-(--brc-primary-hover) hover:shadow-[0_16px_34px_rgba(0,0,139,0.24)] focus-visible:ring-(--brc-primary)",
+                    )}
                   >
-                    <CalendarIcon size={15} />
+                    {car.status === "inspection_no_show" ? (
+                      <RotateCcwIcon size={16} strokeWidth={2.4} />
+                    ) : (
+                      <CalendarCheckIcon size={16} strokeWidth={2.4} />
+                    )}
                     {car.status === "inspection_no_show" ? "Rebook Inspection" : "Book Inspection"}
                   </button>
                 )}
                 {car.status === "draft" && (
-                  <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) px-4 text-sm font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                    <Icon name="clock" size={15} stroke="var(--brc-text-muted)" />
-                    Awaiting review by our team
+                  <span className="inline-flex h-11 max-w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-(--brc-border) bg-white px-4 text-sm font-extrabold text-(--brc-text-muted) shadow-[0_12px_28px_rgba(18,18,18,0.06)] [font-family:var(--brc-font-ui)]">
+                    <Icon name="clock" size={16} stroke="currentColor" />
+                    <span>Awaiting review</span>
                   </span>
+                )}
+                {car.status === "needs_changes" && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleStatusChange(
+                        "draft",
+                        "Resubmitted — our team will review your changes",
+                      )
+                    }
+                    disabled={carStatus.isPending}
+                    className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-primary)/15 bg-(--brc-primary) px-4 text-sm font-extrabold text-(--brc-text-on-primary) shadow-[0_12px_28px_rgba(0,0,139,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+                  >
+                    <Icon name="check" size={16} stroke="currentColor" />
+                    Resubmit for Review
+                  </button>
                 )}
                 {car.status === "published" && (
                   <button
@@ -719,9 +745,9 @@ export default function CarDetailPage() {
                   <button
                     type="button"
                     onClick={startEditing}
-                    className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-4 text-sm font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
+                    className="group inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-border) bg-white px-4 text-sm font-extrabold text-(--brc-text) shadow-[0_12px_28px_rgba(18,18,18,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-(--brc-primary)/25 hover:bg-(--brc-primary-tint) hover:text-(--brc-primary) hover:shadow-[0_16px_34px_rgba(0,0,139,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 [font-family:var(--brc-font-ui)]"
                   >
-                    <PencilIcon size={15} />
+                    <PencilIcon size={16} strokeWidth={2.4} />
                     Edit
                   </button>
                 )}
@@ -730,9 +756,9 @@ export default function CarDetailPage() {
                     type="button"
                     onClick={handleArchive}
                     disabled={deleteCar.isPending}
-                    className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-(--brc-danger)/30 bg-white px-4 text-sm font-semibold text-(--brc-danger) transition-colors hover:bg-(--brc-danger-bg) disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+                    className="group inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-danger)/30 bg-white px-4 text-sm font-extrabold text-(--brc-danger) shadow-[0_12px_28px_rgba(220,38,38,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-danger-bg) hover:shadow-[0_16px_34px_rgba(220,38,38,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-danger) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
                   >
-                    <Trash2Icon size={15} />
+                    <Trash2Icon size={16} strokeWidth={2.4} />
                     Archive
                   </button>
                 )}
@@ -1286,7 +1312,8 @@ function AdminNoteAccordion({ note }: { note: string }) {
             </p>
           </div>
           <span className="mt-3 block text-xs text-[#9a7400]/60 [font-family:var(--brc-font-ui)]">
-            Please make the requested changes and book a new inspection above.
+            Edit the listing to make the requested changes, then click
+            &ldquo;Resubmit for Review&rdquo; above.
           </span>
         </div>
       )}

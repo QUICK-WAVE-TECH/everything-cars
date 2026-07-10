@@ -470,3 +470,33 @@ class MyCarHistoryTest(APITestCase):
         self.client.force_authenticate(user=other)
         res = self.client.get(f"/api/v1/listings/my-cars/{self.car.id}/history")
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class ResubmissionTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("owner-resub@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner, status=CarStatus.NEEDS_CHANGES)
+        self.client.force_authenticate(user=self.owner)
+
+    def test_owner_resubmits_needs_changes_to_draft(self):
+        res = self.client.post(
+            f"/api/v1/listings/my-cars/{self.car.id}/status",
+            {"status": "draft"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.car.refresh_from_db()
+        self.assertEqual(self.car.status, CarStatus.DRAFT)
+        entry = self.car.status_history.get()
+        self.assertEqual(entry.from_status, CarStatus.NEEDS_CHANGES)
+        self.assertEqual(entry.to_status, CarStatus.DRAFT)
+        self.assertEqual(entry.actor_role, "owner")
+
+    def test_owner_cannot_skip_review(self):
+        res = self.client.post(
+            f"/api/v1/listings/my-cars/{self.car.id}/status",
+            {"status": "listing_approved"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)

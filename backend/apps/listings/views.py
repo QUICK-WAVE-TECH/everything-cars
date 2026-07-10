@@ -641,7 +641,7 @@ class MyCarStatusView(APIView):
         "needs_clearance": [],  # Owner addresses issues; staff transitions
         "inspection_rejected": [],  # Owner rebooks via inspections app
         "inspection_no_show": [],  # Owner rebooks via inspections app
-        "needs_changes": [],  # Owner rebooks via inspections app
+        "needs_changes": ["draft"],  # Owner resubmits for admin review
         "published": ["paused", "archived"],
         "paused": ["published", "archived"],
         "suspended": [],  # Only staff can transition
