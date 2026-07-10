@@ -19,7 +19,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useStaffSlots, useCreateSlots, useAdminCenters } from "@/features/inspections/api/inspections-api";
+import { cn } from "@/lib/utils";
+import {
+  useStaffSlots,
+  useCreateSlots,
+  useAdminCenters,
+  useDeactivateSlot,
+} from "@/features/inspections/api/inspections-api";
 import type { InspectionSlot } from "@/features/inspections/api/types";
 
 // ── Date helpers ──
@@ -87,9 +93,31 @@ function slotColor(slot: InspectionSlot): { bg: string; border: string; text: st
 
 function SlotChip({ slot }: { slot: InspectionSlot }) {
   const { bg, border, text } = slotColor(slot);
+  const deactivateSlot = useDeactivateSlot();
+  // Two-click confirm: first click arms the button, second click deactivates.
+  const [arming, setArming] = useState(false);
+
+  async function handleDeactivate() {
+    if (!arming) {
+      setArming(true);
+      return;
+    }
+    try {
+      await deactivateSlot.mutateAsync(slot.id);
+      toast.success("Slot deactivated");
+    } catch (error) {
+      // Backend returns 409 when the slot has an active booking
+      toast.error(
+        error instanceof ApiError ? error.message : "Failed to deactivate slot",
+      );
+    } finally {
+      setArming(false);
+    }
+  }
+
   return (
     <div
-      className="rounded-lg px-2.5 py-2 text-left"
+      className="relative rounded-lg px-2.5 py-2 text-left"
       style={{ background: bg, border: `1px solid ${border}` }}
     >
       <div className="text-[12px] font-bold [font-family:var(--brc-font-ui)]" style={{ color: text }}>
@@ -103,6 +131,29 @@ function SlotChip({ slot }: { slot: InspectionSlot }) {
           {slot.center_name}{slot.center_city ? ` · ${slot.center_city}` : ""}
         </div>
       )}
+      <button
+        type="button"
+        onClick={handleDeactivate}
+        onMouseLeave={() => setArming(false)}
+        onBlur={() => setArming(false)}
+        disabled={deactivateSlot.isPending}
+        aria-label={arming ? "Click again to confirm deactivation" : "Deactivate slot"}
+        title={arming ? "Click again to confirm" : "Deactivate slot"}
+        className={cn(
+          "absolute -right-1.5 -top-1.5 flex h-5 cursor-pointer items-center justify-center rounded-full border shadow-sm transition-all duration-150 [font-family:var(--brc-font-ui)] disabled:cursor-not-allowed disabled:opacity-60",
+          arming
+            ? "px-1.5 border-(--brc-danger) bg-(--brc-danger) text-[9px] font-black text-white"
+            : "w-5 border-(--brc-border) bg-white text-(--brc-text-muted) hover:border-(--brc-danger) hover:text-(--brc-danger)",
+        )}
+      >
+        {deactivateSlot.isPending ? (
+          <Loader2Icon size={10} className="animate-spin" />
+        ) : arming ? (
+          "Confirm?"
+        ) : (
+          <XIcon size={11} />
+        )}
+      </button>
     </div>
   );
 }
@@ -767,7 +818,11 @@ export default function AdminInspectionsPage() {
   const dateFrom = toIsoDate(days[0]!);
   const dateTo = toIsoDate(days[days.length - 1]!);
 
-  const { data, isLoading, isFetching } = useStaffSlots({ date_from: dateFrom, date_to: dateTo });
+  const { data, isLoading, isFetching } = useStaffSlots({
+    date_from: dateFrom,
+    date_to: dateTo,
+    is_active: "true",
+  });
   const slots = data?.results ?? [];
 
   function prevWeek() {
