@@ -716,17 +716,20 @@ function WeeklyCalendar({ slots, isLoading, days }: {
   }, [slots]);
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(6, 1fr)",
-        gap: 1,
-        background: "var(--brc-border)",
-        borderRadius: 12,
-        overflow: "hidden",
-        border: "1px solid var(--brc-border)",
-      }}
-    >
+    // Scroll fallback for narrow screens; on desktop all six columns fit.
+    <div className="overflow-x-auto">
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(6, 1fr)",
+          gap: 1,
+          background: "var(--brc-border)",
+          borderRadius: 12,
+          overflow: "hidden",
+          border: "1px solid var(--brc-border)",
+          minWidth: 720,
+        }}
+      >
       {days.map((day, i) => {
         const iso = toIsoDate(day);
         const daySlots = slotsByDate[iso] ?? [];
@@ -740,6 +743,9 @@ function WeeklyCalendar({ slots, isLoading, days }: {
               minHeight: 200,
               display: "flex",
               flexDirection: "column",
+              // Allow the column to shrink below its content's natural width —
+              // without this, nowrap chip text forces the grid past the viewport.
+              minWidth: 0,
             }}
           >
             {/* Day header */}
@@ -803,6 +809,7 @@ function WeeklyCalendar({ slots, isLoading, days }: {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
