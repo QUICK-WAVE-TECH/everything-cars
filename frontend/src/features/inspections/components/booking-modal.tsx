@@ -6,7 +6,9 @@ import {
   ArrowLeftIcon,
   Building2Icon,
   CalendarIcon,
+  CheckIcon,
   CheckCircle2Icon,
+  ChevronDownIcon,
   ClockIcon,
   Loader2Icon,
   MapPinIcon,
@@ -20,12 +22,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import {
@@ -83,18 +84,90 @@ function today() {
 
 const STEP_LABELS = ["Location", "Center", "Date & time", "Confirm"] as const;
 
+// Solid surfaces on the brc token system — matches the admin drawer,
+// my-cars cards, and the staff inspection form.
+const inputClass =
+  "border border-(--brc-border) bg-white text-(--brc-text) shadow-[var(--brc-shadow-xs)] transition-colors hover:border-(--brc-primary)/40 focus:outline-none focus:ring-2 focus:ring-(--brc-primary)/25";
+const selectContentClass =
+  "border border-(--brc-border) bg-white text-(--brc-text) shadow-[0_16px_42px_rgba(18,18,18,0.12)]";
+const selectItemClass =
+  "cursor-pointer text-(--brc-text) hover:bg-(--brc-primary-tint) focus:bg-(--brc-primary-tint) focus:text-(--brc-primary) data-highlighted:bg-(--brc-primary-tint) data-highlighted:text-(--brc-primary)";
+const primaryButtonClass =
+  "border-none bg-(--brc-primary) text-white shadow-sm hover:bg-(--brc-primary-hover) hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50";
+const secondaryButtonClass =
+  "border border-(--brc-border) bg-white text-(--brc-text) hover:bg-(--brc-bg-subtle) disabled:cursor-not-allowed disabled:opacity-50";
+
+function LocationDropdown({
+  value,
+  placeholder,
+  options,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  placeholder: string;
+  options: string[];
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        disabled={disabled}
+        className={cn(
+          "flex h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-3 text-left text-sm font-semibold outline-none transition-all duration-200 [font-family:var(--brc-font-ui)]",
+          inputClass,
+          disabled &&
+            "cursor-not-allowed bg-(--brc-bg-subtle) text-(--brc-text-muted) hover:border-(--brc-border)",
+        )}
+      >
+        <span className={cn("min-w-0 truncate", !value && "text-(--brc-text-muted)")}>
+          {value || placeholder}
+        </span>
+        <ChevronDownIcon size={16} className="shrink-0 text-(--brc-text-muted)" />
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        align="start"
+        sideOffset={8}
+        className={cn("max-h-64 overflow-y-auto p-1", selectContentClass)}
+      >
+        {options.length === 0 ? (
+          <div className="px-2.5 py-2 text-sm font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+            No options available
+          </div>
+        ) : (
+          options.map((option) => (
+            <DropdownMenuItem
+              key={option}
+              onClick={() => onChange(option)}
+              className={cn(
+                "flex cursor-pointer items-center justify-between gap-2 px-2.5 py-2 font-semibold [font-family:var(--brc-font-ui)]",
+                selectItemClass,
+              )}
+            >
+              <span className="min-w-0 truncate">{option}</span>
+              {value === option && <CheckIcon size={15} className="shrink-0 text-(--brc-primary)" />}
+            </DropdownMenuItem>
+          ))
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function StepDot({ step, current, label }: { step: number; current: number; label: string }) {
   const done = current > step;
   const active = current === step;
   return (
     <div
       className={cn(
-        "flex min-w-0 items-center gap-2 rounded-full border px-3 py-2 transition-colors",
+        "flex min-w-0 items-center gap-2 rounded-full border px-3 py-2 transition-all duration-200",
         active
-          ? "border-(--brc-primary) bg-white text-(--brc-primary)"
+          ? "border-(--brc-primary)/35 bg-(--brc-primary-tint) text-(--brc-primary)"
           : done
-          ? "border-(--brc-success)/30 bg-(--brc-success-bg) text-(--brc-success)"
-          : "border-white/20 bg-white/10 text-white/70",
+          ? "border-transparent bg-(--brc-success-bg) text-(--brc-success)"
+          : "border-(--brc-border) bg-(--brc-bg-subtle) text-(--brc-text-muted)",
       )}
     >
       <span
@@ -104,7 +177,7 @@ function StepDot({ step, current, label }: { step: number; current: number; labe
             ? "bg-(--brc-primary) text-white"
             : done
             ? "bg-(--brc-success) text-white"
-            : "bg-white/15 text-white/75",
+            : "bg-(--brc-bg-muted) text-(--brc-text-muted)",
         )}
       >
         {done ? <CheckCircle2Icon size={14} /> : step}
@@ -132,37 +205,41 @@ function CenterCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        "group flex min-w-0 flex-col gap-2 rounded-lg border p-4 text-left transition-all duration-200 [font-family:var(--brc-font-ui)]",
+        "group flex min-w-0 cursor-pointer flex-col gap-2 rounded-xl border p-4 text-left transition-all duration-200 [font-family:var(--brc-font-ui)]",
         selected
-          ? "border-(--brc-primary) bg-(--brc-primary) text-white shadow-[0_14px_34px_rgba(0,0,139,0.24)]"
-          : "border-(--brc-border) bg-white text-(--brc-text) hover:-translate-y-0.5 hover:border-(--brc-primary) hover:shadow-[0_12px_28px_rgba(18,18,18,0.08)]",
+          ? "border-(--brc-primary) bg-(--brc-primary-tint) shadow-[0_10px_26px_rgba(0,0,139,0.10)]"
+          : "border-(--brc-border) bg-white shadow-[var(--brc-shadow-xs)] hover:-translate-y-0.5 hover:border-(--brc-primary)/40 hover:shadow-[0_14px_32px_rgba(18,18,18,0.10)]",
       )}
     >
       <span className="flex items-center gap-2">
         <span
           className={cn(
             "flex size-8 shrink-0 items-center justify-center rounded-full",
-            selected ? "bg-white/15 text-white" : "bg-(--brc-primary-tint) text-(--brc-primary)",
+            selected
+              ? "bg-(--brc-primary) text-white"
+              : "bg-(--brc-primary-tint) text-(--brc-primary)",
           )}
         >
           <Building2Icon size={16} />
         </span>
-        <span className="min-w-0 truncate text-sm font-extrabold">
+        <span
+          className={cn(
+            "min-w-0 truncate text-sm font-extrabold",
+            selected ? "text-(--brc-primary)" : "text-(--brc-text)",
+          )}
+        >
           {center.company_name}
         </span>
       </span>
-      <span
-        className={cn(
-          "text-xs leading-5",
-          selected ? "text-white/80" : "text-(--brc-text-muted)",
-        )}
-      >
+      <span className="text-xs leading-5 text-(--brc-text-secondary)">
         {center.address}
       </span>
       <span
         className={cn(
           "mt-1 inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold",
-          selected ? "bg-white/15 text-white" : "bg-(--brc-bg-muted) text-(--brc-text-muted)",
+          selected
+            ? "bg-(--brc-primary) text-white"
+            : "bg-(--brc-bg-muted) text-(--brc-text-secondary)",
         )}
       >
         <MapPinIcon size={11} />
@@ -193,22 +270,29 @@ function SlotButton({
       disabled={isFull}
       onClick={onSelect}
       className={cn(
-        "group flex min-h-[96px] min-w-0 flex-col justify-between rounded-lg border p-3 text-left transition-all duration-200 [font-family:var(--brc-font-ui)] disabled:cursor-not-allowed disabled:opacity-45",
+        "group flex min-h-[96px] min-w-0 cursor-pointer flex-col justify-between rounded-xl border p-3 text-left transition-all duration-200 [font-family:var(--brc-font-ui)] disabled:cursor-not-allowed disabled:opacity-50",
         selected
-          ? "border-(--brc-primary) bg-(--brc-primary) text-white shadow-[0_14px_34px_rgba(0,0,139,0.24)]"
-          : "border-(--brc-border) bg-white text-(--brc-text) hover:-translate-y-0.5 hover:border-(--brc-primary) hover:shadow-[0_12px_28px_rgba(18,18,18,0.08)]",
+          ? "border-(--brc-primary) bg-(--brc-primary-tint) shadow-[0_10px_26px_rgba(0,0,139,0.10)]"
+          : "border-(--brc-border) bg-white shadow-[var(--brc-shadow-xs)] hover:-translate-y-0.5 hover:border-(--brc-primary)/40 hover:shadow-[0_14px_32px_rgba(18,18,18,0.10)]",
       )}
     >
       <span className="flex items-center gap-2">
         <span
           className={cn(
             "flex size-8 shrink-0 items-center justify-center rounded-full",
-            selected ? "bg-white/15 text-white" : "bg-(--brc-primary-tint) text-(--brc-primary)",
+            selected
+              ? "bg-(--brc-primary) text-white"
+              : "bg-(--brc-primary-tint) text-(--brc-primary)",
           )}
         >
           <ClockIcon size={16} />
         </span>
-        <span className="min-w-0 truncate text-sm font-extrabold">
+        <span
+          className={cn(
+            "min-w-0 truncate text-sm font-extrabold",
+            selected ? "text-(--brc-primary)" : "text-(--brc-text)",
+          )}
+        >
           {timeLabel}
         </span>
       </span>
@@ -216,7 +300,7 @@ function SlotButton({
         className={cn(
           "mt-3 inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold",
           selected
-            ? "bg-white/15 text-white"
+            ? "bg-(--brc-primary) text-white"
             : isFull
             ? "bg-(--brc-bg-muted) text-(--brc-text-muted)"
             : "bg-(--brc-success-bg) text-(--brc-success)",
@@ -416,24 +500,23 @@ export function BookingModal({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="max-h-[calc(100vh-2rem)] gap-0 overflow-hidden rounded-2xl border border-white/70 bg-white p-0 shadow-[0_28px_80px_rgba(18,18,18,0.22)] sm:max-w-[900px]"
+        className="max-h-[calc(100vh-2rem)] gap-0 overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-0 shadow-[0_34px_90px_rgba(18,18,18,0.22)] sm:max-w-[940px]"
         showCloseButton={!isConfirming}
       >
-        <DialogHeader className="relative overflow-hidden bg-(--brc-surface-inverse) px-5 py-5 text-white sm:px-7">
-          <div className="absolute inset-x-0 bottom-0 h-px bg-white/10" />
+        <DialogHeader className="border-b border-(--brc-border) bg-white px-5 py-5 sm:px-7">
           <div className="flex flex-col gap-4 pr-10">
             <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-lg bg-white text-(--brc-primary)">
+              <span className="mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-xl bg-(--brc-primary-tint) text-(--brc-primary)">
                 <ShieldCheckIcon size={22} />
               </span>
               <div className="min-w-0">
-                <span className="text-xs font-extrabold uppercase tracking-[0.16em] text-white/55 [font-family:var(--brc-font-ui)]">
+                <span className="text-xs font-extrabold uppercase tracking-[0.18em] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
                   Vehicle inspection
                 </span>
-                <DialogTitle className="mt-1 text-2xl font-black leading-tight text-white [font-family:var(--brc-font-display)]">
+                <DialogTitle className="mt-1 text-2xl font-black leading-tight text-(--brc-text) [font-family:var(--brc-font-display)]">
                   {isReschedule ? "Reschedule inspection" : "Book an inspection"}
                 </DialogTitle>
-                <p className="mt-1 max-w-[620px] text-sm leading-6 text-white/68 [font-family:var(--brc-font-ui)]">
+                <p className="mt-1 max-w-[660px] text-sm leading-6 text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
                   Choose a center and an available visit window. Attend your inspection at the selected center — no further confirmation needed.
                 </p>
               </div>
@@ -444,12 +527,12 @@ export function BookingModal({
                 <div key={label} className="flex items-center gap-2">
                   <StepDot step={i + 1} current={step} label={label} />
                   {i < STEP_LABELS.length - 1 && (
-                    <span className="hidden h-px w-6 bg-white/20 sm:block" />
+                    <span className="hidden h-px w-6 bg-(--brc-border) sm:block" />
                   )}
                 </div>
               ))}
               {step === 3 && (
-                <span className="ml-auto hidden rounded-full bg-white/10 px-3 py-2 text-xs font-bold text-white/72 [font-family:var(--brc-font-ui)] sm:inline-flex">
+                <span className="ml-auto hidden rounded-full border border-(--brc-border) bg-(--brc-bg-subtle) px-3 py-2 text-xs font-bold text-(--brc-text-secondary) [font-family:var(--brc-font-ui)] sm:inline-flex">
                   {availableDateCount} available date{availableDateCount === 1 ? "" : "s"}
                 </span>
               )}
@@ -459,7 +542,7 @@ export function BookingModal({
 
         <div className="grid max-h-[calc(100vh-250px)] min-h-[430px] overflow-y-auto bg-(--brc-bg-subtle) lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="min-w-0 p-4 sm:p-6">
-            <div className="rounded-xl border border-(--brc-border) bg-white p-4 shadow-[0_16px_40px_rgba(18,18,18,0.06)] sm:p-5">
+            <div className="rounded-2xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] sm:p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-base font-black text-(--brc-text) [font-family:var(--brc-font-display)]">
@@ -468,7 +551,7 @@ export function BookingModal({
                     {step === 3 && "Select a visit date and time"}
                     {step === 4 && "Confirm your appointment"}
                   </h3>
-                  <p className="mt-1 text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                  <p className="mt-1 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
                     {step === 1 && "Pick the country, state, and city closest to you."}
                     {step === 2 && "These centers serve your selected city."}
                     {step === 3 &&
@@ -481,7 +564,7 @@ export function BookingModal({
                   <button
                     type="button"
                     onClick={handleBack}
-                    className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-3 text-sm font-bold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
+                    className={cn("inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm font-bold transition-all duration-200 [font-family:var(--brc-font-ui)]", secondaryButtonClass)}
                   >
                     <ArrowLeftIcon size={15} />
                     Back
@@ -502,54 +585,38 @@ export function BookingModal({
                         <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
                           Country
                         </span>
-                        <Select value={country} onValueChange={handleCountryChange}>
-                          <SelectTrigger className="h-11 w-full">
-                            <SelectValue placeholder="Select country" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(locations ?? []).map((l) => (
-                              <SelectItem key={l.country} value={l.country}>
-                                {l.country}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <LocationDropdown
+                          value={country}
+                          placeholder="Select country"
+                          options={(locations ?? []).map((l) => l.country)}
+                          onChange={handleCountryChange}
+                        />
                       </label>
 
                       <label className="flex flex-col gap-2">
                         <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
                           State
                         </span>
-                        <Select value={state} onValueChange={handleStateChange} disabled={!country}>
-                          <SelectTrigger className="h-11 w-full">
-                            <SelectValue placeholder="Select state" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {states.map((s) => (
-                              <SelectItem key={s.state} value={s.state}>
-                                {s.state}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <LocationDropdown
+                          value={state}
+                          placeholder="Select state"
+                          options={states.map((s) => s.state)}
+                          disabled={!country}
+                          onChange={handleStateChange}
+                        />
                       </label>
 
                       <label className="flex flex-col gap-2">
                         <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
                           City
                         </span>
-                        <Select value={city} onValueChange={handleCityChange} disabled={!state}>
-                          <SelectTrigger className="h-11 w-full">
-                            <SelectValue placeholder="Select city" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {cities.map((c) => (
-                              <SelectItem key={c} value={c}>
-                                {c}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <LocationDropdown
+                          value={city}
+                          placeholder="Select city"
+                          options={cities}
+                          disabled={!state}
+                          onChange={handleCityChange}
+                        />
                       </label>
                     </div>
                   )}
@@ -564,8 +631,8 @@ export function BookingModal({
                       <Loader2Icon size={24} className="animate-spin text-(--brc-primary)" />
                     </div>
                   ) : !centers || centers.length === 0 ? (
-                    <div className="flex h-[220px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-(--brc-border-strong) bg-(--brc-bg-subtle) px-6 text-center">
-                      <span className="flex size-12 items-center justify-center rounded-full bg-white text-(--brc-text-muted)">
+                    <div className="flex h-[220px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 text-center">
+                      <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-bg-muted) text-(--brc-text-muted)">
                         <Building2Icon size={22} />
                       </span>
                       <div>
@@ -601,7 +668,7 @@ export function BookingModal({
                         <Loader2Icon size={26} className="animate-spin text-(--brc-primary)" />
                       </div>
                     ) : (
-                      <div className="mx-auto flex w-full max-w-[380px] flex-col gap-3 rounded-xl bg-white p-3 shadow-[0_14px_34px_rgba(18,18,18,0.08)] sm:p-4">
+                      <div className="mx-auto flex w-full max-w-[380px] flex-col gap-3 rounded-xl border border-(--brc-border) bg-white p-3 shadow-[var(--brc-shadow-xs)] sm:p-4">
                         <Calendar
                           mode="single"
                           selected={selectedDate}
@@ -626,9 +693,9 @@ export function BookingModal({
                             caption_label:
                               "truncate text-[18px] font-black leading-none text-(--brc-text) [font-family:var(--brc-font-display)] sm:text-[20px]",
                             button_previous:
-                              "size-9 rounded-full border border-(--brc-border) bg-white text-(--brc-text) shadow-sm transition hover:-translate-x-0.5 hover:border-(--brc-primary) hover:bg-(--brc-primary) hover:text-white",
+                              "size-9 rounded-full border border-(--brc-border) bg-white text-(--brc-text) shadow-sm transition hover:-translate-x-0.5 hover:border-(--brc-primary)/40 hover:bg-(--brc-primary-tint) hover:text-(--brc-primary)",
                             button_next:
-                              "size-9 rounded-full border border-(--brc-border) bg-white text-(--brc-text) shadow-sm transition hover:translate-x-0.5 hover:border-(--brc-primary) hover:bg-(--brc-primary) hover:text-white",
+                              "size-9 rounded-full border border-(--brc-border) bg-white text-(--brc-text) shadow-sm transition hover:translate-x-0.5 hover:border-(--brc-primary)/40 hover:bg-(--brc-primary-tint) hover:text-(--brc-primary)",
                             weekdays: "grid grid-cols-7 gap-1",
                             weekday:
                               "flex h-7 items-center justify-center rounded-md text-[11px] font-black uppercase tracking-[0.08em] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]",
@@ -636,16 +703,16 @@ export function BookingModal({
                             day:
                               "relative aspect-square rounded-[10px] text-center transition",
                             day_button:
-                              "relative z-10 size-[var(--cell-size)] min-w-0 rounded-[10px] text-sm font-bold text-(--brc-text) transition-all duration-150 hover:bg-(--brc-primary-tint) hover:text-(--brc-primary) data-[selected-single=true]:bg-(--brc-primary) data-[selected-single=true]:text-white data-[selected-single=true]:shadow-[0_10px_20px_rgba(0,0,139,0.24)] [font-family:var(--brc-font-ui)]",
+                              "relative z-10 size-[var(--cell-size)] min-w-0 rounded-[10px] text-sm font-bold text-(--brc-text) transition-all duration-150 hover:bg-(--brc-primary-tint) hover:text-(--brc-primary) data-[selected-single=true]:bg-(--brc-primary) data-[selected-single=true]:text-white data-[selected-single=true]:shadow-[0_10px_24px_rgba(0,0,139,0.22)] [font-family:var(--brc-font-ui)]",
                             today:
-                              "rounded-[10px] ring-1 ring-(--brc-warning)",
+                              "rounded-[10px] ring-1 ring-(--brc-primary)/40",
                             disabled:
-                              "pointer-events-none text-(--brc-text-muted) opacity-20 grayscale",
-                            outside: "text-(--brc-text-muted) opacity-20",
+                              "pointer-events-none text-(--brc-text-muted) opacity-35",
+                            outside: "text-(--brc-text-muted) opacity-35",
                           }}
                         />
 
-                        <div className="grid grid-cols-2 gap-2 border-t border-(--brc-border) pt-3 text-[11px] font-bold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                        <div className="grid grid-cols-2 gap-2 border-t border-(--brc-border) pt-3 text-[11px] font-bold text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
                           <span className="flex items-center gap-1.5">
                             <span className="size-2.5 rounded-full bg-(--brc-primary)" />
                             Available
@@ -661,8 +728,8 @@ export function BookingModal({
 
                   <div className="min-w-0 flex-1">
                     {!selectedDate ? (
-                      <div className="flex h-[220px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-(--brc-border-strong) bg-(--brc-bg-subtle) px-6 text-center">
-                        <span className="flex size-12 items-center justify-center rounded-full bg-white text-(--brc-text-muted)">
+                      <div className="flex h-[220px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 text-center">
+                        <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-bg-muted) text-(--brc-text-muted)">
                           <CalendarIcon size={22} />
                         </span>
                         <p className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
@@ -674,8 +741,8 @@ export function BookingModal({
                         <Loader2Icon size={24} className="animate-spin text-(--brc-primary)" />
                       </div>
                     ) : !daySlots || daySlots.length === 0 ? (
-                      <div className="flex h-[220px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-(--brc-border-strong) bg-(--brc-bg-subtle) px-6 text-center">
-                        <span className="flex size-12 items-center justify-center rounded-full bg-white text-(--brc-text-muted)">
+                      <div className="flex h-[220px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 text-center">
+                        <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-bg-muted) text-(--brc-text-muted)">
                           <ClockIcon size={22} />
                         </span>
                         <div>
@@ -719,7 +786,7 @@ export function BookingModal({
                     )}
                     <div className="flex flex-col gap-4">
                       <div className="flex items-start gap-3">
-                        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white text-(--brc-success)">
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-(--brc-primary-tint) text-(--brc-primary)">
                           <MapPinIcon size={18} />
                         </span>
                         <div className="min-w-0">
@@ -729,14 +796,14 @@ export function BookingModal({
                           <span className="block text-sm font-extrabold leading-5 text-(--brc-text) [font-family:var(--brc-font-ui)]">
                             {selectedCenter.company_name}
                           </span>
-                          <span className="block text-xs leading-5 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                          <span className="block text-xs leading-5 text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
                             {selectedCenter.address}
                           </span>
                         </div>
                       </div>
 
                       <div className="flex items-start gap-3">
-                        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white text-(--brc-primary)">
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-(--brc-primary-tint) text-(--brc-primary)">
                           <CalendarIcon size={18} />
                         </span>
                         <div className="min-w-0">
@@ -750,7 +817,7 @@ export function BookingModal({
                       </div>
 
                       <div className="flex items-start gap-3">
-                        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white text-(--brc-accent)">
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-(--brc-primary-tint) text-(--brc-primary)">
                           <ClockIcon size={18} />
                         </span>
                         <div className="min-w-0">
@@ -763,15 +830,6 @@ export function BookingModal({
                         </div>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="rounded-xl border border-(--brc-accent)/25 bg-(--brc-accent-bg) p-4">
-                    <p className="text-sm font-extrabold text-(--brc-text) [font-family:var(--brc-font-ui)]">
-                      What happens next
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
-                      Your appointment is confirmed immediately. Attend your inspection at the selected center on the date and time above.
-                    </p>
                   </div>
                 </div>
               )}
@@ -787,7 +845,7 @@ export function BookingModal({
 
                 <div className="mt-4 flex flex-col gap-3">
                   <div className="flex items-start gap-3">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white text-(--brc-success)">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-(--brc-primary-tint) text-(--brc-primary)">
                       <MapPinIcon size={18} />
                     </span>
                     <div className="min-w-0">
@@ -801,7 +859,7 @@ export function BookingModal({
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white text-(--brc-primary)">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-(--brc-primary-tint) text-(--brc-primary)">
                       <CalendarIcon size={18} />
                     </span>
                     <div className="min-w-0">
@@ -815,7 +873,7 @@ export function BookingModal({
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white text-(--brc-accent)">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-(--brc-primary-tint) text-(--brc-primary)">
                       <ClockIcon size={18} />
                     </span>
                     <div className="min-w-0">
@@ -833,7 +891,7 @@ export function BookingModal({
               </div>
 
               <div className="rounded-xl border border-(--brc-accent)/25 bg-(--brc-accent-bg) p-4">
-                <p className="text-sm font-extrabold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                <p className="text-sm font-extrabold text-(--brc-accent) [font-family:var(--brc-font-ui)]">
                   What happens next
                 </p>
                 <p className="mt-1 text-xs leading-5 text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
@@ -846,7 +904,8 @@ export function BookingModal({
                 disabled={step === 4 ? !canConfirm : true}
                 onClick={handleConfirm}
                 className={cn(
-                  "hidden h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) px-5 text-sm font-black text-white shadow-[0_14px_30px_rgba(0,0,139,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 [font-family:var(--brc-font-ui)]",
+                  "hidden h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-5 text-sm font-black transition-all duration-200 [font-family:var(--brc-font-ui)]",
+                  primaryButtonClass,
                   step === 4 && "lg:flex",
                 )}
               >
@@ -872,7 +931,7 @@ export function BookingModal({
               type="button"
               onClick={handleBack}
               disabled={isConfirming}
-              className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-border) bg-white px-4 text-sm font-bold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+              className={cn("flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition-all duration-200 [font-family:var(--brc-font-ui)]", secondaryButtonClass)}
             >
               <ArrowLeftIcon size={15} />
               Back
@@ -884,7 +943,7 @@ export function BookingModal({
               type="button"
               disabled={!canProceedStep1}
               onClick={goToStep2}
-              className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) px-5 text-sm font-black text-white transition-all duration-200 hover:bg-(--brc-primary-hover) disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]"
+              className={cn("flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-5 text-sm font-black transition-all duration-200 [font-family:var(--brc-font-ui)]", primaryButtonClass)}
             >
               Choose center
             </button>
@@ -895,7 +954,7 @@ export function BookingModal({
               type="button"
               disabled={!canProceedStep3}
               onClick={goToStep4}
-              className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) px-5 text-sm font-black text-white transition-all duration-200 hover:bg-(--brc-primary-hover) disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]"
+              className={cn("flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-5 text-sm font-black transition-all duration-200 [font-family:var(--brc-font-ui)]", primaryButtonClass)}
             >
               <ClockIcon size={15} />
               Review appointment
@@ -907,7 +966,7 @@ export function BookingModal({
               type="button"
               disabled={!canConfirm}
               onClick={handleConfirm}
-              className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) px-5 text-sm font-black text-white transition-all duration-200 hover:bg-(--brc-primary-hover) disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]"
+              className={cn("flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-5 text-sm font-black transition-all duration-200 [font-family:var(--brc-font-ui)]", primaryButtonClass)}
             >
               {isConfirming && <Loader2Icon size={15} className="animate-spin" />}
               {isConfirming
