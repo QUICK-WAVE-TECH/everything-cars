@@ -273,13 +273,13 @@ function SlotButton({
       disabled={isFull}
       onClick={onSelect}
       className={cn(
-        "group flex min-h-[96px] min-w-0 cursor-pointer flex-col justify-between rounded-xl border p-3 text-left transition-all duration-200 [font-family:var(--brc-font-ui)] disabled:cursor-not-allowed disabled:opacity-50",
+        "group flex min-h-[56px] min-w-0 cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-200 [font-family:var(--brc-font-ui)] disabled:cursor-not-allowed disabled:opacity-50",
         selected
           ? "border-(--brc-primary) bg-(--brc-primary-tint) shadow-[0_10px_26px_rgba(0,0,139,0.10)]"
           : "border-(--brc-border) bg-white shadow-[var(--brc-shadow-xs)] hover:-translate-y-0.5 hover:border-(--brc-primary)/40 hover:shadow-[0_14px_32px_rgba(18,18,18,0.10)]",
       )}
     >
-      <span className="flex items-center gap-2">
+      <span className="flex min-w-0 items-center gap-2">
         <span
           className={cn(
             "flex size-8 shrink-0 items-center justify-center rounded-full",
@@ -288,11 +288,11 @@ function SlotButton({
               : "bg-(--brc-primary-tint) text-(--brc-primary)",
           )}
         >
-          <ClockIcon size={16} />
+          <ClockIcon size={15} />
         </span>
         <span
           className={cn(
-            "min-w-0 truncate text-sm font-extrabold",
+            "whitespace-nowrap text-[13px] font-extrabold",
             selected ? "text-(--brc-primary)" : "text-(--brc-text)",
           )}
         >
@@ -301,7 +301,7 @@ function SlotButton({
       </span>
       <span
         className={cn(
-          "mt-3 inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold",
+          "inline-flex shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold",
           selected
             ? "bg-(--brc-primary) text-white"
             : isFull
@@ -665,10 +665,12 @@ export function BookingModal({
                 </div>
               )}
 
-              {/* Step 3: Date & time */}
+              {/* Step 3: Date & time — stacked so slot chips always get full
+                  panel width (side-by-side crushes them next to the summary
+                  sidebar) */}
               {step === 3 && (
-                <div className="flex flex-col gap-4 lg:flex-row">
-                  <div className="rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle) p-2 sm:p-4 lg:w-[380px] lg:shrink-0">
+                <div className="flex flex-col gap-4">
+                  <div className="rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle) p-2 sm:p-4">
                     {isLoadingAllSlots ? (
                       <div className="flex h-[330px] w-full items-center justify-center">
                         <Loader2Icon size={26} className="animate-spin text-(--brc-primary)" />
