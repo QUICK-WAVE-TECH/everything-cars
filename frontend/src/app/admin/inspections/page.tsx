@@ -117,10 +117,10 @@ function SlotChip({ slot }: { slot: InspectionSlot }) {
 
   return (
     <div
-      className="relative rounded-lg px-2.5 py-2 text-left"
+      className="relative rounded-lg py-2 pl-2.5 pr-8 text-left"
       style={{ background: bg, border: `1px solid ${border}` }}
     >
-      <div className="text-[12px] font-bold [font-family:var(--brc-font-ui)]" style={{ color: text }}>
+      <div className="truncate text-[12px] font-bold [font-family:var(--brc-font-ui)]" style={{ color: text }}>
         {formatTime(slot.start_time)} – {formatTime(slot.end_time)}
       </div>
       <div className="mt-0.5 text-[11px] font-semibold [font-family:var(--brc-font-ui)]" style={{ color: text, opacity: 0.8 }}>
@@ -140,7 +140,7 @@ function SlotChip({ slot }: { slot: InspectionSlot }) {
         aria-label={arming ? "Click again to confirm deactivation" : "Deactivate slot"}
         title={arming ? "Click again to confirm" : "Deactivate slot"}
         className={cn(
-          "absolute -right-1.5 -top-1.5 flex h-5 cursor-pointer items-center justify-center rounded-full border shadow-sm transition-all duration-150 [font-family:var(--brc-font-ui)] disabled:cursor-not-allowed disabled:opacity-60",
+          "absolute right-1.5 top-1.5 flex h-5 cursor-pointer items-center justify-center rounded-full border shadow-sm transition-all duration-150 [font-family:var(--brc-font-ui)] disabled:cursor-not-allowed disabled:opacity-60",
           arming
             ? "px-1.5 border-(--brc-danger) bg-(--brc-danger) text-[9px] font-black text-white"
             : "w-5 border-(--brc-border) bg-white text-(--brc-text-muted) hover:border-(--brc-danger) hover:text-(--brc-danger)",
