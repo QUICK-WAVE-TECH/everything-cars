@@ -2,30 +2,43 @@
 
 import { useMemo, useState, useCallback, useEffect } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { XIcon, CheckIcon, SearchIcon, Loader2Icon } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { useAdminCars, useAdminCarDetail, useAdminCarStatus } from "@/features/listings/api/admin-api";
+import {
+  useAdminCars,
+  useAdminCarDetail,
+  useAdminCarStatus,
+  useApproveListing,
+  useRequestChanges,
+} from "@/features/listings/api/admin-api";
 import type { CarListItem } from "@/features/listings/api/types";
 import {
   useStaffBookings,
-  useApproveBooking,
-  useRejectBooking,
-  usePassInspection,
-  useFailInspection,
+  useStartInspection,
   useMarkNoShow,
 } from "@/features/inspections/api/inspections-api";
 
 // ── Types ──
-type TabKey = "inspection_pending" | "inspection_approved" | "needs_changes" | "published" | "suspended";
+type TabKey =
+  | "draft"
+  | "listing_approved"
+  | "inspection_pending"
+  | "inspection_in_progress"
+  | "needs_clearance"
+  | "published"
+  | "suspended";
 
 const TABS: { key: TabKey; label: string }[] = [
-  { key: "inspection_pending", label: "Inspection Pending" },
-  { key: "inspection_approved", label: "Awaiting Inspection" },
-  { key: "needs_changes", label: "Needs Changes" },
+  { key: "draft", label: "Pending Review" },
+  { key: "listing_approved", label: "Approved for Booking" },
+  { key: "inspection_pending", label: "Awaiting Inspection" },
+  { key: "inspection_in_progress", label: "In Progress" },
+  { key: "needs_clearance", label: "Needs Clearance" },
   { key: "published", label: "Published" },
   { key: "suspended", label: "Suspended" },
 ];
@@ -59,16 +72,17 @@ function listingTypeLabel(t: string) {
 
 // ── Status pill ──
 const STATUS_STYLES: Record<string, { bg: string; fg: string; label: string }> = {
-  pending_review: { bg: "var(--brc-warning-bg)", fg: "#9a7400", label: "Pending Review" },
-  inspection_pending: { bg: "var(--brc-warning-bg)", fg: "#9a7400", label: "Inspection Pending" },
-  inspection_approved: { bg: "var(--brc-success-bg)", fg: "var(--brc-success)", label: "Inspection Approved" },
+  draft: { bg: "var(--brc-bg-muted)", fg: "var(--brc-text-muted)", label: "Pending Review" },
+  listing_approved: { bg: "var(--brc-success-bg)", fg: "var(--brc-success)", label: "Approved for Booking" },
+  inspection_pending: { bg: "var(--brc-warning-bg)", fg: "#9a7400", label: "Awaiting Inspection" },
+  inspection_in_progress: { bg: "#e0e7ff", fg: "#4338ca", label: "In Progress" },
+  needs_clearance: { bg: "#ffe0cc", fg: "#b34700", label: "Needs Clearance" },
   inspection_rejected: { bg: "var(--brc-danger-bg)", fg: "var(--brc-danger)", label: "Inspection Rejected" },
   inspection_no_show: { bg: "#ffe0cc", fg: "#b34700", label: "No Show" },
   needs_changes: { bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)", label: "Needs Changes" },
   published: { bg: "var(--brc-success-bg)", fg: "var(--brc-success)", label: "Published" },
   suspended: { bg: "var(--brc-danger-bg)", fg: "var(--brc-danger)", label: "Suspended" },
   archived: { bg: "var(--brc-bg-muted)", fg: "var(--brc-text-muted)", label: "Archived" },
-  draft: { bg: "var(--brc-bg-muted)", fg: "var(--brc-text-muted)", label: "Draft" },
   paused: { bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)", label: "Paused" },
 };
 
@@ -158,20 +172,20 @@ const CHECKLIST = [
 ];
 
 // ── Inspection Booking Card ──
-function InspectionBookingCard({ carId, status }: { carId: string; status: string }) {
-  const isPending = status === "inspection_pending";
-  const { data: bookingsData, isLoading } = useStaffBookings({ status: isPending ? "pending" : "approved" });
+function InspectionBookingCard({ carId, trackingId, phase }: { carId: string; trackingId: string | null; phase: "pending" | "in_progress" }) {
+  const { data: bookingsData, isLoading } = useStaffBookings({ status: "pending" });
+  const bookingResults = bookingsData?.results;
 
   const booking = useMemo(() => {
-    if (!bookingsData?.results) return null;
-    return bookingsData.results.find((b) => b.car_id === carId) ?? null;
-  }, [bookingsData?.results, carId]);
+    if (!bookingResults) return null;
+    return bookingResults.find((b) => b.car_id === carId) ?? null;
+  }, [bookingResults, carId]);
 
-  const cardStyle = isPending
+  const cardStyle = phase === "pending"
     ? { background: "#f0f4ff", borderColor: "#d0dcff" }
-    : { background: "#f0fdf4", borderColor: "#bbf7d0" };
+    : { background: "#eef2ff", borderColor: "#c7d2fe" };
 
-  const labelColor = isPending ? "#1d4ed8" : "#15803d";
+  const labelColor = phase === "pending" ? "#1d4ed8" : "#4338ca";
 
   if (isLoading) {
     return (
@@ -201,9 +215,16 @@ function InspectionBookingCard({ carId, status }: { carId: string; status: strin
 
   return (
     <div className="rounded-xl border p-4" style={cardStyle}>
-      <span className="mb-3 block text-[13px] font-bold uppercase tracking-widest [font-family:var(--brc-font-ui)]" style={{ color: labelColor }}>
-        {isPending ? "Inspection Booking — Pending Approval" : "Inspection Booking — Approved"}
-      </span>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <span className="block text-[13px] font-bold uppercase tracking-widest [font-family:var(--brc-font-ui)]" style={{ color: labelColor }}>
+          {phase === "pending" ? "Inspection Booking — Awaiting Start" : "Inspection Booking — In Progress"}
+        </span>
+        {trackingId && (
+          <span className="rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+            #{trackingId}
+          </span>
+        )}
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col gap-[3px] rounded-lg bg-white/70 px-3 py-2.5">
           <span className="text-[11px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Date</span>
@@ -217,16 +238,17 @@ function InspectionBookingCard({ carId, status }: { carId: string; status: strin
             {formatTime(slot.start_time)} – {formatTime(slot.end_time)}
           </span>
         </div>
-        <div className="flex flex-col gap-[3px] rounded-lg bg-white/70 px-3 py-2.5">
-          <span className="text-[11px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Location</span>
-          <span className="truncate text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">{slot.location}</span>
+        <div className="col-span-2 flex flex-col gap-[3px] rounded-lg bg-white/70 px-3 py-2.5">
+          <span className="text-[11px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Inspection Center</span>
+          <span className="truncate text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">{slot.center.company_name}</span>
+          <span className="truncate text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{slot.center.address}, {slot.center.city}</span>
         </div>
         <div className="flex flex-col gap-[3px] rounded-lg bg-white/70 px-3 py-2.5">
           <span className="text-[11px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Owner</span>
           <span className="truncate text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">{booking.booked_by_name}</span>
         </div>
         {booking.reschedule_count > 0 && (
-          <div className="col-span-2 flex flex-col gap-[3px] rounded-lg bg-white/70 px-3 py-2.5">
+          <div className="flex flex-col gap-[3px] rounded-lg bg-white/70 px-3 py-2.5">
             <span className="text-[11px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Reschedules</span>
             <span className="text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">{booking.reschedule_count}</span>
           </div>
@@ -241,30 +263,34 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
   carId: string | null; open: boolean; onClose: () => void;
   onAction: (carId: string, status: string, note?: string) => void; isActing: boolean;
 }) {
+  const router = useRouter();
   const { data: car } = useAdminCarDetail(open ? carId : null);
   const [checks, setChecks] = useState<number[]>([]);
   const [activeImg, setActiveImg] = useState(0);
-  const [noteMode, setNoteMode] = useState<"changes" | "reject" | "fail" | null>(null);
+  const [noteMode, setNoteMode] = useState<"changes" | null>(null);
   const [staffNote, setStaffNote] = useState("");
 
-  const approveBooking = useApproveBooking();
-  const rejectBooking = useRejectBooking();
-  const passInspection = usePassInspection();
-  const failInspection = useFailInspection();
+  const approveListing = useApproveListing();
+  const requestChanges = useRequestChanges();
+  const startInspection = useStartInspection();
   const markNoShow = useMarkNoShow();
 
+  const isDraft = car?.status === "draft";
+  const isListingApproved = car?.status === "listing_approved";
   const isInspectionPending = car?.status === "inspection_pending";
-  const isInspectionApproved = car?.status === "inspection_approved";
+  const isInspectionInProgress = car?.status === "inspection_in_progress";
+  const isNeedsClearance = car?.status === "needs_clearance";
 
-  // Fetch the booking for this car so we can call inspection hooks with bookingId
-  const { data: bookingsData } = useStaffBookings({ status: isInspectionPending ? "pending" : "approved" });
+  // Fetch pending bookings so we can resolve the booking for this car
+  const { data: bookingsData } = useStaffBookings({ status: "pending" });
+  const drawerBookingResults = bookingsData?.results;
   const booking = useMemo(() => {
-    if (!bookingsData?.results || !carId) return null;
-    return bookingsData.results.find((b) => b.car_id === carId) ?? null;
-  }, [bookingsData?.results, carId]);
+    if (!drawerBookingResults || !carId) return null;
+    return drawerBookingResults.find((b) => b.car_id === carId) ?? null;
+  }, [drawerBookingResults, carId]);
 
   const allChecked = checks.length === CHECKLIST.length;
-  const reviewable = isInspectionPending;
+  const reviewable = isDraft;
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -273,12 +299,16 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
   }, [onClose]);
 
   // Reset note state when drawer opens/closes or car changes
-  useEffect(() => {
+  // (state-adjustment-during-render pattern — avoids an effect re-render)
+  const resetKey = `${carId ?? "none"}-${open}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
     setNoteMode(null);
     setStaffNote("");
     setChecks([]);
     setActiveImg(0);
-  }, [carId, open]);
+  }
 
   function toggle(i: number) {
     setChecks((c) => c.includes(i) ? c.filter((x) => x !== i) : [...c, i]);
@@ -297,41 +327,39 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
 
   const images = car?.images ?? [];
 
-  // ── Inspection booking action handlers ──
-  async function handleApproveBooking() {
+  // ── Action handlers ──
+  async function handleApproveListing() {
+    if (!car) return;
+    try {
+      await approveListing.mutateAsync(car.id);
+      toast.success("Listing approved — owner can now book an inspection");
+      onClose();
+    } catch { toast.error("Failed to approve listing"); }
+  }
+
+  async function handleRequestChanges() {
+    if (!car || !staffNote.trim()) return;
+    try {
+      await requestChanges.mutateAsync({ carId: car.id, note: staffNote.trim() });
+      toast.success("Changes requested — owner will be notified");
+      onClose();
+    } catch { toast.error("Failed to request changes"); }
+  }
+
+  async function handleStartInspection() {
     if (!car || !booking) return;
     try {
-      await approveBooking.mutateAsync({ bookingId: booking.id });
-      toast.success("Inspection booking approved");
+      await startInspection.mutateAsync(booking.id);
+      toast.success("Inspection started");
       onClose();
-    } catch { toast.error("Failed to approve booking"); }
+      router.push(`/admin/inspections/${booking.id}/inspect`);
+    } catch { toast.error("Failed to start inspection"); }
   }
 
-  async function handleRejectBooking() {
-    if (!car || !booking || !staffNote.trim()) return;
-    try {
-      await rejectBooking.mutateAsync({ bookingId: booking.id, staff_note: staffNote.trim() });
-      toast.success("Inspection booking rejected");
-      onClose();
-    } catch { toast.error("Failed to reject booking"); }
-  }
-
-  async function handlePassInspection() {
-    if (!car || !booking) return;
-    try {
-      await passInspection.mutateAsync({ bookingId: booking.id });
-      toast.success("Inspection passed — listing published");
-      onClose();
-    } catch { toast.error("Failed to pass inspection"); }
-  }
-
-  async function handleFailInspection() {
-    if (!car || !booking || !staffNote.trim()) return;
-    try {
-      await failInspection.mutateAsync({ bookingId: booking.id, staff_note: staffNote.trim() });
-      toast.success("Inspection marked as failed");
-      onClose();
-    } catch { toast.error("Failed to record inspection failure"); }
+  function handleContinueInspection() {
+    if (!booking) return;
+    onClose();
+    router.push(`/admin/inspections/${booking.id}/inspect`);
   }
 
   async function handleNoShow() {
@@ -343,8 +371,8 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
     } catch { toast.error("Failed to mark no-show"); }
   }
 
-  const isInspectionActing = approveBooking.isPending || rejectBooking.isPending || passInspection.isPending || failInspection.isPending || markNoShow.isPending;
-  const anyActing = isActing || isInspectionActing;
+  const isSectionActing = approveListing.isPending || requestChanges.isPending || startInspection.isPending || markNoShow.isPending;
+  const anyActing = isActing || isSectionActing;
 
   return (
     <div aria-hidden={!open} className={cn("fixed inset-0 z-[100]", open ? "pointer-events-auto" : "pointer-events-none")}>
@@ -366,7 +394,10 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
             <div className="flex shrink-0 items-center gap-3 border-b border-(--brc-border) px-6 py-[18px]">
               <div className="min-w-0 flex-1">
                 <span className="block truncate text-lg font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">{car.title}</span>
-                <span className="text-[13px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{car.year} · {car.body_type || car.brand} · submitted {formatDate(car.created_at)}</span>
+                <span className="text-[13px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                  {car.year} · {car.body_type || car.brand} · submitted {formatDate(car.created_at)}
+                  {car.tracking_id ? ` · #${car.tracking_id}` : ""}
+                </span>
               </div>
               <AdminStatusBadge status={car.status} />
               <button onClick={onClose} aria-label="Close review" className="flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-lg border-none bg-(--brc-bg-subtle)">
@@ -377,8 +408,11 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
             {/* Scrollable body */}
             <div className="flex flex-1 flex-col gap-7 overflow-y-auto p-6">
               {/* Inspection booking info card */}
-              {(isInspectionPending || isInspectionApproved) && carId && (
-                <InspectionBookingCard carId={carId} status={car.status} />
+              {isInspectionPending && carId && (
+                <InspectionBookingCard carId={carId} trackingId={car.tracking_id} phase="pending" />
+              )}
+              {isInspectionInProgress && carId && (
+                <InspectionBookingCard carId={carId} trackingId={car.tracking_id} phase="in_progress" />
               )}
 
               {/* Gallery with arrows + thumbnails + counter */}
@@ -500,7 +534,7 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
                 </section>
               )}
 
-              {/* Checklist — shown only for inspection_pending */}
+              {/* Checklist — shown only for draft (pending review) */}
               {reviewable && (
                 <section className="flex flex-col gap-3">
                   <h3 className="m-0 text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
@@ -522,12 +556,26 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
                   </div>
                 </section>
               )}
+
+              {/* Needs clearance note */}
+              {isNeedsClearance && (
+                <section className="flex flex-col gap-3">
+                  <h3 className="m-0 text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Clearance note</h3>
+                  {car.admin_note ? (
+                    <div className="rounded-lg border border-[#f97316]/30 bg-[#fff7ed] p-3">
+                      <p className="m-0 text-sm text-[#b34700] [font-family:var(--brc-font-ui)]">{car.admin_note}</p>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">No clearance note recorded.</span>
+                  )}
+                </section>
+              )}
             </div>
 
             {/* Sticky action bar */}
             <div className="shrink-0 border-t border-(--brc-border) bg-white px-6 py-3.5">
-              {/* ── Stage 1: inspection_pending ── */}
-              {isInspectionPending && noteMode === "changes" ? (
+              {/* ── draft: request changes note ── */}
+              {isDraft && noteMode === "changes" ? (
                 <div className="flex flex-col gap-3">
                   <div>
                     <span className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">What needs to change?</span>
@@ -545,103 +593,59 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
                       className="flex h-[46px] flex-1 cursor-pointer items-center justify-center rounded-lg border border-(--brc-border) bg-white text-sm font-bold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]">
                       Cancel
                     </button>
-                    <button type="button" disabled={anyActing || !staffNote.trim()} onClick={() => onAction(car.id, "needs_changes", staffNote.trim())}
+                    <button type="button" disabled={anyActing || !staffNote.trim()} onClick={handleRequestChanges}
                       className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-warning) text-sm font-bold text-[#121212] transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]">
                       {anyActing ? <Loader2Icon size={16} className="animate-spin" /> : null}
                       Send to Owner
                     </button>
                   </div>
                 </div>
-              ) : isInspectionPending && noteMode === "reject" ? (
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <span className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">Reason for rejection</span>
-                    <p className="mt-1 text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">This note will be recorded against the booking.</p>
-                  </div>
-                  <textarea
-                    value={staffNote}
-                    onChange={(e) => setStaffNote(e.target.value)}
-                    placeholder="e.g. Booking rejected due to incomplete documentation."
-                    rows={3}
-                    className="resize-none rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) p-3 text-sm leading-relaxed text-(--brc-text) outline-none placeholder:text-(--brc-text-muted) focus:border-(--brc-danger) [font-family:var(--brc-font-ui)]"
-                  />
-                  <div className="flex gap-2.5">
-                    <button type="button" onClick={() => { setNoteMode(null); setStaffNote(""); }}
-                      className="flex h-[46px] flex-1 cursor-pointer items-center justify-center rounded-lg border border-(--brc-border) bg-white text-sm font-bold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]">
-                      Cancel
-                    </button>
-                    <button type="button" disabled={anyActing || !staffNote.trim()} onClick={handleRejectBooking}
-                      className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-danger) text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]">
-                      {anyActing ? <Loader2Icon size={16} className="animate-spin" /> : null}
-                      Confirm Rejection
-                    </button>
-                  </div>
-                </div>
-              ) : isInspectionPending ? (
-                /* Stage 1 default: Approve / Request Changes / Reject */
+              ) : isDraft ? (
+                /* draft default: Approve for Inspection / Request Changes */
                 <div className="flex flex-col gap-2">
                   <div className="flex gap-2.5">
-                    <button type="button" disabled={anyActing} onClick={() => setNoteMode("reject")}
-                      className="flex h-[46px] flex-1 cursor-pointer items-center justify-center rounded-lg border border-(--brc-danger) bg-white text-sm font-bold text-(--brc-danger) transition-colors hover:bg-(--brc-danger-bg) disabled:opacity-50 [font-family:var(--brc-font-ui)]">
-                      Reject
-                    </button>
                     <button type="button" disabled={anyActing} onClick={() => setNoteMode("changes")}
                       className="flex h-[46px] flex-1 cursor-pointer items-center justify-center rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) text-sm font-bold text-(--brc-text) transition-colors hover:brightness-95 disabled:opacity-50 [font-family:var(--brc-font-ui)]">
                       Request Changes
                     </button>
-                    <button type="button" disabled={anyActing || !allChecked} onClick={handleApproveBooking}
+                    <button type="button" disabled={anyActing || !allChecked} onClick={handleApproveListing}
                       className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-success) text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-45 [font-family:var(--brc-font-ui)]">
                       {anyActing ? <Loader2Icon size={16} className="animate-spin" /> : null}
-                      Approve
+                      Approve for Inspection
                     </button>
                   </div>
                   {!allChecked && <span className="text-center text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Complete the admin checklist to enable approval.</span>}
                 </div>
 
-              ) : isInspectionApproved && noteMode === "fail" ? (
-                /* Stage 2: fail note input */
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <span className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">Reason for failing inspection</span>
-                    <p className="mt-1 text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">This note will be recorded against the inspection booking.</p>
-                  </div>
-                  <textarea
-                    value={staffNote}
-                    onChange={(e) => setStaffNote(e.target.value)}
-                    placeholder="e.g. Vehicle condition does not match listing description."
-                    rows={3}
-                    className="resize-none rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) p-3 text-sm leading-relaxed text-(--brc-text) outline-none placeholder:text-(--brc-text-muted) focus:border-(--brc-danger) [font-family:var(--brc-font-ui)]"
-                  />
-                  <div className="flex gap-2.5">
-                    <button type="button" onClick={() => { setNoteMode(null); setStaffNote(""); }}
-                      className="flex h-[46px] flex-1 cursor-pointer items-center justify-center rounded-lg border border-(--brc-border) bg-white text-sm font-bold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]">
-                      Cancel
-                    </button>
-                    <button type="button" disabled={anyActing || !staffNote.trim()} onClick={handleFailInspection}
-                      className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-danger) text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]">
-                      {anyActing ? <Loader2Icon size={16} className="animate-spin" /> : null}
-                      Confirm Failure
-                    </button>
-                  </div>
-                </div>
-              ) : isInspectionApproved ? (
-                /* Stage 2 default: Pass / Fail / No-Show */
+              ) : isListingApproved ? (
+                <span className="block text-center text-[13px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Waiting for the owner to book an inspection slot.</span>
+
+              ) : isInspectionPending ? (
+                /* Start Inspection / Mark No-Show */
                 <div className="flex gap-2.5">
-                  <button type="button" disabled={anyActing} onClick={() => setNoteMode("fail")}
-                    className="flex h-[46px] flex-1 cursor-pointer items-center justify-center rounded-lg border border-(--brc-danger) bg-white text-sm font-bold text-(--brc-danger) transition-colors hover:bg-(--brc-danger-bg) disabled:opacity-50 [font-family:var(--brc-font-ui)]">
-                    Fail Inspection
-                  </button>
-                  <button type="button" disabled={anyActing} onClick={handleNoShow}
+                  <button type="button" disabled={anyActing || !booking} onClick={handleNoShow}
                     className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#f97316] bg-white text-sm font-bold text-[#b34700] transition-colors hover:bg-[#fff7ed] disabled:opacity-50 [font-family:var(--brc-font-ui)]">
-                    {anyActing ? <Loader2Icon size={16} className="animate-spin" /> : null}
+                    {markNoShow.isPending ? <Loader2Icon size={16} className="animate-spin" /> : null}
                     Mark No-Show
                   </button>
-                  <button type="button" disabled={anyActing} onClick={handlePassInspection}
-                    className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-success) text-sm font-bold text-white transition-colors hover:brightness-95 disabled:opacity-50 [font-family:var(--brc-font-ui)]">
-                    {anyActing ? <Loader2Icon size={16} className="animate-spin" /> : null}
-                    Pass — Publish
+                  <button type="button" disabled={anyActing || !booking} onClick={handleStartInspection}
+                    className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]">
+                    {startInspection.isPending ? <Loader2Icon size={16} className="animate-spin" /> : null}
+                    Start Inspection
                   </button>
                 </div>
+
+              ) : isInspectionInProgress ? (
+                <div className="flex gap-2.5">
+                  <button type="button" disabled={!booking} onClick={handleContinueInspection}
+                    className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]">
+                    Continue Inspection
+                    <Icon name="chevright" size={14} stroke="currentColor" />
+                  </button>
+                </div>
+
+              ) : isNeedsClearance ? (
+                <span className="block text-center text-[13px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Open the inspection history to review the clearance request in full.</span>
 
               ) : car.status === "needs_changes" ? (
                 <div className="flex flex-col gap-3">
@@ -684,7 +688,7 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
 const PAGE_SIZE = 20;
 
 export default function AdminApprovalsPage() {
-  const [tab, setTab] = useState<TabKey>("inspection_pending");
+  const [tab, setTab] = useState<TabKey>("draft");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -711,9 +715,11 @@ export default function AdminApprovalsPage() {
   const { data: allData } = useAdminCars({});
   const allCars = useMemo(() => allData?.results ?? [], [allData?.results]);
   const counts = useMemo(() => ({
+    draft: allCars.filter((c) => c.status === "draft").length,
+    listing_approved: allCars.filter((c) => c.status === "listing_approved").length,
     inspection_pending: allCars.filter((c) => c.status === "inspection_pending").length,
-    inspection_approved: allCars.filter((c) => c.status === "inspection_approved").length,
-    needs_changes: allCars.filter((c) => c.status === "needs_changes").length,
+    inspection_in_progress: allCars.filter((c) => c.status === "inspection_in_progress").length,
+    needs_clearance: allCars.filter((c) => c.status === "needs_clearance").length,
     published: allCars.filter((c) => c.status === "published").length,
     suspended: allCars.filter((c) => c.status === "suspended").length,
   }), [allCars]);
@@ -728,11 +734,6 @@ export default function AdminApprovalsPage() {
       const messages: Record<string, string> = {
         published: "Listing published",
         suspended: "Listing suspended",
-        needs_changes: "Changes requested — owner will be notified",
-        inspection_approved: "Inspection booking approved",
-        inspection_rejected: "Inspection booking rejected",
-        inspection_failed: "Inspection marked as failed",
-        inspection_no_show: "Marked as no-show",
       };
       toast.success(messages[status] ?? "Status updated");
       setDrawerOpen(false);
@@ -769,14 +770,14 @@ export default function AdminApprovalsPage() {
       <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-[var(--brc-space-10,40px)]">
         {/* KPI Cards */}
         <div className="flex flex-wrap gap-[18px]">
-          <KpiCard icon="clock" label="Inspection Pending" value={counts.inspection_pending} accent="#C8870B" share={counts.inspection_pending / Math.max(1, allCars.length)}
-            sub={<TrendPill tone={counts.inspection_pending > 0 ? "warn" : "up"}>{counts.inspection_pending > 0 ? `${counts.inspection_pending} awaiting` : "all clear"}</TrendPill>} />
+          <KpiCard icon="clock" label="Pending Review" value={counts.draft} accent="#C8870B" share={counts.draft / Math.max(1, allCars.length)}
+            sub={<TrendPill tone={counts.draft > 0 ? "warn" : "up"}>{counts.draft > 0 ? `${counts.draft} awaiting` : "all clear"}</TrendPill>} />
+          <KpiCard icon="clock" label="Inspection Pipeline" value={counts.inspection_pending + counts.inspection_in_progress} accent="#4338ca" share={(counts.inspection_pending + counts.inspection_in_progress) / Math.max(1, allCars.length)}
+            sub={<TrendPill tone="neutral">{counts.needs_clearance} need clearance</TrendPill>} />
           <KpiCard icon="check" label="Published" value={counts.published} accent="var(--brc-success)" share={counts.published / Math.max(1, allCars.length)}
             sub={<TrendPill tone="up">{approvalRate}% approval</TrendPill>} />
           <KpiCard icon="plus" label="Suspended" value={counts.suspended} accent="var(--brc-danger)" share={counts.suspended / Math.max(1, allCars.length)}
             sub={<TrendPill tone="neutral">{Math.round((counts.suspended / Math.max(1, allCars.length)) * 100)}% of all</TrendPill>} />
-          <KpiCard icon="car" label="Total Listings" value={allCars.length} accent="var(--brc-primary)" share={1}
-            sub={<TrendPill tone="neutral">{new Set(allCars.map((c) => c.owner.id)).size} owners</TrendPill>} />
         </div>
 
         {/* Table card */}
@@ -789,7 +790,7 @@ export default function AdminApprovalsPage() {
             </div>
             <span className="inline-flex items-center gap-2 rounded-full bg-(--brc-primary-tint) px-3.5 py-1.5 text-[13px] font-bold text-(--brc-primary) [font-family:var(--brc-font-ui)]">
               <span className="size-[7px] rounded-full bg-(--brc-primary)" />
-              {counts.inspection_pending} in queue
+              {counts[tab]} in queue
             </span>
           </div>
 
