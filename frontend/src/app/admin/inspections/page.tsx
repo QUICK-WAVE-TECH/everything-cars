@@ -1,9 +1,17 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, XIcon, Loader2Icon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, XIcon, Loader2Icon, BuildingIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ApiError } from "@/lib/api-client";
 import {
   Dialog,
@@ -11,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useStaffSlots, useCreateSlots } from "@/features/inspections/api/inspections-api";
+import { useStaffSlots, useCreateSlots, useAdminCenters } from "@/features/inspections/api/inspections-api";
 import type { InspectionSlot } from "@/features/inspections/api/types";
 
 // ── Date helpers ──
@@ -90,9 +98,9 @@ function SlotChip({ slot }: { slot: InspectionSlot }) {
       <div className="mt-0.5 text-[11px] font-semibold [font-family:var(--brc-font-ui)]" style={{ color: text, opacity: 0.8 }}>
         {slot.bookings_count}/{slot.capacity} booked
       </div>
-      {slot.location && (
+      {slot.center_name && (
         <div className="mt-0.5 truncate text-[10px] [font-family:var(--brc-font-ui)]" style={{ color: text, opacity: 0.65 }}>
-          {slot.location}
+          {slot.center_name}{slot.center_city ? ` · ${slot.center_city}` : ""}
         </div>
       )}
     </div>
@@ -165,9 +173,11 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
   const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5]); // Mon–Sat default
   const [timeSlots, setTimeSlots] = useState<TimeSlotRow[]>([{ start_time: "09:00", end_time: "10:00" }]);
   const [capacity, setCapacity] = useState(1);
-  const [location, setLocation] = useState("");
+  const [centerId, setCenterId] = useState("");
 
   const createSlots = useCreateSlots();
+  const { data: centersData, isLoading: centersLoading } = useAdminCenters({ is_active: "true" });
+  const centers = centersData?.results ?? [];
   const todayIso = toIsoDate(new Date());
 
   const previewCount = useMemo(
@@ -206,12 +216,12 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
     setSelectedDays([0, 1, 2, 3, 4, 5]);
     setTimeSlots([{ start_time: "09:00", end_time: "10:00" }]);
     setCapacity(1);
-    setLocation("");
+    setCenterId("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!dateFrom || !dateTo || selectedDays.length === 0 || timeSlots.length === 0 || !location.trim()) {
+    if (!dateFrom || !dateTo || selectedDays.length === 0 || timeSlots.length === 0 || !centerId) {
       toast.error("Please fill in all required fields.");
       return;
     }
@@ -222,7 +232,7 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
         days: selectedDays,
         time_slots: timeSlots,
         capacity,
-        location: location.trim(),
+        center: centerId,
       });
       toast.success(`${result.created_count} slot${result.created_count !== 1 ? "s" : ""} created successfully`);
       resetForm();
@@ -485,15 +495,44 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
               />
             </div>
             <div>
-              <label style={labelStyle}>Location</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. 5 Marina Road, Lagos"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                style={inputStyle}
-              />
+              <label style={labelStyle}>Center</label>
+              {centers.length === 0 && !centersLoading ? (
+                <div
+                  style={{
+                    ...inputStyle,
+                    display: "flex",
+                    alignItems: "center",
+                    color: "var(--brc-text-muted)",
+                  }}
+                >
+                  No active centers found
+                </div>
+              ) : (
+                <Select value={centerId} onValueChange={(value) => setCenterId(value ?? "")}>
+                  <SelectTrigger
+                    className="w-full"
+                    style={{
+                      height: 40,
+                      borderRadius: 8,
+                      border: "1px solid var(--brc-border)",
+                      background: "var(--brc-bg-subtle)",
+                      padding: "0 12px",
+                      fontSize: 14,
+                      color: "var(--brc-text)",
+                      fontFamily: "var(--brc-font-ui)",
+                    }}
+                  >
+                    <SelectValue placeholder={centersLoading ? "Loading centers..." : "Select a center"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {centers.map((center) => (
+                      <SelectItem key={center.id} value={center.id}>
+                        {center.company_name} — {center.city}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
 
@@ -567,7 +606,7 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
           <button
             type="submit"
             form="create-slots-form"
-            disabled={createSlots.isPending || previewCount === 0}
+            disabled={createSlots.isPending || previewCount === 0 || !centerId}
             style={{
               height: 42,
               padding: "0 20px",
@@ -578,8 +617,8 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
               fontSize: 14,
               fontWeight: 700,
               fontFamily: "var(--brc-font-ui)",
-              cursor: createSlots.isPending || previewCount === 0 ? "not-allowed" : "pointer",
-              opacity: createSlots.isPending || previewCount === 0 ? 0.5 : 1,
+              cursor: createSlots.isPending || previewCount === 0 || !centerId ? "not-allowed" : "pointer",
+              opacity: createSlots.isPending || previewCount === 0 || !centerId ? 0.5 : 1,
               display: "flex",
               alignItems: "center",
               gap: 6,
@@ -800,29 +839,52 @@ export default function AdminInspectionsPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setModalOpen(true)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              height: 46,
-              padding: "0 22px",
-              borderRadius: 10,
-              border: "none",
-              background: "var(--brc-primary)",
-              color: "white",
-              fontSize: 14,
-              fontWeight: 700,
-              fontFamily: "var(--brc-font-ui)",
-              cursor: "pointer",
-              boxShadow: "0 4px 14px rgba(0,0,139,0.20)",
-            }}
-          >
-            <PlusIcon size={16} />
-            Create Slots
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Link
+              href="/admin/inspections/centers"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                height: 46,
+                padding: "0 20px",
+                borderRadius: 10,
+                border: "1px solid var(--brc-border)",
+                background: "white",
+                color: "var(--brc-text)",
+                fontSize: 14,
+                fontWeight: 700,
+                fontFamily: "var(--brc-font-ui)",
+                textDecoration: "none",
+              }}
+            >
+              <BuildingIcon size={16} />
+              Manage Centers
+            </Link>
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                height: 46,
+                padding: "0 22px",
+                borderRadius: 10,
+                border: "none",
+                background: "var(--brc-primary)",
+                color: "white",
+                fontSize: 14,
+                fontWeight: 700,
+                fontFamily: "var(--brc-font-ui)",
+                cursor: "pointer",
+                boxShadow: "0 4px 14px rgba(0,0,139,0.20)",
+              }}
+            >
+              <PlusIcon size={16} />
+              Create Slots
+            </button>
+          </div>
         </div>
       </section>
 
