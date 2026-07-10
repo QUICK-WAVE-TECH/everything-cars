@@ -664,26 +664,38 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
 
               ) : isInspectionPending ? (
                 /* Start Inspection / Mark No-Show */
-                <div className="flex gap-2.5">
-                  <button type="button" disabled={anyActing || !booking} onClick={handleNoShow}
-                    className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#f97316] bg-white text-sm font-bold text-[#b34700] transition-colors hover:bg-[#fff7ed] disabled:opacity-50 [font-family:var(--brc-font-ui)]">
-                    {markNoShow.isPending ? <Loader2Icon size={16} className="animate-spin" /> : null}
-                    Mark No-Show
-                  </button>
-                  <button type="button" disabled={anyActing || !booking} onClick={handleStartInspection}
-                    className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]">
-                    {startInspection.isPending ? <Loader2Icon size={16} className="animate-spin" /> : null}
-                    Start Inspection
-                  </button>
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2.5">
+                    <button type="button" disabled={anyActing || !booking} onClick={handleNoShow}
+                      className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#f97316] bg-white text-sm font-bold text-[#b34700] transition-colors hover:bg-[#fff7ed] disabled:opacity-50 [font-family:var(--brc-font-ui)]">
+                      {markNoShow.isPending ? <Loader2Icon size={16} className="animate-spin" /> : null}
+                      Mark No-Show
+                    </button>
+                    <button type="button" disabled={anyActing || !booking} onClick={handleStartInspection}
+                      className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]">
+                      {startInspection.isPending ? <Loader2Icon size={16} className="animate-spin" /> : null}
+                      Start Inspection
+                    </button>
+                  </div>
+                  {!booking && (
+                    <span className="text-center text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                      No active booking found for this car — the owner may need to rebook.
+                    </span>
+                  )}
                 </div>
 
               ) : isInspectionInProgress ? (
-                <div className="flex gap-2.5">
+                <div className="flex flex-col gap-2">
                   <button type="button" disabled={!booking} onClick={handleContinueInspection}
                     className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]">
                     Continue Inspection
                     <Icon name="chevright" size={14} stroke="currentColor" />
                   </button>
+                  {!booking && (
+                    <span className="text-center text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                      No active booking found for this car — the owner may need to rebook.
+                    </span>
+                  )}
                 </div>
 
               ) : isNeedsClearance ? (

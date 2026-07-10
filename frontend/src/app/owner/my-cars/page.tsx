@@ -122,20 +122,20 @@ const STATS: { icon: IconName; label: string; key: string; color: string; iconCo
 
 const PER_PAGE = 10;
 const LISTING_TABLE_COLUMNS =
-  "minmax(200px,1.45fr) 90px 120px 130px 120px minmax(170px,1fr) minmax(130px,0.75fr) 56px";
+  "minmax(190px,1.5fr) 76px minmax(100px,0.7fr) minmax(118px,0.85fr) minmax(148px,1fr) minmax(118px,0.8fr) 48px";
 
 // ---------- Status badge ----------
 const STATUS_MAP: Record<ListingStatus, { bg: string; fg: string; dot: string; label: string }> = {
   draft: { bg: "var(--brc-bg-muted)", fg: "var(--brc-text-muted)", dot: "var(--brc-text-muted)", label: "Draft" },
-  listing_approved: { bg: "var(--brc-success-bg)", fg: "var(--brc-success)", dot: "var(--brc-success)", label: "Approved — Book Inspection" },
+  listing_approved: { bg: "var(--brc-success-bg)", fg: "var(--brc-success)", dot: "var(--brc-success)", label: "Approved" },
   needs_changes: { bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)", dot: "var(--brc-accent)", label: "Needs Changes" },
-  needs_clearance: { bg: "var(--brc-warning-bg)", fg: "#9a7400", dot: "var(--brc-warning)", label: "Needs Further Clearance" },
+  needs_clearance: { bg: "var(--brc-warning-bg)", fg: "#9a7400", dot: "var(--brc-warning)", label: "Needs Clearance" },
   published: { bg: "var(--brc-success-bg)", fg: "var(--brc-success)", dot: "var(--brc-success)", label: "Published" },
   paused: { bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)", dot: "var(--brc-accent)", label: "Paused" },
   suspended: { bg: "var(--brc-danger-bg)", fg: "var(--brc-danger)", dot: "var(--brc-danger)", label: "Suspended" },
   archived: { bg: "var(--brc-bg-muted)", fg: "var(--brc-text-secondary)", dot: "var(--brc-text-secondary)", label: "Archived" },
   inspection_pending: { bg: "var(--brc-warning-bg)", fg: "#9a7400", dot: "var(--brc-warning)", label: "Inspection Booked" },
-  inspection_in_progress: { bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)", dot: "var(--brc-accent)", label: "Inspection In Progress" },
+  inspection_in_progress: { bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)", dot: "var(--brc-accent)", label: "In Progress" },
   inspection_rejected: { bg: "var(--brc-danger-bg)", fg: "var(--brc-danger)", dot: "var(--brc-danger)", label: "Inspection Failed" },
   inspection_no_show: { bg: "#fff3e0", fg: "#c25800", dot: "#e65100", label: "No Show" },
 };
@@ -529,7 +529,7 @@ function ActionCell({
         onClick={() => onBook(listing.id)}
         className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border-none bg-(--brc-primary) px-3 text-[12px] font-bold text-(--brc-text-on-primary) transition-all duration-150 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) hover:shadow-md [font-family:var(--brc-font-ui)]"
       >
-        Book Inspection
+        Book Now
       </button>
     );
   }
@@ -878,15 +878,14 @@ export default function MyCarsPage() {
 
           {/* Table */}
           <div className="hidden overflow-x-auto md:block">
-            <div className="min-w-[1120px]">
+            <div className="min-w-[840px]">
               {/* Table header */}
               <div
                 className="mb-1 grid items-center rounded-lg bg-(--brc-bg-subtle)"
                 style={{ gridTemplateColumns: LISTING_TABLE_COLUMNS }}
               >
                 <div className="px-4 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Car</span></div>
-                <div className="px-3 py-3 text-center"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Type</span></div>
-                <div className="px-3 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Listed</span></div>
+                <div className="px-2 py-3 text-center"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Type</span></div>
                 <div className="px-3 py-3 text-right"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Price</span></div>
                 <div className="px-3 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Status</span></div>
                 <div className="px-3 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Appointment</span></div>
@@ -925,14 +924,14 @@ export default function MyCarsPage() {
                               <Icon name="car" size={20} stroke="var(--brc-text-muted)" />
                             )}
                           </span>
-                          <span className="truncate text-sm font-bold text-(--brc-text) transition-colors duration-200 group-hover:text-(--brc-primary) [font-family:var(--brc-font-ui)]">{r.car}</span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-bold text-(--brc-text) transition-colors duration-200 group-hover:text-(--brc-primary) [font-family:var(--brc-font-ui)]">{r.car}</span>
+                            <span className="block truncate text-[12px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Listed {r.date}</span>
+                          </span>
                         </div>
                       </div>
-                      <div className="flex min-w-0 items-center justify-center px-3 py-3">
+                      <div className="flex min-w-0 items-center justify-center px-2 py-3">
                         <span className="truncate text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">{r.type}</span>
-                      </div>
-                      <div className="flex min-w-0 items-center px-3 py-3">
-                        <span className="truncate text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">{r.date}</span>
                       </div>
                       <div className="flex min-w-0 items-center justify-end px-3 py-3 text-right">
                         <span className="truncate text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">{r.price}</span>
