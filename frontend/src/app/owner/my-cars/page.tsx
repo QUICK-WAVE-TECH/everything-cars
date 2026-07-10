@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CheckIcon } from "lucide-react";
+import { ArrowRightIcon, CalendarCheckIcon, RotateCcwIcon } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { IconName } from "@/features/auth/components/icon";
@@ -443,23 +443,18 @@ function AppointmentCell({
     return (
       <div
         className={cn(
-          "flex min-w-0 items-start gap-2 rounded-lg border bg-white [font-family:var(--brc-font-ui)]",
+          "flex min-w-0 flex-col rounded-lg border bg-white [font-family:var(--brc-font-ui)]",
           compact ? "px-3 py-2.5" : "border-transparent px-0 py-0",
         )}
       >
-        <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-(--brc-success-bg) text-(--brc-success)">
-          <CheckIcon size={14} />
+        <span className="block truncate text-[13px] font-extrabold leading-5 text-(--brc-text)">
+          {formatSlotDate(booking.slot.date)}
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-extrabold leading-5 text-(--brc-text)">
-            {formatSlotDate(booking.slot.date)}
-          </span>
-          <span className="block truncate text-[12px] font-semibold leading-5 text-(--brc-text-secondary)">
-            {formatSlotTime(booking.slot.start_time)} - {formatSlotTime(booking.slot.end_time)}
-          </span>
-          <span className="mt-1 inline-flex rounded-full bg-(--brc-success-bg) px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-(--brc-success)">
-            Confirmed
-          </span>
+        <span className="block truncate text-[12px] font-semibold leading-5 text-(--brc-text-secondary)">
+          {formatSlotTime(booking.slot.start_time)} - {formatSlotTime(booking.slot.end_time)}
+        </span>
+        <span className="mt-1 inline-flex w-fit rounded-full bg-(--brc-success-bg) px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-(--brc-success)">
+          Confirmed
         </span>
       </div>
     );
@@ -527,9 +522,11 @@ function ActionCell({
       <button
         type="button"
         onClick={() => onBook(listing.id)}
-        className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border-none bg-(--brc-primary) px-3 text-[12px] font-bold text-(--brc-text-on-primary) transition-all duration-150 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) hover:shadow-md [font-family:var(--brc-font-ui)]"
+        className="group inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-primary)/15 bg-(--brc-primary) px-3.5 text-[12px] font-extrabold text-(--brc-text-on-primary) shadow-[0_10px_24px_rgba(0,0,139,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) hover:shadow-[0_14px_30px_rgba(0,0,139,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 [font-family:var(--brc-font-ui)]"
       >
-        Book Now
+        <CalendarCheckIcon size={14} strokeWidth={2.4} />
+        <span className="whitespace-nowrap">Book Now</span>
+        <ArrowRightIcon size={13} className="transition-transform duration-200 group-hover:translate-x-0.5" strokeWidth={2.5} />
       </button>
     );
   }
@@ -539,10 +536,11 @@ function ActionCell({
       <button
         type="button"
         onClick={() => onBook(listing.id)}
-        className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-(--brc-warning) bg-(--brc-warning-bg) px-3 text-[12px] font-bold text-(--brc-text) transition-all duration-150 hover:-translate-y-0.5 hover:brightness-95 [font-family:var(--brc-font-ui)]"
+        className="group inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-warning)/50 bg-(--brc-warning-bg) px-3.5 text-[12px] font-extrabold text-(--brc-text) shadow-[0_8px_18px_rgba(154,116,0,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_12px_26px_rgba(154,116,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-warning) focus-visible:ring-offset-2 [font-family:var(--brc-font-ui)]"
         style={{ color: "#9a7400" }}
       >
-        Rebook
+        <RotateCcwIcon size={14} strokeWidth={2.4} />
+        <span className="whitespace-nowrap">Rebook</span>
       </button>
     );
   }
