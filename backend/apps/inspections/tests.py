@@ -9,7 +9,12 @@ from .models import (
     InspectionBooking,
     InspectionSlot,
 )
-from .models import ActorRole, CarStatusHistory, InspectionCenter
+from .models import (
+    ActorRole,
+    CarStatusHistory,
+    InspectionCenter,
+    PhysicalInspection,
+)
 from .services import generate_tracking_id, record_status_change
 
 from apps.listings.models import CarStatus
@@ -359,84 +364,113 @@ class OwnerBookingTest(APITestCase):
         self.assertNotIn(str(self.slot.id), slot_ids)
 
 
-class StaffBookingActionsTest(APITestCase):
+def inspection_form_payload(**overrides):
+    base = {
+        "condition": "used",
+        "mileage": 42000,
+        "fuel_type": "petrol",
+        "car_type": "foreign_used",
+        "features": ["ABS", "sunroof"],
+        "engine_condition": "good",
+        "chassis_condition": "excellent",
+        "ac_condition": "good",
+        "is_flooded": False,
+        "has_accident_history": False,
+        "staff_notes": "",
+        "result": "passed",
+    }
+    base.update(overrides)
+    return base
+
+
+class StaffInspectionFlowTest(APITestCase):
     def setUp(self):
         self.staff = create_user("staff@test.com", "owner", is_staff=True)
         self.owner = create_user("owner@test.com", "owner")
         create_owner_profile(self.owner)
-        self.car = create_car(self.owner, status=CarStatus.DRAFT)
+        self.car = create_car(self.owner, status=CarStatus.INSPECTION_PENDING)
         self.slot = create_slot(self.staff)
         self.booking = InspectionBooking.objects.create(
             car=self.car, slot=self.slot, booked_by=self.owner
         )
-        self.car.status = CarStatus.INSPECTION_PENDING
-        self.car.save(update_fields=["status"])
         self.client.force_authenticate(user=self.staff)
 
-    def test_approve_booking(self):
-        res = self.client.post(
-            f"/api/v1/inspections/admin/bookings/{self.booking.id}/approve/"
+    def _start(self):
+        return self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/start/"
         )
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.booking.refresh_from_db()
-        self.assertEqual(self.booking.status, BookingStatus.APPROVED)
-        self.car.refresh_from_db()
-        self.assertEqual(self.car.status, CarStatus.INSPECTION_APPROVED)
 
-    def test_reject_booking_requires_note(self):
-        res = self.client.post(
-            f"/api/v1/inspections/admin/bookings/{self.booking.id}/reject/"
-        )
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_reject_booking_with_note(self):
-        res = self.client.post(
-            f"/api/v1/inspections/admin/bookings/{self.booking.id}/reject/",
-            {"staff_note": "Photos are blurry"},
+    def _submit(self, **overrides):
+        return self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/inspection/",
+            inspection_form_payload(**overrides),
             format="json",
         )
+
+    def test_start_inspection(self):
+        res = self._start()
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.car.refresh_from_db()
-        self.assertEqual(self.car.status, CarStatus.NEEDS_CHANGES)
-        self.assertEqual(self.car.admin_note, "Photos are blurry")
+        self.assertEqual(self.car.status, CarStatus.INSPECTION_IN_PROGRESS)
 
-    def test_pass_inspection(self):
-        self.booking.status = BookingStatus.APPROVED
-        self.booking.save(update_fields=["status"])
-        self.car.status = CarStatus.INSPECTION_APPROVED
-        self.car.save(update_fields=["status"])
+    def test_cannot_submit_before_start(self):
+        res = self._submit()
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
-        res = self.client.post(
-            f"/api/v1/inspections/admin/bookings/{self.booking.id}/pass/"
-        )
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
+    def test_submit_passed_publishes_car(self):
+        self._start()
+        res = self._submit(result="passed")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.car.refresh_from_db()
         self.assertEqual(self.car.status, CarStatus.PUBLISHED)
         self.assertIsNotNone(self.car.published_at)
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, BookingStatus.COMPLETED)
+        inspection = PhysicalInspection.objects.get(booking=self.booking)
+        self.assertEqual(inspection.inspector, self.staff)
 
-    def test_fail_inspection_requires_note(self):
-        self.booking.status = BookingStatus.APPROVED
-        self.booking.save(update_fields=["status"])
-        res = self.client.post(
-            f"/api/v1/inspections/admin/bookings/{self.booking.id}/fail/"
-        )
+    def test_needs_clearance_requires_note(self):
+        self._start()
+        res = self._submit(result="needs_clearance", staff_notes="")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("staff_notes", res.data)
 
-    def test_fail_inspection_with_note(self):
-        self.booking.status = BookingStatus.APPROVED
-        self.booking.save(update_fields=["status"])
-        res = self.client.post(
-            f"/api/v1/inspections/admin/bookings/{self.booking.id}/fail/",
-            {"staff_note": "Brake pads worn out"},
-            format="json",
+    def test_needs_clearance_with_note(self):
+        self._start()
+        res = self._submit(
+            result="needs_clearance", staff_notes="Customs papers missing"
         )
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.car.refresh_from_db()
+        self.assertEqual(self.car.status, CarStatus.NEEDS_CLEARANCE)
+        self.assertEqual(self.car.admin_note, "Customs papers missing")
+
+    def test_failed_inspection(self):
+        self._start()
+        res = self._submit(result="failed", staff_notes="Chassis damage")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.car.refresh_from_db()
         self.assertEqual(self.car.status, CarStatus.INSPECTION_REJECTED)
 
+    def test_cannot_submit_twice(self):
+        self._start()
+        self._submit(result="passed")
+        # a fresh booking would be needed; same booking must 400 (completed)
+        res = self._submit(result="passed")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_submissions_write_history(self):
+        self._start()
+        self._submit(result="passed")
+        transitions = list(
+            self.car.status_history.values_list("to_status", flat=True)
+        )
+        self.assertEqual(
+            transitions,
+            [CarStatus.INSPECTION_IN_PROGRESS, CarStatus.PUBLISHED],
+        )
+
     def test_mark_no_show(self):
-        self.booking.status = BookingStatus.APPROVED
-        self.booking.save(update_fields=["status"])
         res = self.client.post(
             f"/api/v1/inspections/admin/bookings/{self.booking.id}/no-show/"
         )
@@ -444,11 +478,10 @@ class StaffBookingActionsTest(APITestCase):
         self.car.refresh_from_db()
         self.assertEqual(self.car.status, CarStatus.INSPECTION_NO_SHOW)
 
-    def test_cannot_pass_non_approved_booking(self):
-        res = self.client.post(
-            f"/api/v1/inspections/admin/bookings/{self.booking.id}/pass/"
-        )
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+    def test_non_staff_cannot_inspect(self):
+        self.client.force_authenticate(user=self.owner)
+        self.assertEqual(self._start().status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self._submit().status_code, status.HTTP_403_FORBIDDEN)
 
     def test_staff_list_bookings(self):
         res = self.client.get("/api/v1/inspections/admin/bookings/")
@@ -459,6 +492,84 @@ class StaffBookingActionsTest(APITestCase):
         res = self.client.get(f"/api/v1/inspections/admin/bookings/{self.booking.id}/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn("car", res.data)
+
+
+class InspectionDocumentsTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user("staff-doc@test.com", "owner", is_staff=True)
+        self.owner = create_user("owner-doc@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.client.force_authenticate(user=self.staff)
+
+    def _make_inspection(self, car):
+        slot = create_slot(self.staff)
+        booking = InspectionBooking.objects.create(
+            car=car, slot=slot, booked_by=self.owner
+        )
+        car.status = CarStatus.INSPECTION_PENDING
+        car.save(update_fields=["status"])
+        self.client.post(f"/api/v1/inspections/admin/bookings/{booking.id}/start/")
+        res = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{booking.id}/inspection/",
+            inspection_form_payload(result="passed"),
+            format="json",
+        )
+        return res.data["id"]
+
+    def _doc_payload(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        return {
+            "car_documents": SimpleUploadedFile(
+                "docs.pdf", b"dummy-doc", content_type="application/pdf"
+            ),
+            "receipt_upload": SimpleUploadedFile(
+                "receipt.pdf", b"dummy-receipt", content_type="application/pdf"
+            ),
+            "custom_duty_status": "fully_paid",
+            "receipt_type": "dealership",
+        }
+
+    def test_upload_documents_for_sale_car(self):
+        car = create_car(self.owner)  # default listing has a sale price
+        inspection_id = self._make_inspection(car)
+        res = self.client.post(
+            f"/api/v1/inspections/admin/inspections/{inspection_id}/documents/",
+            self._doc_payload(),
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.data["custom_duty_status"], "fully_paid")
+
+    def test_documents_rejected_for_rental_only_car(self):
+        car = create_car(
+            self.owner,
+            listing_type="rent",
+            sale_price=None,
+            rent_price_per_day="25000.00",
+        )
+        inspection_id = self._make_inspection(car)
+        res = self.client.post(
+            f"/api/v1/inspections/admin/inspections/{inspection_id}/documents/",
+            self._doc_payload(),
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_duplicate_documents_conflict(self):
+        car = create_car(self.owner)
+        inspection_id = self._make_inspection(car)
+        self.client.post(
+            f"/api/v1/inspections/admin/inspections/{inspection_id}/documents/",
+            self._doc_payload(),
+            format="multipart",
+        )
+        res = self.client.post(
+            f"/api/v1/inspections/admin/inspections/{inspection_id}/documents/",
+            self._doc_payload(),
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
 
 
 def create_center(staff, **overrides):

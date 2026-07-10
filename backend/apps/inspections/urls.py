@@ -2,23 +2,22 @@ from django.urls import path
 
 from .views import (
     AvailableSlotsView,
+    LocationsView,
     OwnerBookingCancelView,
     OwnerBookingCreateView,
     OwnerBookingListView,
     OwnerBookingRescheduleView,
-    StaffBookingApproveView,
+    PublicCentersView,
     StaffBookingDetailView,
-    StaffBookingFailView,
     StaffBookingListView,
     StaffBookingNoShowView,
-    StaffBookingPassView,
-    StaffBookingRejectView,
+    StaffCenterDetailView,
+    StaffCenterListCreateView,
+    StaffInspectionDocumentsView,
+    StaffInspectionStartView,
+    StaffInspectionSubmitView,
     StaffSlotDetailView,
     StaffSlotListCreateView,
-    StaffCenterListCreateView,
-    StaffCenterDetailView,
-    LocationsView,
-    PublicCentersView,
 )
 
 urlpatterns = [
@@ -27,7 +26,16 @@ urlpatterns = [
     path(
         "slots/<uuid:slot_id>/", StaffSlotDetailView.as_view(), name="staff-slot-detail"
     ),
-    # Owner slot availability
+    # Staff center management
+    path("admin/centers/", StaffCenterListCreateView.as_view(), name="staff-centers"),
+    path(
+        "admin/centers/<uuid:center_id>/",
+        StaffCenterDetailView.as_view(),
+        name="staff-center-detail",
+    ),
+    # Owner location discovery & slot availability
+    path("locations/", LocationsView.as_view(), name="locations"),
+    path("centers/", PublicCentersView.as_view(), name="public-centers"),
     path("available-slots/", AvailableSlotsView.as_view(), name="available-slots"),
     # Owner booking
     path("bookings/", OwnerBookingCreateView.as_view(), name="create-booking"),
@@ -42,7 +50,7 @@ urlpatterns = [
         OwnerBookingRescheduleView.as_view(),
         name="reschedule-booking",
     ),
-    # Staff booking management
+    # Staff booking management & physical inspection
     path("admin/bookings/", StaffBookingListView.as_view(), name="staff-bookings"),
     path(
         "admin/bookings/<uuid:booking_id>/",
@@ -50,36 +58,23 @@ urlpatterns = [
         name="staff-booking-detail",
     ),
     path(
-        "admin/bookings/<uuid:booking_id>/approve/",
-        StaffBookingApproveView.as_view(),
-        name="approve-booking",
+        "admin/bookings/<uuid:booking_id>/start/",
+        StaffInspectionStartView.as_view(),
+        name="start-inspection",
     ),
     path(
-        "admin/bookings/<uuid:booking_id>/reject/",
-        StaffBookingRejectView.as_view(),
-        name="reject-booking",
-    ),
-    path(
-        "admin/bookings/<uuid:booking_id>/pass/",
-        StaffBookingPassView.as_view(),
-        name="pass-booking",
-    ),
-    path(
-        "admin/bookings/<uuid:booking_id>/fail/",
-        StaffBookingFailView.as_view(),
-        name="fail-booking",
+        "admin/bookings/<uuid:booking_id>/inspection/",
+        StaffInspectionSubmitView.as_view(),
+        name="submit-inspection",
     ),
     path(
         "admin/bookings/<uuid:booking_id>/no-show/",
         StaffBookingNoShowView.as_view(),
         name="no-show-booking",
     ),
-    path("admin/centers/", StaffCenterListCreateView.as_view(), name="staff-centers"),
     path(
-        "admin/centers/<uuid:center_id>/",
-        StaffCenterDetailView.as_view(),
-        name="staff-center-detail",
+        "admin/inspections/<uuid:inspection_id>/documents/",
+        StaffInspectionDocumentsView.as_view(),
+        name="inspection-documents",
     ),
-    path("locations/", LocationsView.as_view(), name="locations"),
-    path("centers/", PublicCentersView.as_view(), name="public-centers"),
 ]

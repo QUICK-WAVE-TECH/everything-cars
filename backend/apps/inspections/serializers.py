@@ -3,7 +3,15 @@ from datetime import time
 from rest_framework import serializers
 from django.utils import timezone
 
-from .models import InspectionSlot, InspectionBooking, InspectionCenter
+from .models import (
+    CarStatusHistory,
+    InspectionBooking,
+    InspectionCenter,
+    InspectionDocument,
+    InspectionResult,
+    InspectionSlot,
+    PhysicalInspection,
+)
 from apps.listings.serializers import CarDetailSerializer
 
 
@@ -215,3 +223,77 @@ class BookingCreateSerializer(serializers.Serializer):
 
 class StaffNoteSerializer(serializers.Serializer):
     staff_note = serializers.CharField(min_length=1)
+
+
+class PhysicalInspectionSerializer(serializers.ModelSerializer):
+    inspector_name = serializers.SerializerMethodField()
+    inspected_at = serializers.DateTimeField(required=False)
+
+    class Meta:
+        model = PhysicalInspection
+        fields = [
+            "id",
+            "condition",
+            "mileage",
+            "fuel_type",
+            "car_type",
+            "features",
+            "engine_condition",
+            "chassis_condition",
+            "ac_condition",
+            "is_flooded",
+            "has_accident_history",
+            "staff_notes",
+            "result",
+            "inspected_at",
+            "inspector_name",
+            "created_at",
+        ]
+        read_only_fields = ["id", "inspector_name", "created_at"]
+
+    def get_inspector_name(self, obj):
+        if not obj.inspector_id:
+            return ""
+        return f"{obj.inspector.first_name} {obj.inspector.last_name}".strip()
+
+    def validate(self, attrs):
+        needs_note = attrs.get("result") in (
+            InspectionResult.NEEDS_CLEARANCE,
+            InspectionResult.FAILED,
+        )
+        if needs_note and not attrs.get("staff_notes", "").strip():
+            raise serializers.ValidationError(
+                {"staff_notes": "A reason is required for this result."}
+            )
+        return attrs
+
+
+class InspectionDocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InspectionDocument
+        fields = [
+            "id",
+            "car_documents",
+            "receipt_upload",
+            "custom_duty_status",
+            "receipt_type",
+            "additional_notes",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+
+class CarStatusHistorySerializer(serializers.ModelSerializer):
+    """Owner-facing timeline entries. `actor` is deliberately excluded —
+    owners see the role (staff/owner/system) but never staff identity."""
+
+    class Meta:
+        model = CarStatusHistory
+        fields = [
+            "id",
+            "from_status",
+            "to_status",
+            "actor_role",
+            "note",
+            "created_at",
+        ]

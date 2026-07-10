@@ -275,13 +275,13 @@ def notify_inspection_booked(booking):
         )
 
 
-def notify_inspection_booking_approved(booking):
-    """Owner gets notified when staff approves their inspection booking."""
+def notify_inspection_started(booking):
+    """Owner gets notified when staff begins the physical inspection."""
     _create_notification(
         recipient=booking.booked_by,
-        notification_type=NotificationType.INSPECTION_BOOKING_APPROVED,
-        title="Inspection booking confirmed",
-        message=f"Your inspection for {booking.car.title} has been confirmed for {booking.slot.date.strftime('%b %d')}, {booking.slot.start_time.strftime('%I:%M %p')}",
+        notification_type=NotificationType.INSPECTION_STARTED,
+        title="Inspection in progress",
+        message=f"The physical inspection of your {booking.car.title} has started.",
         data={
             "booking_id": str(booking.id),
             "car_id": str(booking.car_id),
@@ -290,13 +290,16 @@ def notify_inspection_booking_approved(booking):
     )
 
 
-def notify_inspection_booking_rejected(booking):
-    """Owner gets notified when staff rejects their booking at review."""
+def notify_needs_clearance(booking):
+    """Owner gets notified when the inspection needs further clearance."""
     _create_notification(
         recipient=booking.booked_by,
-        notification_type=NotificationType.INSPECTION_BOOKING_REJECTED,
-        title="Inspection booking rejected",
-        message=f"Your inspection booking for {booking.car.title} was rejected. Check your listing for details.",
+        notification_type=NotificationType.NEEDS_CLEARANCE,
+        title="Inspection needs further clearance",
+        message=(
+            f"Your {booking.car.title} needs further clearance before it can be "
+            "published. Check your listing for what's required."
+        ),
         data={
             "booking_id": str(booking.id),
             "car_id": str(booking.car_id),
@@ -304,6 +307,26 @@ def notify_inspection_booking_rejected(booking):
             "staff_note": booking.staff_note,
         },
     )
+
+
+def notify_clearance_response(booking):
+    """All staff get notified when an owner responds to a clearance request."""
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    for staff in staff_users:
+        _create_notification(
+            recipient=staff,
+            notification_type=NotificationType.CLEARANCE_RESPONSE,
+            title="Clearance response received",
+            message=(
+                f"The owner of {booking.car.title} says the clearance issues "
+                "have been addressed — ready for re-review."
+            ),
+            data={
+                "booking_id": str(booking.id),
+                "car_id": str(booking.car_id),
+                "car_title": booking.car.title,
+            },
+        )
 
 
 def notify_inspection_passed(booking):

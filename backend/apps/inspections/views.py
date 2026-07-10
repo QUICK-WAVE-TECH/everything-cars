@@ -10,10 +10,12 @@ from rest_framework.views import APIView
 from common.pagination import StandardPagination
 from common.permissions import IsOwner, IsStaff
 from apps.listings.models import Car, CarStatus
+from rest_framework.parsers import FormParser, MultiPartParser
+
 from apps.notifications.service import (
     notify_inspection_booked,
-    notify_inspection_booking_approved,
-    notify_inspection_booking_rejected,
+    notify_inspection_started,
+    notify_needs_clearance,
     notify_inspection_passed,
     notify_inspection_failed,
     notify_inspection_no_show,
@@ -24,8 +26,10 @@ from .models import (
     ActorRole,
     BookingStatus,
     InspectionBooking,
-    InspectionSlot,
     InspectionCenter,
+    InspectionResult,
+    InspectionSlot,
+    PhysicalInspection,
 )
 from .services import generate_tracking_id, record_status_change
 from .serializers import (
@@ -33,10 +37,11 @@ from .serializers import (
     BookingCreateSerializer,
     InspectionBookingDetailSerializer,
     InspectionBookingSerializer,
+    InspectionCenterSerializer,
+    InspectionDocumentSerializer,
     InspectionSlotCreateSerializer,
     InspectionSlotSerializer,
-    StaffNoteSerializer,
-    InspectionCenterSerializer,
+    PhysicalInspectionSerializer,
 )
 
 
@@ -192,10 +197,12 @@ class StaffSlotDetailView(APIView):
                 {"detail": "Slot not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
-        has_approved = slot.bookings.filter(status=BookingStatus.APPROVED).exists()
-        if has_approved:
+        has_active = slot.bookings.filter(
+            status__in=ACTIVE_BOOKING_STATUSES
+        ).exists()
+        if has_active:
             return Response(
-                {"detail": "Cannot deactivate a slot with approved bookings."},
+                {"detail": "Cannot deactivate a slot with active bookings."},
                 status=status.HTTP_409_CONFLICT,
             )
         slot.is_active = False
@@ -529,7 +536,9 @@ class StaffBookingDetailView(APIView):
         return Response(InspectionBookingDetailSerializer(booking).data)
 
 
-class StaffBookingApproveView(APIView):
+class StaffInspectionStartView(APIView):
+    """Marks the start of the physical inspection: car → inspection_in_progress."""
+
     permission_classes = [IsStaff]
 
     def post(self, request, booking_id):
@@ -547,103 +556,27 @@ class StaffBookingApproveView(APIView):
             if booking.status != BookingStatus.PENDING:
                 return Response(
                     {
-                        "detail": f"Cannot approve — booking is '{booking.get_status_display()}'."
+                        "detail": f"Cannot start — booking is '{booking.get_status_display()}'."
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-
-            booking.status = BookingStatus.APPROVED
-            booking.save(update_fields=["status", "updated_at"])
-
-        schedule_notification(
-            notify_inspection_booking_approved,
-            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
-        )
-
-        detail = booking_detail_queryset().get(id=booking.id)
-        return Response(InspectionBookingDetailSerializer(detail).data)
-
-
-class StaffBookingRejectView(APIView):
-    permission_classes = [IsStaff]
-
-    def post(self, request, booking_id):
-        serializer = StaffNoteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        with transaction.atomic():
-            try:
-                booking = InspectionBooking.objects.select_for_update().get(
-                    id=booking_id
-                )
-            except InspectionBooking.DoesNotExist:
-                return Response(
-                    {"detail": "Booking not found."},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            if booking.status != BookingStatus.PENDING:
-                return Response(
-                    {
-                        "detail": f"Cannot reject — booking is '{booking.get_status_display()}'."
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            booking.status = BookingStatus.REJECTED
-            booking.staff_note = serializer.validated_data["staff_note"]
-            booking.save(update_fields=["status", "staff_note", "updated_at"])
 
             car = Car.objects.select_for_update().get(id=booking.car_id)
-            car.status = CarStatus.NEEDS_CHANGES
-            car.admin_note = booking.staff_note
-            car.save(update_fields=["status", "admin_note", "updated_at"])
-
-        schedule_notification(
-            notify_inspection_booking_rejected,
-            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
-        )
-
-        detail = booking_detail_queryset().get(id=booking.id)
-        return Response(InspectionBookingDetailSerializer(detail).data)
-
-
-class StaffBookingPassView(APIView):
-    permission_classes = [IsStaff]
-
-    def post(self, request, booking_id):
-        with transaction.atomic():
-            try:
-                booking = InspectionBooking.objects.select_for_update().get(
-                    id=booking_id
-                )
-            except InspectionBooking.DoesNotExist:
+            if car.status != CarStatus.INSPECTION_PENDING:
                 return Response(
-                    {"detail": "Booking not found."},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            if booking.status != BookingStatus.APPROVED:
-                return Response(
-                    {
-                        "detail": f"Cannot mark pass — booking is '{booking.get_status_display()}', must be 'Approved'."
-                    },
+                    {"detail": f"Cannot start — car status is '{car.status}'."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            booking.status = BookingStatus.COMPLETED
-            booking.save(update_fields=["status", "updated_at"])
-
-            car = Car.objects.select_for_update().get(id=booking.car_id)
-            car.status = CarStatus.PUBLISHED
-            car.published_at = timezone.now()
-            car.admin_note = ""
-            car.save(
-                update_fields=["status", "published_at", "admin_note", "updated_at"]
+            record_status_change(
+                car,
+                CarStatus.INSPECTION_IN_PROGRESS,
+                actor=request.user,
+                actor_role=ActorRole.STAFF,
             )
 
         schedule_notification(
-            notify_inspection_passed,
+            notify_inspection_started,
             lambda bid=booking.id: booking_detail_queryset().get(id=bid),
         )
 
@@ -651,11 +584,29 @@ class StaffBookingPassView(APIView):
         return Response(InspectionBookingDetailSerializer(detail).data)
 
 
-class StaffBookingFailView(APIView):
+# result → (car status, owner notification)
+RESULT_TRANSITIONS = {
+    InspectionResult.PASSED: (CarStatus.PUBLISHED, notify_inspection_passed),
+    InspectionResult.NEEDS_CLEARANCE: (
+        CarStatus.NEEDS_CLEARANCE,
+        notify_needs_clearance,
+    ),
+    InspectionResult.FAILED: (
+        CarStatus.INSPECTION_REJECTED,
+        notify_inspection_failed,
+    ),
+}
+
+
+class StaffInspectionSubmitView(APIView):
+    """Records the physical inspection form. The result drives the car's
+    next status: passed → published (auto), needs_clearance → owner loop,
+    failed → inspection_rejected (terminal)."""
+
     permission_classes = [IsStaff]
 
     def post(self, request, booking_id):
-        serializer = StaffNoteSerializer(data=request.data)
+        serializer = PhysicalInspectionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         with transaction.atomic():
@@ -669,30 +620,108 @@ class StaffBookingFailView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            if booking.status != BookingStatus.APPROVED:
+            if booking.status != BookingStatus.PENDING:
                 return Response(
                     {
-                        "detail": f"Cannot mark fail — booking is '{booking.get_status_display()}', must be 'Approved'."
+                        "detail": f"Cannot submit — booking is '{booking.get_status_display()}'."
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            booking.status = BookingStatus.REJECTED
-            booking.staff_note = serializer.validated_data["staff_note"]
-            booking.save(update_fields=["status", "staff_note", "updated_at"])
+            if PhysicalInspection.objects.filter(booking=booking).exists():
+                return Response(
+                    {"detail": "An inspection was already submitted for this booking."},
+                    status=status.HTTP_409_CONFLICT,
+                )
 
             car = Car.objects.select_for_update().get(id=booking.car_id)
-            car.status = CarStatus.INSPECTION_REJECTED
-            car.admin_note = booking.staff_note
-            car.save(update_fields=["status", "admin_note", "updated_at"])
+            if car.status != CarStatus.INSPECTION_IN_PROGRESS:
+                return Response(
+                    {
+                        "detail": (
+                            "Start the inspection before submitting results "
+                            f"(car status is '{car.status}')."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            inspection = serializer.save(
+                booking=booking,
+                car=car,
+                inspector=request.user,
+                inspected_at=serializer.validated_data.get("inspected_at")
+                or timezone.now(),
+            )
+
+            booking.status = BookingStatus.COMPLETED
+            booking.staff_note = inspection.staff_notes
+            booking.save(update_fields=["status", "staff_note", "updated_at"])
+
+            new_status, notify_func = RESULT_TRANSITIONS[inspection.result]
+            extra = ["admin_note"]
+            if new_status == CarStatus.PUBLISHED:
+                car.published_at = timezone.now()
+                car.admin_note = ""
+                extra.append("published_at")
+            else:
+                car.admin_note = inspection.staff_notes
+            record_status_change(
+                car,
+                new_status,
+                actor=request.user,
+                actor_role=ActorRole.STAFF,
+                note=inspection.staff_notes,
+                extra_update_fields=extra,
+            )
 
         schedule_notification(
-            notify_inspection_failed,
+            notify_func,
             lambda bid=booking.id: booking_detail_queryset().get(id=bid),
         )
 
-        detail = booking_detail_queryset().get(id=booking.id)
-        return Response(InspectionBookingDetailSerializer(detail).data)
+        return Response(
+            PhysicalInspectionSerializer(inspection).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class StaffInspectionDocumentsView(APIView):
+    """Uploads sale-car paperwork gathered during the physical inspection."""
+
+    permission_classes = [IsStaff]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, inspection_id):
+        try:
+            inspection = PhysicalInspection.objects.select_related("car").get(
+                id=inspection_id
+            )
+        except PhysicalInspection.DoesNotExist:
+            return Response(
+                {"detail": "Inspection not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not inspection.car.sale_price:
+            return Response(
+                {"detail": "Documents are only required for cars listed for sale."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if hasattr(inspection, "documents"):
+            return Response(
+                {"detail": "Documents were already uploaded for this inspection."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        serializer = InspectionDocumentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        documents = serializer.save(inspection=inspection)
+        return Response(
+            InspectionDocumentSerializer(documents).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class StaffBookingNoShowView(APIView):
@@ -710,10 +739,10 @@ class StaffBookingNoShowView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            if booking.status != BookingStatus.APPROVED:
+            if booking.status != BookingStatus.PENDING:
                 return Response(
                     {
-                        "detail": f"Cannot mark no-show — booking is '{booking.get_status_display()}', must be 'Approved'."
+                        "detail": f"Cannot mark no-show — booking is '{booking.get_status_display()}'."
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -722,8 +751,13 @@ class StaffBookingNoShowView(APIView):
             booking.save(update_fields=["status", "updated_at"])
 
             car = Car.objects.select_for_update().get(id=booking.car_id)
-            car.status = CarStatus.INSPECTION_NO_SHOW
-            car.save(update_fields=["status", "updated_at"])
+            record_status_change(
+                car,
+                CarStatus.INSPECTION_NO_SHOW,
+                actor=request.user,
+                actor_role=ActorRole.STAFF,
+                note="Missed inspection appointment.",
+            )
 
         schedule_notification(
             notify_inspection_no_show,
