@@ -751,6 +751,7 @@ class LocationDiscoveryTest(APITestCase):
         self.assertEqual(len(res.data), 1)  # one country: NG
         ng = res.data[0]
         self.assertEqual(ng["country"], "NG")
+        self.assertEqual(ng["country_name"], "Nigeria")
         states = {s["state"] for s in ng["states"]}
         self.assertEqual(states, {"Lagos", "FCT"})  # Kano absent — inactive center
         lagos_state = next(s for s in ng["states"] if s["state"] == "Lagos")

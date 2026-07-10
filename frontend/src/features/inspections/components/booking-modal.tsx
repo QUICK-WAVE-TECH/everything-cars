@@ -97,6 +97,8 @@ const primaryButtonClass =
 const secondaryButtonClass =
   "border border-(--brc-border) bg-white text-(--brc-text) hover:bg-(--brc-bg-subtle) disabled:cursor-not-allowed disabled:opacity-50";
 
+type DropdownOption = { value: string; label: string };
+
 function LocationDropdown({
   value,
   placeholder,
@@ -106,10 +108,11 @@ function LocationDropdown({
 }: {
   value: string;
   placeholder: string;
-  options: string[];
+  options: DropdownOption[];
   disabled?: boolean;
   onChange: (value: string) => void;
 }) {
+  const selectedLabel = options.find((o) => o.value === value)?.label ?? value;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -122,7 +125,7 @@ function LocationDropdown({
         )}
       >
         <span className={cn("min-w-0 truncate", !value && "text-(--brc-text-muted)")}>
-          {value || placeholder}
+          {value ? selectedLabel : placeholder}
         </span>
         <ChevronDownIcon size={16} className="shrink-0 text-(--brc-text-muted)" />
       </DropdownMenuTrigger>
@@ -139,15 +142,15 @@ function LocationDropdown({
         ) : (
           options.map((option) => (
             <DropdownMenuItem
-              key={option}
-              onClick={() => onChange(option)}
+              key={option.value}
+              onClick={() => onChange(option.value)}
               className={cn(
                 "flex cursor-pointer items-center justify-between gap-2 px-2.5 py-2 font-semibold [font-family:var(--brc-font-ui)]",
                 selectItemClass,
               )}
             >
-              <span className="min-w-0 truncate">{option}</span>
-              {value === option && <CheckIcon size={15} className="shrink-0 text-(--brc-primary)" />}
+              <span className="min-w-0 truncate">{option.label}</span>
+              {value === option.value && <CheckIcon size={15} className="shrink-0 text-(--brc-primary)" />}
             </DropdownMenuItem>
           ))
         )}
@@ -588,7 +591,10 @@ export function BookingModal({
                         <LocationDropdown
                           value={country}
                           placeholder="Select country"
-                          options={(locations ?? []).map((l) => l.country)}
+                          options={(locations ?? []).map((l) => ({
+                            value: l.country,
+                            label: l.country_name || l.country,
+                          }))}
                           onChange={handleCountryChange}
                         />
                       </label>
@@ -600,7 +606,7 @@ export function BookingModal({
                         <LocationDropdown
                           value={state}
                           placeholder="Select state"
-                          options={states.map((s) => s.state)}
+                          options={states.map((s) => ({ value: s.state, label: s.state }))}
                           disabled={!country}
                           onChange={handleStateChange}
                         />
@@ -613,7 +619,7 @@ export function BookingModal({
                         <LocationDropdown
                           value={city}
                           placeholder="Select city"
-                          options={cities}
+                          options={cities.map((c) => ({ value: c, label: c }))}
                           disabled={!state}
                           onChange={handleCityChange}
                         />

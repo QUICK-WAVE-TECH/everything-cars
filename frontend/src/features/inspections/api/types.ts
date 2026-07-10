@@ -20,7 +20,10 @@ export type LocationState = {
 };
 
 export type LocationCountry = {
+  /** ISO code, e.g. "NG" — used as the filter value for center queries. */
   country: string;
+  /** Full display name, e.g. "Nigeria". */
+  country_name: string;
   states: LocationState[];
 };
 

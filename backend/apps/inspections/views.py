@@ -4,6 +4,7 @@ from datetime import timedelta, time
 from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Q
 from django.utils import timezone
+from django_countries.fields import Country
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -1071,6 +1072,9 @@ class LocationsView(APIView):
             [
                 {
                     "country": country,
+                    # Full display name ("Nigeria"); `country` stays the ISO
+                    # code because the centers filter matches the stored code.
+                    "country_name": Country(country).name or country,
                     "states": [
                         {"state": state, "cities": cities}
                         for state, cities in states.items()
