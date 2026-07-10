@@ -1420,4 +1420,9 @@ class AdminApproveListingView(APIView):
             notify_listing_approved,
             lambda car_id=car.id: Car.objects.select_related("owner").get(id=car_id),
         )
+        car = (
+            Car.objects.select_related("owner__owner_profile")
+            .prefetch_related("images", "features")
+            .get(id=car_id)
+        )
         return Response(CarDetailSerializer(car, context={"request": request}).data)

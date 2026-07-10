@@ -57,6 +57,7 @@ def booking_detail_queryset():
         "car__owner",
         "car__owner__owner_profile",
         "slot",
+        "slot__center",
         "slot__created_by",
         "booked_by",
     ).prefetch_related("car__images", "car__features")
@@ -69,7 +70,7 @@ class StaffSlotListCreateView(APIView):
     permission_classes = [IsStaff]
 
     def get(self, request):
-        slots = InspectionSlot.objects.select_related("created_by").all()
+        slots = InspectionSlot.objects.select_related("created_by", "center").all()
 
         date_from = request.query_params.get("date_from")
         date_to = request.query_params.get("date_to")
@@ -108,7 +109,7 @@ class StaffSlotListCreateView(APIView):
         days = data["days"]
         time_slots = data["time_slots"]
         capacity = data["capacity"]
-        location = data["location"]
+        center = data["center"]
 
         created = []
         current = date_from
@@ -145,7 +146,7 @@ class StaffSlotListCreateView(APIView):
                         date=current,
                         start_time=start,
                         end_time=end,
-                        location=location,
+                        center=center,
                         defaults={
                             "capacity": capacity,
                             "created_by": request.user,
@@ -175,7 +176,7 @@ class StaffSlotDetailView(APIView):
                 {"detail": "Slot not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
-        allowed_fields = {"capacity", "location", "note", "is_active"}
+        allowed_fields = {"capacity", "center", "note", "is_active"}
         for field, value in request.data.items():
             if field in allowed_fields:
                 setattr(slot, field, value)
@@ -211,6 +212,7 @@ class AvailableSlotsView(APIView):
         today = timezone.localdate()
         slots = (
             InspectionSlot.objects.filter(date__gte=today, is_active=True)
+            .select_related("center")
             .annotate(
                 bookings_count=Count(
                     "bookings",
@@ -220,6 +222,10 @@ class AvailableSlotsView(APIView):
             .filter(bookings_count__lt=F("capacity"))
             .order_by("date", "start_time")
         )
+
+        center_filter = request.query_params.get("center")
+        if center_filter:
+            slots = slots.filter(center_id=center_filter)
 
         date_filter = request.query_params.get("date")
         if date_filter:
@@ -742,11 +748,6 @@ class StaffCenterDetailView(APIView):
             return InspectionCenter.objects.get(id=center_id)
         except InspectionCenter.DoesNotExist:
             return None
-
-        return Response(
-            {"detail": "Center not found."},
-            status=status.HTTP_404_NOT_FOUND,
-        )
 
     def get(self, request, center_id):
 

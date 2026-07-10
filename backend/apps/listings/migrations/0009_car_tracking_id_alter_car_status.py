@@ -3,6 +3,16 @@
 from django.db import migrations, models
 
 
+def remap_inspection_approved_cars(apps, schema_editor):
+    """`inspection_approved` no longer exists in the new flow. Cars stranded
+    in it (booking approved, awaiting physical inspection) map cleanest to
+    `inspection_pending` — still booked, awaiting inspection."""
+    Car = apps.get_model("listings", "Car")
+    Car.objects.filter(status="inspection_approved").update(
+        status="inspection_pending"
+    )
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,6 +20,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(remap_inspection_approved_cars, migrations.RunPython.noop),
         migrations.AddField(
             model_name='car',
             name='tracking_id',

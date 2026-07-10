@@ -23,9 +23,10 @@ def create_slot(staff, days_ahead=7, **overrides):
         "start_time": time(9, 0),
         "end_time": time(10, 0),
         "capacity": 1,
-        "location": "Test Inspection Center, Lagos",
         "created_by": staff,
     }
+    if "center" not in overrides:
+        defaults["center"] = create_center(staff)
     defaults.update(overrides)
     return InspectionSlot.objects.create(**defaults)
 
@@ -33,6 +34,7 @@ def create_slot(staff, days_ahead=7, **overrides):
 class StaffSlotManagementTest(APITestCase):
     def setUp(self):
         self.staff = create_user("staff@test.com", "owner", is_staff=True)
+        self.center = create_center(self.staff)
         self.client.force_authenticate(user=self.staff)
 
     def test_create_slots_batch(self):
@@ -49,7 +51,7 @@ class StaffSlotManagementTest(APITestCase):
                     {"start_time": "10:00", "end_time": "11:00"},
                 ],
                 "capacity": 1,
-                "location": "Lekki Inspection Center",
+                "center": str(self.center.id),
             },
             format="json",
         )
@@ -66,7 +68,7 @@ class StaffSlotManagementTest(APITestCase):
                 "days": [yesterday.weekday()],
                 "time_slots": [{"start_time": "09:00", "end_time": "10:00"}],
                 "capacity": 1,
-                "location": "Lekki Inspection Center",
+                "center": str(self.center.id),
             },
             format="json",
         )
@@ -84,7 +86,7 @@ class StaffSlotManagementTest(APITestCase):
                 "days": [tomorrow.weekday()],
                 "time_slots": [{"start_time": "10:00", "end_time": "09:00"}],
                 "capacity": 1,
-                "location": "Lekki Inspection Center",
+                "center": str(self.center.id),
             },
             format="json",
         )

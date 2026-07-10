@@ -7,6 +7,17 @@ from django.conf import settings
 from django.db import migrations, models
 
 
+def purge_pre_center_slots(apps, schema_editor):
+    """Old slots used a free-text location that cannot be mapped to the new
+    InspectionCenter FK. Any DB migrating through here loses its legacy
+    slot/booking test data by design — without this, the non-null `center`
+    AddField below fails on populated tables."""
+    InspectionBooking = apps.get_model("inspections", "InspectionBooking")
+    InspectionSlot = apps.get_model("inspections", "InspectionSlot")
+    InspectionBooking.objects.all().delete()
+    InspectionSlot.objects.all().delete()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -16,6 +27,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(purge_pre_center_slots, migrations.RunPython.noop),
         migrations.CreateModel(
             name='CarStatusHistory',
             fields=[

@@ -7,8 +7,47 @@ from .models import InspectionSlot, InspectionBooking, InspectionCenter
 from apps.listings.serializers import CarDetailSerializer
 
 
+class InspectionCenterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InspectionCenter
+        fields = [
+            "id",
+            "company_name",
+            "address",
+            "country",
+            "country_code",
+            "state",
+            "city",
+            "city_code",
+            "phone",
+            "email",
+            "max_reschedules",
+            "is_active",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+    def validate_city_code(self, value):
+        value = value.strip().upper()
+        if len(value) != 3 or not value.isalpha():
+            raise serializers.ValidationError(
+                "City code must be exactly 3 letters, e.g LOS."
+            )
+
+        return value
+
+    def validate_country_code(self, value):
+        value = value.strip().upper()
+        if not (2 <= len(value) <= 3) or not value.isalpha():
+            raise serializers.ValidationError("Country Code must be 2-3 letters")
+        return value
+
+
 class InspectionSlotSerializer(serializers.ModelSerializer):
     created_by_name = serializers.SerializerMethodField()
+    center_name = serializers.CharField(source="center.company_name", read_only=True)
+    center_city = serializers.CharField(source="center.city", read_only=True)
+    center = InspectionCenterSerializer(read_only=True)
 
     class Meta:
         model = InspectionSlot
@@ -18,10 +57,12 @@ class InspectionSlotSerializer(serializers.ModelSerializer):
             "start_time",
             "end_time",
             "capacity",
-            "location",
+            "center",
             "note",
             "is_active",
             "created_by_name",
+            "center_name",
+            "center_city",
             "created_at",
         ]
         read_only_fields = ["id", "created_by_name", "created_at"]
@@ -44,7 +85,9 @@ class InspectionSlotCreateSerializer(serializers.Serializer):
         min_length=1,
     )
     capacity = serializers.IntegerField(min_value=1, default=1)
-    location = serializers.CharField(max_length=200)
+    center = serializers.PrimaryKeyRelatedField(
+        queryset=InspectionCenter.objects.filter(is_active=True)
+    )
 
     def _parse_time(self, value):
         if isinstance(value, time):
@@ -115,7 +158,7 @@ class AvailableSlotSerializer(serializers.ModelSerializer):
             "date",
             "start_time",
             "end_time",
-            "location",
+            "center",
             "spots_remaining",
         ]
 
@@ -172,39 +215,3 @@ class BookingCreateSerializer(serializers.Serializer):
 
 class StaffNoteSerializer(serializers.Serializer):
     staff_note = serializers.CharField(min_length=1)
-
-
-class InspectionCenterSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = InspectionCenter
-        fields = [
-            "id",
-            "company_name",
-            "address",
-            "country",
-            "country_code",
-            "state",
-            "city",
-            "city_code",
-            "phone",
-            "email",
-            "max_reschedules",
-            "is_active",
-            "created_at",
-        ]
-        read_only_fields = ["id", "created_at"]
-
-    def validate_city_code(self, value):
-        value = value.strip().upper()
-        if len(value) != 3 or not value.isalpha():
-            raise serializers.ValidationError(
-                "City code must be exactly 3 letters, e.g LOS."
-            )
-
-        return value
-
-    def validate_country_code(self, value):
-        value = value.strip().upper()
-        if not (2 <= len(value) <= 3) or not value.isalpha():
-            raise serializers.ValidationError("Country Code must be 2-3 letters")
-        return value
