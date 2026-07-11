@@ -49,6 +49,7 @@ import {
 import { ApiError } from "@/lib/api-client";
 import { BookingModal } from "@/features/inspections/components/booking-modal";
 import {
+  useCancelBooking,
   useClearanceResponse,
   useMyBookings,
 } from "@/features/inspections/api/inspections-api";
@@ -458,11 +459,14 @@ export default function CarDetailPage() {
   const carStatus = useCarStatus();
   const { data: myBookings } = useMyBookings({ car: carId });
   const clearanceResponse = useClearanceResponse();
+  const cancelBooking = useCancelBooking();
 
   const [editing, setEditing] = useState(false);
   const [newFiles, setNewFiles] = useState<CarImageFiles>({});
   const [activeImage, setActiveImage] = useState(0);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [reschedulingPending, setReschedulingPending] = useState(false);
+  const [cancelArming, setCancelArming] = useState(false);
   const [clearanceMessage, setClearanceMessage] = useState("");
 
   // Most recent pending/completed booking for this car — used to send a
@@ -486,6 +490,16 @@ export default function CarDetailPage() {
     const results = myBookings?.results ?? [];
     return results
       .filter((b) => b.car_id === carId && b.status === "no_show")
+      .sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )[0];
+  }, [myBookings, carId]);
+
+  // The active booking — target for owner cancel / reschedule actions.
+  const pendingBooking = useMemo(() => {
+    const results = myBookings?.results ?? [];
+    return results
+      .filter((b) => b.car_id === carId && b.status === "pending")
       .sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       )[0];
@@ -560,6 +574,24 @@ export default function CarDetailPage() {
       toast.error(
         error instanceof ApiError ? error.message : "Failed to update status",
       );
+    }
+  }
+
+  async function handleCancelBooking() {
+    if (!pendingBooking) return;
+    if (!cancelArming) {
+      setCancelArming(true);
+      return;
+    }
+    try {
+      await cancelBooking.mutateAsync(pendingBooking.id);
+      toast.success("Booking cancelled — you can book a new slot anytime");
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError ? error.message : "Failed to cancel booking",
+      );
+    } finally {
+      setCancelArming(false);
     }
   }
 
@@ -698,6 +730,39 @@ export default function CarDetailPage() {
                     <Icon name="clock" size={16} stroke="currentColor" />
                     <span>Awaiting review</span>
                   </span>
+                )}
+                {car.status === "inspection_pending" && pendingBooking && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReschedulingPending(true);
+                        setBookingOpen(true);
+                      }}
+                      className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-primary)/30 bg-white px-4 text-sm font-extrabold text-(--brc-primary) shadow-[0_12px_28px_rgba(0,0,139,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-tint) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 [font-family:var(--brc-font-ui)]"
+                    >
+                      <RotateCcwIcon size={16} strokeWidth={2.4} />
+                      Reschedule
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelBooking}
+                      onMouseLeave={() => setCancelArming(false)}
+                      onBlur={() => setCancelArming(false)}
+                      disabled={cancelBooking.isPending}
+                      className={cn(
+                        "inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border px-4 text-sm font-extrabold transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-danger) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]",
+                        cancelArming
+                          ? "border-(--brc-danger) bg-(--brc-danger) text-white"
+                          : "border-(--brc-danger)/40 bg-white text-(--brc-danger) hover:bg-(--brc-danger-bg)",
+                      )}
+                    >
+                      {cancelBooking.isPending ? (
+                        <Loader2Icon size={16} className="animate-spin" />
+                      ) : null}
+                      {cancelArming ? "Confirm cancel?" : "Cancel Booking"}
+                    </button>
+                  </>
                 )}
                 {car.status === "needs_changes" && (
                   <button
@@ -1245,15 +1310,28 @@ export default function CarDetailPage() {
     </div>
       <BookingModal
         carId={car.id}
-        mode={car.status === "inspection_no_show" && noShowBooking ? "reschedule" : "book"}
+        mode={
+          (reschedulingPending && pendingBooking) ||
+          (car.status === "inspection_no_show" && noShowBooking)
+            ? "reschedule"
+            : "book"
+        }
         bookingId={
-          car.status === "inspection_no_show" && noShowBooking
+          reschedulingPending && pendingBooking
+            ? pendingBooking.id
+            : car.status === "inspection_no_show" && noShowBooking
             ? noShowBooking.id
             : undefined
         }
         open={bookingOpen}
-        onClose={() => setBookingOpen(false)}
-        onSuccess={() => setBookingOpen(false)}
+        onClose={() => {
+          setBookingOpen(false);
+          setReschedulingPending(false);
+        }}
+        onSuccess={() => {
+          setBookingOpen(false);
+          setReschedulingPending(false);
+        }}
       />
     </>
   );
