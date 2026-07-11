@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowRightIcon, CalendarCheckIcon, RotateCcwIcon } from "lucide-react";
+import { ArrowRightIcon, CalendarCheckIcon, PencilIcon, RotateCcwIcon } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { IconName } from "@/features/auth/components/icon";
@@ -122,7 +122,7 @@ const STATS: { icon: IconName; label: string; key: string; color: string; iconCo
 
 const PER_PAGE = 10;
 const LISTING_TABLE_COLUMNS =
-  "minmax(190px,1.5fr) 76px minmax(100px,0.7fr) minmax(118px,0.85fr) minmax(148px,1fr) minmax(118px,0.8fr) 48px";
+  "minmax(190px,1.5fr) 76px minmax(100px,0.7fr) minmax(118px,0.85fr) minmax(148px,1fr) minmax(150px,0.9fr) 48px";
 
 // ---------- Status badge ----------
 const STATUS_MAP: Record<ListingStatus, { bg: string; fg: string; dot: string; label: string }> = {
@@ -550,9 +550,10 @@ function ActionCell({
       <button
         type="button"
         onClick={() => router.push(`/owner/my-cars/${listing.id}`)}
-        className="inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-(--brc-accent) bg-(--brc-accent-bg) px-3 text-[12px] font-bold text-(--brc-accent) transition-all duration-150 hover:-translate-y-0.5 hover:brightness-95 [font-family:var(--brc-font-ui)]"
+        className="group inline-flex h-9 w-full max-w-[150px] cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-accent)/35 bg-white px-3 text-[12px] font-extrabold text-(--brc-accent) shadow-[0_8px_18px_rgba(195,101,35,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-accent-bg) hover:shadow-[0_12px_26px_rgba(195,101,35,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-accent) focus-visible:ring-offset-2 [font-family:var(--brc-font-ui)]"
       >
-        Edit & Resubmit
+        <PencilIcon size={14} strokeWidth={2.4} />
+        <span className="whitespace-nowrap">Edit & Resubmit</span>
       </button>
     );
   }
