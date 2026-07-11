@@ -410,7 +410,11 @@ export default function StaffInspectionFormPage() {
               <span className="block text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">Flood damage</span>
               <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Is there any evidence the vehicle was flooded?</span>
             </div>
-            <Switch checked={isFlooded} onCheckedChange={(v) => setIsFlooded(!!v)} />
+            <Switch
+              checked={isFlooded}
+              onCheckedChange={(v) => setIsFlooded(!!v)}
+              className="data-checked:bg-(--brc-primary) data-unchecked:bg-(--brc-bg-muted)"
+            />
           </div>
 
           <div className="flex items-center justify-between gap-3 rounded-lg border border-(--brc-border) px-3.5 py-3">
@@ -418,7 +422,11 @@ export default function StaffInspectionFormPage() {
               <span className="block text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">Accident history</span>
               <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Is there any evidence of prior accident damage?</span>
             </div>
-            <Switch checked={hasAccidentHistory} onCheckedChange={(v) => setHasAccidentHistory(!!v)} />
+            <Switch
+              checked={hasAccidentHistory}
+              onCheckedChange={(v) => setHasAccidentHistory(!!v)}
+              className="data-checked:bg-(--brc-primary) data-unchecked:bg-(--brc-bg-muted)"
+            />
           </div>
         </FormSection>
 
@@ -513,7 +521,10 @@ export default function StaffInspectionFormPage() {
                     active ? "border-(--brc-primary) bg-(--brc-primary-tint)" : "border-(--brc-border) bg-white hover:bg-(--brc-bg-subtle)"
                   )}
                 >
-                  <RadioGroupItem value={opt.value} className="mt-0.5" />
+                  <RadioGroupItem
+                    value={opt.value}
+                    className="mt-0.5 data-checked:border-(--brc-primary) data-checked:bg-(--brc-primary) data-checked:text-white"
+                  />
                   <div className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">{opt.label}</span>
                     <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{opt.hint}</span>

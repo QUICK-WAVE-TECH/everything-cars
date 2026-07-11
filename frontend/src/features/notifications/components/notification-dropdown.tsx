@@ -13,6 +13,9 @@ import {
 import type { NotificationItem, NotificationType } from "@/features/notifications/api";
 import type { UserRole } from "@/shared/types";
 
+// Admins browse notifications under /admin — not a backend role.
+type ViewerRole = UserRole | "admin";
+
 // ── Icon mapping ─────────────────────────────────────────────────────────────
 
 const TYPE_ICON: Record<NotificationType, IconName> = {
@@ -44,18 +47,19 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
 
 // ── Navigation helper ─────────────────────────────────────────────────────────
 
-function resolveHref(notification: NotificationItem, role: UserRole): string {
+function resolveHref(notification: NotificationItem, role: ViewerRole): string {
   const { notification_type, data } = notification;
+  const home = role === "admin" ? "/admin/approvals" : `/${role}/dashboard`;
 
   switch (notification_type) {
     case "request_received":
     case "request_cancelled":
-      return data.request_id ? `/owner/requests/${data.request_id}` : `/${role}/dashboard`;
+      return data.request_id ? `/owner/requests/${data.request_id}` : home;
 
     case "request_approved":
     case "request_rejected":
     case "requests_auto_rejected":
-      return data.request_id ? `/customer/requests/${data.request_id}` : `/${role}/dashboard`;
+      return data.request_id ? `/customer/requests/${data.request_id}` : home;
 
     case "payment_submitted":
       return "/admin/payments";
@@ -63,7 +67,7 @@ function resolveHref(notification: NotificationItem, role: UserRole): string {
     case "payment_confirmed":
     case "rental_active":
     case "rental_completed":
-      return data.request_id ? `/customer/requests/${data.request_id}` : `/${role}/dashboard`;
+      return data.request_id ? `/customer/requests/${data.request_id}` : home;
 
     case "listing_suspended":
     case "listing_approved":
@@ -85,7 +89,7 @@ function resolveHref(notification: NotificationItem, role: UserRole): string {
 
     case "system":
     default:
-      return `/${role}/dashboard`;
+      return home;
   }
 }
 
@@ -93,7 +97,7 @@ function resolveHref(notification: NotificationItem, role: UserRole): string {
 
 type NotificationRowProps = {
   notification: NotificationItem;
-  role: UserRole;
+  role: ViewerRole;
   onRead: (id: string, href: string) => void;
 };
 
@@ -191,7 +195,7 @@ function NotificationRow({ notification, role, onRead }: NotificationRowProps) {
 // ── Main Dropdown ─────────────────────────────────────────────────────────────
 
 type NotificationDropdownProps = {
-  role: UserRole;
+  role: ViewerRole;
   unreadCount: number;
 };
 

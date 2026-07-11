@@ -58,7 +58,7 @@ function AdminNavbar() {
         </nav>
 
         <div className="flex items-center gap-5">
-          <NotificationDropdown role="owner" unreadCount={unreadData?.unread_count ?? 0} />
+          <NotificationDropdown role="admin" unreadCount={unreadData?.unread_count ?? 0} />
           <button type="button" className="flex cursor-pointer border-none bg-transparent p-0">
             <Icon name="user" size={22} stroke="var(--brc-text)" />
           </button>

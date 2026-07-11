@@ -14,6 +14,9 @@ import {
 import type { NotificationItem, NotificationType } from "@/features/notifications/api";
 import type { UserRole } from "@/shared/types";
 
+// Admins browse notifications under /admin — not a backend role.
+type ViewerRole = UserRole | "admin";
+
 const TYPE_ICON: Record<NotificationType, IconName> = {
   request_received: "car",
   request_approved: "check",
@@ -41,23 +44,24 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
   system: "bell",
 };
 
-function resolveHref(notification: NotificationItem, role: UserRole): string {
+function resolveHref(notification: NotificationItem, role: ViewerRole): string {
   const { notification_type, data } = notification;
+  const home = role === "admin" ? "/admin/approvals" : `/${role}/dashboard`;
 
   switch (notification_type) {
     case "request_received":
     case "request_cancelled":
-      return data.request_id ? `/owner/requests/${data.request_id}` : `/${role}/dashboard`;
+      return data.request_id ? `/owner/requests/${data.request_id}` : home;
     case "request_approved":
     case "request_rejected":
     case "requests_auto_rejected":
-      return data.request_id ? `/customer/requests/${data.request_id}` : `/${role}/dashboard`;
+      return data.request_id ? `/customer/requests/${data.request_id}` : home;
     case "payment_submitted":
       return "/admin/payments";
     case "payment_confirmed":
     case "rental_active":
     case "rental_completed":
-      return data.request_id ? `/customer/requests/${data.request_id}` : `/${role}/dashboard`;
+      return data.request_id ? `/customer/requests/${data.request_id}` : home;
     case "listing_suspended":
     case "listing_approved":
     case "changes_requested":
@@ -78,11 +82,11 @@ function resolveHref(notification: NotificationItem, role: UserRole): string {
 
     case "system":
     default:
-      return `/${role}/dashboard`;
+      return home;
   }
 }
 
-function NotificationCard({ n, role, onRead }: { n: NotificationItem; role: UserRole; onRead: (id: string, href: string) => void }) {
+function NotificationCard({ n, role, onRead }: { n: NotificationItem; role: ViewerRole; onRead: (id: string, href: string) => void }) {
   const icon = TYPE_ICON[n.notification_type] ?? "bell";
   const href = resolveHref(n, role);
 
@@ -149,7 +153,7 @@ function NotificationCard({ n, role, onRead }: { n: NotificationItem; role: User
   );
 }
 
-export function NotificationsPage({ role }: { role: UserRole }) {
+export function NotificationsPage({ role }: { role: ViewerRole }) {
   const router = useRouter();
   const { data, isLoading } = useNotifications();
   const { data: unreadData } = useUnreadCount();

@@ -1,5 +1,5 @@
 import { NotificationsPage } from "@/features/notifications/components/notifications-page";
 
 export default function AdminNotificationsPage() {
-  return <NotificationsPage role="owner" />;
+  return <NotificationsPage role="admin" />;
 }
