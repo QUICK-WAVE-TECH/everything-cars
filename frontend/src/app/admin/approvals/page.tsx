@@ -19,6 +19,7 @@ import {
   useAdminCarHistory,
 } from "@/features/listings/api/admin-api";
 import type { CarListItem } from "@/features/listings/api/types";
+import { CarStatusTimeline } from "@/features/listings/components/car-status-timeline";
 import {
   useStaffBookings,
   useStartInspection,
@@ -303,9 +304,10 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
     return drawerBookingResults.find((b) => b.car_id === carId) ?? null;
   }, [drawerBookingResults, carId]);
 
-  // Owner clearance responses are same-status annotation rows on the timeline
-  const { data: carHistory } = useAdminCarHistory(
-    open && isNeedsClearance ? carId : null,
+  // Full status timeline — also the source for owner clearance responses,
+  // which are same-status annotation rows.
+  const { data: carHistory, isLoading: historyLoading } = useAdminCarHistory(
+    open ? carId : null,
   );
   const clearanceResponses = useMemo(
     () =>
@@ -616,6 +618,16 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
                   </div>
                 </section>
               )}
+
+              {/* Status timeline */}
+              <section className="flex flex-col gap-3">
+                <h3 className="m-0 text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Status timeline</h3>
+                <CarStatusTimeline
+                  entries={carHistory ?? []}
+                  loading={historyLoading}
+                  viewer="staff"
+                />
+              </section>
 
               {/* Needs clearance note */}
               {isNeedsClearance && (

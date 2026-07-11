@@ -28,8 +28,11 @@ function statusLabel(status: string): string {
   );
 }
 
-function actorLabel(role: CarStatusHistoryEntry["actor_role"]): string {
-  if (role === "owner") return "You";
+function actorLabel(
+  role: CarStatusHistoryEntry["actor_role"],
+  viewer: "owner" | "staff",
+): string {
+  if (role === "owner") return viewer === "owner" ? "You" : "Owner";
   if (role === "staff") return "Staff";
   return "System";
 }
@@ -45,11 +48,26 @@ function formatEntryDate(iso: string): string {
 }
 
 export interface CarStatusTimelineProps {
-  carId: string;
+  /** Owner view: fetches from the owner history endpoint. */
+  carId?: string;
+  /** Staff view: pass pre-fetched entries (e.g. from useAdminCarHistory). */
+  entries?: CarStatusHistoryEntry[];
+  loading?: boolean;
+  viewer?: "owner" | "staff";
 }
 
-export function CarStatusTimeline({ carId }: CarStatusTimelineProps) {
-  const { data: history, isLoading } = useCarHistory(carId);
+export function CarStatusTimeline({
+  carId,
+  entries,
+  loading = false,
+  viewer = "owner",
+}: CarStatusTimelineProps) {
+  // When entries are supplied, skip the owner-scoped fetch entirely.
+  const { data: fetched, isLoading: isFetching } = useCarHistory(
+    entries ? null : carId ?? null,
+  );
+  const history = entries ?? fetched;
+  const isLoading = entries ? loading : isFetching;
 
   if (isLoading) {
     return (
@@ -115,7 +133,7 @@ export function CarStatusTimeline({ carId }: CarStatusTimelineProps) {
                     isLast ? "text-(--brc-primary)" : "text-(--brc-text)",
                   )}
                 >
-                  {isAnnotation ? `${actorLabel(entry.actor_role)} responded` : statusLabel(entry.to_status)}
+                  {isAnnotation ? `${actorLabel(entry.actor_role, viewer)} responded` : statusLabel(entry.to_status)}
                 </span>
                 {isLast && (
                   <span className="rounded-full bg-(--brc-primary-tint) px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-(--brc-primary) [font-family:var(--brc-font-ui)]">
@@ -124,7 +142,7 @@ export function CarStatusTimeline({ carId }: CarStatusTimelineProps) {
                 )}
               </div>
               <span className="mt-0.5 block text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                {actorLabel(entry.actor_role)} · {formatEntryDate(entry.created_at)}
+                {actorLabel(entry.actor_role, viewer)} · {formatEntryDate(entry.created_at)}
               </span>
               {entry.note && (
                 <p className="mt-2 rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) p-3 text-sm leading-relaxed text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
