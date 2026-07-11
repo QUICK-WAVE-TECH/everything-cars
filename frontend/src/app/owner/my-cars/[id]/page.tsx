@@ -713,18 +713,30 @@ export default function CarDetailPage() {
                     type="button"
                     onClick={() => setBookingOpen(true)}
                     className={cn(
-                      "group inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-4 text-sm font-extrabold shadow-[0_12px_28px_rgba(0,0,139,0.18)] transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]",
+                      "group relative inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-xl px-4 text-sm font-black shadow-[0_14px_32px_rgba(0,0,139,0.18)] transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[176px] [font-family:var(--brc-font-ui)]",
+                      "before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:w-1/2 before:-translate-x-full before:bg-gradient-to-r before:from-transparent before:via-white/24 before:to-transparent before:transition-transform before:duration-500 hover:before:translate-x-[220%]",
                       car.status === "inspection_no_show"
-                        ? "border border-(--brc-warning)/50 bg-(--brc-warning-bg) text-[#9a7400] hover:bg-white hover:shadow-[0_16px_34px_rgba(154,116,0,0.16)] focus-visible:ring-(--brc-warning)"
-                        : "border border-(--brc-primary)/15 bg-(--brc-primary) text-(--brc-text-on-primary) hover:bg-(--brc-primary-hover) hover:shadow-[0_16px_34px_rgba(0,0,139,0.24)] focus-visible:ring-(--brc-primary)",
+                        ? "border border-(--brc-warning)/45 bg-(--brc-warning-bg) text-[#9a7400] hover:bg-white hover:shadow-[0_18px_38px_rgba(154,116,0,0.18)] focus-visible:ring-(--brc-warning)"
+                        : "border border-(--brc-primary)/15 bg-(--brc-primary) text-(--brc-text-on-primary) hover:bg-(--brc-primary-hover) hover:shadow-[0_18px_38px_rgba(0,0,139,0.26)] focus-visible:ring-(--brc-primary)",
                     )}
                   >
-                    {car.status === "inspection_no_show" ? (
-                      <RotateCcwIcon size={16} strokeWidth={2.4} />
-                    ) : (
-                      <CalendarCheckIcon size={16} strokeWidth={2.4} />
-                    )}
-                    {car.status === "inspection_no_show" ? "Rebook Inspection" : "Book Inspection"}
+                    <span
+                      className={cn(
+                        "relative z-10 flex size-7 shrink-0 items-center justify-center rounded-lg",
+                        car.status === "inspection_no_show"
+                          ? "bg-white/70 text-[#9a7400]"
+                          : "bg-white/14 text-white",
+                      )}
+                    >
+                      {car.status === "inspection_no_show" ? (
+                        <RotateCcwIcon size={16} strokeWidth={2.5} />
+                      ) : (
+                        <CalendarCheckIcon size={16} strokeWidth={2.5} />
+                      )}
+                    </span>
+                    <span className="relative z-10 whitespace-nowrap">
+                      {car.status === "inspection_no_show" ? "Rebook Inspection" : "Book Inspection"}
+                    </span>
                   </button>
                 )}
                 {car.status === "draft" && (

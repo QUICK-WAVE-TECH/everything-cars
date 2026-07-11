@@ -223,11 +223,11 @@ function InspectionBookingCard({ carId, trackingId, phase }: { carId: string; tr
   return (
     <div className="rounded-xl border p-4" style={cardStyle}>
       <div className="mb-3 flex items-center justify-between gap-2">
-        <span className="block text-[13px] font-bold uppercase tracking-widest [font-family:var(--brc-font-ui)]" style={{ color: labelColor }}>
+        <span className="block min-w-0 text-[13px] font-bold uppercase tracking-widest [font-family:var(--brc-font-ui)]" style={{ color: labelColor }}>
           {phase === "pending" ? "Inspection Booking — Awaiting Start" : "Inspection Booking — In Progress"}
         </span>
         {trackingId && (
-          <span className="rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-bold tabular-nums text-(--brc-text) [font-family:var(--brc-font-ui)]">
             #{trackingId}
           </span>
         )}
