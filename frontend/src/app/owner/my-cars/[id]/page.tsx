@@ -747,6 +747,16 @@ export default function CarDetailPage() {
                 )}
                 {car.status === "inspection_pending" && pendingBooking && (
                   <>
+                    {pendingBooking.reschedule_count > 0 && (
+                      <span
+                        title="Reschedules used at this center"
+                        className="inline-flex h-11 items-center gap-1.5 whitespace-nowrap rounded-lg border border-(--brc-warning)/40 bg-(--brc-warning-bg) px-3 text-xs font-bold text-[#9a7400] [font-family:var(--brc-font-ui)]"
+                      >
+                        <RotateCcwIcon size={13} strokeWidth={2.4} />
+                        Rescheduled {pendingBooking.reschedule_count} of{" "}
+                        {pendingBooking.slot.center.max_reschedules}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
