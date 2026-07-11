@@ -542,7 +542,7 @@ export function BookingModal({
           </div>
         </DialogHeader>
 
-        <div className="grid max-h-[calc(100vh-250px)] min-h-[430px] overflow-y-auto bg-(--brc-bg-subtle) lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid max-h-[calc(100dvh-250px)] min-h-[min(430px,calc(100dvh-300px))] overflow-y-auto bg-(--brc-bg-subtle) lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="min-w-0 p-4 sm:p-6">
             <div className="rounded-2xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] sm:p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

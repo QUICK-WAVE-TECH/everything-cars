@@ -27,21 +27,21 @@ function buildQuery(params?: Record<string, string | number | boolean | undefine
 
 export const inspectionKeys = {
   slots: ["inspections", "slots"] as const,
-  slotsList: (params?: Record<string, string | undefined>) =>
+  slotsList: (params?: Record<string, string | number | undefined>) =>
     ["inspections", "slots", params ?? {}] as const,
   availableSlots: (centerId?: string, date?: string) =>
     ["inspections", "available-slots", centerId ?? "all", date ?? "all"] as const,
   locations: ["inspections", "locations"] as const,
-  publicCenters: (params?: Record<string, string | undefined>) =>
+  publicCenters: (params?: Record<string, string | number | undefined>) =>
     ["inspections", "public-centers", params ?? {}] as const,
   adminCenters: ["inspections", "admin-centers"] as const,
-  adminCentersList: (params?: Record<string, string | undefined>) =>
+  adminCentersList: (params?: Record<string, string | number | undefined>) =>
     ["inspections", "admin-centers", params ?? {}] as const,
   bookings: ["inspections", "bookings"] as const,
-  myBookings: (params?: Record<string, string | undefined>) =>
+  myBookings: (params?: Record<string, string | number | undefined>) =>
     ["inspections", "bookings", "my", params ?? {}] as const,
   adminBookings: ["inspections", "admin-bookings"] as const,
-  adminBookingsList: (params?: Record<string, string | undefined>) =>
+  adminBookingsList: (params?: Record<string, string | number | undefined>) =>
     ["inspections", "admin-bookings", params ?? {}] as const,
   adminBookingDetail: (id: string | null) =>
     ["inspections", "admin-bookings", "detail", id] as const,
@@ -51,7 +51,7 @@ export const inspectionKeys = {
 
 // ── Staff Center Management ──
 
-export function useAdminCenters(params?: { is_active?: string; search?: string }) {
+export function useAdminCenters(params?: { is_active?: string; search?: string; page_size?: number }) {
   const query = buildQuery(params);
   return useQuery({
     queryKey: inspectionKeys.adminCentersList(params),
@@ -116,7 +116,7 @@ export function useCentersByCity(params: {
 
 // ── Staff Slot Management ──
 
-export function useStaffSlots(params?: { date_from?: string; date_to?: string; is_active?: string }) {
+export function useStaffSlots(params?: { date_from?: string; date_to?: string; is_active?: string; page_size?: number }) {
   const query = buildQuery(params);
   return useQuery({
     queryKey: inspectionKeys.slotsList(params),
@@ -190,12 +190,13 @@ export function useCreateBooking() {
       apiClient.post<InspectionBooking>("/inspections/bookings/", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: inspectionKeys.bookings });
+      queryClient.invalidateQueries({ queryKey: ["inspections", "available-slots"] });
       queryClient.invalidateQueries({ queryKey: listingKeys.owner });
     },
   });
 }
 
-export function useMyBookings(params?: { car?: string }, options?: { enabled?: boolean }) {
+export function useMyBookings(params?: { car?: string; page_size?: number }, options?: { enabled?: boolean }) {
   const query = buildQuery(params);
   return useQuery({
     queryKey: inspectionKeys.myBookings(params),
@@ -215,6 +216,7 @@ export function useCancelBooking() {
       apiClient.post(`/inspections/bookings/${bookingId}/cancel/`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: inspectionKeys.bookings });
+      queryClient.invalidateQueries({ queryKey: ["inspections", "available-slots"] });
       queryClient.invalidateQueries({ queryKey: listingKeys.owner });
     },
   });
@@ -227,6 +229,7 @@ export function useRescheduleBooking() {
       apiClient.post<InspectionBooking>(`/inspections/bookings/${bookingId}/reschedule/`, { slot_id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: inspectionKeys.bookings });
+      queryClient.invalidateQueries({ queryKey: ["inspections", "available-slots"] });
       queryClient.invalidateQueries({ queryKey: listingKeys.owner });
       queryClient.invalidateQueries({ queryKey: inspectionKeys.slots });
     },

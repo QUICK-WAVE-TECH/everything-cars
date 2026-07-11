@@ -54,7 +54,7 @@ export type CarListItem = {
   state: string;
   city: string;
   status: string;
-  availability_status: "available" | "rented" | "reserved" | "sold";
+  availability_status: "available" | "rented" | "reserved" | "sold" | "archived";
   owner: CarOwner;
   primary_image: string | null;
   created_at: string;

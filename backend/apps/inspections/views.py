@@ -1,6 +1,7 @@
 import json
 from datetime import timedelta, time
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Q
 from django.utils import timezone
@@ -56,6 +57,35 @@ BOOKABLE_CAR_STATUSES = [
 ]
 
 
+def _valid_uuid_or_none(value):
+    """Query params are user input — a malformed UUID must 400, not 500."""
+    import uuid as uuid_module
+
+    try:
+        return uuid_module.UUID(value)
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def _slot_has_started(slot, now=None):
+    now = now or timezone.localtime()
+    return slot.date < now.date() or (
+        slot.date == now.date() and slot.start_time <= now.time()
+    )
+
+
+def _parse_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes"}:
+            return True
+        if normalized in {"false", "0", "no"}:
+            return False
+    return None
+
+
 def schedule_notification(notify_func, get_payload):
     transaction.on_commit(lambda: notify_func(get_payload()), robust=True)
 
@@ -98,7 +128,7 @@ class StaffSlotListCreateView(APIView):
                 "bookings",
                 filter=Q(bookings__status__in=ACTIVE_BOOKING_STATUSES),
             )
-        )
+        ).order_by("date", "start_time", "created_at")
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(slots, request)
@@ -179,18 +209,87 @@ class StaffSlotDetailView(APIView):
 
     def patch(self, request, slot_id):
         try:
-            slot = InspectionSlot.objects.get(id=slot_id)
+            slot = InspectionSlot.objects.select_related("center").get(id=slot_id)
         except InspectionSlot.DoesNotExist:
             return Response(
                 {"detail": "Slot not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
-        allowed_fields = {"capacity", "center", "note", "is_active"}
-        for field, value in request.data.items():
-            if field in allowed_fields:
-                setattr(slot, field, value)
-        slot.save()
-        return Response(InspectionSlotSerializer(slot).data)
+        active_bookings = slot.bookings.filter(
+            status__in=ACTIVE_BOOKING_STATUSES
+        ).count()
+        update_fields = []
+
+        if "capacity" in request.data:
+            try:
+                capacity = int(request.data["capacity"])
+            except (TypeError, ValueError):
+                return Response(
+                    {"capacity": "Capacity must be a valid number."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if capacity < 1:
+                return Response(
+                    {"capacity": "Capacity must be at least 1."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if capacity < active_bookings:
+                return Response(
+                    {
+                        "capacity": (
+                            "Capacity cannot be lower than the current active "
+                            f"booking count ({active_bookings})."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            slot.capacity = capacity
+            update_fields.append("capacity")
+
+        if "center" in request.data:
+            try:
+                center = InspectionCenter.objects.get(
+                    id=request.data["center"],
+                    is_active=True,
+                )
+            except (
+                InspectionCenter.DoesNotExist,
+                DjangoValidationError,
+                ValueError,
+                TypeError,
+            ):
+                return Response(
+                    {"center": "Select a valid active inspection center."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            slot.center = center
+            update_fields.append("center")
+
+        if "note" in request.data:
+            slot.note = str(request.data.get("note") or "")
+            update_fields.append("note")
+
+        if "is_active" in request.data:
+            is_active = _parse_bool(request.data["is_active"])
+            if is_active is None:
+                return Response(
+                    {"is_active": "Use true or false."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not is_active and active_bookings:
+                return Response(
+                    {"detail": "Cannot deactivate a slot with active bookings."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            slot.is_active = is_active
+            update_fields.append("is_active")
+
+        if update_fields:
+            slot.save(update_fields=update_fields)
+
+        data = InspectionSlotSerializer(slot).data
+        data["bookings_count"] = active_bookings
+        return Response(data)
 
     def delete(self, request, slot_id):
         try:
@@ -220,9 +319,13 @@ class AvailableSlotsView(APIView):
     permission_classes = [IsOwner]
 
     def get(self, request):
-        today = timezone.localdate()
+        now = timezone.localtime()
         slots = (
-            InspectionSlot.objects.filter(date__gte=today, is_active=True)
+            InspectionSlot.objects.filter(is_active=True)
+            .filter(
+                Q(date__gt=now.date())
+                | Q(date=now.date(), start_time__gt=now.time())
+            )
             .select_related("center")
             .annotate(
                 bookings_count=Count(
@@ -289,9 +392,9 @@ class OwnerBookingCreateView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            if slot.date < timezone.localdate():
+            if _slot_has_started(slot):
                 return Response(
-                    {"detail": "Cannot book a slot in the past."},
+                    {"detail": "Cannot book a slot that has already started."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -307,19 +410,19 @@ class OwnerBookingCreateView(APIView):
 
             # Rebooking after a cancel/no-show counts as a reschedule so the
             # per-center cap can't be bypassed by cancelling and rebooking.
+            # A COMPLETED last booking means the previous inspection cycle
+            # finished — a fresh cycle starts at zero.
             last_booking = (
                 InspectionBooking.objects.filter(car=car)
                 .order_by("-created_at")
                 .first()
             )
             reschedule_count = 0
-            if last_booking:
-                reschedule_count = last_booking.reschedule_count
-                if last_booking.status in (
-                    BookingStatus.CANCELLED,
-                    BookingStatus.NO_SHOW,
-                ):
-                    reschedule_count += 1
+            if last_booking and last_booking.status in (
+                BookingStatus.CANCELLED,
+                BookingStatus.NO_SHOW,
+            ):
+                reschedule_count = last_booking.reschedule_count + 1
                 if reschedule_count > slot.center.max_reschedules:
                     return Response(
                         {
@@ -380,7 +483,13 @@ class OwnerBookingListView(APIView):
         )
         car_filter = request.query_params.get("car")
         if car_filter:
-            bookings = bookings.filter(car_id=car_filter)
+            car_uuid = _valid_uuid_or_none(car_filter)
+            if car_uuid is None:
+                return Response(
+                    {"detail": "Invalid car id."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            bookings = bookings.filter(car_id=car_uuid)
         paginator = StandardPagination()
         page = paginator.paginate_queryset(bookings, request)
         serializer = InspectionBookingSerializer(page, many=True)
@@ -495,9 +604,9 @@ class OwnerBookingRescheduleView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            if new_slot.date < timezone.localdate():
+            if _slot_has_started(new_slot):
                 return Response(
-                    {"detail": "Cannot book a slot in the past."},
+                    {"detail": "Cannot book a slot that has already started."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -548,7 +657,7 @@ class StaffBookingListView(APIView):
     permission_classes = [IsStaff]
 
     def get(self, request):
-        bookings = booking_detail_queryset()
+        bookings = booking_detail_queryset().order_by("-created_at")
 
         status_filter = request.query_params.get("status")
         if status_filter:
@@ -560,7 +669,13 @@ class StaffBookingListView(APIView):
 
         car_filter = request.query_params.get("car")
         if car_filter:
-            bookings = bookings.filter(car_id=car_filter)
+            car_uuid = _valid_uuid_or_none(car_filter)
+            if car_uuid is None:
+                return Response(
+                    {"detail": "Invalid car id."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            bookings = bookings.filter(car_id=car_uuid)
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(bookings, request)
@@ -632,7 +747,12 @@ class StaffInspectionStartView(APIView):
         )
 
         detail = booking_detail_queryset().get(id=booking.id)
-        return Response(InspectionBookingDetailSerializer(detail).data)
+        return Response(
+            InspectionBookingDetailSerializer(
+                detail,
+                context={"request": request},
+            ).data
+        )
 
 
 # result → (car status, owner notification)
@@ -852,6 +972,19 @@ class StaffClearanceResolveView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
+            # Resolution targets the completed inspection booking — cancelled
+            # leftovers from reschedules must not carry the notification.
+            if booking.status != BookingStatus.COMPLETED:
+                return Response(
+                    {
+                        "detail": (
+                            "Cannot resolve — booking is "
+                            f"'{booking.get_status_display()}', must be Completed."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             car = Car.objects.select_for_update().get(id=booking.car_id)
             if car.status != CarStatus.NEEDS_CLEARANCE:
                 return Response(
@@ -867,6 +1000,11 @@ class StaffClearanceResolveView(APIView):
                 extra.append("published_at")
             else:
                 car.admin_note = note
+                # The owner notification reads booking.staff_note — keep it
+                # in sync with the actual rejection reason, not the stale
+                # clearance-era note.
+                booking.staff_note = note
+                booking.save(update_fields=["staff_note", "updated_at"])
             record_status_change(
                 car,
                 new_status,
@@ -881,7 +1019,12 @@ class StaffClearanceResolveView(APIView):
             lambda bid=booking.id: booking_detail_queryset().get(id=bid),
         )
         detail = booking_detail_queryset().get(id=booking.id)
-        return Response(InspectionBookingDetailSerializer(detail).data)
+        return Response(
+            InspectionBookingDetailSerializer(
+                detail,
+                context={"request": request},
+            ).data
+        )
 
 
 class OwnerClearanceResponseView(APIView):
@@ -986,7 +1129,12 @@ class StaffBookingNoShowView(APIView):
         )
 
         detail = booking_detail_queryset().get(id=booking.id)
-        return Response(InspectionBookingDetailSerializer(detail).data)
+        return Response(
+            InspectionBookingDetailSerializer(
+                detail,
+                context={"request": request},
+            ).data
+        )
 
 
 class StaffCenterListCreateView(APIView):

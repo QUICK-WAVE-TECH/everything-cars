@@ -34,6 +34,9 @@ type TabKey =
   | "inspection_pending"
   | "inspection_in_progress"
   | "needs_clearance"
+  | "inspection_no_show"
+  | "inspection_rejected"
+  | "needs_changes"
   | "published"
   | "suspended";
 
@@ -43,6 +46,9 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "inspection_pending", label: "Awaiting Inspection" },
   { key: "inspection_in_progress", label: "In Progress" },
   { key: "needs_clearance", label: "Needs Clearance" },
+  { key: "inspection_no_show", label: "No Show" },
+  { key: "inspection_rejected", label: "Rejected" },
+  { key: "needs_changes", label: "Needs Changes" },
   { key: "published", label: "Published" },
   { key: "suspended", label: "Suspended" },
 ];
@@ -776,6 +782,10 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
                   )}
                 </div>
 
+              ) : car.status === "inspection_no_show" ? (
+                <span className="block text-center text-[13px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Owner missed the appointment — waiting for them to rebook.</span>
+              ) : car.status === "inspection_rejected" ? (
+                <span className="block text-center text-[13px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Inspection failed — waiting for the owner to fix the issues and resubmit.</span>
               ) : car.status === "needs_changes" ? (
                 <div className="flex flex-col gap-3">
                   {car.admin_note && (
@@ -791,7 +801,7 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
                   <span className="text-[13px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">This listing has been suspended.</span>
                   <button type="button" disabled={anyActing} onClick={() => onAction(car.id, "published")}
                     className="flex h-[46px] cursor-pointer items-center gap-2 rounded-lg border-none bg-(--brc-success) px-5 text-sm font-bold text-white hover:brightness-95 disabled:opacity-50 [font-family:var(--brc-font-ui)]">
-                    Reinstate & Publish
+                    Reinstate
                   </button>
                 </div>
               ) : car.status === "published" ? (
@@ -849,6 +859,9 @@ export default function AdminApprovalsPage() {
     inspection_pending: rawCounts?.inspection_pending ?? 0,
     inspection_in_progress: rawCounts?.inspection_in_progress ?? 0,
     needs_clearance: rawCounts?.needs_clearance ?? 0,
+    inspection_no_show: rawCounts?.inspection_no_show ?? 0,
+    inspection_rejected: rawCounts?.inspection_rejected ?? 0,
+    needs_changes: rawCounts?.needs_changes ?? 0,
     published: rawCounts?.published ?? 0,
     suspended: rawCounts?.suspended ?? 0,
   }), [rawCounts]);

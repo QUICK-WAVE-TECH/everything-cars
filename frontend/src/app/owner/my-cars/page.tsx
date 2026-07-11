@@ -651,7 +651,7 @@ function Pagination({ page, setPage, totalPages }: { page: number; setPage: (p: 
 // ---------- Main page ----------
 export default function MyCarsPage() {
   const { data: rawListings, isLoading } = useMyCarsList();
-  const { data: bookingsData } = useMyBookings();
+  const { data: bookingsData } = useMyBookings({ page_size: 100 });
   const deleteCar = useDeleteCar();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -670,8 +670,11 @@ export default function MyCarsPage() {
   const bookingByCarId = useMemo<Record<string, InspectionBooking>>(() => {
     if (!bookingsData?.results) return {};
     return bookingsData.results.reduce<Record<string, InspectionBooking>>((acc, b) => {
-      // Keep the most recently created booking per car (first in list = most recent)
-      if (!acc[b.car_id]) acc[b.car_id] = b;
+      const current = acc[b.car_id];
+      // Prefer the active (pending) booking; otherwise most recent wins
+      if (!current || (b.status === "pending" && current.status !== "pending")) {
+        acc[b.car_id] = b;
+      }
       return acc;
     }, {});
   }, [bookingsData]);

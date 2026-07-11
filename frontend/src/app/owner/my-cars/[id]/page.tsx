@@ -830,7 +830,7 @@ export default function CarDetailPage() {
                     Edit
                   </button>
                 )}
-                {car.status !== "archived" && (
+                {!["archived", "inspection_pending", "inspection_in_progress"].includes(car.status) && (
                   <button
                     type="button"
                     onClick={handleArchive}

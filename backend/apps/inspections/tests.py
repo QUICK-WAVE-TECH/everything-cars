@@ -1007,3 +1007,76 @@ class AdminCarHistoryTest(APITestCase):
         self.client.force_authenticate(user=owner)
         res = self.client.get(f"/api/v1/listings/admin/cars/{car.id}/history")
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class CycleCountResetTest(APITestCase):
+    def test_new_cycle_starts_at_zero_reschedules(self):
+        staff = create_user("staff-cycle@test.com", "owner", is_staff=True)
+        owner = create_user("owner-cycle@test.com", "owner")
+        create_owner_profile(owner)
+        center = create_center(staff)
+        car = create_car(owner, status=CarStatus.LISTING_APPROVED)
+        old_slot = create_slot(staff, center=center)
+        # Previous cycle ended with a completed inspection at the cap
+        InspectionBooking.objects.create(
+            car=car, slot=old_slot, booked_by=owner,
+            status=BookingStatus.COMPLETED, reschedule_count=2,
+        )
+        new_slot = create_slot(staff, days_ahead=9, center=center)
+        self.client.force_authenticate(user=owner)
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {"car_id": str(car.id), "slot_id": str(new_slot.id)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        booking = InspectionBooking.objects.get(car=car, status=BookingStatus.PENDING)
+        self.assertEqual(booking.reschedule_count, 0)
+
+
+class ClearanceResolveGuardTest(APITestCase):
+    def test_cannot_resolve_via_cancelled_booking(self):
+        staff = create_user("staff-crg@test.com", "owner", is_staff=True)
+        owner = create_user("owner-crg@test.com", "owner")
+        create_owner_profile(owner)
+        car = create_car(owner, status=CarStatus.NEEDS_CLEARANCE)
+        slot = create_slot(staff)
+        cancelled = InspectionBooking.objects.create(
+            car=car, slot=slot, booked_by=owner, status=BookingStatus.CANCELLED
+        )
+        self.client.force_authenticate(user=staff)
+        res = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{cancelled.id}/clearance/",
+            {"action": "publish"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_reject_updates_booking_staff_note(self):
+        staff = create_user("staff-crg2@test.com", "owner", is_staff=True)
+        owner = create_user("owner-crg2@test.com", "owner")
+        create_owner_profile(owner)
+        car = create_car(owner, status=CarStatus.NEEDS_CLEARANCE)
+        slot = create_slot(staff)
+        booking = InspectionBooking.objects.create(
+            car=car, slot=slot, booked_by=owner,
+            status=BookingStatus.COMPLETED, staff_note="old clearance note",
+        )
+        self.client.force_authenticate(user=staff)
+        res = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{booking.id}/clearance/",
+            {"action": "reject", "staff_note": "Docs never provided"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        booking.refresh_from_db()
+        self.assertEqual(booking.staff_note, "Docs never provided")
+
+
+class BookingCarFilterValidationTest(APITestCase):
+    def test_malformed_car_uuid_returns_400(self):
+        owner = create_user("owner-uuid@test.com", "owner")
+        create_owner_profile(owner)
+        self.client.force_authenticate(user=owner)
+        res = self.client.get("/api/v1/inspections/bookings/my/?car=not-a-uuid")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)

@@ -561,7 +561,7 @@ function ConfirmToggleDialog({
 // ── Page ──
 
 export default function AdminInspectionCentersPage() {
-  const { data, isLoading } = useAdminCenters();
+  const { data, isLoading } = useAdminCenters({ page_size: 100 });
   const centers = data?.results ?? [];
 
   const [formOpen, setFormOpen] = useState(false);

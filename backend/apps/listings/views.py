@@ -68,7 +68,12 @@ from apps.notifications.service import (
     notify_listing_submitted,
     notify_changes_requested,
 )
-from apps.inspections.models import ActorRole
+from apps.inspections.models import (
+    ACTIVE_BOOKING_STATUSES,
+    ActorRole,
+    BookingStatus,
+    InspectionBooking,
+)
 from apps.inspections.serializers import CarStatusHistorySerializer
 from apps.inspections.services import record_status_change
 
@@ -396,6 +401,29 @@ class MyCarDetailView(APIView):
 
             if car_has_active_requests(car.id):
                 return active_request_archive_response()
+
+            # Archiving mid-inspection would orphan the booking (it keeps
+            # consuming slot capacity and sits in the staff queue forever).
+            if car.status == CarStatus.INSPECTION_PENDING:
+                return Response(
+                    {
+                        "detail": (
+                            "Cancel your inspection booking before archiving "
+                            "this listing."
+                        )
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if car.status == CarStatus.INSPECTION_IN_PROGRESS:
+                return Response(
+                    {
+                        "detail": (
+                            "An inspection is in progress — wait for the "
+                            "result before archiving this listing."
+                        )
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
 
             record_status_change(
                 car,
@@ -1130,10 +1158,40 @@ class AdminCarStatusView(APIView):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+
+            # Reinstating restores the pre-suspension status — publishing
+            # unconditionally would let a never-inspected car go live.
+            if car.status == CarStatus.SUSPENDED:
+                last_suspension = (
+                    car.status_history.filter(to_status=CarStatus.SUSPENDED)
+                    .order_by("-created_at")
+                    .first()
+                )
+                prior = last_suspension.from_status if last_suspension else ""
+                if prior == CarStatus.NEEDS_CHANGES:
+                    new_status = CarStatus.NEEDS_CHANGES
+                elif prior == CarStatus.INSPECTION_PENDING:
+                    # The booking was cancelled on suspension — back to bookable
+                    new_status = CarStatus.LISTING_APPROVED
+                # anything else (published or unknown) → published
+
+            # Suspending mid-booking would strand a PENDING booking that
+            # keeps consuming slot capacity — release it.
+            if (
+                new_status == CarStatus.SUSPENDED
+                and car.status == CarStatus.INSPECTION_PENDING
+            ):
+                InspectionBooking.objects.filter(
+                    car=car, status__in=ACTIVE_BOOKING_STATUSES
+                ).update(status=BookingStatus.CANCELLED)
+
             note = request.data.get("note", "")
             extra = ["admin_note"]
             if note:
                 car.admin_note = note
+            elif new_status == CarStatus.NEEDS_CHANGES:
+                # Never let a stale note leak into the owner notification
+                car.admin_note = ""
             if new_status == CarStatus.PUBLISHED:
                 car.published_at = timezone.now()
                 car.admin_note = ""  # Clear note on publish

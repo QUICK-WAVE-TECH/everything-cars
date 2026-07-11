@@ -24,6 +24,7 @@ import {
   useSubmitInspection,
 } from "@/features/inspections/api/inspections-api";
 import type { PhysicalInspectionPayload } from "@/features/inspections/api/types";
+import { ApiError } from "@/lib/api-client";
 
 // ── Helpers ──
 function formatDate(value: string) {
@@ -189,11 +190,16 @@ export default function StaffInspectionFormPage() {
     formData.append("staff_notes", staffNotes.trim());
     formData.append("result", result);
 
-    if (carDocuments) formData.append("car_documents", carDocuments);
-    if (receiptUpload) formData.append("receipt_upload", receiptUpload);
-    if (customDutyStatus) formData.append("custom_duty_status", customDutyStatus);
-    if (receiptType) formData.append("receipt_type", receiptType);
-    if (additionalNotes.trim()) formData.append("additional_notes", additionalNotes.trim());
+    // Failed inspections don't require documents — and the backend treats ANY
+    // document field as "documents provided" and then demands all of them, so
+    // partial doc fields on a failed result would trigger an opaque 400.
+    if (result !== "failed") {
+      if (carDocuments) formData.append("car_documents", carDocuments);
+      if (receiptUpload) formData.append("receipt_upload", receiptUpload);
+      if (customDutyStatus) formData.append("custom_duty_status", customDutyStatus);
+      if (receiptType) formData.append("receipt_type", receiptType);
+      if (additionalNotes.trim()) formData.append("additional_notes", additionalNotes.trim());
+    }
 
     try {
       await submitInspection.mutateAsync({ bookingId: booking.id, data: formData });
@@ -201,8 +207,12 @@ export default function StaffInspectionFormPage() {
       const resultLabel = RESULT_OPTIONS.find((r) => r.value === result)?.label ?? result;
       toast.success(`Inspection recorded — ${resultLabel}`);
       router.push("/admin/approvals");
-    } catch {
-      toast.error("Failed to submit inspection.");
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError
+          ? error.message
+          : "Failed to submit inspection.",
+      );
     }
   }
 

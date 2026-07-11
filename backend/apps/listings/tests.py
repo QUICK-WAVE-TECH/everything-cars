@@ -631,3 +631,91 @@ class PublicArchivedVisibilityTest(APITestCase):
         car = create_car(self.owner, title="Withdrawn Car", status=CarStatus.ARCHIVED)
         res = self.client.get(f"/api/v1/listings/cars/{car.id}")
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class ArchiveGuardTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("owner-ag@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.client.force_authenticate(user=self.owner)
+
+    def test_archive_blocked_during_inspection_pending(self):
+        car = create_car(self.owner, status=CarStatus.INSPECTION_PENDING)
+        res = self.client.delete(f"/api/v1/listings/my-cars/{car.id}")
+        self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
+
+    def test_archive_blocked_during_inspection_in_progress(self):
+        car = create_car(self.owner, status=CarStatus.INSPECTION_IN_PROGRESS)
+        res = self.client.delete(f"/api/v1/listings/my-cars/{car.id}")
+        self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
+
+    def test_archive_allowed_from_draft(self):
+        car = create_car(self.owner, status=CarStatus.DRAFT)
+        res = self.client.delete(f"/api/v1/listings/my-cars/{car.id}")
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+
+
+class SuspendReinstateTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user("staff-sr@test.com", "owner", is_staff=True)
+        self.owner = create_user("owner-sr@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.client.force_authenticate(user=self.staff)
+
+    def _set_status(self, car, new_status):
+        return self.client.post(
+            f"/api/v1/listings/admin/cars/{car.id}/status",
+            {"status": new_status},
+            format="json",
+        )
+
+    def test_suspend_from_inspection_pending_cancels_booking(self):
+        from apps.inspections.models import (
+            BookingStatus,
+            InspectionBooking,
+            InspectionCenter,
+            InspectionSlot,
+        )
+        from datetime import time as dtime, timedelta as td
+        from django.utils import timezone as tz
+
+        car = create_car(self.owner, status=CarStatus.INSPECTION_PENDING)
+        center = InspectionCenter.objects.create(
+            company_name="C", address="a", country="NG", country_code="NG",
+            state="Lagos", city="Lagos", city_code="LOS", created_by=self.staff,
+        )
+        slot = InspectionSlot.objects.create(
+            date=tz.localdate() + td(days=3), start_time=dtime(9), end_time=dtime(10),
+            center=center, created_by=self.staff,
+        )
+        booking = InspectionBooking.objects.create(
+            car=car, slot=slot, booked_by=self.owner
+        )
+        res = self._set_status(car, "suspended")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, BookingStatus.CANCELLED)
+
+    def test_reinstate_restores_prior_status_not_blind_publish(self):
+        car = create_car(self.owner, status=CarStatus.INSPECTION_PENDING)
+        self._set_status(car, "suspended")
+        res = self._set_status(car, "published")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        car.refresh_from_db()
+        # booking was cancelled on suspension → back to bookable, NOT published
+        self.assertEqual(car.status, CarStatus.LISTING_APPROVED)
+
+    def test_reinstate_previously_published_car_republishes(self):
+        car = create_car(self.owner, status=CarStatus.PUBLISHED)
+        self._set_status(car, "suspended")
+        res = self._set_status(car, "published")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        car.refresh_from_db()
+        self.assertEqual(car.status, CarStatus.PUBLISHED)
+
+    def test_archived_unsold_availability_not_sold(self):
+        car = create_car(self.owner, status=CarStatus.ARCHIVED)
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.get("/api/v1/listings/my-cars?status=archived")
+        row = next(c for c in res.data["results"] if c["id"] == str(car.id))
+        self.assertEqual(row["availability_status"], "archived")

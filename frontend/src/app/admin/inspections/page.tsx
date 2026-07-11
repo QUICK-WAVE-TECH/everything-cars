@@ -227,7 +227,7 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
   const [centerId, setCenterId] = useState("");
 
   const createSlots = useCreateSlots();
-  const { data: centersData, isLoading: centersLoading } = useAdminCenters({ is_active: "true" });
+  const { data: centersData, isLoading: centersLoading } = useAdminCenters({ is_active: "true", page_size: 100 });
   const centers = useMemo(() => centersData?.results ?? [], [centersData?.results]);
   const todayIso = toIsoDate(new Date());
 
@@ -829,6 +829,8 @@ export default function AdminInspectionsPage() {
     date_from: dateFrom,
     date_to: dateTo,
     is_active: "true",
+    // A busy week easily exceeds the default page size of 20
+    page_size: 100,
   });
   const slots = data?.results ?? [];
 
