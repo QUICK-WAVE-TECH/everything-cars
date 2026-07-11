@@ -3,6 +3,7 @@ from .views import (
     CustomerPaymentSubmitView,
     MyCarListCreateView,
     MyCarDetailView,
+    MyCarHistoryView,
     CarImageUploadView,
     MyCarStatusView,
     PublicCarListView,
@@ -14,6 +15,9 @@ from .views import (
     OwnerRequestListView,
     OwnerRequestDetailView,
     OwnerRequestActionView,
+    AdminApproveListingView,
+    AdminCarHistoryView,
+    AdminCarStatusCountsView,
     AdminCarListView,
     AdminCarDetailView,
     AdminCarStatusView,
@@ -35,6 +39,11 @@ urlpatterns = [
     ),
     path(
         "my-cars/<uuid:car_id>/status", MyCarStatusView.as_view(), name="my-car-status"
+    ),
+    path(
+        "my-cars/<uuid:car_id>/history",
+        MyCarHistoryView.as_view(),
+        name="my-car-history",
     ),
     # Public car endpoints
     path("cars", PublicCarListView.as_view(), name="public-cars-list"),
@@ -84,6 +93,11 @@ urlpatterns = [
     ),
     path("admin/cars", AdminCarListView.as_view(), name="admin-cars"),
     path(
+        "admin/cars/status-counts",
+        AdminCarStatusCountsView.as_view(),
+        name="admin-car-status-counts",
+    ),
+    path(
         "admin/cars/<uuid:car_id>",
         AdminCarDetailView.as_view(),
         name="admin-car-detail",
@@ -92,6 +106,16 @@ urlpatterns = [
         "admin/cars/<uuid:car_id>/status",
         AdminCarStatusView.as_view(),
         name="admin-car-status",
+    ),
+    path(
+        "admin/cars/<uuid:car_id>/approve-listing",
+        AdminApproveListingView.as_view(),
+        name="admin-approve-listing",
+    ),
+    path(
+        "admin/cars/<uuid:car_id>/history",
+        AdminCarHistoryView.as_view(),
+        name="admin-car-history",
     ),
     path(
         "admin/requests/<uuid:request_id>/confirm-payment",

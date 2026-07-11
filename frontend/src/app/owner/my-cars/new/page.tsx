@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useId, type FormEvent } from "react";
+import { useState, useRef, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,6 +17,12 @@ import { COUNTRIES } from "@/features/auth/data/countries";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useCreateCar, useUploadCarImages } from "@/features/listings/api";
+import type { CarImageFiles, CarImageType } from "@/features/listings/api/types";
+import {
+  CarPhotoSlotsField,
+  findOversizedCarImage,
+} from "@/features/listings/components/car-photo-slots-field";
+import { useRouter } from "next/navigation";
 import {
   createCarSchema,
   type CreateCarFormValues,
@@ -221,110 +227,19 @@ function TextAreaField({ label, placeholder, value, onChange }: {
   );
 }
 
-function FileField({ label, files, onChoose, onClear }: {
-  label: string;
-  files: File[];
-  onChoose: (files: File[]) => void;
-  onClear: () => void;
-}) {
-  const id = useId();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-
-  function handleFiles(fileList: FileList | File[] | null) {
-    const selectedFiles = Array.from(fileList ?? []);
-    if (selectedFiles.length > 0) {
-      onChoose(selectedFiles);
-    }
-  }
-
-  function handleClear() {
-    if (inputRef.current) {
-      inputRef.current.value = "";
-    }
-    onClear();
-  }
-
-  const selectedLabel = files.length
-    ? `${files.length} image${files.length > 1 ? "s" : ""} selected`
-    : "Upload images or drag and drop here";
-  const selectedNames = files
-    .slice(0, 3)
-    .map((file) => file.name)
-    .join(", ");
-  const hint = files.length
-    ? `${selectedNames}${files.length > 3 ? `, +${files.length - 3} more` : ""}`
-    : "JPG, PNG, WEBP, or HEIC (Max 5MB each)";
-
-  return (
-    <div className="col-span-full flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-sm text-(--brc-text) [font-family:var(--brc-font-ui)] sm:text-base">{label}</span>
-        {files.length > 0 && (
-          <button
-            type="button"
-            onClick={handleClear}
-            className="inline-flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-xs font-semibold text-(--brc-danger) [font-family:var(--brc-font-ui)]"
-          >
-            Clear
-            <XIcon size={14} />
-          </button>
-        )}
-      </div>
-      <label
-        htmlFor={id}
-        className={cn(
-          "brc-button-motion brc-button-motion-subtle flex min-h-[150px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-(--brc-border-strong) bg-(--brc-bg-subtle) px-6 py-7 text-center",
-          isDragging && "border-(--brc-primary) bg-(--brc-primary-tint)",
-        )}
-        onDragEnter={(event) => {
-          event.preventDefault();
-          setIsDragging(true);
-        }}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setIsDragging(true);
-        }}
-        onDragLeave={(event) => {
-          event.preventDefault();
-          setIsDragging(false);
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          setIsDragging(false);
-          handleFiles(event.dataTransfer.files);
-        }}
-      >
-        <input
-          id={id}
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic"
-          multiple
-          className="sr-only"
-          onChange={(event) => handleFiles(event.target.files)}
-        />
-        <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-accent-bg)">
-          <Icon name="upload" size={22} stroke="var(--brc-accent)" />
-        </span>
-        <span className="flex max-w-full flex-col gap-1">
-          <span className="text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
-            {selectedLabel}
-          </span>
-          <span className="break-words text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-            {hint}
-          </span>
-        </span>
-      </label>
-    </div>
-  );
-}
-
 // ---------- Page ----------
+const REQUIRED_IMAGE_TYPES: CarImageType[] = [
+  "front",
+  "back",
+  "left_side",
+  "right_side",
+];
+
 export default function ListCarPage() {
+  const router = useRouter();
   const createCar = useCreateCar();
   const uploadImages = useUploadCarImages();
-  const [files, setFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<CarImageFiles>({});
   const [done, setDone] = useState(false);
   const submitInFlightRef = useRef(false);
 
@@ -363,6 +278,19 @@ export default function ListCarPage() {
 
   async function handleSubmit(values: CreateCarInput) {
     try {
+      // Validate photos BEFORE creating the car — otherwise a failed upload
+      // leaves an orphaned photo-less draft (and retries create duplicates).
+      const missingImages = REQUIRED_IMAGE_TYPES.filter((type) => !files[type]);
+      if (missingImages.length > 0) {
+        toast.error("Please add front, back, left side, and right side photos.");
+        return;
+      }
+      const oversized = findOversizedCarImage(files);
+      if (oversized) {
+        toast.error(`${oversized.name} is over 5 MB — please use a smaller photo.`);
+        return;
+      }
+
       const payload: Record<string, unknown> = {
         ...values,
         year: parseInt(values.year, 10),
@@ -375,8 +303,20 @@ export default function ListCarPage() {
 
       const car = await createCar.mutateAsync(payload);
 
-      if (files.length > 0) {
+      try {
         await uploadImages.mutateAsync({ carId: car.id, files });
+      } catch (uploadError) {
+        // The car exists but has no photos — send the owner to the listing
+        // to retry instead of leaving a mystery draft (or duplicating it).
+        const message =
+          uploadError instanceof ApiError
+            ? uploadError.message
+            : "Photo upload failed.";
+        toast.error(
+          `Your listing was saved as a draft, but the photos didn't upload: ${message} Add photos from the listing page.`,
+        );
+        router.push(`/owner/my-cars/${car.id}`);
+        return;
       }
 
       setDone(true);
@@ -406,7 +346,7 @@ export default function ListCarPage() {
 
   function handleReset() {
     form.reset();
-    setFiles([]);
+    setFiles({});
     setDone(false);
     submitInFlightRef.current = false;
   }
@@ -431,7 +371,7 @@ export default function ListCarPage() {
                   Car Listed Successfully
                 </h2>
                 <p className="mx-auto mt-3 max-w-[460px] text-base text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                  <strong className="text-(--brc-text)">{title || brand}</strong> is now {isBuy ? "up for sale" : "available to rent"}. We&apos;ll notify you when a request comes in.
+                  <strong className="text-(--brc-text)">{title || brand}</strong> is now {isBuy ? "up for sale" : "available to rent"}. Head to your listings to book an inspection date.
                 </p>
               </div>
               <div className="mt-2 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
@@ -535,12 +475,7 @@ export default function ListCarPage() {
                   onChange={(val) => form.setValue("city", val)}
                 />
 
-                <FileField
-                  label="Car Image(s)"
-                  files={files}
-                  onChoose={setFiles}
-                  onClear={() => setFiles([])}
-                />
+                <CarPhotoSlotsField value={files} onChange={setFiles} />
                 <TextAreaField label="Description" placeholder="Describe your car, its condition, and any special features" value={w.description ?? ""} onChange={(v) => form.setValue("description", v)} />
 
                 <FeaturesField

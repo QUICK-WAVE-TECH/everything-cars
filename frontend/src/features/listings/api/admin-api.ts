@@ -14,6 +14,7 @@ type AdminListParams = {
 
 export const adminListingKeys = {
   cars: ["cars", "admin"] as const,
+  carCounts: ["cars", "admin", "status-counts"] as const,
   carsList: (params?: AdminListParams) => ["cars", "admin", params ?? {}] as const,
   carDetail: (carId: string | null) => ["cars", "admin", "detail", carId] as const,
   requests: ["requests", "admin"] as const,
@@ -43,6 +44,29 @@ export function useAdminCars(params?: AdminListParams) {
         `/listings/admin/cars${query ? `?${query}` : ""}`,
       ),
     staleTime: 15 * 1000,
+  });
+}
+
+// Admin — car counts per status (drives the approvals KPIs and tab badges)
+export function useAdminCarCounts() {
+  return useQuery({
+    queryKey: adminListingKeys.carCounts,
+    queryFn: () =>
+      apiClient.get<Record<string, number>>("/listings/admin/cars/status-counts"),
+    staleTime: 15 * 1000,
+  });
+}
+
+// Admin — full status timeline (includes owner clearance responses)
+export function useAdminCarHistory(carId: string | null) {
+  return useQuery({
+    queryKey: [...adminListingKeys.cars, "history", carId] as const,
+    queryFn: () =>
+      apiClient.get<
+        import("@/features/inspections/api/types").CarStatusHistoryEntry[]
+      >(`/listings/admin/cars/${carId}/history`),
+    enabled: !!carId,
+    staleTime: 10 * 1000,
   });
 }
 
@@ -89,6 +113,35 @@ export function useAdminCarStatus() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminListingKeys.cars });
       queryClient.invalidateQueries({ queryKey: listingKeys.public });
+      queryClient.invalidateQueries({ queryKey: listingKeys.owner });
+    },
+  });
+}
+
+// Admin — approve a draft/needs_changes listing for inspection booking
+export function useApproveListing() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (carId: string) =>
+      apiClient.post<CarDetail>(`/listings/admin/cars/${carId}/approve-listing`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminListingKeys.cars });
+      queryClient.invalidateQueries({ queryKey: listingKeys.owner });
+    },
+  });
+}
+
+// Admin — request changes on a draft listing (note required)
+export function useRequestChanges() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ carId, note }: { carId: string; note: string }) =>
+      apiClient.post<CarDetail>(`/listings/admin/cars/${carId}/status`, {
+        status: "needs_changes",
+        note,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminListingKeys.cars });
       queryClient.invalidateQueries({ queryKey: listingKeys.owner });
     },
   });

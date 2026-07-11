@@ -229,55 +229,201 @@ def notify_auto_rejected(request_obj, reason="Car has been sold"):
     )
 
 
-def notify_listing_submitted(car):
-    """Staff gets notified when owner submits car for review."""
-    staff_users = User.objects.filter(is_staff=True, is_active=True)
-    for staff in staff_users:
-        _create_notification(
-            recipient=staff,
-            notification_type=NotificationType.LISTING_SUBMITTED,
-            title="New listing for review",
-            message=f"{car.owner.first_name} submitted '{car.title}' for review.",
-            data={
-                "car_id": str(car.id),
-                "car_title": car.title,
-                "owner_name": f"{car.owner.first_name} {car.owner.last_name}",
-            },
-        )
-
-
-def notify_listing_approved(car):
-    """Owner gets notified when staff approves their listing."""
-    _create_notification(
-        recipient=car.owner,
-        notification_type=NotificationType.LISTING_APPROVED,
-        title="Listing published",
-        message=f"Your listing '{car.title}' has been approved and is now live!",
-        data={"car_id": str(car.id), "car_title": car.title},
-    )
-
-
-def notify_listing_rejected(car):
+def notify_listing_suspended(car):
     """Owner gets notified when staff suspends their listing."""
     _create_notification(
         recipient=car.owner,
-        notification_type=NotificationType.LISTING_REJECTED,
+        notification_type=NotificationType.LISTING_SUSPENDED,
         title="Listing suspended",
         message=f"Your listing '{car.title}' has been suspended by admin.",
         data={"car_id": str(car.id), "car_title": car.title},
     )
 
 
-def notify_listing_needs_changes(car):
-    """Owner gets notified when staff requests changes."""
+def notify_listing_submitted(car, resubmitted=False):
+    """All staff get notified when a listing enters the review queue —
+    either a brand-new listing or one resubmitted after changes."""
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    title = "Listing resubmitted for review" if resubmitted else "New listing awaiting review"
+    message = (
+        f"The owner of {car.title} has made the requested changes — ready for re-review."
+        if resubmitted
+        else f"A new listing '{car.title}' is awaiting review."
+    )
+    for staff in staff_users:
+        _create_notification(
+            recipient=staff,
+            notification_type=NotificationType.LISTING_SUBMITTED,
+            title=title,
+            message=message,
+            data={"car_id": str(car.id), "car_title": car.title},
+        )
+
+
+def notify_changes_requested(car):
+    """Owner gets notified when staff requests changes to their listing."""
     _create_notification(
         recipient=car.owner,
-        notification_type=NotificationType.LISTING_NEEDS_CHANGES,
-        title="Changes requested on listing",
-        message=f"Admin has requested changes to '{car.title}': {car.admin_note}",
+        notification_type=NotificationType.CHANGES_REQUESTED,
+        title="Changes requested on your listing",
+        message=(
+            f"Our team reviewed '{car.title}' and requested changes"
+            + (f": {car.admin_note}" if car.admin_note else ".")
+        ),
+        data={"car_id": str(car.id), "car_title": car.title},
+    )
+
+
+def notify_listing_approved(car):
+    """Owner gets notified when staff approves their listing for inspection."""
+    _create_notification(
+        recipient=car.owner,
+        notification_type=NotificationType.LISTING_APPROVED,
+        title="Listing approved",
+        message=(
+            f"Your listing '{car.title}' has been approved — "
+            "you can now book an inspection."
+        ),
+        data={"car_id": str(car.id), "car_title": car.title},
+    )
+
+
+# ── Inspection notifications ──
+
+
+def notify_inspection_booked(booking):
+    """All staff get notified when owner books an inspection."""
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    for staff in staff_users:
+        _create_notification(
+            recipient=staff,
+            notification_type=NotificationType.INSPECTION_BOOKED,
+            title="New inspection booking",
+            message=f"{booking.booked_by.first_name} {booking.booked_by.last_name} booked an inspection for {booking.car.title} on {booking.slot.date.strftime('%b %d')}, {booking.slot.start_time.strftime('%I:%M %p')}",
+            data={
+                "booking_id": str(booking.id),
+                "car_id": str(booking.car_id),
+                "car_title": booking.car.title,
+                "owner_name": f"{booking.booked_by.first_name} {booking.booked_by.last_name}",
+            },
+        )
+
+
+def notify_inspection_started(booking):
+    """Owner gets notified when staff begins the physical inspection."""
+    _create_notification(
+        recipient=booking.booked_by,
+        notification_type=NotificationType.INSPECTION_STARTED,
+        title="Inspection in progress",
+        message=f"The physical inspection of your {booking.car.title} has started.",
         data={
-            "car_id": str(car.id),
-            "car_title": car.title,
-            "admin_note": car.admin_note,
+            "booking_id": str(booking.id),
+            "car_id": str(booking.car_id),
+            "car_title": booking.car.title,
         },
     )
+
+
+def notify_needs_clearance(booking):
+    """Owner gets notified when the inspection needs further clearance."""
+    _create_notification(
+        recipient=booking.booked_by,
+        notification_type=NotificationType.NEEDS_CLEARANCE,
+        title="Inspection needs further clearance",
+        message=(
+            f"Your {booking.car.title} needs further clearance before it can be "
+            "published. Check your listing for what's required."
+        ),
+        data={
+            "booking_id": str(booking.id),
+            "car_id": str(booking.car_id),
+            "car_title": booking.car.title,
+            "staff_note": booking.staff_note,
+        },
+    )
+
+
+def notify_clearance_response(booking, response_message=""):
+    """All staff get notified when an owner responds to a clearance request."""
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    detail = f': "{response_message}"' if response_message else " — ready for re-review."
+    for staff in staff_users:
+        _create_notification(
+            recipient=staff,
+            notification_type=NotificationType.CLEARANCE_RESPONSE,
+            title="Clearance response received",
+            message=(
+                f"The owner of {booking.car.title} responded{detail}"
+            ),
+            data={
+                "booking_id": str(booking.id),
+                "car_id": str(booking.car_id),
+                "car_title": booking.car.title,
+            },
+        )
+
+
+def notify_inspection_passed(booking):
+    """Owner gets notified when car passes inspection — listing is now live."""
+    _create_notification(
+        recipient=booking.booked_by,
+        notification_type=NotificationType.INSPECTION_PASSED,
+        title="Inspection passed — listing is live!",
+        message=f"Your {booking.car.title} passed inspection and is now visible to customers.",
+        data={
+            "booking_id": str(booking.id),
+            "car_id": str(booking.car_id),
+            "car_title": booking.car.title,
+        },
+    )
+
+
+def notify_inspection_failed(booking):
+    """Owner gets notified when car fails physical inspection."""
+    _create_notification(
+        recipient=booking.booked_by,
+        notification_type=NotificationType.INSPECTION_FAILED,
+        title="Inspection did not pass",
+        message=f"Your {booking.car.title} did not pass inspection. See staff feedback for next steps.",
+        data={
+            "booking_id": str(booking.id),
+            "car_id": str(booking.car_id),
+            "car_title": booking.car.title,
+            "staff_note": booking.staff_note,
+        },
+    )
+
+
+def notify_inspection_no_show(booking):
+    """Owner gets notified when staff marks them as no-show."""
+    remaining = 2 - booking.reschedule_count
+    _create_notification(
+        recipient=booking.booked_by,
+        notification_type=NotificationType.INSPECTION_NO_SHOW,
+        title="Missed inspection appointment",
+        message=f"You missed your inspection for {booking.car.title}. You can rebook ({remaining} reschedule{'s' if remaining != 1 else ''} remaining).",
+        data={
+            "booking_id": str(booking.id),
+            "car_id": str(booking.car_id),
+            "car_title": booking.car.title,
+            "reschedules_remaining": str(remaining),
+        },
+    )
+
+
+def notify_inspection_rescheduled(booking):
+    """All staff get notified when owner reschedules inspection."""
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    for staff in staff_users:
+        _create_notification(
+            recipient=staff,
+            notification_type=NotificationType.INSPECTION_RESCHEDULED,
+            title="Inspection rescheduled",
+            message=f"{booking.booked_by.first_name} {booking.booked_by.last_name} rescheduled inspection for {booking.car.title} to {booking.slot.date.strftime('%b %d')}, {booking.slot.start_time.strftime('%I:%M %p')}",
+            data={
+                "booking_id": str(booking.id),
+                "car_id": str(booking.car_id),
+                "car_title": booking.car.title,
+                "owner_name": f"{booking.booked_by.first_name} {booking.booked_by.last_name}",
+            },
+        )

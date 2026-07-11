@@ -3,9 +3,11 @@ from io import BytesIO
 from pathlib import Path
 
 import uuid as uuid_lib
+from PIL import Image, ImageOps
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
 from django.db.models import (
+    Count,
     DateField,
     Exists,
     ExpressionWrapper,
@@ -17,7 +19,7 @@ from django.db.models import (
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
-from PIL import Image, ImageOps
+
 
 from rest_framework import status
 from rest_framework.views import APIView
@@ -30,6 +32,7 @@ from .models import (
     ACTIVE_REQUEST_STATUSES,
     Car,
     CarImage,
+    CarImageType,
     CarStatus,
     ListingType,
     Request,
@@ -60,16 +63,41 @@ from apps.notifications.service import (
     notify_rental_active,
     notify_rental_completed,
     notify_auto_rejected,
-    notify_listing_submitted,
+    notify_listing_suspended,
     notify_listing_approved,
-    notify_listing_rejected,
-    notify_listing_needs_changes,
+    notify_listing_submitted,
+    notify_changes_requested,
 )
+from apps.inspections.models import (
+    ACTIVE_BOOKING_STATUSES,
+    ActorRole,
+    BookingStatus,
+    InspectionBooking,
+)
+from apps.inspections.serializers import CarStatusHistorySerializer
+from apps.inspections.services import record_status_change
 
 
-MAX_CAR_IMAGES_PER_REQUEST = 10
-MAX_CAR_IMAGES_PER_CAR = 20
+REQUIRED_CAR_IMAGE_TYPES = [
+    CarImageType.FRONT,
+    CarImageType.BACK,
+    CarImageType.LEFT_SIDE,
+    CarImageType.RIGHT_SIDE,
+]
+OPTIONAL_CAR_IMAGE_TYPES = [CarImageType.INTERIOR]
+CAR_IMAGE_TYPES = REQUIRED_CAR_IMAGE_TYPES + OPTIONAL_CAR_IMAGE_TYPES
+MAX_CAR_IMAGES_PER_REQUEST = len(CAR_IMAGE_TYPES)
+MAX_CAR_IMAGES_PER_CAR = len(CAR_IMAGE_TYPES)
 MAX_CAR_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+# Editable: pre-approval states, the clearance loop, and failed inspections
+# (owner fixes the issues and resubmits for review). inspection_no_show
+# rebooks without editing.
+EDITABLE_CAR_STATUSES = [
+    CarStatus.DRAFT,
+    CarStatus.NEEDS_CHANGES,
+    CarStatus.NEEDS_CLEARANCE,
+    CarStatus.INSPECTION_REJECTED,
+]
 REQUEST_APPROVAL_BLOCKING_STATUSES = [
     RequestStatus.APPROVED,
     RequestStatus.PAYMENT_SUBMITTED,
@@ -115,17 +143,27 @@ def availability_annotations():
         .annotate(end_date=request_end_date_expression())
         .filter(end_date__gt=today)
     )
-    reserved_future_rental = Request.objects.filter(
-        car_id=OuterRef("id"),
-        request_type=ListingType.RENT,
-        status__in=RESERVED_RENTAL_STATUSES,
-        start_date__gt=today,
-    )
+    # No reserved status for rentals — they show as "available" with
+    # blocked dates on the calendar. Only buy requests reserve the car.
+    reserved_future_rental = Request.objects.none()
     return {
         "_has_buy_in_progress": Exists(buy_in_progress),
         "_has_active_current_rental": Exists(active_current_rental),
         "_has_reserved_future_rental": Exists(reserved_future_rental),
     }
+
+
+def sold_annotation():
+    """True when the car was genuinely sold (a buy request completed).
+    Archived-without-sale means the owner withdrew the listing — those
+    cars must not appear publicly as 'sold'."""
+    return Exists(
+        Request.objects.filter(
+            car_id=OuterRef("id"),
+            request_type=ListingType.BUY,
+            status=RequestStatus.COMPLETED,
+        )
+    )
 
 
 def car_has_active_requests(car_id):
@@ -219,7 +257,9 @@ def find_request_approval_conflict(req):
         exclude_request_id=req.id,
     )
     if rent_conflict:
-        return "This car already has an approved, paid, or active rental for those dates."
+        return (
+            "This car already has an approved, paid, or active rental for those dates."
+        )
 
     return None
 
@@ -289,6 +329,12 @@ class MyCarListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
             car = serializer.save(owner=request.user)
+            schedule_notification(
+                notify_listing_submitted,
+                lambda car_id=car.id: Car.objects.select_related("owner").get(
+                    id=car_id
+                ),
+            )
 
         car = (
             Car.objects.select_related("owner__owner_profile")
@@ -331,20 +377,14 @@ class MyCarDetailView(APIView):
                     {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
                 )
 
-            if car.status == CarStatus.ARCHIVED:
+            if car.status not in EDITABLE_CAR_STATUSES:
                 return Response(
-                    {"detail": "Archived cars cannot be updated."},
-                    status=status.HTTP_400_BAD_REQUEST,
+                    {"detail": "Car details cannot be edited in this status."},
+                    status=status.HTTP_403_FORBIDDEN,
                 )
-            was_published = car.status == CarStatus.PUBLISHED
             serializer = CarCreateSerializer(car, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             car = serializer.save()
-
-            if was_published:
-                car.status = CarStatus.PENDING_REVIEW
-                car.published_at = None
-                car.save(update_fields=["status", "published_at", "updated_at"])
 
         car.refresh_from_db()
         car = self._get_car(car_id, request.user)
@@ -362,8 +402,35 @@ class MyCarDetailView(APIView):
             if car_has_active_requests(car.id):
                 return active_request_archive_response()
 
-            car.status = CarStatus.ARCHIVED
-            car.save(update_fields=["status", "updated_at"])
+            # Archiving mid-inspection would orphan the booking (it keeps
+            # consuming slot capacity and sits in the staff queue forever).
+            if car.status == CarStatus.INSPECTION_PENDING:
+                return Response(
+                    {
+                        "detail": (
+                            "Cancel your inspection booking before archiving "
+                            "this listing."
+                        )
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+            if car.status == CarStatus.INSPECTION_IN_PROGRESS:
+                return Response(
+                    {
+                        "detail": (
+                            "An inspection is in progress — wait for the "
+                            "result before archiving this listing."
+                        )
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            record_status_change(
+                car,
+                CarStatus.ARCHIVED,
+                actor=request.user,
+                actor_role=ActorRole.OWNER,
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -372,21 +439,31 @@ class CarImageUploadView(APIView):
     parser_classes = [MultiPartParser]
 
     def post(self, request, car_id):
-        files = request.FILES.getlist("images")
-        if not files:
+        # Check car ownership and edit lockdown before file validation so
+        # we return 403/404 even when no files are sent.
+        try:
+            with transaction.atomic():
+                car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
+                if car.status not in EDITABLE_CAR_STATUSES:
+                    return Response(
+                        {"detail": "Car images cannot be uploaded in this status."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+        except Car.DoesNotExist:
+            return Response(
+                {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        upload_data = {
+            image_type: request.FILES.get(image_type)
+            for image_type in CAR_IMAGE_TYPES
+            if request.FILES.get(image_type) is not None
+        }
+        files = list(upload_data.values())
+        if not upload_data:
             return Response(
                 {
                     "detail": "No images provided",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if len(files) > MAX_CAR_IMAGES_PER_REQUEST:
-            return Response(
-                {
-                    "detail": (
-                        f"You can upload up to {MAX_CAR_IMAGES_PER_REQUEST} "
-                        "images at a time."
-                    )
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -406,34 +483,44 @@ class CarImageUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        upload_serializer = CarImageUploadSerializer(data={"images": files})
+        upload_serializer = CarImageUploadSerializer(data=upload_data)
         upload_serializer.is_valid(raise_exception=True)
-        files = upload_serializer.validated_data["images"]
+        uploads_by_type = upload_serializer.validated_data
 
         try:
             with transaction.atomic():
                 car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
-                if car.status == CarStatus.ARCHIVED:
-                    return Response(
-                        {"detail": "Archived cars cannot receive new images."},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
 
-                existing_image_count = car.images.count()
-                if existing_image_count + len(files) > MAX_CAR_IMAGES_PER_CAR:
+                existing_types = set(
+                    car.images.exclude(image_type="").values_list(
+                        "image_type", flat=True
+                    )
+                )
+                missing_required_types = [
+                    image_type
+                    for image_type in REQUIRED_CAR_IMAGE_TYPES
+                    if image_type not in uploads_by_type
+                    and image_type not in existing_types
+                ]
+                if missing_required_types:
                     return Response(
                         {
                             "detail": (
-                                f"A car can have up to {MAX_CAR_IMAGES_PER_CAR} images."
-                            )
+                                "Please upload front, back, left side, and right side "
+                                "photos before continuing."
+                            ),
+                            "missing_types": missing_required_types,
                         },
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-                has_existing_images = existing_image_count > 0
                 created_images = []
 
-                for i, file in enumerate(files):
+                for image_type in CAR_IMAGE_TYPES:
+                    file = uploads_by_type.get(image_type)
+                    if file is None:
+                        continue
+
                     optimized_file = optimize_car_image(
                         file,
                         MAX_OPTIMIZED_CAR_IMAGE_SIZE,
@@ -444,18 +531,18 @@ class CarImageUploadView(APIView):
                         suffix="-thumb",
                         quality=CAR_IMAGE_THUMBNAIL_WEBP_QUALITY,
                     )
+                    car.images.filter(image_type=image_type).delete()
+                    if image_type == CarImageType.FRONT:
+                        car.images.filter(is_primary=True).update(is_primary=False)
                     image = CarImage.objects.create(
                         car=car,
+                        image_type=image_type,
                         image=optimized_file,
                         thumbnail=thumbnail_file,
-                        is_primary=(not has_existing_images and i == 0),
+                        is_primary=(image_type == CarImageType.FRONT),
                     )
                     created_images.append(image)
 
-                if car.status == CarStatus.PUBLISHED:
-                    car.status = CarStatus.PENDING_REVIEW
-                    car.published_at = None
-                    car.save(update_fields=["status", "published_at", "updated_at"])
         except Car.DoesNotExist:
             return Response(
                 {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
@@ -474,6 +561,9 @@ class PublicCarListView(APIView):
     def get(self, request):
         cars = (
             Car.objects.filter(status__in=[CarStatus.PUBLISHED, CarStatus.ARCHIVED])
+            .annotate(_is_sold=sold_annotation())
+            # Archived cars appear publicly only when actually sold
+            .filter(Q(status=CarStatus.PUBLISHED) | Q(_is_sold=True))
             .select_related("owner__owner_profile")
             .prefetch_related("images")
             .annotate(**availability_annotations())
@@ -481,7 +571,10 @@ class PublicCarListView(APIView):
 
         # Basic filters
         listing_type = request.query_params.get("listing_type")
-        if listing_type:
+        if listing_type in (ListingType.RENT, ListingType.BUY):
+            # "both" listings serve either mode
+            cars = cars.filter(listing_type__in=[listing_type, ListingType.BOTH])
+        elif listing_type:
             cars = cars.filter(listing_type=listing_type)
 
         state = request.query_params.get("state")
@@ -519,6 +612,7 @@ class PublicCarListView(APIView):
 @method_decorator(cache_page(60 * 5), name="dispatch")
 class PublicCarFilterOptionsView(APIView):
     """Returns available filter options (states, cities, body types, brands) from published cars."""
+
     permission_classes = [AllowAny]
 
     def get(self, request):
@@ -564,7 +658,10 @@ class PublicCarDetailView(APIView):
             car = (
                 Car.objects.select_related("owner__owner_profile")
                 .prefetch_related("images", "features", booked_prefetch)
-                .annotate(**availability_annotations())
+                .annotate(
+                    _is_sold=sold_annotation(), **availability_annotations()
+                )
+                .filter(Q(status=CarStatus.PUBLISHED) | Q(_is_sold=True))
                 .get(
                     id=car_id,
                     status__in=[CarStatus.PUBLISHED, CarStatus.ARCHIVED],
@@ -577,16 +674,38 @@ class PublicCarDetailView(APIView):
         return Response(CarDetailSerializer(car, context={"request": request}).data)
 
 
+class MyCarHistoryView(APIView):
+    """Owner-facing status timeline. The serializer excludes staff identity —
+    owners see roles and notes, never who acted."""
+
+    permission_classes = [IsOwner]
+
+    def get(self, request, car_id):
+        try:
+            car = Car.objects.get(id=car_id, owner=request.user)
+        except Car.DoesNotExist:
+            return Response(
+                {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        history = car.status_history.all()
+        return Response(CarStatusHistorySerializer(history, many=True).data)
+
+
 class MyCarStatusView(APIView):
     permission_classes = [IsOwner]
 
     OWNER_TRANSITIONS = {
-        "draft": ["pending_review"],
-        "pending_review": [],  # Only admin can transition from here
-        "needs_changes": ["pending_review"],  # Owner fixes and resubmits
+        "draft": [],  # Admin approves listing → listing_approved
+        "listing_approved": [],  # Owner books via inspections app → inspection_pending
+        "inspection_pending": [],  # Only staff can transition
+        "inspection_in_progress": [],  # Only staff can transition
+        "needs_clearance": [],  # Owner addresses issues; staff transitions
+        "inspection_rejected": ["draft"],  # Owner fixes issues and resubmits
+        "inspection_no_show": [],  # Owner rebooks via inspections app
+        "needs_changes": ["draft"],  # Owner resubmits for admin review
         "published": ["paused", "archived"],
         "paused": ["published", "archived"],
-        "suspended": [],  # Only admin can transition from here
+        "suspended": [],  # Only staff can transition
         "archived": [],  # Terminal
     }
 
@@ -618,17 +737,23 @@ class MyCarStatusView(APIView):
             if new_status == CarStatus.ARCHIVED and car_has_active_requests(car.id):
                 return active_request_archive_response()
 
-            car.status = new_status
+            extra = []
             if new_status == CarStatus.PUBLISHED and not car.published_at:
                 car.published_at = timezone.now()
-            if new_status == CarStatus.PENDING_REVIEW:
-                car.admin_note = ""  # Clear admin note on resubmit
-            car.save(
-                update_fields=["status", "admin_note", "published_at", "updated_at"]
+                extra.append("published_at")
+            record_status_change(
+                car,
+                new_status,
+                actor=request.user,
+                actor_role=ActorRole.OWNER,
+                extra_update_fields=extra,
             )
-            if new_status == CarStatus.PENDING_REVIEW:
+            if new_status == CarStatus.DRAFT:
+                # needs_changes → draft is a resubmission — tell staff
                 schedule_notification(
-                    notify_listing_submitted,
+                    lambda resubmitted_car: notify_listing_submitted(
+                        resubmitted_car, resubmitted=True
+                    ),
                     lambda car_id=car.id: Car.objects.select_related("owner").get(
                         id=car_id
                     ),
@@ -680,9 +805,7 @@ class CustomerRequestListCreateView(APIView):
 
         try:
             with transaction.atomic():
-                requested_car = Car.objects.select_for_update().get(
-                    id=requested_car.id
-                )
+                requested_car = Car.objects.select_for_update().get(id=requested_car.id)
                 serializer.validated_data["car"] = requested_car
 
                 duplicate_exists = Request.objects.filter(
@@ -1004,10 +1127,8 @@ class AdminCarStatusView(APIView):
     permission_classes = [IsStaff]
 
     ADMIN_TRANSITIONS = {
-        ("pending_review", "published"),
-        ("pending_review", "suspended"),
-        ("pending_review", "needs_changes"),
-        ("needs_changes", "published"),
+        ("draft", "needs_changes"),
+        ("inspection_pending", "suspended"),
         ("needs_changes", "suspended"),
         ("published", "suspended"),
         ("suspended", "published"),
@@ -1015,16 +1136,9 @@ class AdminCarStatusView(APIView):
 
     def post(self, request, car_id):
         new_status = request.data.get("status")
-        note = request.data.get("note", "")
         if not new_status:
             return Response(
                 {"detail": "Status is required."}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if new_status == "needs_changes" and not note:
-            return Response(
-                {"detail": "A note is required when requesting changes."},
-                status=status.HTTP_400_BAD_REQUEST,
             )
 
         with transaction.atomic():
@@ -1044,19 +1158,55 @@ class AdminCarStatusView(APIView):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            car.status = new_status
+
+            # Reinstating restores the pre-suspension status — publishing
+            # unconditionally would let a never-inspected car go live.
+            if car.status == CarStatus.SUSPENDED:
+                last_suspension = (
+                    car.status_history.filter(to_status=CarStatus.SUSPENDED)
+                    .order_by("-created_at")
+                    .first()
+                )
+                prior = last_suspension.from_status if last_suspension else ""
+                if prior == CarStatus.NEEDS_CHANGES:
+                    new_status = CarStatus.NEEDS_CHANGES
+                elif prior == CarStatus.INSPECTION_PENDING:
+                    # The booking was cancelled on suspension — back to bookable
+                    new_status = CarStatus.LISTING_APPROVED
+                # anything else (published or unknown) → published
+
+            # Suspending mid-booking would strand a PENDING booking that
+            # keeps consuming slot capacity — release it.
+            if (
+                new_status == CarStatus.SUSPENDED
+                and car.status == CarStatus.INSPECTION_PENDING
+            ):
+                InspectionBooking.objects.filter(
+                    car=car, status__in=ACTIVE_BOOKING_STATUSES
+                ).update(status=BookingStatus.CANCELLED)
+
+            note = request.data.get("note", "")
+            extra = ["admin_note"]
+            if note:
+                car.admin_note = note
+            elif new_status == CarStatus.NEEDS_CHANGES:
+                # Never let a stale note leak into the owner notification
+                car.admin_note = ""
             if new_status == CarStatus.PUBLISHED:
                 car.published_at = timezone.now()
                 car.admin_note = ""  # Clear note on publish
-            elif new_status == CarStatus.NEEDS_CHANGES:
-                car.admin_note = note
-            car.save(
-                update_fields=["status", "admin_note", "updated_at", "published_at"]
+                extra.append("published_at")
+            record_status_change(
+                car,
+                new_status,
+                actor=request.user,
+                actor_role=ActorRole.STAFF,
+                note=note,
+                extra_update_fields=extra,
             )
             notification_map = {
-                CarStatus.PUBLISHED: notify_listing_approved,
-                CarStatus.SUSPENDED: notify_listing_rejected,
-                CarStatus.NEEDS_CHANGES: notify_listing_needs_changes,
+                CarStatus.SUSPENDED: notify_listing_suspended,
+                CarStatus.NEEDS_CHANGES: notify_changes_requested,
             }
             notify_func = notification_map.get(new_status)
             if notify_func:
@@ -1363,3 +1513,70 @@ class StaffConfirmPaymentView(APIView):
         return Response(
             RequestDetailSerializer(detail, context={"request": request}).data,
         )
+
+
+class AdminCarHistoryView(APIView):
+    """Full status timeline for staff — includes owner clearance responses
+    recorded as same-status annotation rows."""
+
+    permission_classes = [IsStaff]
+
+    def get(self, request, car_id):
+        try:
+            car = Car.objects.get(id=car_id)
+        except Car.DoesNotExist:
+            return Response(
+                {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        history = car.status_history.all()
+        return Response(CarStatusHistorySerializer(history, many=True).data)
+
+
+class AdminCarStatusCountsView(APIView):
+    """Aggregate car counts per status — the approvals dashboard KPIs.
+    Counting a paginated list page undercounts; this asks the DB directly."""
+
+    permission_classes = [IsStaff]
+
+    def get(self, request):
+        rows = Car.objects.values("status").annotate(n=Count("id"))
+        return Response({row["status"]: row["n"] for row in rows})
+
+
+class AdminApproveListingView(APIView):
+    permission_classes = [IsStaff]
+
+    APPROVABLE_STATUSES = [CarStatus.DRAFT, CarStatus.NEEDS_CHANGES]
+
+    def post(self, request, car_id):
+        with transaction.atomic():
+            try:
+                car = Car.objects.select_for_update().get(id=car_id)
+            except Car.DoesNotExist:
+                return Response(
+                    {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
+                )
+
+            if car.status not in self.APPROVABLE_STATUSES:
+                return Response(
+                    {"detail": (f"Cannot approve a listing in '{car.status}' status.")},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            record_status_change(
+                car,
+                CarStatus.LISTING_APPROVED,
+                actor=request.user,
+                actor_role=ActorRole.STAFF,
+            )
+
+        schedule_notification(
+            notify_listing_approved,
+            lambda car_id=car.id: Car.objects.select_related("owner").get(id=car_id),
+        )
+        car = (
+            Car.objects.select_related("owner__owner_profile")
+            .prefetch_related("images", "features")
+            .get(id=car_id)
+        )
+        return Response(CarDetailSerializer(car, context={"request": request}).data)

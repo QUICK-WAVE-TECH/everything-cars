@@ -38,12 +38,25 @@ class FuelType(models.TextChoices):
 
 class CarStatus(models.TextChoices):
     DRAFT = "draft", "Draft"
-    PENDING_REVIEW = "pending_review", "Pending Review"
+    INSPECTION_PENDING = "inspection_pending", "Inspection Pending"
+    LISTING_APPROVED = "listing_approved", "Listing Approved"
+    INSPECTION_IN_PROGRESS = "inspection_in_progress", "Inspection In Progress"
+    NEEDS_CLEARANCE = "needs_clearance", "Needs Clearance"
+    INSPECTION_REJECTED = "inspection_rejected", "Inspection Rejected"
+    INSPECTION_NO_SHOW = "inspection_no_show", "Inspection No Show"
     NEEDS_CHANGES = "needs_changes", "Needs Changes"
     PUBLISHED = "published", "Published"
     PAUSED = "paused", "Paused"
     SUSPENDED = "suspended", "Suspended"
     ARCHIVED = "archived", "Archived"
+
+
+class CarImageType(models.TextChoices):
+    FRONT = "front", "Front"
+    BACK = "back", "Back"
+    LEFT_SIDE = "left_side", "Left Side"
+    RIGHT_SIDE = "right_side", "Right Side"
+    INTERIOR = "interior", "Interior"
 
 
 class Currency(models.TextChoices):
@@ -124,9 +137,12 @@ class Car(models.Model):
     description = models.TextField(blank=True)
 
     status = models.CharField(
-        max_length=20, choices=CarStatus.choices, default=CarStatus.DRAFT, db_index=True
+        max_length=30, choices=CarStatus.choices, default=CarStatus.DRAFT, db_index=True
     )
     admin_note = models.TextField(blank=True)
+    tracking_id = models.CharField(
+        max_length=20, unique=True, null=True, blank=True, db_index=True
+    )
     published_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -154,6 +170,12 @@ def car_image_thumbnail_path(instance, filename):
 class CarImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     car = models.ForeignKey(Car, on_delete=models.CASCADE, related_name="images")
+    image_type = models.CharField(
+        max_length=20,
+        choices=CarImageType.choices,
+        blank=True,
+        default="",
+    )
     image = models.ImageField(upload_to=car_image_path)
     thumbnail = models.ImageField(
         upload_to=car_image_thumbnail_path,
@@ -169,7 +191,12 @@ class CarImage(models.Model):
                 fields=["car"],
                 condition=models.Q(is_primary=True),
                 name="one_primary_image_per_car",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["car", "image_type"],
+                condition=~models.Q(image_type=""),
+                name="one_image_per_type_per_car",
+            ),
         ]
 
 
