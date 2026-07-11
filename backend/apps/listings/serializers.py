@@ -18,11 +18,27 @@ from .models import (
 
 
 class CarImageSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+    thumbnail = serializers.SerializerMethodField()
 
     class Meta:
         model = CarImage
-        fields = ["id", "image", "thumbnail", "is_primary", "created_at"]
+        fields = ["id", "image", "thumbnail", "image_type", "is_primary", "created_at"]
         read_only_fields = fields
+
+    def _absolute_file_url(self, file):
+        if not file:
+            return None
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(file.url)
+        return file.url
+
+    def get_image(self, obj):
+        return self._absolute_file_url(obj.image)
+
+    def get_thumbnail(self, obj):
+        return self._absolute_file_url(obj.thumbnail)
 
 
 class ListingFeatureSerializer(serializers.ModelSerializer):
@@ -98,7 +114,15 @@ class CarListSerializer(serializers.ModelSerializer):
 
     def get_availability_status(self, obj):
         if obj.status == CarStatus.ARCHIVED:
-            return "sold"
+            # "Sold" only when a purchase actually completed; an owner can
+            # archive (withdraw) a listing that was never sold.
+            is_sold = getattr(obj, "_is_sold", None)
+            if is_sold is None:
+                is_sold = obj.requests.filter(
+                    request_type=ListingType.BUY,
+                    status=RequestStatus.COMPLETED,
+                ).exists()
+            return "sold" if is_sold else "archived"
 
         has_buy_in_progress = getattr(obj, "_has_buy_in_progress", None)
         has_active_current_rental = getattr(obj, "_has_active_current_rental", None)
@@ -141,6 +165,7 @@ class CarListSerializer(serializers.ModelSerializer):
 
 class CarDetailSerializer(serializers.ModelSerializer):
     owner = CarOwnerSerializer(read_only=True)
+    primary_image = serializers.SerializerMethodField()
     images = CarImageSerializer(many=True, read_only=True)
     features = ListingFeatureSerializer(many=True, read_only=True)
     availability_status = serializers.SerializerMethodField()
@@ -170,17 +195,22 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "city",
             "description",
             "status",
+            "tracking_id",
             "admin_note",
             "published_at",
             "created_at",
             "updated_at",
             "owner",
+            "primary_image",
             "images",
             "features",
             "availability_status",
             "booked_periods",
             "available_from",
         ]
+
+    def get_primary_image(self, obj):
+        return CarListSerializer(context=self.context).get_primary_image(obj)
 
     def _get_booked_requests(self, obj):
         """Get booked requests — use prefetched if available."""
@@ -199,7 +229,15 @@ class CarDetailSerializer(serializers.ModelSerializer):
 
     def get_availability_status(self, obj):
         if obj.status == CarStatus.ARCHIVED:
-            return "sold"
+            # "Sold" only when a purchase actually completed; an owner can
+            # archive (withdraw) a listing that was never sold.
+            is_sold = getattr(obj, "_is_sold", None)
+            if is_sold is None:
+                is_sold = obj.requests.filter(
+                    request_type=ListingType.BUY,
+                    status=RequestStatus.COMPLETED,
+                ).exists()
+            return "sold" if is_sold else "archived"
 
         has_buy_in_progress = getattr(obj, "_has_buy_in_progress", None)
         has_active_current_rental = getattr(obj, "_has_active_current_rental", None)
@@ -370,10 +408,11 @@ class CarCreateSerializer(serializers.ModelSerializer):
 
 
 class CarImageUploadSerializer(serializers.Serializer):
-    images = serializers.ListField(
-        child=serializers.ImageField(),
-        allow_empty=False,
-    )
+    front = serializers.ImageField(required=False)
+    back = serializers.ImageField(required=False)
+    left_side = serializers.ImageField(required=False)
+    right_side = serializers.ImageField(required=False)
+    interior = serializers.ImageField(required=False)
 
 
 # ---------- Request serializers ----------

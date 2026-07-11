@@ -1,3 +1,12 @@
+export type CarImageType =
+  | "front"
+  | "back"
+  | "left_side"
+  | "right_side"
+  | "interior";
+
+export type CarImageFiles = Partial<Record<CarImageType, File>>;
+
 export type CarOwner = {
   id: string;
   first_name: string;
@@ -13,6 +22,7 @@ export type CarImage = {
   id: string;
   image: string;
   thumbnail: string | null;
+  image_type: CarImageType | "";
   is_primary: boolean;
   created_at: string;
 };
@@ -44,7 +54,7 @@ export type CarListItem = {
   state: string;
   city: string;
   status: string;
-  availability_status: "available" | "rented" | "reserved" | "sold";
+  availability_status: "available" | "rented" | "reserved" | "sold" | "archived";
   owner: CarOwner;
   primary_image: string | null;
   created_at: string;
@@ -58,6 +68,7 @@ export type CarDetail = CarListItem & {
   mileage: number | null;
   country: string;
   description: string;
+  tracking_id: string | null;
   admin_note: string;
   published_at: string | null;
   updated_at: string;

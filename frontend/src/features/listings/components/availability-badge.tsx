@@ -1,7 +1,7 @@
 "use client";
 
 type AvailabilityBadgeProps = {
-  status: "available" | "rented" | "reserved" | "sold";
+  status: "available" | "rented" | "reserved" | "sold" | "archived";
   availableFrom?: string | null;
 };
 
@@ -22,6 +22,7 @@ const BADGE_CONFIG: Record<
   rented: { dot: "#9a7400", fg: "#9a7400", bg: "var(--brc-warning-bg)" },
   reserved: { dot: "var(--brc-accent)", fg: "var(--brc-accent)", bg: "var(--brc-accent-bg)" },
   sold: { dot: "var(--brc-text-muted)", fg: "var(--brc-text-muted)", bg: "var(--brc-bg-subtle)", border: "1px solid var(--brc-border)" },
+  archived: { dot: "var(--brc-text-muted)", fg: "var(--brc-text-muted)", bg: "var(--brc-bg-subtle)", border: "1px solid var(--brc-border)" },
 };
 
 const BADGE_LABELS: Record<AvailabilityBadgeProps["status"], string> = {
@@ -29,6 +30,7 @@ const BADGE_LABELS: Record<AvailabilityBadgeProps["status"], string> = {
   rented: "Currently Rented",
   reserved: "Reserved",
   sold: "Sold",
+  archived: "Archived",
 };
 
 export function AvailabilityBadge({ status, availableFrom }: AvailabilityBadgeProps) {

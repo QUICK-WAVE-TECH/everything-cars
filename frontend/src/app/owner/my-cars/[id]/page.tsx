@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -11,10 +11,13 @@ import {
   ArrowLeftIcon,
   PencilIcon,
   XIcon,
-  UploadIcon,
   Trash2Icon,
   ImageIcon,
   ChevronDownIcon,
+  CalendarCheckIcon,
+  AlertTriangleIcon,
+  Loader2Icon,
+  RotateCcwIcon,
 } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import {
@@ -25,6 +28,7 @@ import {
 import { COUNTRIES } from "@/features/auth/data/countries";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   useMyCarDetail,
@@ -34,12 +38,28 @@ import {
   useCarStatus,
 } from "@/features/listings/api";
 import type { CarDetail } from "@/features/listings/api";
+import type { CarImageFiles } from "@/features/listings/api/types";
+import { CarPhotoSlotsField } from "@/features/listings/components/car-photo-slots-field";
+import { CarStatusTimeline } from "@/features/listings/components/car-status-timeline";
 import {
   createCarSchema,
   type CreateCarFormValues,
   type CreateCarInput,
 } from "@/features/listings/schemas";
 import { ApiError } from "@/lib/api-client";
+import { BookingModal } from "@/features/inspections/components/booking-modal";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  useCancelBooking,
+  useClearanceResponse,
+  useMyBookings,
+} from "@/features/inspections/api/inspections-api";
 
 // ---------- Shared form fields (same as new page) ----------
 
@@ -320,11 +340,47 @@ const STATUS_STYLES: Record<
     dot: "var(--brc-text-muted)",
     label: "Draft",
   },
-  pending_review: {
+  listing_approved: {
+    bg: "var(--brc-success-bg)",
+    fg: "var(--brc-success)",
+    dot: "var(--brc-success)",
+    label: "Approved — Book Inspection",
+  },
+  inspection_pending: {
     bg: "var(--brc-warning-bg)",
     fg: "#9a7400",
     dot: "var(--brc-warning)",
-    label: "In Review",
+    label: "Inspection Pending",
+  },
+  inspection_in_progress: {
+    bg: "var(--brc-accent-bg)",
+    fg: "var(--brc-accent)",
+    dot: "var(--brc-accent)",
+    label: "Inspection In Progress",
+  },
+  needs_clearance: {
+    bg: "var(--brc-warning-bg)",
+    fg: "#9a7400",
+    dot: "var(--brc-warning)",
+    label: "Needs Further Clearance",
+  },
+  inspection_rejected: {
+    bg: "var(--brc-danger-bg)",
+    fg: "var(--brc-danger)",
+    dot: "var(--brc-danger)",
+    label: "Inspection Failed",
+  },
+  inspection_no_show: {
+    bg: "var(--brc-danger-bg)",
+    fg: "var(--brc-danger)",
+    dot: "var(--brc-danger)",
+    label: "No Show",
+  },
+  needs_changes: {
+    bg: "var(--brc-warning-bg)",
+    fg: "#9a7400",
+    dot: "var(--brc-warning)",
+    label: "Needs Changes",
   },
   published: {
     bg: "var(--brc-success-bg)",
@@ -408,11 +464,53 @@ export default function CarDetailPage() {
   const deleteCar = useDeleteCar();
   const uploadImages = useUploadCarImages();
   const carStatus = useCarStatus();
+  const { data: myBookings } = useMyBookings({ car: carId });
+  const clearanceResponse = useClearanceResponse();
+  const cancelBooking = useCancelBooking();
 
   const [editing, setEditing] = useState(false);
-  const [newFiles, setNewFiles] = useState<File[]>([]);
+  const [newFiles, setNewFiles] = useState<CarImageFiles>({});
   const [activeImage, setActiveImage] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const [reschedulingPending, setReschedulingPending] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [clearanceMessage, setClearanceMessage] = useState("");
+
+  // Most recent pending/completed booking for this car — used to send a
+  // clearance response when staff has flagged the car as needing further
+  // clearance.
+  const clearanceBooking = useMemo(() => {
+    const results = myBookings?.results ?? [];
+    return results
+      .filter(
+        (b) =>
+          b.car_id === carId && (b.status === "pending" || b.status === "completed"),
+      )
+      .sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )[0];
+  }, [myBookings, carId]);
+
+  // Most recent no-show booking — rebooking goes through the reschedule
+  // endpoint so the attempt counts toward the center's cap.
+  const noShowBooking = useMemo(() => {
+    const results = myBookings?.results ?? [];
+    return results
+      .filter((b) => b.car_id === carId && b.status === "no_show")
+      .sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )[0];
+  }, [myBookings, carId]);
+
+  // The active booking — target for owner cancel / reschedule actions.
+  const pendingBooking = useMemo(() => {
+    const results = myBookings?.results ?? [];
+    return results
+      .filter((b) => b.car_id === carId && b.status === "pending")
+      .sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )[0];
+  }, [myBookings, carId]);
 
   const form = useForm<CreateCarFormValues, unknown, CreateCarInput>({
     resolver: zodResolver(createCarSchema),
@@ -443,7 +541,7 @@ export default function CarDetailPage() {
 
   function cancelEditing() {
     if (car) form.reset(populateForm(car));
-    setNewFiles([]);
+    setNewFiles({});
     setEditing(false);
   }
 
@@ -461,9 +559,9 @@ export default function CarDetailPage() {
 
       await updateCar.mutateAsync(payload);
 
-      if (newFiles.length > 0) {
+      if (Object.keys(newFiles).length > 0) {
         await uploadImages.mutateAsync({ carId, files: newFiles });
-        setNewFiles([]);
+        setNewFiles({});
       }
 
       setEditing(false);
@@ -482,6 +580,35 @@ export default function CarDetailPage() {
     } catch (error) {
       toast.error(
         error instanceof ApiError ? error.message : "Failed to update status",
+      );
+    }
+  }
+
+  async function handleCancelBooking() {
+    if (!pendingBooking) return;
+    try {
+      await cancelBooking.mutateAsync(pendingBooking.id);
+      toast.success("Booking cancelled — you can book a new slot anytime");
+      setCancelDialogOpen(false);
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError ? error.message : "Failed to cancel booking",
+      );
+    }
+  }
+
+  async function handleClearanceSubmit() {
+    if (!clearanceBooking) return;
+    try {
+      await clearanceResponse.mutateAsync({
+        bookingId: clearanceBooking.id,
+        message: clearanceMessage,
+      });
+      toast.success("Response sent to staff");
+      setClearanceMessage("");
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError ? error.message : "Failed to send response",
       );
     }
   }
@@ -544,6 +671,7 @@ export default function CarDetailPage() {
   }
 
   return (
+    <>
     <div className="bg-(--brc-bg-subtle)">
       <div className="mx-auto flex w-full max-w-[1024px] flex-col gap-6 px-4 py-6 sm:gap-8 sm:px-6 sm:py-10 lg:px-[var(--brc-space-10,40px)] lg:py-14">
         {/* Back arrow */}
@@ -566,29 +694,104 @@ export default function CarDetailPage() {
                 {car.title}
               </h1>
               <StatusBadge status={car.status} />
+              {car.tracking_id && (
+                <span className="inline-flex items-center rounded-full border border-(--brc-border) bg-white px-2.5 py-1 text-xs font-bold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                  #{car.tracking_id}
+                </span>
+              )}
             </div>
             <p className="mt-1 text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
               {car.year} {car.brand} {car.model} · {car.state}
               {car.city ? `, ${car.city}` : ""}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
             {!editing ? (
               <>
+                {["listing_approved", "inspection_no_show"].includes(car.status) && (
+                  <button
+                    type="button"
+                    onClick={() => setBookingOpen(true)}
+                    className={cn(
+                      "group relative inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-xl px-4 text-sm font-black shadow-[0_14px_32px_rgba(0,0,139,0.18)] transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-[176px] [font-family:var(--brc-font-ui)]",
+                      "before:pointer-events-none before:absolute before:inset-y-0 before:left-0 before:w-1/2 before:-translate-x-full before:bg-gradient-to-r before:from-transparent before:via-white/24 before:to-transparent before:transition-transform before:duration-500 hover:before:translate-x-[220%]",
+                      car.status === "inspection_no_show"
+                        ? "border border-(--brc-warning)/45 bg-(--brc-warning-bg) text-[#9a7400] hover:bg-white hover:shadow-[0_18px_38px_rgba(154,116,0,0.18)] focus-visible:ring-(--brc-warning)"
+                        : "border border-(--brc-primary)/15 bg-(--brc-primary) text-(--brc-text-on-primary) hover:bg-(--brc-primary-hover) hover:shadow-[0_18px_38px_rgba(0,0,139,0.26)] focus-visible:ring-(--brc-primary)",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "relative z-10 flex size-7 shrink-0 items-center justify-center rounded-lg",
+                        car.status === "inspection_no_show"
+                          ? "bg-white/70 text-[#9a7400]"
+                          : "bg-white/14 text-white",
+                      )}
+                    >
+                      {car.status === "inspection_no_show" ? (
+                        <RotateCcwIcon size={16} strokeWidth={2.5} />
+                      ) : (
+                        <CalendarCheckIcon size={16} strokeWidth={2.5} />
+                      )}
+                    </span>
+                    <span className="relative z-10 whitespace-nowrap">
+                      {car.status === "inspection_no_show" ? "Rebook Inspection" : "Book Inspection"}
+                    </span>
+                  </button>
+                )}
                 {car.status === "draft" && (
+                  <span className="inline-flex h-11 max-w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-(--brc-border) bg-white px-4 text-sm font-extrabold text-(--brc-text-muted) shadow-[0_12px_28px_rgba(18,18,18,0.06)] [font-family:var(--brc-font-ui)]">
+                    <Icon name="clock" size={16} stroke="currentColor" />
+                    <span>Awaiting review</span>
+                  </span>
+                )}
+                {car.status === "inspection_pending" && pendingBooking && (
+                  <>
+                    {pendingBooking.reschedule_count > 0 && (
+                      <span
+                        title="Reschedules used at this center"
+                        className="inline-flex h-11 items-center gap-1.5 whitespace-nowrap rounded-lg border border-(--brc-warning)/40 bg-(--brc-warning-bg) px-3 text-xs font-bold text-[#9a7400] [font-family:var(--brc-font-ui)]"
+                      >
+                        <RotateCcwIcon size={13} strokeWidth={2.4} />
+                        Rescheduled {pendingBooking.reschedule_count} of{" "}
+                        {pendingBooking.slot.center.max_reschedules}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReschedulingPending(true);
+                        setBookingOpen(true);
+                      }}
+                      className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-primary)/30 bg-white px-4 text-sm font-extrabold text-(--brc-primary) shadow-[0_12px_28px_rgba(0,0,139,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-tint) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 [font-family:var(--brc-font-ui)]"
+                    >
+                      <RotateCcwIcon size={16} strokeWidth={2.4} />
+                      Reschedule
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCancelDialogOpen(true)}
+                      disabled={cancelBooking.isPending}
+                      className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-danger)/40 bg-white px-4 text-sm font-extrabold text-(--brc-danger) transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-danger-bg) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-danger) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+                    >
+                      Cancel Booking
+                    </button>
+                  </>
+                )}
+                {["needs_changes", "inspection_rejected"].includes(car.status) && (
                   <button
                     type="button"
                     onClick={() =>
                       handleStatusChange(
-                        "pending_review",
-                        "Submitted for review",
+                        "draft",
+                        "Resubmitted — our team will review your changes",
                       )
                     }
                     disabled={carStatus.isPending}
-                    className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border-none bg-(--brc-primary) px-4 text-sm font-semibold text-(--brc-text-on-primary) transition-colors hover:bg-(--brc-primary-hover) disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+                    className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-primary)/15 bg-(--brc-primary) px-4 text-sm font-extrabold text-(--brc-text-on-primary) shadow-[0_12px_28px_rgba(0,0,139,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
                   >
-                    <Icon name="arrow" size={15} stroke="currentColor" />
-                    Submit for Review
+                    <Icon name="check" size={16} stroke="currentColor" />
+                    Resubmit for Review
                   </button>
                 )}
                 {car.status === "published" && (
@@ -617,35 +820,24 @@ export default function CarDetailPage() {
                     Republish
                   </button>
                 )}
-                {car.status === "needs_changes" && (
+                {["draft", "needs_changes", "needs_clearance", "inspection_rejected"].includes(car.status) && (
                   <button
                     type="button"
-                    onClick={() =>
-                      handleStatusChange("pending_review", "Resubmitted for review")
-                    }
-                    disabled={carStatus.isPending}
-                    className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border-none bg-(--brc-primary) px-4 text-sm font-semibold text-(--brc-text-on-primary) transition-colors hover:bg-(--brc-primary-hover) disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+                    onClick={startEditing}
+                    className="group inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-border) bg-white px-4 text-sm font-extrabold text-(--brc-text) shadow-[0_12px_28px_rgba(18,18,18,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:border-(--brc-primary)/25 hover:bg-(--brc-primary-tint) hover:text-(--brc-primary) hover:shadow-[0_16px_34px_rgba(0,0,139,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 [font-family:var(--brc-font-ui)]"
                   >
-                    <Icon name="arrow" size={15} stroke="currentColor" />
-                    Resubmit for Review
+                    <PencilIcon size={16} strokeWidth={2.4} />
+                    Edit
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={startEditing}
-                  className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-4 text-sm font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
-                >
-                  <PencilIcon size={15} />
-                  Edit
-                </button>
-                {car.status !== "archived" && (
+                {!["archived", "inspection_pending", "inspection_in_progress"].includes(car.status) && (
                   <button
                     type="button"
                     onClick={handleArchive}
                     disabled={deleteCar.isPending}
-                    className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-(--brc-danger)/30 bg-white px-4 text-sm font-semibold text-(--brc-danger) transition-colors hover:bg-(--brc-danger-bg) disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+                    className="group inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-danger)/30 bg-white px-4 text-sm font-extrabold text-(--brc-danger) shadow-[0_12px_28px_rgba(220,38,38,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-danger-bg) hover:shadow-[0_16px_34px_rgba(220,38,38,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-danger) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
                   >
-                    <Trash2Icon size={15} />
+                    <Trash2Icon size={16} strokeWidth={2.4} />
                     Archive
                   </button>
                 )}
@@ -663,10 +855,35 @@ export default function CarDetailPage() {
           </div>
         </div>
 
-        {/* Admin note — collapsible accordion when status is needs_changes */}
-        {car.status === "needs_changes" && car.admin_note && (
-          <AdminNoteAccordion note={car.admin_note} />
+        {/* Admin note — collapsible accordion */}
+        {["needs_changes", "inspection_rejected"].includes(car.status) && car.admin_note && (
+          <AdminNoteAccordion
+            note={car.admin_note}
+            variant={car.status === "inspection_rejected" ? "rejected" : "changes"}
+          />
         )}
+
+        {/* Clearance banner */}
+        {car.status === "needs_clearance" && (
+          <ClearanceBanner
+            note={car.admin_note}
+            message={clearanceMessage}
+            onMessageChange={setClearanceMessage}
+            onSubmit={handleClearanceSubmit}
+            isSubmitting={clearanceResponse.isPending}
+            disabled={!clearanceBooking}
+          />
+        )}
+
+        {/* Progress */}
+        <Card className="rounded-2xl border border-(--brc-border) p-5 shadow-none sm:p-6">
+          <CardContent className="flex flex-col gap-4 p-0">
+            <h2 className="text-lg font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+              Progress
+            </h2>
+            <CarStatusTimeline carId={car.id} />
+          </CardContent>
+        </Card>
 
         {/* Image Gallery */}
         <Card className="rounded-2xl border border-(--brc-border) p-5 shadow-none sm:p-6">
@@ -675,37 +892,15 @@ export default function CarDetailPage() {
               <h2 className="text-lg font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
                 Images
               </h2>
-              {editing && (
-                <div className="flex items-center gap-3">
-                  <input
-                    ref={inputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/heic"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files?.length)
-                        setNewFiles(Array.from(e.target.files));
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => inputRef.current?.click()}
-                    className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-3 text-xs font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
-                  >
-                    <UploadIcon size={14} />
-                    Add Images
-                  </button>
-                  {newFiles.length > 0 && (
-                    <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                      +{newFiles.length} new
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
 
-            {car.images.length === 0 && newFiles.length === 0 ? (
+            {editing ? (
+              <CarPhotoSlotsField
+                value={newFiles}
+                onChange={setNewFiles}
+                existingImages={car.images}
+              />
+            ) : car.images.length === 0 ? (
               <div className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-(--brc-border) py-10 text-(--brc-text-muted)">
                 <ImageIcon size={32} strokeWidth={1.5} />
                 <span className="text-sm [font-family:var(--brc-font-ui)]">
@@ -1130,6 +1325,74 @@ export default function CarDetailPage() {
         </Card>
       </div>
     </div>
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="max-w-[440px] rounded-2xl border border-(--brc-border) bg-white p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-(--brc-text) [font-family:var(--brc-font-display)]">
+              Cancel this booking?
+            </DialogTitle>
+          </DialogHeader>
+          {pendingBooking && (
+            <p className="m-0 text-sm leading-6 text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+              Your appointment at{" "}
+              <span className="font-bold text-(--brc-text)">
+                {pendingBooking.slot.center.company_name}
+              </span>{" "}
+              will be released and the listing returns to &ldquo;Approved — ready
+              to book&rdquo;. Rebooking later counts toward the center&rsquo;s
+              reschedule limit.
+            </p>
+          )}
+          <DialogFooter className="mt-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setCancelDialogOpen(false)}
+              disabled={cancelBooking.isPending}
+              className="inline-flex h-11 cursor-pointer items-center justify-center rounded-lg border border-(--brc-border) bg-white px-4 text-sm font-bold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+            >
+              Keep Booking
+            </button>
+            <button
+              type="button"
+              onClick={handleCancelBooking}
+              disabled={cancelBooking.isPending}
+              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-danger) px-4 text-sm font-bold text-white transition-all hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+            >
+              {cancelBooking.isPending ? (
+                <Loader2Icon size={15} className="animate-spin" />
+              ) : null}
+              Yes, Cancel Booking
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <BookingModal
+        carId={car.id}
+        mode={
+          (reschedulingPending && pendingBooking) ||
+          (car.status === "inspection_no_show" && noShowBooking)
+            ? "reschedule"
+            : "book"
+        }
+        bookingId={
+          reschedulingPending && pendingBooking
+            ? pendingBooking.id
+            : car.status === "inspection_no_show" && noShowBooking
+            ? noShowBooking.id
+            : undefined
+        }
+        open={bookingOpen}
+        onClose={() => {
+          setBookingOpen(false);
+          setReschedulingPending(false);
+        }}
+        onSuccess={() => {
+          setBookingOpen(false);
+          setReschedulingPending(false);
+        }}
+      />
+    </>
   );
 }
 
@@ -1148,48 +1411,163 @@ function ReadonlyDetail({ label, value }: { label: string; value: string }) {
 }
 
 // ── Admin note accordion ──
-function AdminNoteAccordion({ note }: { note: string }) {
+function AdminNoteAccordion({
+  note,
+  variant = "changes",
+}: {
+  note: string;
+  variant?: "changes" | "rejected";
+}) {
   const [open, setOpen] = useState(false);
+  const isRejected = variant === "rejected";
 
   return (
-    <div className="overflow-hidden rounded-xl border border-(--brc-warning)/30 bg-(--brc-warning-bg)">
+    <div
+      className={cn(
+        "overflow-hidden rounded-xl border",
+        isRejected
+          ? "border-(--brc-danger)/30 bg-(--brc-danger-bg)"
+          : "border-(--brc-warning)/30 bg-(--brc-warning-bg)",
+      )}
+    >
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full cursor-pointer items-center justify-between border-none bg-transparent p-4 text-left transition-colors hover:bg-(--brc-warning)/10 sm:p-5"
+        className={cn(
+          "flex w-full cursor-pointer items-center justify-between border-none bg-transparent p-4 text-left transition-colors sm:p-5",
+          isRejected ? "hover:bg-(--brc-danger)/10" : "hover:bg-(--brc-warning)/10",
+        )}
       >
         <div className="flex items-center gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-(--brc-warning)/20">
-            <Icon name="clock" size={20} stroke="#9a7400" />
+          <span
+            className={cn(
+              "flex size-10 shrink-0 items-center justify-center rounded-full",
+              isRejected ? "bg-(--brc-danger)/15" : "bg-(--brc-warning)/20",
+            )}
+          >
+            {isRejected ? (
+              <AlertTriangleIcon size={20} className="text-(--brc-danger)" />
+            ) : (
+              <Icon name="clock" size={20} stroke="#9a7400" />
+            )}
           </span>
           <div>
-            <h3 className="m-0 text-sm font-bold text-[#9a7400] [font-family:var(--brc-font-ui)]">
-              Changes Requested by Admin
+            <h3
+              className={cn(
+                "m-0 text-sm font-bold [font-family:var(--brc-font-ui)]",
+                isRejected ? "text-(--brc-danger)" : "text-[#9a7400]",
+              )}
+            >
+              {isRejected ? "Inspection Failed" : "Changes Requested by Admin"}
             </h3>
-            <span className="text-xs text-[#9a7400]/60 [font-family:var(--brc-font-ui)]">
+            <span
+              className={cn(
+                "text-xs [font-family:var(--brc-font-ui)]",
+                isRejected ? "text-(--brc-danger)/60" : "text-[#9a7400]/60",
+              )}
+            >
               {open ? "Click to collapse" : "Click to view details"}
             </span>
           </div>
         </div>
         <ChevronDownIcon
           size={18}
-          className="text-[#9a7400] transition-transform duration-200"
+          className={cn(
+            "transition-transform duration-200",
+            isRejected ? "text-(--brc-danger)" : "text-[#9a7400]",
+          )}
           style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
         />
       </button>
 
       {open && (
-        <div className="border-t border-(--brc-warning)/20 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
-          <div className="rounded-lg border border-(--brc-warning)/20 bg-white/60 p-4">
-            <p className="m-0 text-sm leading-relaxed text-[#9a7400]/90 [font-family:var(--brc-font-ui)]">
+        <div
+          className={cn(
+            "border-t px-4 pb-4 pt-3 sm:px-5 sm:pb-5",
+            isRejected ? "border-(--brc-danger)/20" : "border-(--brc-warning)/20",
+          )}
+        >
+          <div
+            className={cn(
+              "rounded-lg border bg-white/60 p-4",
+              isRejected ? "border-(--brc-danger)/20" : "border-(--brc-warning)/20",
+            )}
+          >
+            <p
+              className={cn(
+                "m-0 text-sm leading-relaxed [font-family:var(--brc-font-ui)]",
+                isRejected ? "text-(--brc-danger)/90" : "text-[#9a7400]/90",
+              )}
+            >
               {note}
             </p>
           </div>
-          <span className="mt-3 block text-xs text-[#9a7400]/60 [font-family:var(--brc-font-ui)]">
-            Please make the requested changes and click &quot;Resubmit for Review&quot; above.
+          <span
+            className={cn(
+              "mt-3 block text-xs [font-family:var(--brc-font-ui)]",
+              isRejected ? "text-(--brc-danger)/60" : "text-[#9a7400]/60",
+            )}
+          >
+            {isRejected
+              ? "Fix the issues found during inspection, then click “Resubmit for Review” above to go through review and inspection again."
+              : "Edit the listing to make the requested changes, then click “Resubmit for Review” above."}
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Clearance banner ──
+function ClearanceBanner({
+  note,
+  message,
+  onMessageChange,
+  onSubmit,
+  isSubmitting,
+  disabled,
+}: {
+  note: string;
+  message: string;
+  onMessageChange: (value: string) => void;
+  onSubmit: () => void;
+  isSubmitting: boolean;
+  disabled: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-(--brc-warning)/30 bg-(--brc-warning-bg) p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-(--brc-warning)/20">
+          <AlertTriangleIcon size={18} className="text-[#9a7400]" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="m-0 text-sm font-bold text-[#9a7400] [font-family:var(--brc-font-ui)]">
+            Needs Further Clearance
+          </h3>
+          {note && (
+            <p className="mt-2 rounded-lg border border-(--brc-warning)/20 bg-white/60 p-3 text-sm leading-relaxed text-[#9a7400]/90 [font-family:var(--brc-font-ui)]">
+              {note}
+            </p>
+          )}
+          <div className="mt-3 flex flex-col gap-2">
+            <Textarea
+              value={message}
+              onChange={(e) => onMessageChange(e.target.value)}
+              placeholder="Describe how you've addressed the concern above..."
+              className="min-h-24 border-(--brc-warning)/30 bg-white text-sm [font-family:var(--brc-font-ui)]"
+            />
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={disabled || isSubmitting || !message.trim()}
+              className="inline-flex h-10 w-fit cursor-pointer items-center gap-2 rounded-lg border-none bg-(--brc-primary) px-4 text-sm font-semibold text-(--brc-text-on-primary) transition-colors hover:bg-(--brc-primary-hover) disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+            >
+              {isSubmitting && <Loader2Icon size={15} className="animate-spin" />}
+              I&apos;ve addressed this
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

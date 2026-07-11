@@ -52,11 +52,40 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return JSON.parse(text) as T;
 }
 
+function formatApiErrorMessage(errorData: unknown, fallback: string) {
+  if (!errorData || typeof errorData !== "object") {
+    return fallback;
+  }
+
+  const detail = (errorData as { detail?: unknown }).detail;
+  if (typeof detail === "string") {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    return detail.join(" ");
+  }
+
+  const fieldMessages = Object.entries(errorData as Record<string, unknown>)
+    .flatMap(([field, value]) => {
+      const label = field.replaceAll("_", " ");
+      if (Array.isArray(value)) {
+        return value.map((message) => `${label}: ${String(message)}`);
+      }
+      if (typeof value === "string") {
+        return [`${label}: ${value}`];
+      }
+      return [];
+    });
+
+  return fieldMessages[0] ?? fallback;
+}
+
 async function throwApiError(response: Response): Promise<never> {
   const errorData = await parseResponse<unknown>(response).catch(() => ({}));
-  const message =
-    (errorData as { detail?: string }).detail ||
-    `Request failed with status ${response.status}`;
+  const message = formatApiErrorMessage(
+    errorData,
+    `Request failed with status ${response.status}`,
+  );
 
   const error = new ApiError(response.status, message, errorData);
 

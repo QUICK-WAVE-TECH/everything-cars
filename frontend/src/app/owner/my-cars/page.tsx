@@ -4,7 +4,9 @@ import { useMemo, useState, useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { ArrowRightIcon, CalendarCheckIcon, PencilIcon, RotateCcwIcon } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { IconName } from "@/features/auth/components/icon";
@@ -20,9 +22,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { BookingModal } from "@/features/inspections/components/booking-modal";
+import { useMyBookings } from "@/features/inspections/api/inspections-api";
+import type { InspectionBooking } from "@/features/inspections/api/types";
 
 // ---------- Types ----------
-type ListingStatus = "draft" | "pending_review" | "needs_changes" | "published" | "paused" | "suspended" | "archived";
+type ListingStatus =
+  | "draft"
+  | "listing_approved"
+  | "needs_changes"
+  | "needs_clearance"
+  | "published"
+  | "paused"
+  | "suspended"
+  | "archived"
+  | "inspection_pending"
+  | "inspection_in_progress"
+  | "inspection_rejected"
+  | "inspection_no_show";
 
 type Listing = {
   id: string;
@@ -104,21 +121,36 @@ const STATS: { icon: IconName; label: string; key: string; color: string; iconCo
 ];
 
 const PER_PAGE = 10;
-const LISTING_TABLE_COLUMNS = "minmax(220px,1.6fr) 90px 130px 150px 120px 56px";
+const LISTING_TABLE_COLUMNS =
+  "minmax(190px,1.5fr) 76px minmax(100px,0.7fr) minmax(118px,0.85fr) minmax(148px,1fr) minmax(150px,0.9fr) 48px";
 
 // ---------- Status badge ----------
 const STATUS_MAP: Record<ListingStatus, { bg: string; fg: string; dot: string; label: string }> = {
   draft: { bg: "var(--brc-bg-muted)", fg: "var(--brc-text-muted)", dot: "var(--brc-text-muted)", label: "Draft" },
-  pending_review: { bg: "var(--brc-warning-bg)", fg: "#9a7400", dot: "var(--brc-warning)", label: "In Review" },
+  listing_approved: { bg: "var(--brc-success-bg)", fg: "var(--brc-success)", dot: "var(--brc-success)", label: "Approved" },
   needs_changes: { bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)", dot: "var(--brc-accent)", label: "Needs Changes" },
+  needs_clearance: { bg: "var(--brc-warning-bg)", fg: "#9a7400", dot: "var(--brc-warning)", label: "Needs Clearance" },
   published: { bg: "var(--brc-success-bg)", fg: "var(--brc-success)", dot: "var(--brc-success)", label: "Published" },
   paused: { bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)", dot: "var(--brc-accent)", label: "Paused" },
   suspended: { bg: "var(--brc-danger-bg)", fg: "var(--brc-danger)", dot: "var(--brc-danger)", label: "Suspended" },
   archived: { bg: "var(--brc-bg-muted)", fg: "var(--brc-text-secondary)", dot: "var(--brc-text-secondary)", label: "Archived" },
+  inspection_pending: { bg: "var(--brc-warning-bg)", fg: "#9a7400", dot: "var(--brc-warning)", label: "Inspection Booked" },
+  inspection_in_progress: { bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)", dot: "var(--brc-accent)", label: "In Progress" },
+  inspection_rejected: { bg: "var(--brc-danger-bg)", fg: "var(--brc-danger)", dot: "var(--brc-danger)", label: "Inspection Failed" },
+  inspection_no_show: { bg: "#fff3e0", fg: "#c25800", dot: "#e65100", label: "No Show" },
 };
 
+const UNKNOWN_STATUS_STYLE = {
+  bg: "var(--brc-bg-muted)",
+  fg: "var(--brc-text-muted)",
+  dot: "var(--brc-text-muted)",
+  label: "Unknown",
+} as const;
+
 function StatusBadge({ status }: { status: ListingStatus }) {
-  const s = STATUS_MAP[status];
+  // Statuses come from the API — never crash the whole page on one the
+  // frontend doesn't know yet (e.g. mid-deploy or legacy data).
+  const s = STATUS_MAP[status] ?? UNKNOWN_STATUS_STYLE;
   return (
     <span
       className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold [font-family:var(--brc-font-ui)]"
@@ -240,7 +272,7 @@ function FilterPanel({ filters, setFilters, onApply, onReset, onClose }: {
       </div>
       <div className="flex flex-col gap-4 p-4">
         <FilterSelect label="Type" value={filters.type} options={["Rent", "Buy", "Both"]} onPick={(v) => setFilters({ ...filters, type: v })} />
-        <FilterSelect label="Status" value={filters.status} options={["Draft", "Pending Review", "Needs Changes", "Published", "Paused", "Suspended", "Archived"]} onPick={(v) => setFilters({ ...filters, status: v })} />
+        <FilterSelect label="Status" value={filters.status} options={["Draft", "Listing Approved", "Needs Changes", "Needs Clearance", "Inspection Pending", "Inspection In Progress", "Published", "Paused", "Suspended", "Archived"]} onPick={(v) => setFilters({ ...filters, status: v })} />
         <div className="my-1 h-px bg-(--brc-border)" />
         <div className="flex gap-3">
           <button type="button" onClick={onReset} className="h-10 flex-1 cursor-pointer rounded-lg border-none bg-(--brc-bg-muted) text-sm font-medium text-(--brc-text) [font-family:var(--brc-font-ui)]">
@@ -270,11 +302,15 @@ function ListingDetail({ label, value, valueClassName }: { label: string; value:
 
 function MobileListingCard({
   listing,
+  booking,
   onClose,
+  onBook,
   isClosing,
 }: {
   listing: Listing;
+  booking: InspectionBooking | undefined;
   onClose: (listingId: string) => void;
+  onBook: (carId: string) => void;
   isClosing: boolean;
 }) {
   return (
@@ -316,6 +352,20 @@ function MobileListingCard({
         <ListingDetail label="Price" value={listing.price} />
       </div>
 
+      <div className="mt-3">
+        <AppointmentCell listing={listing} booking={booking} compact />
+      </div>
+
+      {/* Inspection action row (when applicable) */}
+      {(listing.status === "listing_approved" ||
+        listing.status === "inspection_no_show" ||
+        listing.status === "needs_changes" ||
+        listing.status === "inspection_rejected") && (
+        <div className="mt-3">
+          <ActionCell listing={listing} onBook={onBook} />
+        </div>
+      )}
+
       <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-(--brc-bg-subtle) p-1.5">
         <Link
           href={`/owner/my-cars/${listing.id}`}
@@ -353,6 +403,171 @@ function EmptyListings() {
       No listings match your filters.
     </div>
   );
+}
+
+// ---------- Inspection booking helpers ----------
+
+function formatSlotDate(date: string): string {
+  // Never call `new Date("YYYY-MM-DD")` directly — parse the parts manually
+  // to avoid a timezone off-by-one bug.
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatSlotTime(time: string): string {
+  const [hourStr, minuteStr] = time.split(":");
+  const hour = parseInt(hourStr ?? "0", 10);
+  const minute = minuteStr ?? "00";
+  const period = hour >= 12 ? "PM" : "AM";
+  const h = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h}:${minute} ${period}`;
+}
+
+// ---------- Action cell ----------
+
+function AppointmentCell({
+  listing,
+  booking,
+  compact = false,
+}: {
+  listing: Listing;
+  booking: InspectionBooking | undefined;
+  compact?: boolean;
+}) {
+  const { status } = listing;
+
+  if ((status === "inspection_pending" || status === "inspection_in_progress") && booking) {
+    return (
+      <div
+        className={cn(
+          "flex min-w-0 flex-col rounded-lg border bg-white [font-family:var(--brc-font-ui)]",
+          compact ? "px-3 py-2.5" : "border-transparent px-0 py-0",
+        )}
+      >
+        <span className="block truncate text-[13px] font-extrabold leading-5 text-(--brc-text)">
+          {formatSlotDate(booking.slot.date)}
+        </span>
+        <span className="block truncate text-[12px] font-semibold leading-5 text-(--brc-text-secondary)">
+          {formatSlotTime(booking.slot.start_time)} - {formatSlotTime(booking.slot.end_time)}
+        </span>
+        <span className="mt-1 inline-flex w-fit rounded-full bg-(--brc-success-bg) px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-(--brc-success)">
+          Confirmed
+        </span>
+      </div>
+    );
+  }
+
+  if (status === "draft") {
+    return (
+      <span className="text-[12px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+        Awaiting review
+      </span>
+    );
+  }
+
+  if (status === "listing_approved") {
+    return (
+      <span className="text-[12px] font-bold text-(--brc-success) [font-family:var(--brc-font-ui)]">
+        Ready to book
+      </span>
+    );
+  }
+
+  if (status === "needs_clearance") {
+    return (
+      <span className="text-[12px] font-bold text-[#9a7400] [font-family:var(--brc-font-ui)]">
+        Clearance needed
+      </span>
+    );
+  }
+
+  if (status === "inspection_no_show") {
+    return (
+      <span className="text-[12px] font-bold text-[#c25800] [font-family:var(--brc-font-ui)]">
+        Rebook needed
+      </span>
+    );
+  }
+
+  if (status === "inspection_rejected") {
+    return (
+      <span className="text-[12px] font-bold text-(--brc-danger) [font-family:var(--brc-font-ui)]">
+        Failed — fix &amp; resubmit
+      </span>
+    );
+  }
+
+  if (status === "needs_changes") {
+    return (
+      <span className="text-[12px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+        Edit first
+      </span>
+    );
+  }
+
+  return (
+    <span className="text-[12px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+      —
+    </span>
+  );
+}
+
+function ActionCell({
+  listing,
+  onBook,
+}: {
+  listing: Listing;
+  onBook: (carId: string) => void;
+}) {
+  const router = useRouter();
+  const { status } = listing;
+
+  if (status === "listing_approved") {
+    return (
+      <button
+        type="button"
+        onClick={() => onBook(listing.id)}
+        className="group inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-primary)/15 bg-(--brc-primary) px-3.5 text-[12px] font-extrabold text-(--brc-text-on-primary) shadow-[0_10px_24px_rgba(0,0,139,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) hover:shadow-[0_14px_30px_rgba(0,0,139,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 [font-family:var(--brc-font-ui)]"
+      >
+        <CalendarCheckIcon size={14} strokeWidth={2.4} />
+        <span className="whitespace-nowrap">Book Now</span>
+        <ArrowRightIcon size={13} className="transition-transform duration-200 group-hover:translate-x-0.5" strokeWidth={2.5} />
+      </button>
+    );
+  }
+
+  if (status === "inspection_no_show") {
+    return (
+      <button
+        type="button"
+        onClick={() => onBook(listing.id)}
+        className="group inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-warning)/50 bg-(--brc-warning-bg) px-3.5 text-[12px] font-extrabold text-(--brc-text) shadow-[0_8px_18px_rgba(154,116,0,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_12px_26px_rgba(154,116,0,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-warning) focus-visible:ring-offset-2 [font-family:var(--brc-font-ui)]"
+        style={{ color: "#9a7400" }}
+      >
+        <RotateCcwIcon size={14} strokeWidth={2.4} />
+        <span className="whitespace-nowrap">Rebook</span>
+      </button>
+    );
+  }
+
+  if (status === "needs_changes" || status === "inspection_rejected") {
+    return (
+      <button
+        type="button"
+        onClick={() => router.push(`/owner/my-cars/${listing.id}`)}
+        className="group inline-flex h-9 w-full max-w-[150px] cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-accent)/35 bg-white px-3 text-[12px] font-extrabold text-(--brc-accent) shadow-[0_8px_18px_rgba(195,101,35,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-accent-bg) hover:shadow-[0_12px_26px_rgba(195,101,35,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-accent) focus-visible:ring-offset-2 [font-family:var(--brc-font-ui)]"
+      >
+        <PencilIcon size={14} strokeWidth={2.4} />
+        <span className="whitespace-nowrap">{status === "inspection_rejected" ? "Fix & Resubmit" : "Edit & Resubmit"}</span>
+      </button>
+    );
+  }
+
+  return null;
 }
 
 // ---------- Row action menu ----------
@@ -436,13 +651,43 @@ function Pagination({ page, setPage, totalPages }: { page: number; setPage: (p: 
 // ---------- Main page ----------
 export default function MyCarsPage() {
   const { data: rawListings, isLoading } = useMyCarsList();
+  const { data: bookingsData } = useMyBookings({ page_size: 100 });
   const deleteCar = useDeleteCar();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState({ type: "", status: "" });
   const [applied, setApplied] = useState({ type: "", status: "" });
+  const [bookingCarId, setBookingCarId] = useState<string | null>(null);
+  const [bookingOpen, setBookingOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { data: selectedBookingsData } = useMyBookings(
+    bookingCarId ? { car: bookingCarId } : undefined,
+    { enabled: !!bookingCarId },
+  );
+
+  // Build a map of car_id → most recent active booking for fast lookup
+  const bookingByCarId = useMemo<Record<string, InspectionBooking>>(() => {
+    if (!bookingsData?.results) return {};
+    return bookingsData.results.reduce<Record<string, InspectionBooking>>((acc, b) => {
+      const current = acc[b.car_id];
+      // Prefer the active (pending) booking; otherwise most recent wins
+      if (!current || (b.status === "pending" && current.status !== "pending")) {
+        acc[b.car_id] = b;
+      }
+      return acc;
+    }, {});
+  }, [bookingsData]);
+
+  function handleOpenBooking(carId: string) {
+    setBookingCarId(carId);
+    setBookingOpen(true);
+  }
+
+  function handleCloseBooking() {
+    setBookingOpen(false);
+    setBookingCarId(null);
+  }
 
   const listings = useMemo(() => (rawListings?.results ?? []).map(toListing), [rawListings]);
 
@@ -633,7 +878,9 @@ export default function MyCarsPage() {
                 <MobileListingCard
                   key={listing.id}
                   listing={listing}
+                  booking={bookingByCarId[listing.id]}
                   onClose={handleCloseListing}
+                  onBook={handleOpenBooking}
                   isClosing={deleteCar.isPending}
                 />
               ))
@@ -642,17 +889,18 @@ export default function MyCarsPage() {
 
           {/* Table */}
           <div className="hidden overflow-x-auto md:block">
-            <div className="min-w-[980px]">
+            <div className="min-w-[840px]">
               {/* Table header */}
               <div
                 className="mb-1 grid items-center rounded-lg bg-(--brc-bg-subtle)"
                 style={{ gridTemplateColumns: LISTING_TABLE_COLUMNS }}
               >
                 <div className="px-4 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Car</span></div>
-                <div className="px-3 py-3 text-center"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Type</span></div>
-                <div className="px-3 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Listed</span></div>
+                <div className="px-2 py-3 text-center"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Type</span></div>
                 <div className="px-3 py-3 text-right"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Price</span></div>
                 <div className="px-3 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Status</span></div>
+                <div className="px-3 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Appointment</span></div>
+                <div className="px-3 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Action</span></div>
                 <div />
               </div>
 
@@ -687,20 +935,32 @@ export default function MyCarsPage() {
                               <Icon name="car" size={20} stroke="var(--brc-text-muted)" />
                             )}
                           </span>
-                          <span className="truncate text-sm font-bold text-(--brc-text) transition-colors duration-200 group-hover:text-(--brc-primary) [font-family:var(--brc-font-ui)]">{r.car}</span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-bold text-(--brc-text) transition-colors duration-200 group-hover:text-(--brc-primary) [font-family:var(--brc-font-ui)]">{r.car}</span>
+                            <span className="block truncate text-[12px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Listed {r.date}</span>
+                          </span>
                         </div>
                       </div>
-                      <div className="flex min-w-0 items-center justify-center px-3 py-3">
+                      <div className="flex min-w-0 items-center justify-center px-2 py-3">
                         <span className="truncate text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">{r.type}</span>
-                      </div>
-                      <div className="flex min-w-0 items-center px-3 py-3">
-                        <span className="truncate text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">{r.date}</span>
                       </div>
                       <div className="flex min-w-0 items-center justify-end px-3 py-3 text-right">
                         <span className="truncate text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">{r.price}</span>
                       </div>
                       <div className="flex min-w-0 items-center px-3 py-3">
                         <StatusBadge status={r.status} />
+                      </div>
+                      <div className="flex min-w-0 items-center px-3 py-3">
+                        <AppointmentCell
+                          listing={r}
+                          booking={bookingByCarId[r.id]}
+                        />
+                      </div>
+                      <div className="flex min-w-0 items-center px-3 py-3">
+                        <ActionCell
+                          listing={r}
+                          onBook={handleOpenBooking}
+                        />
                       </div>
                       <div className="flex min-w-0 items-center justify-center px-2 py-3">
                         <RowMenu
@@ -723,6 +983,23 @@ export default function MyCarsPage() {
         </div>
       </div>
       </div>
+
+      {bookingCarId && (() => {
+        // Rebooking after a no-show goes through the reschedule endpoint so
+        // the attempt counts toward the center's cap and history reads right.
+        const lastBooking = selectedBookingsData?.results?.[0] ?? bookingByCarId[bookingCarId];
+        const isRebooking = lastBooking?.status === "no_show";
+        return (
+          <BookingModal
+            carId={bookingCarId}
+            mode={isRebooking ? "reschedule" : "book"}
+            bookingId={isRebooking ? lastBooking.id : undefined}
+            open={bookingOpen}
+            onClose={handleCloseBooking}
+            onSuccess={handleCloseBooking}
+          />
+        );
+      })()}
     </>
   );
 }

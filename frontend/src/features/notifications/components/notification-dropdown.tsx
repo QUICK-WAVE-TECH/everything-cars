@@ -13,6 +13,9 @@ import {
 import type { NotificationItem, NotificationType } from "@/features/notifications/api";
 import type { UserRole } from "@/shared/types";
 
+// Admins browse notifications under /admin — not a backend role.
+type ViewerRole = UserRole | "admin";
+
 // ── Icon mapping ─────────────────────────────────────────────────────────────
 
 const TYPE_ICON: Record<NotificationType, IconName> = {
@@ -21,10 +24,20 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
   request_rejected: "car",
   request_cancelled: "car",
   requests_auto_rejected: "car",
-  listing_submitted: "file",
+  listing_suspended: "file",
   listing_approved: "check",
-  listing_rejected: "file",
-  listing_needs_changes: "file",
+  listing_submitted: "file",
+  changes_requested: "file",
+  inspection_started: "clock",
+  needs_clearance: "file",
+  clearance_response: "bell",
+  inspection_booked: "clock",
+  inspection_booking_approved: "check",
+  inspection_booking_rejected: "file",
+  inspection_passed: "check",
+  inspection_failed: "file",
+  inspection_no_show: "clock",
+  inspection_rescheduled: "clock",
   payment_submitted: "banknote",
   payment_confirmed: "banknote",
   rental_active: "car",
@@ -34,18 +47,19 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
 
 // ── Navigation helper ─────────────────────────────────────────────────────────
 
-function resolveHref(notification: NotificationItem, role: UserRole): string {
+function resolveHref(notification: NotificationItem, role: ViewerRole): string {
   const { notification_type, data } = notification;
+  const home = role === "admin" ? "/admin/approvals" : `/${role}/dashboard`;
 
   switch (notification_type) {
     case "request_received":
     case "request_cancelled":
-      return data.request_id ? `/owner/requests/${data.request_id}` : `/${role}/dashboard`;
+      return data.request_id ? `/owner/requests/${data.request_id}` : home;
 
     case "request_approved":
     case "request_rejected":
     case "requests_auto_rejected":
-      return data.request_id ? `/customer/requests/${data.request_id}` : `/${role}/dashboard`;
+      return data.request_id ? `/customer/requests/${data.request_id}` : home;
 
     case "payment_submitted":
       return "/admin/payments";
@@ -53,17 +67,29 @@ function resolveHref(notification: NotificationItem, role: UserRole): string {
     case "payment_confirmed":
     case "rental_active":
     case "rental_completed":
-      return data.request_id ? `/customer/requests/${data.request_id}` : `/${role}/dashboard`;
+      return data.request_id ? `/customer/requests/${data.request_id}` : home;
 
-    case "listing_submitted":
+    case "listing_suspended":
     case "listing_approved":
-    case "listing_rejected":
-    case "listing_needs_changes":
-      return data.car_id ? `/owner/my-cars/${data.car_id}` : `/${role}/dashboard`;
+    case "changes_requested":
+    case "inspection_started":
+    case "needs_clearance":
+    case "inspection_booking_approved":
+    case "inspection_booking_rejected":
+    case "inspection_passed":
+    case "inspection_failed":
+    case "inspection_no_show":
+      return data.car_id ? `/owner/my-cars/${data.car_id}` : `/owner/my-cars`;
+
+    case "inspection_booked":
+    case "inspection_rescheduled":
+    case "clearance_response":
+    case "listing_submitted":
+      return `/admin/approvals`;
 
     case "system":
     default:
-      return `/${role}/dashboard`;
+      return home;
   }
 }
 
@@ -71,7 +97,7 @@ function resolveHref(notification: NotificationItem, role: UserRole): string {
 
 type NotificationRowProps = {
   notification: NotificationItem;
-  role: UserRole;
+  role: ViewerRole;
   onRead: (id: string, href: string) => void;
 };
 
@@ -169,7 +195,7 @@ function NotificationRow({ notification, role, onRead }: NotificationRowProps) {
 // ── Main Dropdown ─────────────────────────────────────────────────────────────
 
 type NotificationDropdownProps = {
-  role: UserRole;
+  role: ViewerRole;
   unreadCount: number;
 };
 
