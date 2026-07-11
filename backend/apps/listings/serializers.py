@@ -157,6 +157,7 @@ class CarListSerializer(serializers.ModelSerializer):
 
 class CarDetailSerializer(serializers.ModelSerializer):
     owner = CarOwnerSerializer(read_only=True)
+    primary_image = serializers.SerializerMethodField()
     images = CarImageSerializer(many=True, read_only=True)
     features = ListingFeatureSerializer(many=True, read_only=True)
     availability_status = serializers.SerializerMethodField()
@@ -192,12 +193,16 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "owner",
+            "primary_image",
             "images",
             "features",
             "availability_status",
             "booked_periods",
             "available_from",
         ]
+
+    def get_primary_image(self, obj):
+        return CarListSerializer(context=self.context).get_primary_image(obj)
 
     def _get_booked_requests(self, obj):
         """Get booked requests — use prefetched if available."""

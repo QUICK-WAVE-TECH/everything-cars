@@ -687,9 +687,11 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
               ) : isInspectionInProgress ? (
                 <div className="flex flex-col gap-2">
                   <button type="button" disabled={!booking} onClick={handleContinueInspection}
-                    className="flex h-[46px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]">
-                    Continue Inspection
-                    <Icon name="chevright" size={14} stroke="currentColor" />
+                    className="group relative flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-xl border border-(--brc-primary)/15 bg-(--brc-primary) px-4 text-sm font-black text-white shadow-[0_14px_30px_rgba(0,0,139,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) hover:shadow-[0_18px_38px_rgba(0,0,139,0.26)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 [font-family:var(--brc-font-ui)]">
+                    <span className="relative z-10 whitespace-nowrap">Continue Inspection</span>
+                    <span className="relative z-10 flex size-7 items-center justify-center rounded-lg bg-white/14 transition-transform duration-200 group-hover:translate-x-0.5">
+                      <Icon name="chevright" size={15} stroke="currentColor" />
+                    </span>
                   </button>
                   {!booking && (
                     <span className="text-center text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">

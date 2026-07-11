@@ -579,7 +579,12 @@ class StaffBookingDetailView(APIView):
                 {"detail": "Booking not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        return Response(InspectionBookingDetailSerializer(booking).data)
+        return Response(
+            InspectionBookingDetailSerializer(
+                booking,
+                context={"request": request},
+            ).data
+        )
 
 
 class StaffInspectionStartView(APIView):

@@ -218,7 +218,11 @@ export default function StaffInspectionFormPage() {
   }
 
   const car = booking.car;
-  const primaryImage = car.images.find((i) => i.is_primary)?.image ?? car.images[0]?.image ?? null;
+  const primaryImage =
+    car.primary_image ??
+    car.images.find((i) => i.is_primary)?.image ??
+    car.images[0]?.image ??
+    null;
 
   return (
     <>
