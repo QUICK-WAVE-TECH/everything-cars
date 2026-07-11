@@ -596,3 +596,38 @@ class AdminStatusCountsTest(APITestCase):
         self.client.force_authenticate(user=owner)
         res = self.client.get("/api/v1/listings/admin/cars/status-counts")
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PublicArchivedVisibilityTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("owner-arch@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.customer = create_user("customer-arch@test.com", "customer")
+        create_customer_profile(self.customer)
+
+    def test_owner_archived_car_hidden_from_public(self):
+        create_car(self.owner, title="Withdrawn Car", status=CarStatus.ARCHIVED)
+        res = self.client.get("/api/v1/listings/cars")
+        titles = {c["title"] for c in res.data["results"]}
+        self.assertNotIn("Withdrawn Car", titles)
+
+    def test_sold_car_shows_publicly_as_sold(self):
+        car = create_car(self.owner, title="Sold Car", status=CarStatus.ARCHIVED)
+        Request.objects.create(
+            car=car,
+            customer=self.customer,
+            request_type=ListingType.BUY,
+            price_offered="15000000.00",
+            status=RequestStatus.COMPLETED,
+        )
+        res = self.client.get("/api/v1/listings/cars")
+        sold = next(
+            (c for c in res.data["results"] if c["title"] == "Sold Car"), None
+        )
+        self.assertIsNotNone(sold)
+        self.assertEqual(sold["availability_status"], "sold")
+
+    def test_owner_archived_detail_is_404_publicly(self):
+        car = create_car(self.owner, title="Withdrawn Car", status=CarStatus.ARCHIVED)
+        res = self.client.get(f"/api/v1/listings/cars/{car.id}")
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)

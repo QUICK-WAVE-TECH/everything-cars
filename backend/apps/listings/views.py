@@ -148,6 +148,19 @@ def availability_annotations():
     }
 
 
+def sold_annotation():
+    """True when the car was genuinely sold (a buy request completed).
+    Archived-without-sale means the owner withdrew the listing — those
+    cars must not appear publicly as 'sold'."""
+    return Exists(
+        Request.objects.filter(
+            car_id=OuterRef("id"),
+            request_type=ListingType.BUY,
+            status=RequestStatus.COMPLETED,
+        )
+    )
+
+
 def car_has_active_requests(car_id):
     return Request.objects.filter(
         car_id=car_id,
@@ -520,6 +533,9 @@ class PublicCarListView(APIView):
     def get(self, request):
         cars = (
             Car.objects.filter(status__in=[CarStatus.PUBLISHED, CarStatus.ARCHIVED])
+            .annotate(_is_sold=sold_annotation())
+            # Archived cars appear publicly only when actually sold
+            .filter(Q(status=CarStatus.PUBLISHED) | Q(_is_sold=True))
             .select_related("owner__owner_profile")
             .prefetch_related("images")
             .annotate(**availability_annotations())
@@ -614,7 +630,10 @@ class PublicCarDetailView(APIView):
             car = (
                 Car.objects.select_related("owner__owner_profile")
                 .prefetch_related("images", "features", booked_prefetch)
-                .annotate(**availability_annotations())
+                .annotate(
+                    _is_sold=sold_annotation(), **availability_annotations()
+                )
+                .filter(Q(status=CarStatus.PUBLISHED) | Q(_is_sold=True))
                 .get(
                     id=car_id,
                     status__in=[CarStatus.PUBLISHED, CarStatus.ARCHIVED],
