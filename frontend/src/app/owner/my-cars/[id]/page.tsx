@@ -778,7 +778,7 @@ export default function CarDetailPage() {
                     </button>
                   </>
                 )}
-                {car.status === "needs_changes" && (
+                {["needs_changes", "inspection_rejected"].includes(car.status) && (
                   <button
                     type="button"
                     onClick={() =>
@@ -820,7 +820,7 @@ export default function CarDetailPage() {
                     Republish
                   </button>
                 )}
-                {["draft", "needs_changes", "needs_clearance"].includes(car.status) && (
+                {["draft", "needs_changes", "needs_clearance", "inspection_rejected"].includes(car.status) && (
                   <button
                     type="button"
                     onClick={startEditing}
@@ -857,7 +857,10 @@ export default function CarDetailPage() {
 
         {/* Admin note — collapsible accordion */}
         {["needs_changes", "inspection_rejected"].includes(car.status) && car.admin_note && (
-          <AdminNoteAccordion note={car.admin_note} />
+          <AdminNoteAccordion
+            note={car.admin_note}
+            variant={car.status === "inspection_rejected" ? "rejected" : "changes"}
+          />
         )}
 
         {/* Clearance banner */}
@@ -1408,46 +1411,106 @@ function ReadonlyDetail({ label, value }: { label: string; value: string }) {
 }
 
 // ── Admin note accordion ──
-function AdminNoteAccordion({ note }: { note: string }) {
+function AdminNoteAccordion({
+  note,
+  variant = "changes",
+}: {
+  note: string;
+  variant?: "changes" | "rejected";
+}) {
   const [open, setOpen] = useState(false);
+  const isRejected = variant === "rejected";
 
   return (
-    <div className="overflow-hidden rounded-xl border border-(--brc-warning)/30 bg-(--brc-warning-bg)">
+    <div
+      className={cn(
+        "overflow-hidden rounded-xl border",
+        isRejected
+          ? "border-(--brc-danger)/30 bg-(--brc-danger-bg)"
+          : "border-(--brc-warning)/30 bg-(--brc-warning-bg)",
+      )}
+    >
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full cursor-pointer items-center justify-between border-none bg-transparent p-4 text-left transition-colors hover:bg-(--brc-warning)/10 sm:p-5"
+        className={cn(
+          "flex w-full cursor-pointer items-center justify-between border-none bg-transparent p-4 text-left transition-colors sm:p-5",
+          isRejected ? "hover:bg-(--brc-danger)/10" : "hover:bg-(--brc-warning)/10",
+        )}
       >
         <div className="flex items-center gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-(--brc-warning)/20">
-            <Icon name="clock" size={20} stroke="#9a7400" />
+          <span
+            className={cn(
+              "flex size-10 shrink-0 items-center justify-center rounded-full",
+              isRejected ? "bg-(--brc-danger)/15" : "bg-(--brc-warning)/20",
+            )}
+          >
+            {isRejected ? (
+              <AlertTriangleIcon size={20} className="text-(--brc-danger)" />
+            ) : (
+              <Icon name="clock" size={20} stroke="#9a7400" />
+            )}
           </span>
           <div>
-            <h3 className="m-0 text-sm font-bold text-[#9a7400] [font-family:var(--brc-font-ui)]">
-              Changes Requested by Admin
+            <h3
+              className={cn(
+                "m-0 text-sm font-bold [font-family:var(--brc-font-ui)]",
+                isRejected ? "text-(--brc-danger)" : "text-[#9a7400]",
+              )}
+            >
+              {isRejected ? "Inspection Failed" : "Changes Requested by Admin"}
             </h3>
-            <span className="text-xs text-[#9a7400]/60 [font-family:var(--brc-font-ui)]">
+            <span
+              className={cn(
+                "text-xs [font-family:var(--brc-font-ui)]",
+                isRejected ? "text-(--brc-danger)/60" : "text-[#9a7400]/60",
+              )}
+            >
               {open ? "Click to collapse" : "Click to view details"}
             </span>
           </div>
         </div>
         <ChevronDownIcon
           size={18}
-          className="text-[#9a7400] transition-transform duration-200"
+          className={cn(
+            "transition-transform duration-200",
+            isRejected ? "text-(--brc-danger)" : "text-[#9a7400]",
+          )}
           style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
         />
       </button>
 
       {open && (
-        <div className="border-t border-(--brc-warning)/20 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
-          <div className="rounded-lg border border-(--brc-warning)/20 bg-white/60 p-4">
-            <p className="m-0 text-sm leading-relaxed text-[#9a7400]/90 [font-family:var(--brc-font-ui)]">
+        <div
+          className={cn(
+            "border-t px-4 pb-4 pt-3 sm:px-5 sm:pb-5",
+            isRejected ? "border-(--brc-danger)/20" : "border-(--brc-warning)/20",
+          )}
+        >
+          <div
+            className={cn(
+              "rounded-lg border bg-white/60 p-4",
+              isRejected ? "border-(--brc-danger)/20" : "border-(--brc-warning)/20",
+            )}
+          >
+            <p
+              className={cn(
+                "m-0 text-sm leading-relaxed [font-family:var(--brc-font-ui)]",
+                isRejected ? "text-(--brc-danger)/90" : "text-[#9a7400]/90",
+              )}
+            >
               {note}
             </p>
           </div>
-          <span className="mt-3 block text-xs text-[#9a7400]/60 [font-family:var(--brc-font-ui)]">
-            Edit the listing to make the requested changes, then click
-            &ldquo;Resubmit for Review&rdquo; above.
+          <span
+            className={cn(
+              "mt-3 block text-xs [font-family:var(--brc-font-ui)]",
+              isRejected ? "text-(--brc-danger)/60" : "text-[#9a7400]/60",
+            )}
+          >
+            {isRejected
+              ? "Fix the issues found during inspection, then click “Resubmit for Review” above to go through review and inspection again."
+              : "Edit the listing to make the requested changes, then click “Resubmit for Review” above."}
           </span>
         </div>
       )}

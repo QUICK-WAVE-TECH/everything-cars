@@ -139,14 +139,14 @@ class EditLockdownTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
-    def test_edit_blocked_in_inspection_rejected(self):
-        # inspection_rejected is terminal — owner must relist, not edit
+    def test_edit_allowed_in_inspection_rejected(self):
+        # failed inspections are recoverable — owner fixes and resubmits
         self.car.status = CarStatus.INSPECTION_REJECTED
         self.car.save(update_fields=["status"])
         res = self.client.patch(
             f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Green"}
         )
-        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
 
     def test_edit_blocked_in_inspection_no_show(self):
         # no_show cars rebook the inspection; the listing itself stays locked
@@ -525,6 +525,18 @@ class ResubmissionTest(APITestCase):
         ).first()
         self.assertIsNotNone(note)
         self.assertIn("re-review", note.message)
+
+    def test_owner_resubmits_after_failed_inspection(self):
+        self.car.status = CarStatus.INSPECTION_REJECTED
+        self.car.save(update_fields=["status"])
+        res = self.client.post(
+            f"/api/v1/listings/my-cars/{self.car.id}/status",
+            {"status": "draft"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.car.refresh_from_db()
+        self.assertEqual(self.car.status, CarStatus.DRAFT)
 
     def test_owner_cannot_skip_review(self):
         res = self.client.post(

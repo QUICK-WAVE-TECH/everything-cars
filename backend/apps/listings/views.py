@@ -84,12 +84,14 @@ CAR_IMAGE_TYPES = REQUIRED_CAR_IMAGE_TYPES + OPTIONAL_CAR_IMAGE_TYPES
 MAX_CAR_IMAGES_PER_REQUEST = len(CAR_IMAGE_TYPES)
 MAX_CAR_IMAGES_PER_CAR = len(CAR_IMAGE_TYPES)
 MAX_CAR_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
-# Editable: pre-approval states and the clearance loop. inspection_rejected
-# is terminal (owner relists); inspection_no_show rebooks without editing.
+# Editable: pre-approval states, the clearance loop, and failed inspections
+# (owner fixes the issues and resubmits for review). inspection_no_show
+# rebooks without editing.
 EDITABLE_CAR_STATUSES = [
     CarStatus.DRAFT,
     CarStatus.NEEDS_CHANGES,
     CarStatus.NEEDS_CLEARANCE,
+    CarStatus.INSPECTION_REJECTED,
 ]
 REQUEST_APPROVAL_BLOCKING_STATUSES = [
     RequestStatus.APPROVED,
@@ -651,7 +653,7 @@ class MyCarStatusView(APIView):
         "inspection_pending": [],  # Only staff can transition
         "inspection_in_progress": [],  # Only staff can transition
         "needs_clearance": [],  # Owner addresses issues; staff transitions
-        "inspection_rejected": [],  # Owner rebooks via inspections app
+        "inspection_rejected": ["draft"],  # Owner fixes issues and resubmits
         "inspection_no_show": [],  # Owner rebooks via inspections app
         "needs_changes": ["draft"],  # Owner resubmits for admin review
         "published": ["paused", "archived"],

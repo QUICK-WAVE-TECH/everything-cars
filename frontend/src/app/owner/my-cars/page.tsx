@@ -359,7 +359,8 @@ function MobileListingCard({
       {/* Inspection action row (when applicable) */}
       {(listing.status === "listing_approved" ||
         listing.status === "inspection_no_show" ||
-        listing.status === "needs_changes") && (
+        listing.status === "needs_changes" ||
+        listing.status === "inspection_rejected") && (
         <div className="mt-3">
           <ActionCell listing={listing} onBook={onBook} />
         </div>
@@ -484,10 +485,18 @@ function AppointmentCell({
     );
   }
 
-  if (status === "inspection_rejected" || status === "inspection_no_show") {
+  if (status === "inspection_no_show") {
     return (
       <span className="text-[12px] font-bold text-[#c25800] [font-family:var(--brc-font-ui)]">
         Rebook needed
+      </span>
+    );
+  }
+
+  if (status === "inspection_rejected") {
+    return (
+      <span className="text-[12px] font-bold text-(--brc-danger) [font-family:var(--brc-font-ui)]">
+        Failed — fix &amp; resubmit
       </span>
     );
   }
@@ -545,7 +554,7 @@ function ActionCell({
     );
   }
 
-  if (status === "needs_changes") {
+  if (status === "needs_changes" || status === "inspection_rejected") {
     return (
       <button
         type="button"
@@ -553,7 +562,7 @@ function ActionCell({
         className="group inline-flex h-9 w-full max-w-[150px] cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-accent)/35 bg-white px-3 text-[12px] font-extrabold text-(--brc-accent) shadow-[0_8px_18px_rgba(195,101,35,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-accent-bg) hover:shadow-[0_12px_26px_rgba(195,101,35,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-accent) focus-visible:ring-offset-2 [font-family:var(--brc-font-ui)]"
       >
         <PencilIcon size={14} strokeWidth={2.4} />
-        <span className="whitespace-nowrap">Edit & Resubmit</span>
+        <span className="whitespace-nowrap">{status === "inspection_rejected" ? "Fix & Resubmit" : "Edit & Resubmit"}</span>
       </button>
     );
   }
