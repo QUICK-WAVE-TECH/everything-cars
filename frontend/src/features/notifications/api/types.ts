@@ -5,6 +5,8 @@ export type NotificationType =
   | "request_cancelled"
   | "listing_suspended"
   | "listing_approved"
+  | "listing_submitted"
+  | "changes_requested"
   | "inspection_booked"
   | "inspection_booking_approved"
   | "inspection_booking_rejected"

@@ -23,6 +23,8 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
   requests_auto_rejected: "car",
   listing_suspended: "file",
   listing_approved: "check",
+  listing_submitted: "file",
+  changes_requested: "file",
   inspection_started: "clock",
   needs_clearance: "file",
   clearance_response: "bell",
@@ -65,6 +67,7 @@ function resolveHref(notification: NotificationItem, role: UserRole): string {
 
     case "listing_suspended":
     case "listing_approved":
+    case "changes_requested":
     case "inspection_started":
     case "needs_clearance":
     case "inspection_booking_approved":
@@ -77,6 +80,7 @@ function resolveHref(notification: NotificationItem, role: UserRole): string {
     case "inspection_booked":
     case "inspection_rescheduled":
     case "clearance_response":
+    case "listing_submitted":
       return `/admin/approvals`;
 
     case "system":

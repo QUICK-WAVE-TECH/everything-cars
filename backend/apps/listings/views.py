@@ -64,6 +64,8 @@ from apps.notifications.service import (
     notify_auto_rejected,
     notify_listing_suspended,
     notify_listing_approved,
+    notify_listing_submitted,
+    notify_changes_requested,
 )
 from apps.inspections.models import ActorRole
 from apps.inspections.serializers import CarStatusHistorySerializer
@@ -306,6 +308,12 @@ class MyCarListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
             car = serializer.save(owner=request.user)
+            schedule_notification(
+                notify_listing_submitted,
+                lambda car_id=car.id: Car.objects.select_related("owner").get(
+                    id=car_id
+                ),
+            )
 
         car = (
             Car.objects.select_related("owner__owner_profile")
@@ -687,6 +695,16 @@ class MyCarStatusView(APIView):
                 actor_role=ActorRole.OWNER,
                 extra_update_fields=extra,
             )
+            if new_status == CarStatus.DRAFT:
+                # needs_changes → draft is a resubmission — tell staff
+                schedule_notification(
+                    lambda resubmitted_car: notify_listing_submitted(
+                        resubmitted_car, resubmitted=True
+                    ),
+                    lambda car_id=car.id: Car.objects.select_related("owner").get(
+                        id=car_id
+                    ),
+                )
 
         return Response(
             CarDetailSerializer(
@@ -1105,6 +1123,7 @@ class AdminCarStatusView(APIView):
             )
             notification_map = {
                 CarStatus.SUSPENDED: notify_listing_suspended,
+                CarStatus.NEEDS_CHANGES: notify_changes_requested,
             }
             notify_func = notification_map.get(new_status)
             if notify_func:

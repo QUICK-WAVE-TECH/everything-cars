@@ -11,6 +11,8 @@ class NotificationType(models.TextChoices):
     REQUEST_CANCELLED = "request_cancelled", "Request cancelled"
     LISTING_SUSPENDED = "listing_suspended", "Listing suspended"
     LISTING_APPROVED = "listing_approved", "Listing approved"
+    LISTING_SUBMITTED = "listing_submitted", "Listing submitted for review"
+    CHANGES_REQUESTED = "changes_requested", "Changes requested"
     INSPECTION_BOOKED = "inspection_booked", "Inspection booked"
     INSPECTION_BOOKING_APPROVED = "inspection_booking_approved", "Inspection booking approved"
     INSPECTION_BOOKING_REJECTED = "inspection_booking_rejected", "Inspection booking rejected"

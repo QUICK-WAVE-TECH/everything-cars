@@ -431,6 +431,22 @@ class ListingApprovalTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_request_changes_notifies_owner(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                f"/api/v1/listings/admin/cars/{self.car.id}/status",
+                {"status": "needs_changes", "note": "Fix the photos"},
+                format="json",
+            )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        from apps.notifications.models import Notification
+
+        note = Notification.objects.filter(
+            recipient=self.owner, notification_type="changes_requested"
+        ).first()
+        self.assertIsNotNone(note)
+        self.assertIn("Fix the photos", note.message)
+
     def test_request_changes_from_draft(self):
         res = self.client.post(
             f"/api/v1/listings/admin/cars/{self.car.id}/status",
@@ -492,6 +508,23 @@ class ResubmissionTest(APITestCase):
         self.assertEqual(entry.from_status, CarStatus.NEEDS_CHANGES)
         self.assertEqual(entry.to_status, CarStatus.DRAFT)
         self.assertEqual(entry.actor_role, "owner")
+
+    def test_resubmission_notifies_staff(self):
+        staff = create_user("staff-resub@test.com", "owner", is_staff=True)
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                f"/api/v1/listings/my-cars/{self.car.id}/status",
+                {"status": "draft"},
+                format="json",
+            )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        from apps.notifications.models import Notification
+
+        note = Notification.objects.filter(
+            recipient=staff, notification_type="listing_submitted"
+        ).first()
+        self.assertIsNotNone(note)
+        self.assertIn("re-review", note.message)
 
     def test_owner_cannot_skip_review(self):
         res = self.client.post(

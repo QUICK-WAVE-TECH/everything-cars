@@ -240,6 +240,40 @@ def notify_listing_suspended(car):
     )
 
 
+def notify_listing_submitted(car, resubmitted=False):
+    """All staff get notified when a listing enters the review queue —
+    either a brand-new listing or one resubmitted after changes."""
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    title = "Listing resubmitted for review" if resubmitted else "New listing awaiting review"
+    message = (
+        f"The owner of {car.title} has made the requested changes — ready for re-review."
+        if resubmitted
+        else f"A new listing '{car.title}' is awaiting review."
+    )
+    for staff in staff_users:
+        _create_notification(
+            recipient=staff,
+            notification_type=NotificationType.LISTING_SUBMITTED,
+            title=title,
+            message=message,
+            data={"car_id": str(car.id), "car_title": car.title},
+        )
+
+
+def notify_changes_requested(car):
+    """Owner gets notified when staff requests changes to their listing."""
+    _create_notification(
+        recipient=car.owner,
+        notification_type=NotificationType.CHANGES_REQUESTED,
+        title="Changes requested on your listing",
+        message=(
+            f"Our team reviewed '{car.title}' and requested changes"
+            + (f": {car.admin_note}" if car.admin_note else ".")
+        ),
+        data={"car_id": str(car.id), "car_title": car.title},
+    )
+
+
 def notify_listing_approved(car):
     """Owner gets notified when staff approves their listing for inspection."""
     _create_notification(
