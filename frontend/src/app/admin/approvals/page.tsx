@@ -16,6 +16,7 @@ import {
   useApproveListing,
   useRequestChanges,
   useAdminCarCounts,
+  useAdminCarHistory,
 } from "@/features/listings/api/admin-api";
 import type { CarListItem } from "@/features/listings/api/types";
 import {
@@ -301,6 +302,22 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
     if (!drawerBookingResults || !carId) return null;
     return drawerBookingResults.find((b) => b.car_id === carId) ?? null;
   }, [drawerBookingResults, carId]);
+
+  // Owner clearance responses are same-status annotation rows on the timeline
+  const { data: carHistory } = useAdminCarHistory(
+    open && isNeedsClearance ? carId : null,
+  );
+  const clearanceResponses = useMemo(
+    () =>
+      (carHistory ?? []).filter(
+        (e) =>
+          e.actor_role === "owner" &&
+          e.from_status === "needs_clearance" &&
+          e.to_status === "needs_clearance" &&
+          e.note,
+      ),
+    [carHistory],
+  );
 
   // needs_clearance cars have a COMPLETED booking — the pending query
   // above can't find it, so fetch completed bookings for resolution.
@@ -610,6 +627,20 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
                     </div>
                   ) : (
                     <span className="text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">No clearance note recorded.</span>
+                  )}
+
+                  {clearanceResponses.length > 0 && (
+                    <>
+                      <h3 className="m-0 mt-1 text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Owner responses</h3>
+                      {clearanceResponses.map((entry) => (
+                        <div key={entry.id} className="rounded-lg border border-(--brc-primary)/20 bg-(--brc-primary-tint) p-3">
+                          <p className="m-0 text-sm text-(--brc-text) [font-family:var(--brc-font-ui)]">{entry.note}</p>
+                          <span className="mt-1 block text-[11px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                            Owner · {formatDate(entry.created_at)}
+                          </span>
+                        </div>
+                      ))}
+                    </>
                   )}
                 </section>
               )}

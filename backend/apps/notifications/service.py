@@ -343,17 +343,17 @@ def notify_needs_clearance(booking):
     )
 
 
-def notify_clearance_response(booking):
+def notify_clearance_response(booking, response_message=""):
     """All staff get notified when an owner responds to a clearance request."""
     staff_users = User.objects.filter(is_staff=True, is_active=True)
+    detail = f': "{response_message}"' if response_message else " — ready for re-review."
     for staff in staff_users:
         _create_notification(
             recipient=staff,
             notification_type=NotificationType.CLEARANCE_RESPONSE,
             title="Clearance response received",
             message=(
-                f"The owner of {booking.car.title} says the clearance issues "
-                "have been addressed — ready for re-review."
+                f"The owner of {booking.car.title} responded{detail}"
             ),
             data={
                 "booking_id": str(booking.id),

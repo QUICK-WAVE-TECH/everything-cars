@@ -932,7 +932,7 @@ class OwnerClearanceResponseView(APIView):
             )
 
         schedule_notification(
-            notify_clearance_response,
+            lambda b, msg=message: notify_clearance_response(b, response_message=msg),
             lambda bid=booking.id: booking_detail_queryset().get(id=bid),
         )
         return Response({"detail": "Response recorded — staff will re-review."})

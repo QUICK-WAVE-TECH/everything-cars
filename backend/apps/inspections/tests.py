@@ -966,3 +966,44 @@ class AvailableSlotShapeTest(APITestCase):
         self.assertEqual(len(res.data), 1)
         self.assertEqual(res.data[0]["center"]["company_name"], "Car 45")
         self.assertEqual(res.data[0]["center"]["city_code"], "LOS")
+
+
+class AdminCarHistoryTest(APITestCase):
+    def test_staff_sees_owner_clearance_responses(self):
+        staff = create_user("staff-hist2@test.com", "owner", is_staff=True)
+        owner = create_user("owner-hist2@test.com", "owner")
+        create_owner_profile(owner)
+        car = create_car(owner, status=CarStatus.INSPECTION_PENDING)
+        slot = create_slot(staff)
+        booking = InspectionBooking.objects.create(
+            car=car, slot=slot, booked_by=owner
+        )
+        client = self.client
+        client.force_authenticate(user=staff)
+        client.post(f"/api/v1/inspections/admin/bookings/{booking.id}/start/")
+        client.post(
+            f"/api/v1/inspections/admin/bookings/{booking.id}/inspection/",
+            inspection_form_with_documents(
+                result="needs_clearance", staff_notes="Customs docs missing"
+            ),
+            format="multipart",
+        )
+        client.force_authenticate(user=owner)
+        client.post(
+            f"/api/v1/inspections/bookings/{booking.id}/clearance-response/",
+            {"message": "Uploaded the customs documents"},
+            format="json",
+        )
+        client.force_authenticate(user=staff)
+        res = client.get(f"/api/v1/listings/admin/cars/{car.id}/history")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        notes = [e["note"] for e in res.data]
+        self.assertIn("Uploaded the customs documents", notes)
+
+    def test_owner_cannot_access_admin_history(self):
+        owner = create_user("owner-hist3@test.com", "owner")
+        create_owner_profile(owner)
+        car = create_car(owner)
+        self.client.force_authenticate(user=owner)
+        res = self.client.get(f"/api/v1/listings/admin/cars/{car.id}/history")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)

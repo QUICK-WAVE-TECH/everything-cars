@@ -57,6 +57,19 @@ export function useAdminCarCounts() {
   });
 }
 
+// Admin — full status timeline (includes owner clearance responses)
+export function useAdminCarHistory(carId: string | null) {
+  return useQuery({
+    queryKey: [...adminListingKeys.cars, "history", carId] as const,
+    queryFn: () =>
+      apiClient.get<
+        import("@/features/inspections/api/types").CarStatusHistoryEntry[]
+      >(`/listings/admin/cars/${carId}/history`),
+    enabled: !!carId,
+    staleTime: 10 * 1000,
+  });
+}
+
 // Admin — single car detail (any status)
 export function useAdminCarDetail(carId: string | null) {
   return useQuery({

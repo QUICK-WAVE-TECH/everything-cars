@@ -1436,6 +1436,23 @@ class StaffConfirmPaymentView(APIView):
         )
 
 
+class AdminCarHistoryView(APIView):
+    """Full status timeline for staff — includes owner clearance responses
+    recorded as same-status annotation rows."""
+
+    permission_classes = [IsStaff]
+
+    def get(self, request, car_id):
+        try:
+            car = Car.objects.get(id=car_id)
+        except Car.DoesNotExist:
+            return Response(
+                {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        history = car.status_history.all()
+        return Response(CarStatusHistorySerializer(history, many=True).data)
+
+
 class AdminCarStatusCountsView(APIView):
     """Aggregate car counts per status — the approvals dashboard KPIs.
     Counting a paginated list page undercounts; this asks the DB directly."""
