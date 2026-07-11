@@ -3,7 +3,9 @@ import path from "node:path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  allowedDevOrigins: ["192.168.1.30", "127.0.0.1:8000", "localhost"],
+  // Hosts allowed to load Next dev resources (HMR socket, etc.). Bare hostnames
+  // only — no ports. Must include every host you open the app from in the browser.
+  allowedDevOrigins: ["localhost", "127.0.0.1", "192.168.1.30", "172.20.10.3"],
 
   // Pin the workspace root to this directory so Next/Turbopack never infers it
   // from a stray lockfile in a parent directory (which left dev requests hanging).
