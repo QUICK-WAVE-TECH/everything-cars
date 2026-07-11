@@ -15,6 +15,7 @@ import {
   useAdminCarStatus,
   useApproveListing,
   useRequestChanges,
+  useAdminCarCounts,
 } from "@/features/listings/api/admin-api";
 import type { CarListItem } from "@/features/listings/api/types";
 import {
@@ -797,17 +798,21 @@ export default function AdminApprovalsPage() {
   const [drawerCarId, setDrawerCarId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const { data: allData } = useAdminCars({});
-  const allCars = useMemo(() => allData?.results ?? [], [allData?.results]);
+  // Server-side aggregate — counting a single paginated page undercounts.
+  const { data: rawCounts } = useAdminCarCounts();
   const counts = useMemo(() => ({
-    draft: allCars.filter((c) => c.status === "draft").length,
-    listing_approved: allCars.filter((c) => c.status === "listing_approved").length,
-    inspection_pending: allCars.filter((c) => c.status === "inspection_pending").length,
-    inspection_in_progress: allCars.filter((c) => c.status === "inspection_in_progress").length,
-    needs_clearance: allCars.filter((c) => c.status === "needs_clearance").length,
-    published: allCars.filter((c) => c.status === "published").length,
-    suspended: allCars.filter((c) => c.status === "suspended").length,
-  }), [allCars]);
+    draft: rawCounts?.draft ?? 0,
+    listing_approved: rawCounts?.listing_approved ?? 0,
+    inspection_pending: rawCounts?.inspection_pending ?? 0,
+    inspection_in_progress: rawCounts?.inspection_in_progress ?? 0,
+    needs_clearance: rawCounts?.needs_clearance ?? 0,
+    published: rawCounts?.published ?? 0,
+    suspended: rawCounts?.suspended ?? 0,
+  }), [rawCounts]);
+  const totalCars = useMemo(
+    () => Object.values(rawCounts ?? {}).reduce((sum, n) => sum + n, 0),
+    [rawCounts],
+  );
 
   const approvalRate = Math.round((counts.published / Math.max(1, counts.published + counts.suspended)) * 100);
 
@@ -855,14 +860,14 @@ export default function AdminApprovalsPage() {
       <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-[var(--brc-space-10,40px)]">
         {/* KPI Cards */}
         <div className="flex flex-wrap gap-[18px]">
-          <KpiCard icon="clock" label="Pending Review" value={counts.draft} accent="#C8870B" share={counts.draft / Math.max(1, allCars.length)}
+          <KpiCard icon="clock" label="Pending Review" value={counts.draft} accent="#C8870B" share={counts.draft / Math.max(1, totalCars)}
             sub={<TrendPill tone={counts.draft > 0 ? "warn" : "up"}>{counts.draft > 0 ? `${counts.draft} awaiting` : "all clear"}</TrendPill>} />
-          <KpiCard icon="clock" label="Inspection Pipeline" value={counts.inspection_pending + counts.inspection_in_progress} accent="#4338ca" share={(counts.inspection_pending + counts.inspection_in_progress) / Math.max(1, allCars.length)}
+          <KpiCard icon="clock" label="Inspection Pipeline" value={counts.inspection_pending + counts.inspection_in_progress} accent="#4338ca" share={(counts.inspection_pending + counts.inspection_in_progress) / Math.max(1, totalCars)}
             sub={<TrendPill tone="neutral">{counts.needs_clearance} need clearance</TrendPill>} />
-          <KpiCard icon="check" label="Published" value={counts.published} accent="var(--brc-success)" share={counts.published / Math.max(1, allCars.length)}
+          <KpiCard icon="check" label="Published" value={counts.published} accent="var(--brc-success)" share={counts.published / Math.max(1, totalCars)}
             sub={<TrendPill tone="up">{approvalRate}% approval</TrendPill>} />
-          <KpiCard icon="plus" label="Suspended" value={counts.suspended} accent="var(--brc-danger)" share={counts.suspended / Math.max(1, allCars.length)}
-            sub={<TrendPill tone="neutral">{Math.round((counts.suspended / Math.max(1, allCars.length)) * 100)}% of all</TrendPill>} />
+          <KpiCard icon="plus" label="Suspended" value={counts.suspended} accent="var(--brc-danger)" share={counts.suspended / Math.max(1, totalCars)}
+            sub={<TrendPill tone="neutral">{Math.round((counts.suspended / Math.max(1, totalCars)) * 100)}% of all</TrendPill>} />
         </div>
 
         {/* Table card */}

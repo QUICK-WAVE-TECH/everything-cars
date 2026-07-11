@@ -533,3 +533,54 @@ class ResubmissionTest(APITestCase):
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class PublicListingTypeFilterTest(APITestCase):
+    def setUp(self):
+        owner = create_user("owner-pub@test.com", "owner")
+        create_owner_profile(owner)
+        create_car(owner, title="Rent Only", listing_type=ListingType.RENT,
+                   sale_price=None, rent_price_per_day="20000.00")
+        create_car(owner, title="Buy Only", listing_type=ListingType.BUY)
+        create_car(owner, title="Both Ways", listing_type=ListingType.BOTH,
+                   rent_price_per_day="30000.00")
+
+    def _titles(self, res):
+        return {c["title"] for c in res.data["results"]}
+
+    def test_rent_mode_includes_both(self):
+        res = self.client.get("/api/v1/listings/cars?listing_type=rent")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        titles = self._titles(res)
+        self.assertIn("Rent Only", titles)
+        self.assertIn("Both Ways", titles)
+        self.assertNotIn("Buy Only", titles)
+
+    def test_buy_mode_includes_both(self):
+        res = self.client.get("/api/v1/listings/cars?listing_type=buy")
+        titles = self._titles(res)
+        self.assertIn("Buy Only", titles)
+        self.assertIn("Both Ways", titles)
+        self.assertNotIn("Rent Only", titles)
+
+
+class AdminStatusCountsTest(APITestCase):
+    def test_counts_cover_all_cars_not_one_page(self):
+        staff = create_user("staff-counts@test.com", "owner", is_staff=True)
+        owner = create_user("owner-counts@test.com", "owner")
+        create_owner_profile(owner)
+        # More drafts than one pagination page (page size 20)
+        for i in range(25):
+            create_car(owner, title=f"Draft {i}", status=CarStatus.DRAFT)
+        create_car(owner, title="Live", status=CarStatus.PUBLISHED)
+        self.client.force_authenticate(user=staff)
+        res = self.client.get("/api/v1/listings/admin/cars/status-counts")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["draft"], 25)
+        self.assertEqual(res.data["published"], 1)
+
+    def test_non_staff_forbidden(self):
+        owner = create_user("owner-counts2@test.com", "owner")
+        self.client.force_authenticate(user=owner)
+        res = self.client.get("/api/v1/listings/admin/cars/status-counts")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)

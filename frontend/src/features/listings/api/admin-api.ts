@@ -14,6 +14,7 @@ type AdminListParams = {
 
 export const adminListingKeys = {
   cars: ["cars", "admin"] as const,
+  carCounts: ["cars", "admin", "status-counts"] as const,
   carsList: (params?: AdminListParams) => ["cars", "admin", params ?? {}] as const,
   carDetail: (carId: string | null) => ["cars", "admin", "detail", carId] as const,
   requests: ["requests", "admin"] as const,
@@ -42,6 +43,16 @@ export function useAdminCars(params?: AdminListParams) {
       apiClient.get<PaginatedResponse<CarListItem>>(
         `/listings/admin/cars${query ? `?${query}` : ""}`,
       ),
+    staleTime: 15 * 1000,
+  });
+}
+
+// Admin — car counts per status (drives the approvals KPIs and tab badges)
+export function useAdminCarCounts() {
+  return useQuery({
+    queryKey: adminListingKeys.carCounts,
+    queryFn: () =>
+      apiClient.get<Record<string, number>>("/listings/admin/cars/status-counts"),
     staleTime: 15 * 1000,
   });
 }

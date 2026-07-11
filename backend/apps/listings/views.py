@@ -7,6 +7,7 @@ from PIL import Image, ImageOps
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
 from django.db.models import (
+    Count,
     DateField,
     Exists,
     ExpressionWrapper,
@@ -524,7 +525,10 @@ class PublicCarListView(APIView):
 
         # Basic filters
         listing_type = request.query_params.get("listing_type")
-        if listing_type:
+        if listing_type in (ListingType.RENT, ListingType.BUY):
+            # "both" listings serve either mode
+            cars = cars.filter(listing_type__in=[listing_type, ListingType.BOTH])
+        elif listing_type:
             cars = cars.filter(listing_type=listing_type)
 
         state = request.query_params.get("state")
@@ -1430,6 +1434,17 @@ class StaffConfirmPaymentView(APIView):
         return Response(
             RequestDetailSerializer(detail, context={"request": request}).data,
         )
+
+
+class AdminCarStatusCountsView(APIView):
+    """Aggregate car counts per status — the approvals dashboard KPIs.
+    Counting a paginated list page undercounts; this asks the DB directly."""
+
+    permission_classes = [IsStaff]
+
+    def get(self, request):
+        rows = Car.objects.values("status").annotate(n=Count("id"))
+        return Response({row["status"]: row["n"] for row in rows})
 
 
 class AdminApproveListingView(APIView):
