@@ -49,6 +49,13 @@ import {
 import { ApiError } from "@/lib/api-client";
 import { BookingModal } from "@/features/inspections/components/booking-modal";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   useCancelBooking,
   useClearanceResponse,
   useMyBookings,
@@ -466,7 +473,7 @@ export default function CarDetailPage() {
   const [activeImage, setActiveImage] = useState(0);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [reschedulingPending, setReschedulingPending] = useState(false);
-  const [cancelArming, setCancelArming] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [clearanceMessage, setClearanceMessage] = useState("");
 
   // Most recent pending/completed booking for this car — used to send a
@@ -579,19 +586,14 @@ export default function CarDetailPage() {
 
   async function handleCancelBooking() {
     if (!pendingBooking) return;
-    if (!cancelArming) {
-      setCancelArming(true);
-      return;
-    }
     try {
       await cancelBooking.mutateAsync(pendingBooking.id);
       toast.success("Booking cancelled — you can book a new slot anytime");
+      setCancelDialogOpen(false);
     } catch (error) {
       toast.error(
         error instanceof ApiError ? error.message : "Failed to cancel booking",
       );
-    } finally {
-      setCancelArming(false);
     }
   }
 
@@ -746,21 +748,11 @@ export default function CarDetailPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={handleCancelBooking}
-                      onMouseLeave={() => setCancelArming(false)}
-                      onBlur={() => setCancelArming(false)}
+                      onClick={() => setCancelDialogOpen(true)}
                       disabled={cancelBooking.isPending}
-                      className={cn(
-                        "inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border px-4 text-sm font-extrabold transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-danger) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]",
-                        cancelArming
-                          ? "border-(--brc-danger) bg-(--brc-danger) text-white"
-                          : "border-(--brc-danger)/40 bg-white text-(--brc-danger) hover:bg-(--brc-danger-bg)",
-                      )}
+                      className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-danger)/40 bg-white px-4 text-sm font-extrabold text-(--brc-danger) transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-danger-bg) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-danger) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
                     >
-                      {cancelBooking.isPending ? (
-                        <Loader2Icon size={16} className="animate-spin" />
-                      ) : null}
-                      {cancelArming ? "Confirm cancel?" : "Cancel Booking"}
+                      Cancel Booking
                     </button>
                   </>
                 )}
@@ -1308,6 +1300,48 @@ export default function CarDetailPage() {
         </Card>
       </div>
     </div>
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent className="max-w-[440px] rounded-2xl border border-(--brc-border) bg-white p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-(--brc-text) [font-family:var(--brc-font-display)]">
+              Cancel this booking?
+            </DialogTitle>
+          </DialogHeader>
+          {pendingBooking && (
+            <p className="m-0 text-sm leading-6 text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+              Your appointment at{" "}
+              <span className="font-bold text-(--brc-text)">
+                {pendingBooking.slot.center.company_name}
+              </span>{" "}
+              will be released and the listing returns to &ldquo;Approved — ready
+              to book&rdquo;. Rebooking later counts toward the center&rsquo;s
+              reschedule limit.
+            </p>
+          )}
+          <DialogFooter className="mt-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setCancelDialogOpen(false)}
+              disabled={cancelBooking.isPending}
+              className="inline-flex h-11 cursor-pointer items-center justify-center rounded-lg border border-(--brc-border) bg-white px-4 text-sm font-bold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+            >
+              Keep Booking
+            </button>
+            <button
+              type="button"
+              onClick={handleCancelBooking}
+              disabled={cancelBooking.isPending}
+              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-danger) px-4 text-sm font-bold text-white transition-all hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+            >
+              {cancelBooking.isPending ? (
+                <Loader2Icon size={15} className="animate-spin" />
+              ) : null}
+              Yes, Cancel Booking
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <BookingModal
         carId={car.id}
         mode={
