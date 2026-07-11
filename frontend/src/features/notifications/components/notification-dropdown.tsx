@@ -22,6 +22,10 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
   request_cancelled: "car",
   requests_auto_rejected: "car",
   listing_suspended: "file",
+  listing_approved: "check",
+  inspection_started: "clock",
+  needs_clearance: "file",
+  clearance_response: "bell",
   inspection_booked: "clock",
   inspection_booking_approved: "check",
   inspection_booking_rejected: "file",
@@ -60,15 +64,19 @@ function resolveHref(notification: NotificationItem, role: UserRole): string {
       return data.request_id ? `/customer/requests/${data.request_id}` : `/${role}/dashboard`;
 
     case "listing_suspended":
+    case "listing_approved":
+    case "inspection_started":
+    case "needs_clearance":
     case "inspection_booking_approved":
     case "inspection_booking_rejected":
     case "inspection_passed":
     case "inspection_failed":
     case "inspection_no_show":
-      return `/owner/my-cars`;
+      return data.car_id ? `/owner/my-cars/${data.car_id}` : `/owner/my-cars`;
 
     case "inspection_booked":
     case "inspection_rescheduled":
+    case "clearance_response":
       return `/admin/approvals`;
 
     case "system":

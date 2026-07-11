@@ -36,12 +36,37 @@ const NOTIFICATION_QUERY_DEPS: Partial<Record<NotificationType, string[][]>> = {
   rental_active: [["requests", "customer"], ["requests", "owner"]],
   rental_completed: [["requests", "customer"], ["requests", "owner"]],
   listing_suspended: [["cars", "admin"], ["cars", "owner"], ["cars", "public"]],
+  listing_approved: [["cars", "owner"], ["inspections", "car-history"]],
   inspection_booked: [["inspections", "admin-bookings"], ["cars", "admin"]],
   inspection_booking_approved: [["cars", "owner"], ["inspections", "bookings"]],
   inspection_booking_rejected: [["cars", "owner"], ["inspections", "bookings"]],
-  inspection_passed: [["cars", "owner"], ["cars", "public"], ["inspections", "bookings"]],
-  inspection_failed: [["cars", "owner"], ["inspections", "bookings"]],
-  inspection_no_show: [["cars", "owner"], ["inspections", "bookings"]],
+  inspection_started: [
+    ["cars", "owner"],
+    ["inspections", "bookings"],
+    ["inspections", "car-history"],
+  ],
+  needs_clearance: [
+    ["cars", "owner"],
+    ["inspections", "bookings"],
+    ["inspections", "car-history"],
+  ],
+  clearance_response: [["cars", "admin"], ["inspections", "admin-bookings"]],
+  inspection_passed: [
+    ["cars", "owner"],
+    ["cars", "public"],
+    ["inspections", "bookings"],
+    ["inspections", "car-history"],
+  ],
+  inspection_failed: [
+    ["cars", "owner"],
+    ["inspections", "bookings"],
+    ["inspections", "car-history"],
+  ],
+  inspection_no_show: [
+    ["cars", "owner"],
+    ["inspections", "bookings"],
+    ["inspections", "car-history"],
+  ],
   inspection_rescheduled: [["inspections", "admin-bookings"], ["cars", "admin"]],
 };
 
