@@ -80,7 +80,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 // ── Condition level picker ──
 function ConditionPicker({ value, onChange }: { value: ConditionLevel | ""; onChange: (v: ConditionLevel) => void }) {
   return (
-    <div className="grid grid-cols-4 gap-2">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {CONDITION_LEVELS.map((c) => {
         const active = value === c.value;
         return (
@@ -89,7 +89,7 @@ function ConditionPicker({ value, onChange }: { value: ConditionLevel | ""; onCh
             type="button"
             onClick={() => onChange(c.value)}
             className={cn(
-              "flex h-10 cursor-pointer items-center justify-center rounded-lg border text-[13px] font-semibold transition-colors [font-family:var(--brc-font-ui)]",
+              "flex min-h-10 cursor-pointer items-center justify-center rounded-lg border px-1 py-1.5 text-center text-[13px] font-semibold leading-tight transition-colors [font-family:var(--brc-font-ui)]",
               active ? "border-(--brc-primary) bg-(--brc-primary-tint) text-(--brc-primary)" : "border-(--brc-border) bg-white text-(--brc-text-secondary) hover:bg-(--brc-bg-subtle)"
             )}
           >
@@ -561,11 +561,11 @@ export default function StaffInspectionFormPage() {
         </FormSection>
 
         {/* Submit bar */}
-        <div className="flex items-center justify-end gap-3 pb-4">
+        <div className="flex flex-col-reverse gap-3 pb-4 sm:flex-row sm:items-center sm:justify-end">
           <button
             type="button"
             onClick={() => router.push("/admin/approvals")}
-            className="flex h-[46px] cursor-pointer items-center rounded-lg border border-(--brc-border) bg-white px-5 text-sm font-bold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
+            className="flex h-[46px] w-full cursor-pointer items-center justify-center rounded-lg border border-(--brc-border) bg-white px-5 text-sm font-bold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)] sm:w-auto"
           >
             Cancel
           </button>
@@ -573,7 +573,7 @@ export default function StaffInspectionFormPage() {
             type="button"
             disabled={!isFormValid || isSubmitting}
             onClick={handleSubmit}
-            className="flex h-[46px] cursor-pointer items-center gap-2 rounded-lg border-none bg-(--brc-primary) px-6 text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]"
+            className="flex h-[46px] w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) px-6 text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)] sm:w-auto"
           >
             {isSubmitting ? <Loader2Icon size={16} className="animate-spin" /> : null}
             Submit Inspection

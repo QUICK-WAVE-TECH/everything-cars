@@ -185,7 +185,14 @@ function StepDot({ step, current, label }: { step: number; current: number; labe
       >
         {done ? <CheckCircle2Icon size={14} /> : step}
       </span>
-      <span className="truncate text-sm font-bold [font-family:var(--brc-font-ui)]">
+      <span
+        className={cn(
+          "truncate text-sm font-bold [font-family:var(--brc-font-ui)]",
+          // On phones only the active step shows its label so the stepper
+          // stays on one compact row; all labels show from sm up.
+          active ? "inline" : "hidden sm:inline",
+        )}
+      >
         {label}
       </span>
     </div>
@@ -502,7 +509,7 @@ export function BookingModal({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="max-h-[calc(100vh-2rem)] gap-0 overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-0 shadow-[0_34px_90px_rgba(18,18,18,0.22)] sm:max-w-[940px]"
+        className="grid max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-0 shadow-[0_34px_90px_rgba(18,18,18,0.22)] sm:max-w-[940px]"
         showCloseButton={!isConfirming}
       >
         <DialogHeader className="border-b border-(--brc-border) bg-white px-5 py-5 sm:px-7">
@@ -542,7 +549,7 @@ export function BookingModal({
           </div>
         </DialogHeader>
 
-        <div className="grid max-h-[calc(100dvh-250px)] min-h-[min(430px,calc(100dvh-300px))] overflow-y-auto bg-(--brc-bg-subtle) lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid min-h-0 overflow-y-auto bg-(--brc-bg-subtle) lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="min-w-0 p-4 sm:p-6">
             <div className="rounded-2xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] sm:p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

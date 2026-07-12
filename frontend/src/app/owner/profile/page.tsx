@@ -207,50 +207,67 @@ export default function OwnerProfilePage() {
         {/* Account card */}
         <Card className="rounded-(--brc-radius-lg) border border-(--brc-border) p-[clamp(20px,3vw,32px)] shadow-none">
           <CardContent className="flex flex-col gap-7 p-0">
-            {/* Identity row */}
-            <div className="flex flex-wrap items-center gap-[18px]">
-              <span className="flex size-[88px] shrink-0 items-center justify-center rounded-full bg-(--brc-primary-tint) text-[30px] font-extrabold text-(--brc-primary) [font-family:var(--brc-font-display)]">
-                {initials(`${user.first_name} ${user.last_name}`)}
-              </span>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[22px] font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
-                  {user.first_name} {user.last_name}
+            {/* Identity header */}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-start gap-4 sm:items-center sm:gap-[18px]">
+                <span className="flex size-16 shrink-0 items-center justify-center rounded-full bg-(--brc-primary-tint) text-2xl font-extrabold text-(--brc-primary) [font-family:var(--brc-font-display)] sm:size-[88px] sm:text-[30px]">
+                  {initials(`${user.first_name} ${user.last_name}`)}
                 </span>
-                <span className="text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                  {user.email}
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-(--brc-accent-bg) px-3 py-1 text-xs font-semibold text-(--brc-accent) [font-family:var(--brc-font-ui)]">
-                    <span className="size-[7px] rounded-full bg-(--brc-accent)" />
-                    Owner Account
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <span className="truncate text-lg font-bold text-(--brc-text) [font-family:var(--brc-font-ui)] sm:text-[22px]">
+                    {user.first_name} {user.last_name}
                   </span>
-                  {profile?.is_verified && (
-                    <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-(--brc-success-bg) px-3 py-1 text-xs font-semibold text-(--brc-success) [font-family:var(--brc-font-ui)]">
-                      Verified
+                  <span className="truncate text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                    {user.email}
+                  </span>
+                  {/* Badges — under the name on desktop */}
+                  <div className="hidden flex-wrap items-center gap-2 sm:flex">
+                    <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-(--brc-accent-bg) px-3 py-1 text-xs font-semibold text-(--brc-accent) [font-family:var(--brc-font-ui)]">
+                      <span className="size-[7px] rounded-full bg-(--brc-accent)" />
+                      Owner Account
                     </span>
+                    {profile?.is_verified && (
+                      <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-(--brc-success-bg) px-3 py-1 text-xs font-semibold text-(--brc-success) [font-family:var(--brc-font-ui)]">
+                        Verified
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {/* Edit button — pinned top-right; icon-only on mobile */}
+                <div className="shrink-0">
+                  {!editing ? (
+                    <button
+                      type="button"
+                      onClick={startEditing}
+                      aria-label="Edit Profile"
+                      className="flex cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-3 py-2.5 text-sm font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)] sm:px-4"
+                    >
+                      <PencilIcon size={16} />
+                      <span className="hidden sm:inline">Edit Profile</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={cancelEditing}
+                      aria-label="Cancel"
+                      className="flex cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-3 py-2.5 text-sm font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)] sm:px-4"
+                    >
+                      <XIcon size={16} />
+                      <span className="hidden sm:inline">Cancel</span>
+                    </button>
                   )}
                 </div>
               </div>
-              {/* Edit button */}
-              <div className="ml-auto">
-                {!editing ? (
-                  <button
-                    type="button"
-                    onClick={startEditing}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-4 py-2.5 text-sm font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
-                  >
-                    <PencilIcon size={16} />
-                    Edit Profile
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={cancelEditing}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-4 py-2.5 text-sm font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
-                  >
-                    <XIcon size={16} />
-                    Cancel
-                  </button>
+              {/* Badges — full-width row on mobile so both fit on one line */}
+              <div className="flex flex-wrap items-center gap-2 sm:hidden">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-(--brc-accent-bg) px-3 py-1 text-xs font-semibold text-(--brc-accent) [font-family:var(--brc-font-ui)]">
+                  <span className="size-[7px] rounded-full bg-(--brc-accent)" />
+                  Owner Account
+                </span>
+                {profile?.is_verified && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-(--brc-success-bg) px-3 py-1 text-xs font-semibold text-(--brc-success) [font-family:var(--brc-font-ui)]">
+                    Verified
+                  </span>
                 )}
               </div>
             </div>

@@ -387,7 +387,7 @@ function FilterSidebar({
   const [showAllBrands, setShowAllBrands] = useState(false);
   const visibleBrands = showAllBrands ? availableBrands : availableBrands.slice(0, 5);
 
-  const maxPrice = mode === "rent" ? 200000 : 100000000;
+  const maxPrice = mode === "rent" ? 1000000 : 500000000;
   const minPrice = 0;
 
   const availOptions = mode === "rent"
@@ -654,7 +654,7 @@ export function ServicesListing() {
     availability: "All",
     state: ALL_STATES_LABEL,
     city: ALL_CITIES_LABEL,
-    price: [0, 200000],
+    price: [0, 1000000],
   });
 
   const modeData = SERVICE_MODES[mode];
@@ -734,7 +734,7 @@ export function ServicesListing() {
       availability: "All",
       state: ALL_STATES_LABEL,
       city: ALL_CITIES_LABEL,
-      price: m === "rent" ? [0, 200000] : [0, 100000000],
+      price: m === "rent" ? [0, 1000000] : [0, 500000000],
     });
   }
 

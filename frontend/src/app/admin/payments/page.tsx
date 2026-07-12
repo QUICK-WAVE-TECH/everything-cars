@@ -35,17 +35,17 @@ const TABS: { key: TabKey; label: string }[] = [
 // ── KPI Card ──
 function KpiCard({ icon, label, value, accent }: { icon: IconName; label: string; value: number; accent: string }) {
   return (
-    <div className="group/kpi relative isolate flex min-w-[200px] flex-1 overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-[1px] shadow-[var(--brc-shadow-xs)] transition-all duration-300 ease-out hover:-translate-y-1 hover:border-transparent hover:shadow-[0_18px_38px_rgba(0,0,139,0.12)]">
+    <div className="group/kpi relative isolate flex min-w-0 overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-[1px] shadow-[var(--brc-shadow-xs)] transition-all duration-300 ease-out hover:-translate-y-1 hover:border-transparent hover:shadow-[0_18px_38px_rgba(0,0,139,0.12)]">
       <span className="pointer-events-none absolute inset-x-0 top-0 h-px opacity-0 transition-opacity duration-300 group-hover/kpi:opacity-100" style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }} />
-      <div className="relative z-10 flex w-full flex-col gap-3 rounded-[calc(1rem-1px)] bg-white p-5">
+      <div className="relative z-10 flex w-full min-w-0 flex-col gap-3 rounded-[calc(1rem-1px)] bg-white p-4 sm:p-5">
         <div className="flex items-center justify-between">
-          <span className="flex size-11 items-center justify-center rounded-xl border transition-transform duration-300 ease-out group-hover/kpi:scale-110 group-hover/kpi:-rotate-3" style={{ background: `color-mix(in srgb, ${accent} 13%, #fff)`, borderColor: `color-mix(in srgb, ${accent} 22%, transparent)` }}>
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border transition-transform duration-300 ease-out group-hover/kpi:scale-110 group-hover/kpi:-rotate-3 sm:size-11" style={{ background: `color-mix(in srgb, ${accent} 13%, #fff)`, borderColor: `color-mix(in srgb, ${accent} 22%, transparent)` }}>
             <Icon name={icon} size={21} stroke={accent} />
           </span>
         </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-[36px] font-extrabold leading-none tracking-tight text-(--brc-text) [font-family:var(--brc-font-display)]">{value}</span>
-          <span className="text-xs font-semibold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{label}</span>
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="truncate text-[26px] font-extrabold leading-none tracking-tight text-(--brc-text) [font-family:var(--brc-font-display)] sm:text-[36px]">{value}</span>
+          <span className="truncate text-xs font-semibold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{label}</span>
         </div>
       </div>
     </div>
@@ -147,13 +147,13 @@ function PaymentDrawer({ requestId, open, onClose, onConfirmed }: {
               <section className="flex flex-col gap-3">
                 <h3 className="m-0 text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Parties</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border border-(--brc-border) p-3.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Customer (Payer)</span>
-                    <span className="mt-1 block text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">{customerName}</span>
+                  <div className="min-w-0 rounded-lg border border-(--brc-border) p-3.5">
+                    <span className="block truncate text-[11px] font-semibold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Customer (Payer)</span>
+                    <span className="mt-1 block truncate text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">{customerName}</span>
                   </div>
-                  <div className="rounded-lg border border-(--brc-border) p-3.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Owner (Receiver)</span>
-                    <span className="mt-1 block text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">{ownerName}</span>
+                  <div className="min-w-0 rounded-lg border border-(--brc-border) p-3.5">
+                    <span className="block truncate text-[11px] font-semibold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Owner (Receiver)</span>
+                    <span className="mt-1 block truncate text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">{ownerName}</span>
                   </div>
                 </div>
               </section>
@@ -260,6 +260,56 @@ function PaymentDrawer({ requestId, open, onClose, onConfirmed }: {
   );
 }
 
+// ── Mobile card (md:hidden) ──
+function MobileRequestCard({ req, onOpen }: { req: RequestListItem; onOpen: (req: RequestListItem) => void }) {
+  return (
+    <div
+      onClick={() => onOpen(req)}
+      className="cursor-pointer rounded-xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] transition-colors active:bg-(--brc-bg-subtle)"
+    >
+      <div className="flex items-center gap-3">
+        <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-(--brc-bg-subtle)">
+          {req.car.primary_image ? (
+            <Image src={req.car.primary_image} alt="" width={44} height={33} className="object-contain" />
+          ) : (
+            <Icon name="car" size={18} stroke="var(--brc-text-muted)" />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">{req.car.title}</span>
+          <span className="block truncate text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{req.car.year} · {req.car.brand}</span>
+        </div>
+        <StatusBadge status={req.status} />
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="min-w-0 rounded-lg bg-(--brc-bg-subtle) px-2.5 py-2">
+          <span className="block text-[11px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Customer</span>
+          <span className="block truncate text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">{req.customer.first_name} {req.customer.last_name}</span>
+        </div>
+        <div className="min-w-0 rounded-lg bg-(--brc-bg-subtle) px-2.5 py-2">
+          <span className="block text-[11px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Amount</span>
+          <span className="block truncate text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">{fmtMoney(req.price_offered, req.currency)}</span>
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+          {req.request_type === "rent" ? "Rent" : "Buy"} · {formatDate(req.created_at)}
+        </span>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onOpen(req); }}
+          className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-(--brc-border) bg-white px-3 text-[13px] font-bold text-(--brc-primary) [font-family:var(--brc-font-ui)]"
+        >
+          <span>{req.status === "payment_submitted" ? "Verify" : "View"}</span>
+          <Icon name="chevright" size={12} stroke="currentColor" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──
 const PAGE_SIZE = 20;
 
@@ -330,7 +380,7 @@ export default function AdminPaymentsPage() {
 
       <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-(--brc-space-10,40px)">
         {/* KPI Cards */}
-        <div className="flex flex-wrap gap-[18px]">
+        <div className="grid grid-cols-2 gap-3 sm:gap-[18px] lg:grid-cols-4">
           <KpiCard icon="clock" label="Awaiting Verification" value={counts.payment_submitted} accent="#C8870B" />
           <KpiCard icon="check" label="Confirmed" value={counts.paid} accent="var(--brc-success)" />
           <KpiCard icon="car" label="Active Rentals" value={counts.active} accent="var(--brc-primary)" />
@@ -339,13 +389,13 @@ export default function AdminPaymentsPage() {
 
         {/* Table card */}
         <div className="flex flex-col gap-4 rounded-2xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div className="min-w-0">
               <h2 className="m-0 text-xl font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">Payment queue</h2>
               <p className="mt-1 text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Customer payments awaiting verification</p>
             </div>
             {counts.payment_submitted > 0 && (
-              <span className="inline-flex items-center gap-2 rounded-full bg-(--brc-warning-bg) px-3.5 py-1.5 text-[13px] font-bold text-[#9a7400] [font-family:var(--brc-font-ui)]">
+              <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-(--brc-warning-bg) px-3.5 py-1.5 text-[13px] font-bold text-[#9a7400] [font-family:var(--brc-font-ui)]">
                 <span className="size-[7px] rounded-full bg-[#C8870B]" />
                 {counts.payment_submitted} awaiting
               </span>
@@ -358,7 +408,7 @@ export default function AdminPaymentsPage() {
               const active = t.key === tab;
               return (
                 <button key={t.key} type="button" onClick={() => { setTab(t.key); setPage(1); }}
-                  className={cn("relative flex cursor-pointer items-center gap-2 whitespace-nowrap border-none bg-transparent px-3.5 pb-3 pt-2.5 text-sm transition-colors [font-family:var(--brc-font-ui)]", active ? "font-bold text-(--brc-primary)" : "font-medium text-(--brc-text-muted) hover:text-(--brc-text)")}>
+                  className={cn("relative flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap border-none bg-transparent px-3.5 pb-3 pt-2.5 text-sm transition-colors [font-family:var(--brc-font-ui)]", active ? "font-bold text-(--brc-primary)" : "font-medium text-(--brc-text-muted) hover:text-(--brc-text)")}>
                   {t.label}
                   <span className={cn("inline-flex h-[18px] items-center rounded-full px-[7px] text-[11px] font-bold", active ? "bg-(--brc-primary-tint) text-(--brc-primary)" : "bg-(--brc-bg-muted) text-(--brc-text-muted)")}>
                     {counts[t.key]}
@@ -383,16 +433,25 @@ export default function AdminPaymentsPage() {
             </div>
           )}
 
-          {/* Table */}
+          {/* Table / Mobile list */}
           {showSkeleton ? (
-            <div className="flex flex-col gap-1">
-              <Skeleton className="h-12 w-full rounded-lg" />
-              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+            <div className="flex flex-col gap-2 md:gap-1">
+              <Skeleton className="hidden h-12 w-full rounded-lg md:block" />
+              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg md:rounded-none" />)}
             </div>
           ) : requests.length === 0 ? (
             <div className="py-12 text-center text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">No requests match your filters.</div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              {/* Mobile cards */}
+              <div className="flex flex-col gap-3 md:hidden">
+                {requests.map((req) => (
+                  <MobileRequestCard key={req.id} req={req} onOpen={openDrawer} />
+                ))}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden overflow-x-auto md:block">
               <table className="w-full border-collapse" style={{ minWidth: 860 }}>
                 <thead>
                   <tr className="bg-(--brc-bg-subtle)">
@@ -454,7 +513,8 @@ export default function AdminPaymentsPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
 
           {/* Pagination */}

@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumb, FilterPopover, Pagination, RowMenu, type FilterField, type FilterValues } from "@/shared/components";
 import { OwnerStats, StatusBadge } from "@/features/requests";
 import { useOwnerRequests, useRequestAction } from "@/features/requests/api";
+import type { RequestListItem } from "@/features/requests/api";
 
 const PAGE_SIZE = 7;
 const COLUMNS = ["Car", "Type", "Customer", "Price", "Duration", "Start Date", "Status"];
@@ -61,6 +62,83 @@ function formatPrice(amount: string, currency: string): string {
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function RequestDetailChip({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-lg bg-(--brc-bg-subtle) px-3 py-2">
+      <span className="block text-[10px] font-semibold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+        {label}
+      </span>
+      <span className="mt-0.5 block truncate text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function MobileRequestCard({
+  request,
+  onView,
+  onAction,
+}: {
+  request: RequestListItem;
+  onView: () => void;
+  onAction: (action: "approve" | "reject") => void;
+}) {
+  return (
+    <article
+      onClick={onView}
+      className="cursor-pointer rounded-lg border border-(--brc-border) bg-white p-4 shadow-[0_10px_26px_rgba(18,18,18,0.05)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(18,18,18,0.08)]"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="m-0 truncate text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+            {request.car.title}
+          </h3>
+          <p className="mt-1 truncate text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+            {request.customer.first_name} {request.customer.last_name}
+          </p>
+        </div>
+        <StatusBadge status={request.status} />
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <RequestDetailChip label="Type" value={request.request_type === "rent" ? "Rent" : "Buy"} />
+        <RequestDetailChip label="Price" value={formatPrice(request.price_offered, request.currency)} />
+        <RequestDetailChip label="Duration" value={request.duration_days ? `${request.duration_days} days` : "—"} />
+        <RequestDetailChip label="Start Date" value={request.start_date ? formatDate(request.start_date) : "—"} />
+      </div>
+
+      <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={onView}
+          className="h-9 flex-1 cursor-pointer rounded-lg border border-(--brc-border) bg-white text-xs font-bold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
+        >
+          View Details
+        </button>
+        {request.status === "pending" && (
+          <>
+            <button
+              type="button"
+              onClick={() => onAction("approve")}
+              className="h-9 flex-1 cursor-pointer rounded-lg border-none bg-(--brc-success) text-xs font-bold text-white transition-colors hover:brightness-95 [font-family:var(--brc-font-ui)]"
+            >
+              Approve
+            </button>
+            <button
+              type="button"
+              onClick={() => onAction("reject")}
+              className="h-9 flex-1 cursor-pointer rounded-lg border border-(--brc-danger)/40 bg-white text-xs font-bold text-(--brc-danger) transition-colors hover:bg-(--brc-danger-bg) [font-family:var(--brc-font-ui)]"
+            >
+              Reject
+            </button>
+          </>
+        )}
+      </div>
+    </article>
+  );
 }
 
 export default function OwnerRequestsPage() {
@@ -189,8 +267,26 @@ export default function OwnerRequestsPage() {
                 />
               </div>
 
+              {/* Mobile card list */}
+              <div className="flex flex-col gap-3 md:hidden">
+                {rows.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                    No requests match your filters.
+                  </div>
+                ) : (
+                  rows.map((r) => (
+                    <MobileRequestCard
+                      key={r.id}
+                      request={r}
+                      onView={() => router.push(`/owner/requests/${r.id}`)}
+                      onAction={(action) => handleAction(r.id, action)}
+                    />
+                  ))
+                )}
+              </div>
+
               {/* Table */}
-              <div style={{ overflowX: "auto" }}>
+              <div className="hidden md:block" style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 930, tableLayout: "fixed" }}>
                   <colgroup>
                     {COLUMN_WIDTHS.map((width, index) => (

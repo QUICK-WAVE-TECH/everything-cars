@@ -2,6 +2,14 @@ from .base import *  # noqa: F401,F403
 
 DEBUG = True
 
+# WebSocket channel layer — use the in-memory backend locally so dev doesn't
+# require a running Redis server (Redis is awkward to run on Windows). This
+# keeps notifications/WebSockets working within the single dev process.
+# Production still uses Redis PubSub (see base.py / production.py).
+CHANNEL_LAYERS = {  # noqa: F405
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
+}
+
 # CORS — allow all in dev
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True

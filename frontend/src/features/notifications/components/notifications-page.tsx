@@ -133,7 +133,7 @@ function NotificationCard({ n, role, onRead }: { n: NotificationItem; role: View
 
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-          <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: n.is_read ? 500 : 700, fontSize: 15, color: "var(--brc-text)" }}>
+          <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: n.is_read ? 500 : 700, fontSize: 15, color: "var(--brc-text)", minWidth: 0, overflowWrap: "anywhere" }}>
             {n.title}
           </span>
           <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 12, color: "var(--brc-text-muted)", whiteSpace: "nowrap" }}>
@@ -193,11 +193,13 @@ export function NotificationsPage({ role }: { role: ViewerRole }) {
           </div>
           {unreadCount > 0 && (
             <button
+              className="notif-markall"
               onClick={() => markAllRead.mutate()}
               disabled={markAllRead.isPending}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
+                justifyContent: "center",
                 gap: 8,
                 height: 46,
                 padding: "0 20px",
@@ -252,6 +254,11 @@ export function NotificationsPage({ role }: { role: ViewerRole }) {
           </div>
         )}
       </div>
+      <style>{`
+        @media (max-width: 640px) {
+          .notif-markall { width: 100%; }
+        }
+      `}</style>
     </div>
   );
 }

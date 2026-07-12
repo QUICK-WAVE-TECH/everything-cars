@@ -750,7 +750,7 @@ export default function MyCarsPage() {
             <Skeleton className="h-12 w-32 rounded-lg" />
           </div>
           {/* Stat cards skeleton */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 rounded-lg border border-(--brc-border) bg-white p-4 sm:p-5">
                 <Skeleton className="size-8 rounded-full" />
@@ -819,7 +819,7 @@ export default function MyCarsPage() {
           </div>
 
           {/* Stat cards */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {STATS.map((stat) => (
               <StatCard key={stat.label} stat={stat} value={statValues[stat.key] ?? "0"} />
             ))}
@@ -898,9 +898,9 @@ export default function MyCarsPage() {
                 <div className="px-4 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Car</span></div>
                 <div className="px-2 py-3 text-center"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Type</span></div>
                 <div className="px-3 py-3 text-right"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Price</span></div>
-                <div className="px-3 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Status</span></div>
-                <div className="px-3 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Appointment</span></div>
-                <div className="px-3 py-3"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Action</span></div>
+                <div className="px-3 py-3 text-center"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Status</span></div>
+                <div className="px-3 py-3 text-center"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Appointment</span></div>
+                <div className="px-3 py-3 text-center"><span className="text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Action</span></div>
                 <div />
               </div>
 
@@ -947,16 +947,16 @@ export default function MyCarsPage() {
                       <div className="flex min-w-0 items-center justify-end px-3 py-3 text-right">
                         <span className="truncate text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">{r.price}</span>
                       </div>
-                      <div className="flex min-w-0 items-center px-3 py-3">
+                      <div className="flex min-w-0 items-center justify-center px-3 py-3">
                         <StatusBadge status={r.status} />
                       </div>
-                      <div className="flex min-w-0 items-center px-3 py-3">
+                      <div className="flex min-w-0 flex-col items-center justify-center px-3 py-3 text-center">
                         <AppointmentCell
                           listing={r}
                           booking={bookingByCarId[r.id]}
                         />
                       </div>
-                      <div className="flex min-w-0 items-center px-3 py-3">
+                      <div className="flex min-w-0 items-center justify-center px-3 py-3">
                         <ActionCell
                           listing={r}
                           onBook={handleOpenBooking}

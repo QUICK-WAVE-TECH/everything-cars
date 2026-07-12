@@ -308,7 +308,7 @@ function CenterFormDialog({
             />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3">
             <CountrySelect value={form.countryIso} onChange={handleCountryChange} label="Country" />
             <StateSelect country={countryName} value={form.state} onChange={handleStateChange} label="State" />
           </div>
@@ -321,7 +321,7 @@ function CenterFormDialog({
             label="City"
           />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3">
             <div>
               <label style={labelStyle}>Country code</label>
               <Input
@@ -354,7 +354,7 @@ function CenterFormDialog({
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3">
             <div>
               <label style={labelStyle}>Phone</label>
               <Input
@@ -558,6 +558,106 @@ function ConfirmToggleDialog({
   );
 }
 
+// ── Mobile card (md:hidden) ──
+
+function MobileCenterCard({
+  center,
+  onEdit,
+  onToggle,
+}: {
+  center: InspectionCenter;
+  onEdit: (center: InspectionCenter) => void;
+  onToggle: (center: InspectionCenter) => void;
+}) {
+  return (
+    <div
+      style={{
+        background: "white",
+        border: "1px solid var(--brc-border)",
+        borderRadius: 16,
+        padding: 16,
+      }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className="block truncate text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+            {center.company_name}
+          </span>
+          <span className="block truncate text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+            {center.address}
+          </span>
+        </div>
+        <span
+          className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold [font-family:var(--brc-font-ui)]"
+          style={{
+            background: center.is_active ? "var(--brc-success-bg, #d4edda)" : "var(--brc-bg-muted)",
+            color: center.is_active ? "var(--brc-success)" : "var(--brc-text-muted)",
+          }}
+        >
+          <span
+            className="size-1.5 rounded-full"
+            style={{ background: center.is_active ? "var(--brc-success)" : "var(--brc-text-muted)" }}
+          />
+          {center.is_active ? "Active" : "Inactive"}
+        </span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2.5">
+        <div className="min-w-0 rounded-lg bg-(--brc-bg-subtle) px-3 py-2">
+          <span className="block text-[11px] font-semibold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+            Location
+          </span>
+          <span className="mt-1 block truncate text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+            {center.city}, {center.state}
+          </span>
+        </div>
+        <div className="min-w-0 rounded-lg bg-(--brc-bg-subtle) px-3 py-2">
+          <span className="block text-[11px] font-semibold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+            Max reschedules
+          </span>
+          <span className="mt-1 block truncate text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+            {center.max_reschedules}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <Badge variant="outline" style={{ fontFamily: "var(--brc-font-ui)" }}>{center.country_code}</Badge>
+        <Badge variant="outline" style={{ fontFamily: "var(--brc-font-ui)" }}>{center.city_code}</Badge>
+      </div>
+
+      <div className="mt-2.5 min-w-0 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+        <span className="block truncate">{center.phone || "—"}</span>
+        <span className="block truncate text-xs text-(--brc-text-muted)">{center.email || "—"}</span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => onEdit(center)}
+          className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-(--brc-border) bg-white text-[13px] font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]"
+        >
+          <PencilIcon size={14} />
+          Edit
+        </button>
+        <button
+          type="button"
+          onClick={() => onToggle(center)}
+          className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg border text-[13px] font-semibold [font-family:var(--brc-font-ui)]"
+          style={{
+            borderColor: center.is_active ? "var(--brc-danger)" : "var(--brc-success)",
+            color: center.is_active ? "var(--brc-danger)" : "var(--brc-success)",
+            background: "white",
+          }}
+        >
+          <PowerIcon size={14} />
+          {center.is_active ? "Deactivate" : "Reactivate"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──
 
 export default function AdminInspectionCentersPage() {
@@ -588,18 +688,13 @@ export default function AdminInspectionCentersPage() {
       {/* Hero band */}
       <section style={{ borderBottom: "1px solid var(--brc-border)", background: "white" }}>
         <div
+          className="flex flex-col items-stretch gap-4 px-4 pt-6 pb-5 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-5 sm:px-6 sm:pt-9 sm:pb-8 lg:px-[var(--brc-space-10,40px)] lg:pt-10 lg:pb-8"
           style={{
             maxWidth: 1320,
             margin: "0 auto",
-            padding: "40px var(--brc-space-10, 40px) 32px",
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            gap: 20,
           }}
         >
-          <div>
+          <div className="min-w-0">
             <Link
               href="/admin/inspections"
               style={{
@@ -659,6 +754,7 @@ export default function AdminInspectionCentersPage() {
           <button
             type="button"
             onClick={openCreate}
+            className="w-full justify-center sm:w-auto sm:justify-start"
             style={{
               display: "flex",
               alignItems: "center",
@@ -683,10 +779,10 @@ export default function AdminInspectionCentersPage() {
       </section>
 
       <div
+        className="px-4 py-6 sm:px-6 sm:py-8 lg:px-[var(--brc-space-10,40px)] lg:py-8"
         style={{
           maxWidth: 1320,
           margin: "0 auto",
-          padding: "32px var(--brc-space-10, 40px)",
           display: "flex",
           flexDirection: "column",
           gap: 20,
@@ -744,14 +840,29 @@ export default function AdminInspectionCentersPage() {
             </button>
           </div>
         ) : (
-          <div
-            style={{
-              background: "white",
-              border: "1px solid var(--brc-border)",
-              borderRadius: 16,
-              overflow: "hidden",
-            }}
-          >
+          <>
+            {/* Mobile card list */}
+            <div className="flex flex-col gap-3 md:hidden">
+              {centers.map((center) => (
+                <MobileCenterCard
+                  key={center.id}
+                  center={center}
+                  onEdit={openEdit}
+                  onToggle={setToggleCenter}
+                />
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div
+              className="hidden md:block"
+              style={{
+                background: "white",
+                border: "1px solid var(--brc-border)",
+                borderRadius: 16,
+                overflow: "hidden",
+              }}
+            >
             <div style={{ overflowX: "auto" }}>
               <table className="w-full border-collapse" style={{ minWidth: 860 }}>
                 <thead>
@@ -842,7 +953,8 @@ export default function AdminInspectionCentersPage() {
                 </tbody>
               </table>
             </div>
-          </div>
+            </div>
+          </>
         )}
       </div>
 

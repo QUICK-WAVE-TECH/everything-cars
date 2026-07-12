@@ -577,3 +577,17 @@ canvas {
   .pay-grid { grid-template-columns: 1fr !important; }
   .pay-grid aside { position: static !important; }
 }
+
+/* Admin tab bar: slim, unobtrusive horizontal scrollbar (replaces the chunky
+   default OS bar). Tabs themselves are shrink-0 so they scroll, not overlap. */
+.ec-tabscroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--brc-border) transparent;
+}
+.ec-tabscroll::-webkit-scrollbar { height: 6px; }
+.ec-tabscroll::-webkit-scrollbar-track { background: transparent; }
+.ec-tabscroll::-webkit-scrollbar-thumb {
+  background: var(--brc-border);
+  border-radius: 9999px;
+}
+.ec-tabscroll::-webkit-scrollbar-thumb:hover { background: var(--brc-text-muted); }

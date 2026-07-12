@@ -412,7 +412,7 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
           }}
         >
           {/* Date range */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3">
             <div>
               <label style={labelStyle}>Date from</label>
               <input
@@ -499,27 +499,30 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {timeSlots.map((slot, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <input
-                    type="time"
-                    required
-                    value={slot.start_time}
-                    onChange={(e) => updateTimeSlot(i, "start_time", e.target.value)}
-                    style={{ ...inputStyle, flex: 1 }}
-                  />
-                  <span style={{ fontSize: 13, color: "var(--brc-text-muted)", fontFamily: "var(--brc-font-ui)", flexShrink: 0 }}>to</span>
-                  <input
-                    type="time"
-                    required
-                    value={slot.end_time}
-                    onChange={(e) => updateTimeSlot(i, "end_time", e.target.value)}
-                    style={{ ...inputStyle, flex: 1 }}
-                  />
+                <div key={i} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <input
+                      type="time"
+                      required
+                      value={slot.start_time}
+                      onChange={(e) => updateTimeSlot(i, "start_time", e.target.value)}
+                      style={{ ...inputStyle, flex: 1 }}
+                    />
+                    <span style={{ fontSize: 13, color: "var(--brc-text-muted)", fontFamily: "var(--brc-font-ui)", flexShrink: 0 }}>to</span>
+                    <input
+                      type="time"
+                      required
+                      value={slot.end_time}
+                      onChange={(e) => updateTimeSlot(i, "end_time", e.target.value)}
+                      style={{ ...inputStyle, flex: 1 }}
+                    />
+                  </div>
                   {timeSlots.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeTimeSlot(i)}
                       aria-label="Remove time slot"
+                      className="self-end sm:self-auto"
                       style={{
                         flexShrink: 0,
                         display: "flex",
@@ -543,7 +546,7 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
           </div>
 
           {/* Capacity + Location */}
-          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 12 }}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[120px_1fr] sm:gap-3">
             <div>
               <label style={labelStyle}>Capacity</label>
               <input
@@ -863,15 +866,12 @@ export default function AdminInspectionsPage() {
       {/* Hero band */}
       <section style={{ borderBottom: "1px solid var(--brc-border)", background: "white" }}>
         <div
+          className="flex flex-col gap-5 px-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-5 sm:px-6 lg:px-[var(--brc-space-10,40px)]"
           style={{
             maxWidth: 1320,
             margin: "0 auto",
-            padding: "40px var(--brc-space-10, 40px) 32px",
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            gap: 20,
+            paddingTop: 40,
+            paddingBottom: 32,
           }}
         >
           <div>
@@ -913,12 +913,14 @@ export default function AdminInspectionsPage() {
             </p>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row sm:items-center sm:gap-2.5">
             <Link
               href="/admin/inspections/centers"
+              className="w-full sm:w-auto"
               style={{
                 display: "flex",
                 alignItems: "center",
+                justifyContent: "center",
                 gap: 8,
                 height: 46,
                 padding: "0 20px",
@@ -938,9 +940,11 @@ export default function AdminInspectionsPage() {
             <button
               type="button"
               onClick={() => setModalOpen(true)}
+              className="w-full sm:w-auto"
               style={{
                 display: "flex",
                 alignItems: "center",
+                justifyContent: "center",
                 gap: 8,
                 height: 46,
                 padding: "0 22px",
@@ -963,10 +967,12 @@ export default function AdminInspectionsPage() {
       </section>
 
       <div
+        className="px-4 sm:px-6 lg:px-[var(--brc-space-10,40px)]"
         style={{
           maxWidth: 1320,
           margin: "0 auto",
-          padding: "32px var(--brc-space-10, 40px)",
+          paddingTop: 32,
+          paddingBottom: 32,
           display: "flex",
           flexDirection: "column",
           gap: 20,
@@ -983,7 +989,7 @@ export default function AdminInspectionsPage() {
           }}
         >
           {/* Week navigation */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={prevWeek}
@@ -1004,8 +1010,8 @@ export default function AdminInspectionsPage() {
             </button>
 
             <div
+              className="sm:min-w-[220px]"
               style={{
-                minWidth: 220,
                 textAlign: "center",
                 fontSize: 15,
                 fontWeight: 700,
@@ -1066,7 +1072,7 @@ export default function AdminInspectionsPage() {
 
         {/* Slot summary */}
         {!isLoading && (
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-4">
             {[
               { label: "Total slots", value: slots.length },
               { label: "Open", value: slots.filter((s) => s.bookings_count === 0).length },
@@ -1075,6 +1081,7 @@ export default function AdminInspectionsPage() {
             ].map((stat) => (
               <div
                 key={stat.label}
+                className="min-w-0 sm:min-w-[90px]"
                 style={{
                   background: "white",
                   border: "1px solid var(--brc-border)",
@@ -1083,7 +1090,6 @@ export default function AdminInspectionsPage() {
                   display: "flex",
                   flexDirection: "column",
                   gap: 2,
-                  minWidth: 90,
                 }}
               >
                 <span
