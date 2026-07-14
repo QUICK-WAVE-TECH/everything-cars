@@ -78,14 +78,23 @@ export function FormSubmitOverlay() {
   const shownAt = useRef(0);
   useScrollLock(phase !== "hidden");
 
+  // Show the overlay the instant a mutation starts — done during render
+  // (state-adjustment pattern) rather than in an effect, so the covered
+  // frame never paints and the lint rule against effect-setState holds.
+  if (mutating > 0 && phase !== "shown") {
+    setPhase("shown");
+  }
+
+  // Stamp the show time once the transition commits (refs and impure calls
+  // are not allowed during render).
   useEffect(() => {
-    if (mutating > 0) {
-      if (phase !== "shown") {
-        shownAt.current = performance.now();
-        setPhase("shown");
-      }
-      return;
+    if (phase === "shown") {
+      shownAt.current = performance.now();
     }
+  }, [phase]);
+
+  useEffect(() => {
+    if (mutating > 0) return;
     // mutating === 0
     if (phase === "shown") {
       const elapsed = performance.now() - shownAt.current;

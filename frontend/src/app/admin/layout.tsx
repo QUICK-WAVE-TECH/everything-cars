@@ -23,9 +23,13 @@ function AdminNavbar() {
   const { data: unreadData } = useUnreadCount();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  useEffect(() => {
+  // Close the mobile menu on navigation
+  // (state-adjustment-during-render pattern — avoids an effect re-render)
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
     setMenuOpen(false);
-  }, [pathname]);
+  }
 
   function handleSignOut() {
     signOut.mutate(undefined, {
