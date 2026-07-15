@@ -147,6 +147,23 @@ Day-of identity verification (inspector fills at the appointment):
   owner sees on their own pages. No ID or staff-identity data leaks through
   this path.
 
+## 8a. Audit Hardening
+
+- **Actor snapshots:** `CarStatusHistory` gains `actor_name` and `actor_email`
+  text fields, stamped at write time inside `record_status_change`. The
+  `actor` FK is `SET_NULL` — without snapshots, deleting a staff account
+  erases attribution from every action they ever took. Snapshots survive
+  account deletion; the FK remains for joins.
+- **Request forensics:** `CarStatusHistory` also gains `ip_address`
+  (GenericIPAddressField, null) and `user_agent` (text, blank), captured from
+  the request when available. `record_status_change` accepts an optional
+  `request` argument and extracts both; system transitions leave them empty.
+  Staff-only exposure, same as ID data.
+- **Email log:** new `EmailLog` model (recipient, subject, related booking FK
+  nullable, sent_at, success flag, error text) written by the email service on
+  every send attempt — makes "did we notify them, and when" queryable without
+  provider dashboards. Staff-only.
+
 ## 8. Staff-Visible Audit Names
 
 - A staff variant of the history serializer adds `actor_name` (first + last).
@@ -179,7 +196,8 @@ Day-of identity verification (inspector fills at the appointment):
 
 ## Testing
 
-- Backend: per-feature tests in the phase-1 style — attendee validation,
+- Backend: per-feature tests in the phase-1 style — actor snapshot + IP/UA
+  captured on transitions, EmailLog rows written on send, attendee validation,
   consent requirement, ID gate, day-of lockdown boundaries (day before OK,
   day of blocked), assistance request dedup + staff booking on behalf,
   per-row capacity creation, public serializer overlay (and that ID/staff
