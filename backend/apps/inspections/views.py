@@ -458,6 +458,7 @@ class OwnerBookingCreateView(APIView):
                 actor=request.user,
                 actor_role=ActorRole.OWNER,
                 extra_update_fields=extra,
+                request=request,
             )
 
         schedule_notification(
@@ -535,6 +536,7 @@ class OwnerBookingCancelView(APIView):
                 actor=request.user,
                 actor_role=ActorRole.OWNER,
                 note="Inspection booking cancelled.",
+                request=request,
             )
 
         return Response({"detail": "Booking cancelled."})
@@ -639,6 +641,7 @@ class OwnerBookingRescheduleView(APIView):
                     actor=request.user,
                     actor_role=ActorRole.OWNER,
                     note="Inspection rescheduled.",
+                    request=request,
                 )
 
         schedule_notification(
@@ -739,6 +742,7 @@ class StaffInspectionStartView(APIView):
                 CarStatus.INSPECTION_IN_PROGRESS,
                 actor=request.user,
                 actor_role=ActorRole.STAFF,
+                request=request,
             )
 
         schedule_notification(
@@ -879,6 +883,7 @@ class StaffInspectionSubmitView(APIView):
                 actor_role=ActorRole.STAFF,
                 note=inspection.staff_notes,
                 extra_update_fields=extra,
+                request=request,
             )
 
         schedule_notification(
@@ -1012,6 +1017,7 @@ class StaffClearanceResolveView(APIView):
                 actor_role=ActorRole.STAFF,
                 note=note,
                 extra_update_fields=extra,
+                request=request,
             )
 
         schedule_notification(
@@ -1072,6 +1078,7 @@ class OwnerClearanceResponseView(APIView):
                 actor=request.user,
                 actor_role=ActorRole.OWNER,
                 note=message,
+                request=request,
             )
 
         schedule_notification(
@@ -1121,6 +1128,7 @@ class StaffBookingNoShowView(APIView):
                 actor=request.user,
                 actor_role=ActorRole.STAFF,
                 note="Missed inspection appointment.",
+                request=request,
             )
 
         schedule_notification(

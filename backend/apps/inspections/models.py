@@ -257,6 +257,13 @@ class CarStatusHistory(models.Model):
     )
     actor_role = models.CharField(max_length=20, choices=ActorRole.choices)
     note = models.TextField(blank=True, default="")
+    actor_name = models.CharField(max_length=255, blank=True, default="")
+    actor_email = models.CharField(max_length=254, blank=True, default="")
+    actor_phone = models.CharField(max_length=20, blank=True, default="")
+    # Request forensics — who acted, from where. Empty for system transitions
+    # (auto-publish, etc.) since those have no HTTP request behind them.
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

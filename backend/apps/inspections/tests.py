@@ -500,9 +500,7 @@ class StaffInspectionFlowTest(APITestCase):
     def test_submissions_write_history(self):
         self._start()
         self._submit_with_documents(result="passed")
-        transitions = list(
-            self.car.status_history.values_list("to_status", flat=True)
-        )
+        transitions = list(self.car.status_history.values_list("to_status", flat=True))
         self.assertEqual(
             transitions,
             [CarStatus.INSPECTION_IN_PROGRESS, CarStatus.PUBLISHED],
@@ -549,7 +547,9 @@ class InspectionDocumentsTest(APITestCase):
         self.client.post(f"/api/v1/inspections/admin/bookings/{booking.id}/start/")
         res = self.client.post(
             f"/api/v1/inspections/admin/bookings/{booking.id}/inspection/",
-            inspection_form_payload(result="failed", staff_notes="Legacy document upload test"),
+            inspection_form_payload(
+                result="failed", staff_notes="Legacy document upload test"
+            ),
             format="json",
         )
         return res.data["id"]
@@ -843,9 +843,7 @@ class ReviewFixesTest(APITestCase):
 
     def _start_inspection(self):
         self.client.force_authenticate(user=self.staff)
-        self.client.post(
-            f"/api/v1/inspections/admin/bookings/{self.booking.id}/start/"
-        )
+        self.client.post(f"/api/v1/inspections/admin/bookings/{self.booking.id}/start/")
 
     def test_cannot_cancel_mid_inspection(self):
         self._start_inspection()
@@ -975,9 +973,7 @@ class AdminCarHistoryTest(APITestCase):
         create_owner_profile(owner)
         car = create_car(owner, status=CarStatus.INSPECTION_PENDING)
         slot = create_slot(staff)
-        booking = InspectionBooking.objects.create(
-            car=car, slot=slot, booked_by=owner
-        )
+        booking = InspectionBooking.objects.create(car=car, slot=slot, booked_by=owner)
         client = self.client
         client.force_authenticate(user=staff)
         client.post(f"/api/v1/inspections/admin/bookings/{booking.id}/start/")
@@ -1019,8 +1015,11 @@ class CycleCountResetTest(APITestCase):
         old_slot = create_slot(staff, center=center)
         # Previous cycle ended with a completed inspection at the cap
         InspectionBooking.objects.create(
-            car=car, slot=old_slot, booked_by=owner,
-            status=BookingStatus.COMPLETED, reschedule_count=2,
+            car=car,
+            slot=old_slot,
+            booked_by=owner,
+            status=BookingStatus.COMPLETED,
+            reschedule_count=2,
         )
         new_slot = create_slot(staff, days_ahead=9, center=center)
         self.client.force_authenticate(user=owner)
@@ -1059,8 +1058,11 @@ class ClearanceResolveGuardTest(APITestCase):
         car = create_car(owner, status=CarStatus.NEEDS_CLEARANCE)
         slot = create_slot(staff)
         booking = InspectionBooking.objects.create(
-            car=car, slot=slot, booked_by=owner,
-            status=BookingStatus.COMPLETED, staff_note="old clearance note",
+            car=car,
+            slot=slot,
+            booked_by=owner,
+            status=BookingStatus.COMPLETED,
+            staff_note="old clearance note",
         )
         self.client.force_authenticate(user=staff)
         res = self.client.post(
@@ -1080,3 +1082,36 @@ class BookingCarFilterValidationTest(APITestCase):
         self.client.force_authenticate(user=owner)
         res = self.client.get("/api/v1/inspections/bookings/my/?car=not-a-uuid")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class AuditHardeningTest(APITestCase):
+    def test_history_snapshots_actor_identify(self):
+
+        staff = create_user("staff-audit@test.com", "owner", is_staff=True)
+        owner = create_user("owner-audit@test.com", "owner")
+        create_owner_profile(owner)
+        car = create_car(owner, status=CarStatus.DRAFT)
+        self.client.force_authenticate(user=staff)
+        self.client.post(f"/api/v1/listings/admin/cars/{car.id}/approve-listing")
+        entry = car.status_history.get()
+        self.assertEqual(entry.actor_name, f"{staff.first_name} {staff.last_name}")
+        self.assertEqual(entry.actor_email, staff.email)
+        # The snapshot must survive account deletion -> that's  it's whole purpose
+        staff.delete()
+        entry.refresh_from_db()
+        self.assertIsNone(entry.actor)
+        self.assertEqual(entry.actor_email, "staff-audit@test.com")
+
+    def test_history_captures(self):
+        staff = create_user("staff-audit@test.com", "owner", is_staff=True)
+        owner = create_user("owner-audit@test.com", "owner")
+        create_owner_profile(owner)
+        car = create_car(owner, status=CarStatus.DRAFT)
+        self.client.force_authenticate(user=staff)
+        self.client.post(
+            f"/api/v1/listings/admin/cars/{car.id}/approve-listing",
+            HTTP_USER_AGENT="TestBrowser/1.0",
+        )
+        entry = car.status_history.get()
+        self.assertEqual(entry.ip_address, "127.0.0.1")
+        self.assertEqual(entry.user_agent, "TestBrowser/1.0")

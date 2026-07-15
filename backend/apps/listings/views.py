@@ -430,6 +430,7 @@ class MyCarDetailView(APIView):
                 CarStatus.ARCHIVED,
                 actor=request.user,
                 actor_role=ActorRole.OWNER,
+                request=request,
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -747,6 +748,7 @@ class MyCarStatusView(APIView):
                 actor=request.user,
                 actor_role=ActorRole.OWNER,
                 extra_update_fields=extra,
+                request=request,
             )
             if new_status == CarStatus.DRAFT:
                 # needs_changes → draft is a resubmission — tell staff
@@ -1203,6 +1205,7 @@ class AdminCarStatusView(APIView):
                 actor_role=ActorRole.STAFF,
                 note=note,
                 extra_update_fields=extra,
+                request=request,
             )
             notification_map = {
                 CarStatus.SUSPENDED: notify_listing_suspended,
@@ -1568,6 +1571,7 @@ class AdminApproveListingView(APIView):
                 CarStatus.LISTING_APPROVED,
                 actor=request.user,
                 actor_role=ActorRole.STAFF,
+                request=request,
             )
 
         schedule_notification(
