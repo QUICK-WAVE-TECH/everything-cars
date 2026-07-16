@@ -1115,3 +1115,39 @@ class AuditHardeningTest(APITestCase):
         entry = car.status_history.get()
         self.assertEqual(entry.ip_address, "127.0.0.1")
         self.assertEqual(entry.user_agent, "TestBrowser/1.0")
+
+
+class BookingEmailTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user("staff-em@test.com", "owner", is_staff=True)
+        self.owner = create_user("owner-em@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner, status=CarStatus.LISTING_APPROVED)
+        self.center = create_center(self.staff)
+        self.slot = create_slot(self.staff, center=self.center)
+        self.client.force_authenticate(user=self.owner)
+
+    def test_booking_sends_confirmation_and_logs(self):
+        from django.core import mail
+
+        from apps.notifications.models import EmailLog
+
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                "/api/v1/inspections/bookings/",
+                {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
+                format="json",
+            )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        # One email, addressed to the owner, telling them to bring ID.
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["owner-em@test.com"])
+        self.assertIn("bring a valid", mail.outbox[0].body.lower())
+        # The HTML alternative carries the real booking data (car title).
+        html_body = mail.outbox[0].alternatives[0][0]
+        self.assertIn(self.car.title, html_body)
+        # Logged as a successful send tied to the booking.
+        log = EmailLog.objects.get(recipient="owner-em@test.com")
+        self.assertTrue(log.success)
+        self.assertEqual(log.template_key, "inspection_booking_confirmed")
+        self.assertIsNotNone(log.booking_id)

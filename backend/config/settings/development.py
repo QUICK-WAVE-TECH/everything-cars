@@ -14,8 +14,17 @@ CHANNEL_LAYERS = {  # noqa: F405
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
-# Email — print to console in dev
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# Email — deliver to Mailpit in dev (SMTP on :1025, inbox UI at
+# http://localhost:8025). Mailpit captures every message and never relays, so
+# real inboxes are never touched while developing. Start it with `mailpit`.
+# Production reads real SMTP settings from the environment (see production.py).
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "localhost"
+EMAIL_PORT = 1025
+EMAIL_USE_TLS = False
+EMAIL_HOST_USER = ""
+EMAIL_HOST_PASSWORD = ""
+DEFAULT_FROM_EMAIL = "EverythingCars <no-reply@everythingcars.local>"
 
 # Use local file storage in dev
 DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"

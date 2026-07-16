@@ -25,6 +25,7 @@ from apps.notifications.service import (
     notify_inspection_no_show,
     notify_inspection_rescheduled,
 )
+from apps.notifications.email_service import send_booking_confirmation
 from .models import (
     ACTIVE_BOOKING_STATUSES,
     ActorRole,
@@ -463,6 +464,12 @@ class OwnerBookingCreateView(APIView):
 
         schedule_notification(
             notify_inspection_booked,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
+        # Confirmation email to the owner — same on_commit discipline so it only
+        # fires once the booking has actually committed.
+        schedule_notification(
+            send_booking_confirmation,
             lambda bid=booking.id: booking_detail_queryset().get(id=bid),
         )
 
