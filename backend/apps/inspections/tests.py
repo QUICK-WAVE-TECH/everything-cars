@@ -16,6 +16,7 @@ from .models import (
     CarStatusHistory,
     InspectionCenter,
     PhysicalInspection,
+    AssistanceRequest,
 )
 from .services import generate_tracking_id, record_status_change
 
@@ -1253,3 +1254,58 @@ class BookingEmailTest(APITestCase):
         self.assertTrue(log.success)
         self.assertEqual(log.template_key, "inspection_booking_confirmed")
         self.assertIsNotNone(log.booking_id)
+
+
+class AssistanceRequestTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user("staff-asst@test.com", "owner", is_staff=True)
+        self.owner = create_user("owner-asst@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner, status=CarStatus.LISTING_APPROVED)
+        self.client.force_authenticate(user=self.owner)
+
+    def test_create_assistance_notifies_staff(self):
+        from apps.notifications.models import Notification
+
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                "/api/v1/inspections/assistance/",
+                {"car_id": str(self.car.id), "state": "Kano", "message": "No centers"},
+                format="json",
+            )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(AssistanceRequest.objects.count(), 1)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.staff, notification_type="assistance_requested"
+            ).exists()
+        )
+
+    def test_duplicate_open_request_rejected(self):
+        AssistanceRequest.objects.create(owner=self.owner, car=self.car, state="Kano")
+        res = self.client.post(
+            "/api/v1/inspections/assistance/",
+            {"car_id": str(self.car.id)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_staff_can_list_and_handle(self):
+        assistance = AssistanceRequest.objects.create(
+            owner=self.owner, car=self.car, state="Kano"
+        )
+        self.client.force_authenticate(user=self.staff)
+        res = self.client.get("/api/v1/inspections/admin/assistance/?status=open")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["count"], 1)
+        res = self.client.post(
+            f"/api/v1/inspections/admin/assistance/{assistance.id}/handle/"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        assistance.refresh_from_db()
+        self.assertEqual(assistance.status, "handled")
+        self.assertEqual(assistance.handled_by, self.staff)
+
+    def test_owner_cannot_access_staff_queue(self):
+        res = self.client.get("/api/v1/inspections/admin/assistance/")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)

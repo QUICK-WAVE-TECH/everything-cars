@@ -24,6 +24,7 @@ from apps.notifications.service import (
     notify_inspection_failed,
     notify_inspection_no_show,
     notify_inspection_rescheduled,
+    notify_assistance_requested,
 )
 from apps.notifications.email_service import send_booking_confirmation
 from .models import (
@@ -36,6 +37,8 @@ from .models import (
     InspectionResult,
     InspectionSlot,
     PhysicalInspection,
+    AssistanceStatus,
+    AssistanceRequest,
 )
 from .services import generate_tracking_id, record_status_change
 from .serializers import (
@@ -48,6 +51,8 @@ from .serializers import (
     InspectionSlotCreateSerializer,
     InspectionSlotSerializer,
     PhysicalInspectionSerializer,
+    AssistanceRequestCreateSerializer,
+    AssistanceRequestSerializer,
 )
 
 
@@ -309,9 +314,7 @@ class StaffSlotDetailView(APIView):
                 {"detail": "Slot not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
-        has_active = slot.bookings.filter(
-            status__in=ACTIVE_BOOKING_STATUSES
-        ).exists()
+        has_active = slot.bookings.filter(status__in=ACTIVE_BOOKING_STATUSES).exists()
         if has_active:
             return Response(
                 {"detail": "Cannot deactivate a slot with active bookings."},
@@ -333,8 +336,7 @@ class AvailableSlotsView(APIView):
         slots = (
             InspectionSlot.objects.filter(is_active=True)
             .filter(
-                Q(date__gt=now.date())
-                | Q(date=now.date(), start_time__gt=now.time())
+                Q(date__gt=now.date()) | Q(date=now.date(), start_time__gt=now.time())
             )
             .select_related("center")
             .annotate(
@@ -408,9 +410,11 @@ class OwnerBookingCreateView(APIView):
                 )
 
             try:
-                slot = InspectionSlot.objects.select_related(
-                    "center"
-                ).select_for_update(of=("self",)).get(id=slot_id, is_active=True)
+                slot = (
+                    InspectionSlot.objects.select_related("center")
+                    .select_for_update(of=("self",))
+                    .get(id=slot_id, is_active=True)
+                )
             except InspectionSlot.DoesNotExist:
                 return Response(
                     {"detail": "Slot not found or inactive."},
@@ -836,7 +840,11 @@ class StaffInspectionSubmitView(APIView):
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def post(self, request, booking_id):
-        payload = request.data.dict() if hasattr(request.data, "dict") else request.data.copy()
+        payload = (
+            request.data.dict()
+            if hasattr(request.data, "dict")
+            else request.data.copy()
+        )
         features = payload.get("features")
         if isinstance(features, str):
             try:
@@ -886,7 +894,9 @@ class StaffInspectionSubmitView(APIView):
                 )
 
             document_serializer = None
-            requires_documents = bool(car.sale_price) and inspection_result != InspectionResult.FAILED
+            requires_documents = (
+                bool(car.sale_price) and inspection_result != InspectionResult.FAILED
+            )
             has_document_payload = any(
                 payload.get(field)
                 for field in (
@@ -918,7 +928,9 @@ class StaffInspectionSubmitView(APIView):
                     document_serializer.save(inspection=inspection)
                 except IntegrityError:
                     return Response(
-                        {"detail": "Documents were already uploaded for this inspection."},
+                        {
+                            "detail": "Documents were already uploaded for this inspection."
+                        },
                         status=status.HTTP_409_CONFLICT,
                     )
 
@@ -1313,3 +1325,85 @@ class PublicCentersView(APIView):
                 qs = qs.filter(**{f"{param}__iexact": value})
 
         return Response(InspectionCenterSerializer(qs, many=True).data)
+
+
+class OwnerAssistanceCreateView(APIView):
+    permission_classes = [IsOwner]
+
+    def post(self, request):
+        serializer = AssistanceRequestCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        car = None
+        if data.get("car_id"):
+            car = Car.objects.filter(id=data["car_id"], owner=request.user).first()
+            if car is None:
+                return Response(
+                    {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
+                )
+
+        # Dedup — one open request per owner+car, so repeated taps don't pile up.
+        if AssistanceRequest.objects.filter(
+            owner=request.user, car=car, status=AssistanceStatus.OPEN
+        ).exists():
+            return Response(
+                {
+                    "detail": "You already have an open assistance request for this vehicle."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        assistance = AssistanceRequest.objects.create(
+            owner=request.user,
+            car=car,
+            country=data.get("country", ""),
+            state=data.get("state", ""),
+            message=data.get("message", ""),
+        )
+        schedule_notification(
+            notify_assistance_requested,
+            lambda aid=assistance.id: AssistanceRequest.objects.select_related(
+                "owner", "car"
+            ).get(id=aid),
+        )
+        return Response(
+            AssistanceRequestSerializer(assistance).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class StaffAssistanceListView(APIView):
+    permission_classes = [IsStaff]
+
+    def get(self, request):
+        qs = AssistanceRequest.objects.select_related("owner", "car").all()
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = AssistanceRequestSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+
+class StaffAssistanceHandleView(APIView):
+    permission_classes = [IsStaff]
+
+    def post(self, request, request_id):
+        try:
+            assistance = AssistanceRequest.objects.get(id=request_id)
+        except AssistanceRequest.DoesNotExist:
+            return Response(
+                {"detail": "Request not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        if assistance.status == AssistanceStatus.HANDLED:
+            return Response(
+                {"detail": "This request is already handled."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        assistance.status = AssistanceStatus.HANDLED
+        assistance.handled_by = request.user
+        assistance.handled_at = timezone.now()
+        assistance.save(update_fields=["status", "handled_by", "handled_at"])
+        return Response(AssistanceRequestSerializer(assistance).data)

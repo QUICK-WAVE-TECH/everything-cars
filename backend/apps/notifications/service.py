@@ -7,31 +7,6 @@ from apps.users.models import User
 logger = logging.getLogger("notifications")
 
 
-def _create_notification(
-    recipient,
-    notification_type,
-    title,
-    message="",
-    data=None,
-):
-    """Create a notification and push via WebSocket if available."""
-    t0 = time.time()
-    notif = Notification.objects.create(
-        recipient=recipient,
-        notification_type=notification_type,
-        title=title,
-        message=message,
-        data=data or {},
-    )
-    db_ms = (time.time() - t0) * 1000
-    logger.info(
-        "[NOTIF] Created %s for %s — '%s' (DB: %.0fms)",
-        notification_type, recipient.email, title, db_ms,
-    )
-    _push_ws(notif)
-    return notif
-
-
 def _push_ws(notif):
     """Push notification to user's WebSocket group. No-op if Channels not configured."""
     try:
@@ -61,12 +36,42 @@ def _push_ws(notif):
         )
         ws_ms = (time.time() - t0) * 1000
         logger.info(
-            "[WS] Pushed to %s (Redis: %.0fms)", group, ws_ms,
+            "[WS] Pushed to %s (Redis: %.0fms)",
+            group,
+            ws_ms,
         )
     except ImportError:
         logger.warning("[WS] Channels not installed — skipping push")
     except Exception as e:
         logger.error("[WS] Push failed: %s", e)
+
+
+def _create_notification(
+    recipient,
+    notification_type,
+    title,
+    message="",
+    data=None,
+):
+    """Create a notification and push via WebSocket if available."""
+    t0 = time.time()
+    notif = Notification.objects.create(
+        recipient=recipient,
+        notification_type=notification_type,
+        title=title,
+        message=message,
+        data=data or {},
+    )
+    db_ms = (time.time() - t0) * 1000
+    logger.info(
+        "[NOTIF] Created %s for %s — '%s' (DB: %.0fms)",
+        notification_type,
+        recipient.email,
+        title,
+        db_ms,
+    )
+    _push_ws(notif)
+    return notif
 
 
 # ── Request notifications ──
@@ -244,7 +249,11 @@ def notify_listing_submitted(car, resubmitted=False):
     """All staff get notified when a listing enters the review queue —
     either a brand-new listing or one resubmitted after changes."""
     staff_users = User.objects.filter(is_staff=True, is_active=True)
-    title = "Listing resubmitted for review" if resubmitted else "New listing awaiting review"
+    title = (
+        "Listing resubmitted for review"
+        if resubmitted
+        else "New listing awaiting review"
+    )
     message = (
         f"The owner of {car.title} has made the requested changes — ready for re-review."
         if resubmitted
@@ -346,15 +355,15 @@ def notify_needs_clearance(booking):
 def notify_clearance_response(booking, response_message=""):
     """All staff get notified when an owner responds to a clearance request."""
     staff_users = User.objects.filter(is_staff=True, is_active=True)
-    detail = f': "{response_message}"' if response_message else " — ready for re-review."
+    detail = (
+        f': "{response_message}"' if response_message else " — ready for re-review."
+    )
     for staff in staff_users:
         _create_notification(
             recipient=staff,
             notification_type=NotificationType.CLEARANCE_RESPONSE,
             title="Clearance response received",
-            message=(
-                f"The owner of {booking.car.title} responded{detail}"
-            ),
+            message=(f"The owner of {booking.car.title} responded{detail}"),
             data={
                 "booking_id": str(booking.id),
                 "car_id": str(booking.car_id),
@@ -425,5 +434,26 @@ def notify_inspection_rescheduled(booking):
                 "car_id": str(booking.car_id),
                 "car_title": booking.car.title,
                 "owner_name": f"{booking.booked_by.first_name} {booking.booked_by.last_name}",
+            },
+        )
+
+
+def notify_assistance_requested(assistance):
+    """All staff get notified when an owner requests booking assistance"""
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    car_title = assistance.car.title if assistance.car_id else "A vechile"
+    for staff in staff_users:
+        _create_notification(
+            recipient=staff,
+            notification_type=NotificationType.ASSISTANCE_REQUESTED,
+            title="Booking request received",
+            message=(
+                f"{assistance.owner.get_full_name()} needs help booking an "
+                f"inspection for {car_title} in {assistance.state or 'their area'}."
+            ),
+            data={
+                "assistance_id": str(assistance.id),
+                "owner_id": str(assistance.owner_id),
+                "state": assistance.state,
             },
         )

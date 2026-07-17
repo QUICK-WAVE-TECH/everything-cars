@@ -3,12 +3,15 @@ from django.urls import path
 from .views import (
     AvailableSlotsView,
     LocationsView,
+    OwnerAssistanceCreateView,
     OwnerBookingCancelView,
     OwnerBookingCreateView,
     OwnerBookingListView,
     OwnerBookingRescheduleView,
     OwnerClearanceResponseView,
     PublicCentersView,
+    StaffAssistanceHandleView,
+    StaffAssistanceListView,
     StaffBookingDetailView,
     StaffBookingListView,
     StaffBookingNoShowView,
@@ -88,5 +91,14 @@ urlpatterns = [
         "admin/inspections/<uuid:inspection_id>/documents/",
         StaffInspectionDocumentsView.as_view(),
         name="inspection-documents",
+    ),
+    path("assistance/", OwnerAssistanceCreateView.as_view(), name="create-assistance"),
+    path(
+        "admin/assistance/", StaffAssistanceListView.as_view(), name="staff-assistance"
+    ),
+    path(
+        "admin/assistance/<uuid:request_id>/handle/",
+        StaffAssistanceHandleView.as_view(),
+        name="handle-assistance",
     ),
 ]

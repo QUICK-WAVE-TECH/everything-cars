@@ -12,6 +12,7 @@ from .models import (
     InspectionResult,
     InspectionSlot,
     PhysicalInspection,
+    AssistanceRequest,
 )
 from apps.listings.serializers import CarDetailSerializer
 from apps.users.models import IDType
@@ -334,3 +335,44 @@ class CarStatusHistorySerializer(serializers.ModelSerializer):
             "note",
             "created_at",
         ]
+
+
+class AssistanceRequestCreateSerializer(serializers.Serializer):
+    car_id = serializers.UUIDField(required=False, allow_null=True)
+    country = serializers.CharField(
+        required=False, allow_blank=True, max_length=100, default=""
+    )
+    state = serializers.CharField(
+        required=False, allow_blank=True, max_length=250, default=""
+    )
+    message = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class AssistanceRequestSerializer(serializers.ModelSerializer):
+    owner_name = serializers.SerializerMethodField()
+    owner_email = serializers.EmailField(source="owner.email", read_only=True)
+    owner_phone = serializers.CharField(source="owner.phone", read_only=True)
+    car_title = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AssistanceRequest
+        fields = [
+            "id",
+            "owner_name",
+            "owner_email",
+            "owner_phone",
+            "car",
+            "car_title",
+            "country",
+            "state",
+            "message",
+            "status",
+            "created_at",
+            "handled_at",
+        ]
+
+    def get_owner_name(self, obj):
+        return obj.owner.get_full_name()
+
+    def get_car_title(self, obj):
+        return obj.car.title if obj.car_id else ""
