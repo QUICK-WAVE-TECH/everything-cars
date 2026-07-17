@@ -4,6 +4,7 @@ from rest_framework import serializers
 from django.utils import timezone
 
 from .models import (
+    AttendeeType,
     CarStatusHistory,
     InspectionBooking,
     InspectionCenter,
@@ -13,6 +14,7 @@ from .models import (
     PhysicalInspection,
 )
 from apps.listings.serializers import CarDetailSerializer
+from apps.users.models import IDType
 
 
 class InspectionCenterSerializer(serializers.ModelSerializer):
@@ -220,6 +222,40 @@ class InspectionBookingDetailSerializer(InspectionBookingSerializer):
 class BookingCreateSerializer(serializers.Serializer):
     car_id = serializers.UUIDField()
     slot_id = serializers.UUIDField()
+    attendee_type = serializers.ChoiceField(
+        choices=AttendeeType.choices, default=AttendeeType.SELF
+    )
+    rep_name = serializers.CharField(
+        required=False, allow_blank=True, max_length=200, default=""
+    )
+    rep_id_type = serializers.ChoiceField(
+        choices=IDType.choices, required=False, allow_blank=True, default=""
+    )
+    rep_id_number = serializers.CharField(
+        required=False, allow_blank=True, max_length=50, default=""
+    )
+    consent_accepted = serializers.BooleanField(default=False)
+
+    def validate(self, data):
+        if data["attendee_type"] == AttendeeType.REPRESENTATIVE:
+            missing = [
+                f
+                for f in ("rep_name", "rep_id_type", "rep_id_number")
+                if not data.get(f)
+            ]
+            if missing:
+                raise serializers.ValidationError(
+                    {f: "Required when a representative attends." for f in missing}
+                )
+            if not data.get("consent_accepted"):
+                raise serializers.ValidationError(
+                    {
+                        "consent_accepted": (
+                            "You must accept the authorization agreement."
+                        )
+                    }
+                )
+        return data
 
 
 class StaffNoteSerializer(serializers.Serializer):

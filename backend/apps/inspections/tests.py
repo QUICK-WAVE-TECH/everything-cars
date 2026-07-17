@@ -156,6 +156,79 @@ class OwnerBookingTest(APITestCase):
         self.assertEqual(self.car.status, CarStatus.INSPECTION_PENDING)
         self.assertRegex(self.car.tracking_id, r"^NG-LOS-\d{6}$")
 
+    def test_representative_requires_consent(self):
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {
+                "car_id": str(self.car.id),
+                "slot_id": str(self.slot.id),
+                "attendee_type": "representative",
+                "rep_name": "Jane Doe",
+                "rep_id_type": "nin",
+                "rep_id_number": "22334455667",
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("consent_accepted", res.data)
+
+    def test_representative_requires_rep_fields(self):
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {
+                "car_id": str(self.car.id),
+                "slot_id": str(self.slot.id),
+                "attendee_type": "representative",
+                "consent_accepted": True,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("rep_name", res.data)
+        self.assertIn("rep_id_type", res.data)
+        self.assertIn("rep_id_number", res.data)
+
+    def test_representative_booking_stamps_consent(self):
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {
+                "car_id": str(self.car.id),
+                "slot_id": str(self.slot.id),
+                "attendee_type": "representative",
+                "rep_name": "Jane Doe",
+                "rep_id_type": "nin",
+                "rep_id_number": "22334455667",
+                "consent_accepted": True,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        booking = InspectionBooking.objects.get(car=self.car)
+        self.assertEqual(booking.attendee_type, "representative")
+        self.assertEqual(booking.rep_name, "Jane Doe")
+        self.assertIsNotNone(booking.consent_accepted_at)
+
+    def test_booking_blocked_without_id_on_file(self):
+        from apps.users.models import OwnerProfile
+
+        owner = create_user("noid-owner@test.com", "owner")
+        OwnerProfile.objects.create(
+            user=owner,
+            owner_type="individual",
+            bank_account="1",
+            bank_name="B",
+            is_verified=True,
+        )
+        car = create_car(owner, status=CarStatus.LISTING_APPROVED)
+        self.client.force_authenticate(user=owner)
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {"car_id": str(car.id), "slot_id": str(self.slot.id)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("ID verification", res.data["detail"])
+
     def test_cannot_book_unapproved_draft(self):
         self.car.status = CarStatus.DRAFT
         self.car.save(update_fields=["status"])

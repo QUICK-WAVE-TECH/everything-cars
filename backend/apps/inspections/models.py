@@ -3,7 +3,7 @@ import uuid
 from django.db import models
 
 from apps.listings.models import Car
-from apps.users.models import User
+from apps.users.models import User, IDType
 from django_countries.fields import CountryField
 
 
@@ -91,6 +91,11 @@ ACTIVE_BOOKING_STATUSES = [BookingStatus.PENDING, BookingStatus.APPROVED]
 MAX_RESCHEDULES = 2
 
 
+class AttendeeType(models.TextChoices):
+    SELF = "self", "Owner attends"
+    REPRESENTATIVE = "representative", "Representative attends"
+
+
 class InspectionBooking(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     car = models.ForeignKey(
@@ -109,6 +114,18 @@ class InspectionBooking(models.Model):
         db_index=True,
     )
     reschedule_count = models.PositiveSmallIntegerField(default=0)
+    # Attendee declaration — who is physically showing up for the inspection.
+    attendee_type = models.CharField(
+        max_length=20, choices=AttendeeType.choices, default=AttendeeType.SELF
+    )
+    rep_name = models.CharField(max_length=200, blank=True, default="")
+    rep_id_type = models.CharField(
+        max_length=20, choices=IDType.choices, blank=True, default=""
+    )
+    rep_id_number = models.CharField(max_length=50, blank=True, default="")
+    # Proof of authorization consent — null unless a representative is declared.
+    # A timestamp (not a bool) records both that consent was given and when.
+    consent_accepted_at = models.DateTimeField(null=True, blank=True)
     staff_note = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

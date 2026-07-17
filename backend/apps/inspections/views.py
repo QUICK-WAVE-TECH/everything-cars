@@ -29,6 +29,7 @@ from apps.notifications.email_service import send_booking_confirmation
 from .models import (
     ACTIVE_BOOKING_STATUSES,
     ActorRole,
+    AttendeeType,
     BookingStatus,
     InspectionBooking,
     InspectionCenter,
@@ -363,9 +364,24 @@ class OwnerBookingCreateView(APIView):
     def post(self, request):
         serializer = BookingCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
-        car_id = serializer.validated_data["car_id"]
-        slot_id = serializer.validated_data["slot_id"]
+        # ID-on-file gate — an owner with no ID document on record can't book.
+        # This is what lets us avoid asking for the owner's ID at every booking.
+        profile = getattr(request.user, "owner_profile", None)
+        if not profile or not profile.id_type or not profile.id_document:
+            return Response(
+                {
+                    "detail": (
+                        "Complete your ID verification in your profile "
+                        "before booking."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        car_id = data["car_id"]
+        slot_id = data["slot_id"]
 
         with transaction.atomic():
             try:
@@ -442,6 +458,15 @@ class OwnerBookingCreateView(APIView):
                     slot=slot,
                     booked_by=request.user,
                     reschedule_count=reschedule_count,
+                    attendee_type=data["attendee_type"],
+                    rep_name=data.get("rep_name", ""),
+                    rep_id_type=data.get("rep_id_type", ""),
+                    rep_id_number=data.get("rep_id_number", ""),
+                    consent_accepted_at=(
+                        timezone.now()
+                        if data["attendee_type"] == AttendeeType.REPRESENTATIVE
+                        else None
+                    ),
                 )
             except IntegrityError:
                 return Response(

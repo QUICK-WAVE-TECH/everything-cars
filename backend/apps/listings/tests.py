@@ -39,6 +39,9 @@ def create_owner_profile(user):
         bank_account="1234567890",
         bank_name="Test Bank",
         is_verified=True,
+        national_id="12345678901",
+        id_type="nin",
+        id_document=create_test_image("id.jpg"),
     )
 
 
