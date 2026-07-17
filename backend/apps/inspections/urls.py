@@ -23,6 +23,7 @@ from .views import (
     StaffInspectionSubmitView,
     StaffSlotDetailView,
     StaffSlotListCreateView,
+    StaffBookForOwnerView,
 )
 
 urlpatterns = [
@@ -100,5 +101,10 @@ urlpatterns = [
         "admin/assistance/<uuid:request_id>/handle/",
         StaffAssistanceHandleView.as_view(),
         name="handle-assistance",
+    ),
+    path(
+        "admin/bookings/book-for-owner/",
+        StaffBookForOwnerView.as_view(),
+        name="staff-book-for-owner",
     ),
 ]

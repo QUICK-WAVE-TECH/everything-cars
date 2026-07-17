@@ -117,6 +117,96 @@ def booking_detail_queryset():
     ).prefetch_related("car__images", "car__features")
 
 
+def create_booking_core(
+    *, car, slot, booked_by, attendee, actor, actor_role, request=None
+):
+    """Shared booking rules for owner-self-booking and staff-books-for-owner.
+
+    Assumes `car` and `slot` are already locked (select_for_update) inside the
+    caller's transaction and the slot is active. Returns (booking, error_response)
+    — exactly one is non-None.
+    """
+    if car.status not in BOOKABLE_CAR_STATUSES:
+        return None, Response(
+            {
+                "detail": f"Cannot book inspection — car status is '{car.get_status_display()}'."
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if _slot_has_started(slot):
+        return None, Response(
+            {"detail": "Cannot book a slot that has already started."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    current_bookings = InspectionBooking.objects.filter(
+        slot=slot, status__in=ACTIVE_BOOKING_STATUSES
+    ).count()
+    if current_bookings >= slot.capacity:
+        return None, Response(
+            {"detail": "This slot is full. Please pick another."},
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    # Rebooking after a cancel/no-show counts toward the per-center cap.
+    last_booking = (
+        InspectionBooking.objects.filter(car=car).order_by("-created_at").first()
+    )
+    reschedule_count = 0
+    if last_booking and last_booking.status in (
+        BookingStatus.CANCELLED,
+        BookingStatus.NO_SHOW,
+    ):
+        reschedule_count = last_booking.reschedule_count + 1
+        if reschedule_count > slot.center.max_reschedules:
+            return None, Response(
+                {
+                    "detail": (
+                        f"Maximum rebookings ({slot.center.max_reschedules}) reached. "
+                        "Contact staff to rebook."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    try:
+        booking = InspectionBooking.objects.create(
+            car=car,
+            slot=slot,
+            booked_by=booked_by,
+            reschedule_count=reschedule_count,
+            attendee_type=attendee["attendee_type"],
+            rep_name=attendee.get("rep_name", ""),
+            rep_id_type=attendee.get("rep_id_type", ""),
+            rep_id_number=attendee.get("rep_id_number", ""),
+            consent_accepted_at=(
+                timezone.now()
+                if attendee["attendee_type"] == AttendeeType.REPRESENTATIVE
+                else None
+            ),
+        )
+    except IntegrityError:
+        return None, Response(
+            {"detail": "This car already has an active inspection booking."},
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    extra = []
+    if not car.tracking_id:
+        car.tracking_id = generate_tracking_id(slot.center)
+        extra.append("tracking_id")
+    record_status_change(
+        car,
+        CarStatus.INSPECTION_PENDING,
+        actor=actor,
+        actor_role=actor_role,
+        extra_update_fields=extra,
+        request=request,
+    )
+    return booking, None
+
+
 # ── Staff Slot Management ──
 
 
@@ -390,30 +480,20 @@ class OwnerBookingCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        car_id = data["car_id"]
-        slot_id = data["slot_id"]
-
         with transaction.atomic():
             try:
-                car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
+                car = Car.objects.select_for_update().get(
+                    id=data["car_id"], owner=request.user
+                )
             except Car.DoesNotExist:
                 return Response(
                     {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
                 )
-
-            if car.status not in BOOKABLE_CAR_STATUSES:
-                return Response(
-                    {
-                        "detail": f"Cannot book inspection — car status is '{car.get_status_display()}'."
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
             try:
                 slot = (
                     InspectionSlot.objects.select_related("center")
                     .select_for_update(of=("self",))
-                    .get(id=slot_id, is_active=True)
+                    .get(id=data["slot_id"], is_active=True)
                 )
             except InspectionSlot.DoesNotExist:
                 return Response(
@@ -421,95 +501,26 @@ class OwnerBookingCreateView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            if _slot_has_started(slot):
-                return Response(
-                    {"detail": "Cannot book a slot that has already started."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            # Check capacity
-            current_bookings = InspectionBooking.objects.filter(
-                slot=slot, status__in=ACTIVE_BOOKING_STATUSES
-            ).count()
-            if current_bookings >= slot.capacity:
-                return Response(
-                    {"detail": "This slot is full. Please pick another."},
-                    status=status.HTTP_409_CONFLICT,
-                )
-
-            # Rebooking after a cancel/no-show counts as a reschedule so the
-            # per-center cap can't be bypassed by cancelling and rebooking.
-            # A COMPLETED last booking means the previous inspection cycle
-            # finished — a fresh cycle starts at zero.
-            last_booking = (
-                InspectionBooking.objects.filter(car=car)
-                .order_by("-created_at")
-                .first()
-            )
-            reschedule_count = 0
-            if last_booking and last_booking.status in (
-                BookingStatus.CANCELLED,
-                BookingStatus.NO_SHOW,
-            ):
-                reschedule_count = last_booking.reschedule_count + 1
-                if reschedule_count > slot.center.max_reschedules:
-                    return Response(
-                        {
-                            "detail": (
-                                "Maximum rebookings "
-                                f"({slot.center.max_reschedules}) reached. "
-                                "Contact staff to rebook."
-                            )
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-            try:
-                booking = InspectionBooking.objects.create(
-                    car=car,
-                    slot=slot,
-                    booked_by=request.user,
-                    reschedule_count=reschedule_count,
-                    attendee_type=data["attendee_type"],
-                    rep_name=data.get("rep_name", ""),
-                    rep_id_type=data.get("rep_id_type", ""),
-                    rep_id_number=data.get("rep_id_number", ""),
-                    consent_accepted_at=(
-                        timezone.now()
-                        if data["attendee_type"] == AttendeeType.REPRESENTATIVE
-                        else None
-                    ),
-                )
-            except IntegrityError:
-                return Response(
-                    {"detail": "This car already has an active inspection booking."},
-                    status=status.HTTP_409_CONFLICT,
-                )
-
-            extra = []
-            if not car.tracking_id:
-                car.tracking_id = generate_tracking_id(slot.center)
-                extra.append("tracking_id")
-            record_status_change(
-                car,
-                CarStatus.INSPECTION_PENDING,
+            booking, error = create_booking_core(
+                car=car,
+                slot=slot,
+                booked_by=request.user,
+                attendee=data,
                 actor=request.user,
                 actor_role=ActorRole.OWNER,
-                extra_update_fields=extra,
                 request=request,
             )
+            if error:
+                return error
 
         schedule_notification(
             notify_inspection_booked,
             lambda bid=booking.id: booking_detail_queryset().get(id=bid),
         )
-        # Confirmation email to the owner — same on_commit discipline so it only
-        # fires once the booking has actually committed.
         schedule_notification(
             send_booking_confirmation,
             lambda bid=booking.id: booking_detail_queryset().get(id=bid),
         )
-
         detail = booking_detail_queryset().get(id=booking.id)
         return Response(
             InspectionBookingSerializer(detail).data,
@@ -1407,3 +1418,73 @@ class StaffAssistanceHandleView(APIView):
         assistance.handled_at = timezone.now()
         assistance.save(update_fields=["status", "handled_by", "handled_at"])
         return Response(AssistanceRequestSerializer(assistance).data)
+
+
+class StaffBookForOwnerView(APIView):
+    permission_classes = [IsStaff]
+
+    def post(self, request):
+        serializer = BookingCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        with transaction.atomic():
+            try:
+                car = (
+                    Car.objects.select_for_update()
+                    .select_related("owner")
+                    .get(id=data["car_id"])
+                )
+            except Car.DoesNotExist:
+                return Response(
+                    {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
+                )
+            try:
+                slot = (
+                    InspectionSlot.objects.select_related("center")
+                    .select_for_update(of=("self",))
+                    .get(id=data["slot_id"], is_active=True)
+                )
+            except InspectionSlot.DoesNotExist:
+                return Response(
+                    {"detail": "Slot not found or inactive."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # Staff verified identity out of band, so the ID-on-file gate is
+            # intentionally skipped. booked_by is the owner; the history actor is
+            # the staff member, so the audit shows staff placed the booking.
+            booking, error = create_booking_core(
+                car=car,
+                slot=slot,
+                booked_by=car.owner,
+                attendee=data,
+                actor=request.user,
+                actor_role=ActorRole.STAFF,
+                request=request,
+            )
+            if error:
+                return error
+
+            # Close any open assistance request for this owner+car.
+            AssistanceRequest.objects.filter(
+                owner=car.owner, car=car, status=AssistanceStatus.OPEN
+            ).update(
+                status=AssistanceStatus.HANDLED,
+                handled_by=request.user,
+                handled_at=timezone.now(),
+            )
+
+        schedule_notification(
+            notify_inspection_booked,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
+        schedule_notification(
+            send_booking_confirmation,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
+        detail = booking_detail_queryset().get(id=booking.id)
+        return Response(
+            InspectionBookingSerializer(detail).data,
+            status=status.HTTP_201_CREATED,
+        )

@@ -1309,3 +1309,58 @@ class AssistanceRequestTest(APITestCase):
     def test_owner_cannot_access_staff_queue(self):
         res = self.client.get("/api/v1/inspections/admin/assistance/")
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class StaffBookForOwnerTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user("staff-bfo@test.com", "owner", is_staff=True)
+        self.owner = create_user("owner-bfo@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner, status=CarStatus.LISTING_APPROVED)
+        self.center = create_center(self.staff)
+        self.slot = create_slot(self.staff, center=self.center)
+        self.client.force_authenticate(user=self.staff)
+
+    def test_staff_books_for_owner(self):
+        from django.core import mail
+
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                "/api/v1/inspections/admin/bookings/book-for-owner/",
+                {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
+                format="json",
+            )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        booking = InspectionBooking.objects.get(car=self.car)
+        self.assertEqual(booking.booked_by, self.owner)
+        # History actor is the staff member, not the owner.
+        entry = self.car.status_history.filter(
+            to_status=CarStatus.INSPECTION_PENDING
+        ).first()
+        self.assertEqual(entry.actor_email, "staff-bfo@test.com")
+        self.assertEqual(entry.actor_role, "staff")
+        # Owner still receives the confirmation email.
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["owner-bfo@test.com"])
+
+    def test_book_for_owner_closes_assistance(self):
+        assistance = AssistanceRequest.objects.create(
+            owner=self.owner, car=self.car, state="Kano"
+        )
+        self.client.post(
+            "/api/v1/inspections/admin/bookings/book-for-owner/",
+            {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
+            format="json",
+        )
+        assistance.refresh_from_db()
+        self.assertEqual(assistance.status, "handled")
+        self.assertEqual(assistance.handled_by, self.staff)
+
+    def test_non_staff_cannot_book_for_owner(self):
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.post(
+            "/api/v1/inspections/admin/bookings/book-for-owner/",
+            {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
