@@ -88,6 +88,14 @@ def _parse_bool(value):
     return None
 
 
+# Cancel/reschedule are locked from the start of the appointment day onward; an
+# absence on the day itself becomes a staff-recorded no-show instead.
+DAY_OF_LOCK_MESSAGE = (
+    "Changes are locked on the day of the appointment. "
+    "Contact staff if you cannot attend."
+)
+
+
 def schedule_notification(notify_func, get_payload):
     transaction.on_commit(lambda: notify_func(get_payload()), robust=True)
 
@@ -535,8 +543,10 @@ class OwnerBookingCancelView(APIView):
     def post(self, request, booking_id):
         with transaction.atomic():
             try:
-                booking = InspectionBooking.objects.select_for_update().get(
-                    id=booking_id, booked_by=request.user
+                booking = (
+                    InspectionBooking.objects.select_related("slot")
+                    .select_for_update(of=("self",))
+                    .get(id=booking_id, booked_by=request.user)
                 )
             except InspectionBooking.DoesNotExist:
                 return Response(
@@ -547,6 +557,12 @@ class OwnerBookingCancelView(APIView):
             if booking.status != BookingStatus.PENDING:
                 return Response(
                     {"detail": "Only pending bookings can be cancelled."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if booking.slot.date <= timezone.localdate():
+                return Response(
+                    {"detail": DAY_OF_LOCK_MESSAGE},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -601,6 +617,12 @@ class OwnerBookingRescheduleView(APIView):
             if booking.status not in (BookingStatus.PENDING, BookingStatus.NO_SHOW):
                 return Response(
                     {"detail": "This booking cannot be rescheduled."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if booking.slot.date <= timezone.localdate():
+                return Response(
+                    {"detail": DAY_OF_LOCK_MESSAGE},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 

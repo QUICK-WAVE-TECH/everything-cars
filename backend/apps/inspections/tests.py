@@ -390,6 +390,35 @@ class OwnerBookingTest(APITestCase):
         ).first()
         self.assertEqual(new_booking.reschedule_count, 1)
 
+    def test_cannot_cancel_on_appointment_day(self):
+        # Build the booking directly on a today-dated slot (the create endpoint
+        # would reject a slot whose start time has already passed).
+        today_slot = create_slot(self.staff, days_ahead=0, center=self.center)
+        self.car.status = CarStatus.INSPECTION_PENDING
+        self.car.save(update_fields=["status"])
+        booking = InspectionBooking.objects.create(
+            car=self.car, slot=today_slot, booked_by=self.owner
+        )
+        res = self.client.post(f"/api/v1/inspections/bookings/{booking.id}/cancel/")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("day of", res.data["detail"].lower())
+
+    def test_cannot_reschedule_on_appointment_day(self):
+        today_slot = create_slot(self.staff, days_ahead=0, center=self.center)
+        future_slot = create_slot(self.staff, days_ahead=5, center=self.center)
+        self.car.status = CarStatus.INSPECTION_PENDING
+        self.car.save(update_fields=["status"])
+        booking = InspectionBooking.objects.create(
+            car=self.car, slot=today_slot, booked_by=self.owner
+        )
+        res = self.client.post(
+            f"/api/v1/inspections/bookings/{booking.id}/reschedule/",
+            {"slot_id": str(future_slot.id)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("day of", res.data["detail"].lower())
+
     def test_reschedule_blocked_after_max(self):
         self.client.post(
             "/api/v1/inspections/bookings/",
