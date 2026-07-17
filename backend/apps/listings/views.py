@@ -92,11 +92,21 @@ MAX_CAR_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
 # Editable: pre-approval states, the clearance loop, and failed inspections
 # (owner fixes the issues and resubmits for review). inspection_no_show
 # rebooks without editing.
+# Owners may only edit listing *content* (text/spec fields) when staff explicitly
+# requested changes. needs_clearance is answered with a message (not an edit); a
+# rejected inspection is fixed on the physical car and resubmitted. None of those
+# reopen the listing for editing.
 EDITABLE_CAR_STATUSES = [
+    CarStatus.NEEDS_CHANGES,
+]
+
+# Photo uploads are also allowed in DRAFT: creating a listing IS submitting it,
+# and photos are uploaded to the freshly-created draft as part of that flow.
+# (Text details are captured atomically at create time, so DRAFT text stays
+# locked — only the images arrive afterward.)
+IMAGE_EDITABLE_CAR_STATUSES = [
     CarStatus.DRAFT,
     CarStatus.NEEDS_CHANGES,
-    CarStatus.NEEDS_CLEARANCE,
-    CarStatus.INSPECTION_REJECTED,
 ]
 REQUEST_APPROVAL_BLOCKING_STATUSES = [
     RequestStatus.APPROVED,
@@ -445,7 +455,7 @@ class CarImageUploadView(APIView):
         try:
             with transaction.atomic():
                 car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
-                if car.status not in EDITABLE_CAR_STATUSES:
+                if car.status not in IMAGE_EDITABLE_CAR_STATUSES:
                     return Response(
                         {"detail": "Car images cannot be uploaded in this status."},
                         status=status.HTTP_403_FORBIDDEN,

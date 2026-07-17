@@ -118,13 +118,15 @@ class EditLockdownTest(APITestCase):
         self.car = create_car(self.owner)
         self.client.force_authenticate(user=self.owner)
 
-    def test_edit_allowed_in_draft(self):
+    def test_edit_blocked_in_draft(self):
+        # Draft locks the moment it is submitted for review — only staff-requested
+        # changes reopen editing.
         self.car.status = CarStatus.DRAFT
         self.car.save(update_fields=["status"])
         res = self.client.patch(
             f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"}
         )
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_edit_allowed_in_needs_changes(self):
         self.car.status = CarStatus.NEEDS_CHANGES
@@ -134,22 +136,24 @@ class EditLockdownTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
-    def test_edit_allowed_in_needs_clearance(self):
+    def test_edit_blocked_in_needs_clearance(self):
+        # Clearance is answered with a message, not by editing the listing.
         self.car.status = CarStatus.NEEDS_CLEARANCE
         self.car.save(update_fields=["status"])
         res = self.client.patch(
             f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Green"}
         )
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_edit_allowed_in_inspection_rejected(self):
-        # failed inspections are recoverable — owner fixes and resubmits
+    def test_edit_blocked_in_inspection_rejected(self):
+        # A rejected inspection is fixed on the physical car and resubmitted —
+        # the listing content stays locked.
         self.car.status = CarStatus.INSPECTION_REJECTED
         self.car.save(update_fields=["status"])
         res = self.client.patch(
             f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Green"}
         )
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_edit_blocked_in_inspection_no_show(self):
         # no_show cars rebook the inspection; the listing itself stays locked
