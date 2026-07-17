@@ -75,6 +75,8 @@ class SignUpView(APIView):
                     bank_account=data["bank_account"],
                     bank_name=data["bank_name"],
                     document=data.get("document"),
+                    id_type=data.get("id_type", ""),
+                    id_document=data.get("id_document"),
                 )
             transaction.on_commit(
                 lambda: generate_and_send_code(

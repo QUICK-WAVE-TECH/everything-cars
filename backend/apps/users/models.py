@@ -10,6 +10,13 @@ from django_countries.fields import CountryField
 from .managers import UserManager
 
 
+class IDType(models.TextChoices):
+    INTL_PASSPORT = "intl_passport", "International Passport"
+    NIN = "nin", "NIN"
+    VOTERS_CARD = "voters_card", "Voter's Card"
+    DRIVERS_LICENCE = "drivers_licence", "Driver's Licence"
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     class Role(models.TextChoices):
         CUSTOMER = "customer", "Customer"
@@ -35,6 +42,12 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.email})"
+
+    def get_full_name(self):
+        return f"{self.first_name} {self.last_name}"
+
+    def get_short_name(self):
+        return self.first_name
 
 
 class CustomerProfile(models.Model):
@@ -76,6 +89,10 @@ class OwnerProfile(models.Model):
     )
     owner_type = models.CharField(max_length=10, choices=OwnerType.choices)
     fleet_name = models.CharField(max_length=200, blank=True, default="")
+    id_type = models.CharField(max_length=20, choices=IDType.choices, blank=True)
+    id_document = models.ImageField(
+        upload_to="identity-docs/%Y/%m/", blank=True, null=True
+    )
     national_id = models.CharField(max_length=50, blank=True, default="")
     location = models.CharField(max_length=200, blank=True, default="")
     rc_number = models.CharField(max_length=50, blank=True, default="")
