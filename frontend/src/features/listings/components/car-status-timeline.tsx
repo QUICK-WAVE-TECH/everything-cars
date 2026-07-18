@@ -29,11 +29,17 @@ function statusLabel(status: string): string {
 }
 
 function actorLabel(
-  role: CarStatusHistoryEntry["actor_role"],
+  entry: CarStatusHistoryEntry,
   viewer: "owner" | "staff",
 ): string {
+  const role = entry.actor_role;
   if (role === "owner") return viewer === "owner" ? "You" : "Owner";
-  if (role === "staff") return "Staff";
+  if (role === "staff") {
+    // Staff see the acting staff member's name; owners never do.
+    return viewer === "staff" && entry.actor_name
+      ? `Staff · ${entry.actor_name}`
+      : "Staff";
+  }
   return "System";
 }
 
@@ -133,7 +139,7 @@ export function CarStatusTimeline({
                     isLast ? "text-(--brc-primary)" : "text-(--brc-text)",
                   )}
                 >
-                  {isAnnotation ? `${actorLabel(entry.actor_role, viewer)} responded` : statusLabel(entry.to_status)}
+                  {isAnnotation ? `${actorLabel(entry, viewer)} responded` : statusLabel(entry.to_status)}
                 </span>
                 {isLast && (
                   <span className="rounded-full bg-(--brc-primary-tint) px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-(--brc-primary) [font-family:var(--brc-font-ui)]">
@@ -142,7 +148,7 @@ export function CarStatusTimeline({
                 )}
               </div>
               <span className="mt-0.5 block text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                {actorLabel(entry.actor_role, viewer)} · {formatEntryDate(entry.created_at)}
+                {actorLabel(entry, viewer)} · {formatEntryDate(entry.created_at)}
               </span>
               {entry.note && (
                 <p className="mt-2 rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) p-3 text-sm leading-relaxed text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
