@@ -538,6 +538,7 @@ def inspection_form_payload(**overrides):
         "has_accident_history": False,
         "staff_notes": "",
         "result": "passed",
+        "presented_attendee": "owner",
         "presented_id_type": "nin",
         "presented_id_number": "22334455667",
     }
@@ -702,10 +703,32 @@ class StaffInspectionFlowTest(APITestCase):
         res = self._submit(
             result="failed",
             staff_notes="Engine seized",
+            presented_attendee="",
             presented_id_type="",
             presented_id_number="",
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    def test_passed_requires_presented_attendee(self):
+        self._start()
+        res = self._submit(result="passed", presented_attendee="")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("presented_attendee", res.data)
+
+    def test_undeclared_attendee_requires_note(self):
+        self._start()
+        res = self._submit(
+            result="passed", presented_attendee="other", staff_notes=""
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("staff_notes", res.data)
+
+    def test_presented_attendee_is_stored(self):
+        self._start()
+        res = self._submit_with_documents(result="passed")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        insp = PhysicalInspection.objects.get(car=self.car)
+        self.assertEqual(insp.presented_attendee, "owner")
 
     def test_presented_id_is_stored(self):
         self._start()

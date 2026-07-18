@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ArrowLeftIcon, Loader2Icon, PlusIcon, XIcon, UploadIcon } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import { IdTypeSelect } from "@/features/auth/components";
+import { idTypeLabel } from "@/features/auth/schemas";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -134,6 +135,9 @@ export default function StaffInspectionFormPage() {
   const [additionalNotes, setAdditionalNotes] = useState("");
 
   // ── Attendee identity section ──
+  const [presentedAttendee, setPresentedAttendee] = useState<
+    "owner" | "representative" | "other" | ""
+  >("");
   const [presentedIdType, setPresentedIdType] = useState("");
   const [presentedIdNumber, setPresentedIdNumber] = useState("");
   const [presentedIdDocument, setPresentedIdDocument] = useState<File | null>(null);
@@ -175,7 +179,12 @@ export default function StaffInspectionFormPage() {
     !!result &&
     (!notesRequired || staffNotes.trim().length > 0) &&
     (!documentsRequired || documentsComplete) &&
-    (!presentedIdRequired || (!!presentedIdType && presentedIdNumber.trim().length > 0));
+    (!presentedIdRequired ||
+      (!!presentedAttendee &&
+        !!presentedIdType &&
+        presentedIdNumber.trim().length > 0)) &&
+    // An undeclared attendee ("other") must be explained in the notes.
+    (presentedAttendee !== "other" || staffNotes.trim().length > 0);
 
   const isSubmitting = submitInspection.isPending;
 
@@ -200,6 +209,7 @@ export default function StaffInspectionFormPage() {
     formData.append("result", result);
 
     // Attendee's presented ID (staff-only). Required for non-failed results.
+    if (presentedAttendee) formData.append("presented_attendee", presentedAttendee);
     if (presentedIdType) formData.append("presented_id_type", presentedIdType);
     if (presentedIdNumber.trim())
       formData.append("presented_id_number", presentedIdNumber.trim());
@@ -537,8 +547,78 @@ export default function StaffInspectionFormPage() {
         {/* Attendee identity — who physically presented for the inspection */}
         <FormSection
           title="Attendee identity"
-          subtitle="Record the ID the attendee presented. Required unless the inspection failed. Staff-only — never shown to the owner or public."
+          subtitle="Confirm who showed up against the booking, then record the ID they presented. Required unless the inspection failed. Staff-only."
         >
+          {/* What the owner declared at booking */}
+          <div className="rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) p-4 [font-family:var(--brc-font-ui)]">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-(--brc-text-muted)">
+              Declared at booking
+            </span>
+            {booking.attendee_type === "representative" ? (
+              <p className="mt-1 text-sm text-(--brc-text)">
+                Representative:{" "}
+                <strong>{booking.rep_name || "—"}</strong>
+                {booking.rep_id_number
+                  ? ` · ${idTypeLabel(booking.rep_id_type) || "ID"} ${booking.rep_id_number}`
+                  : ""}
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-(--brc-text)">
+                The owner <strong>{booking.booked_by_name}</strong> is expected to
+                attend.
+              </p>
+            )}
+          </div>
+
+          {/* Who actually attended */}
+          <div className="flex flex-col gap-2">
+            <span className="text-base text-(--brc-text) [font-family:var(--brc-font-ui)]">
+              Who presented for the inspection?
+            </span>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {(
+                [
+                  { key: "owner", label: "The owner" },
+                  { key: "representative", label: "Declared representative" },
+                  { key: "other", label: "Someone else" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => {
+                    setPresentedAttendee(opt.key);
+                    // Convenience: pre-fill the declared rep's ID for confirmation.
+                    if (
+                      opt.key === "representative" &&
+                      booking.attendee_type === "representative"
+                    ) {
+                      if (!presentedIdType && booking.rep_id_type)
+                        setPresentedIdType(booking.rep_id_type);
+                      if (!presentedIdNumber && booking.rep_id_number)
+                        setPresentedIdNumber(booking.rep_id_number);
+                    }
+                  }}
+                  className={cn(
+                    "cursor-pointer rounded-lg border p-3 text-left text-sm font-bold transition [font-family:var(--brc-font-ui)]",
+                    presentedAttendee === opt.key
+                      ? "border-(--brc-primary) bg-(--brc-primary-tint) text-(--brc-primary)"
+                      : "border-(--brc-border) bg-white text-(--brc-text)",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {presentedAttendee === "other" && (
+              <p className="rounded-lg bg-(--brc-warning-bg) px-3 py-2 text-xs font-semibold text-[#9a7400] [font-family:var(--brc-font-ui)]">
+                This person was not the owner or the declared representative.
+                Confirm their authorization and explain in the notes below before
+                passing.
+              </p>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <IdTypeSelect
               value={presentedIdType}

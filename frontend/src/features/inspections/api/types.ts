@@ -118,6 +118,7 @@ export type PhysicalInspectionPayload = {
   staff_notes: string;
   result: "passed" | "needs_clearance" | "failed";
   /** Day-of identity capture — required for non-failed results. Staff-only. */
+  presented_attendee?: "owner" | "representative" | "other" | "";
   presented_id_type?: IdType | "";
   presented_id_number?: string;
 };

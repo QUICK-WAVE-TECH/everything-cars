@@ -183,6 +183,15 @@ class InspectionResult(models.TextChoices):
     FAILED = "failed", "Failed"
 
 
+class PresentedAttendee(models.TextChoices):
+    """Who the inspector determined actually presented, vs. the booking's
+    declared attendee — 'other' is an undeclared third party (a mismatch)."""
+
+    OWNER = "owner", "Owner"
+    REPRESENTATIVE = "representative", "Declared representative"
+    OTHER = "other", "Someone else"
+
+
 class PhysicalInspection(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     booking = models.OneToOneField(
@@ -210,8 +219,11 @@ class PhysicalInspection(models.Model):
     has_accident_history = models.BooleanField(default=False)
     result = models.CharField(max_length=20, choices=InspectionResult.choices)
     staff_notes = models.TextField(blank=True, default="")
-    # Day-of identity capture — the ID the attendee physically presented.
+    # Day-of identity capture — who actually presented, and the ID they showed.
     # Staff-only: never serialized to owner/public responses.
+    presented_attendee = models.CharField(
+        max_length=20, choices=PresentedAttendee.choices, blank=True, default=""
+    )
     presented_id_type = models.CharField(
         max_length=20, choices=IDType.choices, blank=True, default=""
     )

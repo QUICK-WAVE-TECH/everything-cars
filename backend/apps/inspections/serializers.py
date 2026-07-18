@@ -307,10 +307,10 @@ class PhysicalInspectionSerializer(serializers.ModelSerializer):
             "result",
             "inspected_at",
             "inspector_name",
+            "presented_attendee",
             "presented_id_type",
             "presented_id_number",
             "presented_id_document",
-            "created_at",
             "created_at",
         ]
         read_only_fields = ["id", "inspector_name", "created_at"]
@@ -331,12 +331,16 @@ class PhysicalInspectionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"staff_notes": "A reason is required for this result."}
             )
-        # A non-failed inspection means someone attended and was inspected
-        # record who, by the ID they presented . (photo optional)
+        # A non-failed inspection means someone attended and was inspected —
+        # record who presented (owner/representative/other) and their ID.
         if result and result != InspectionResult.FAILED:
             missing = [
                 f
-                for f in ("presented_id_type", "presented_id_number")
+                for f in (
+                    "presented_attendee",
+                    "presented_id_type",
+                    "presented_id_number",
+                )
                 if not attrs.get(f)
             ]
             if missing:
@@ -346,6 +350,18 @@ class PhysicalInspectionSerializer(serializers.ModelSerializer):
                         for f in missing
                     }
                 )
+        # An undeclared third party ("other") is a mismatch — require a note.
+        if attrs.get("presented_attendee") == "other" and not attrs.get(
+            "staff_notes", ""
+        ).strip():
+            raise serializers.ValidationError(
+                {
+                    "staff_notes": (
+                        "Explain the attendee mismatch — the person who presented "
+                        "was neither the owner nor the declared representative."
+                    )
+                }
+            )
         return attrs
 
 
