@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   ArrowLeftIcon,
@@ -32,12 +33,22 @@ import { cn } from "@/lib/utils";
 import {
   useAvailableSlots,
   useCentersByCity,
+  useCreateAssistanceRequest,
   useCreateBooking,
   useLocations,
   useRescheduleBooking,
 } from "@/features/inspections/api/inspections-api";
 import type { AvailableSlot, InspectionCenter } from "@/features/inspections/api/types";
+import { useMe } from "@/features/auth/api";
+import { IdTypeSelect } from "@/features/auth/components";
 import { ApiError } from "@/lib/api-client";
+
+// Placeholder authorization text — replace with legal-approved copy.
+const CONSENT_TEXT =
+  "I authorize the named representative to attend the vehicle inspection on my " +
+  "behalf, present the declared means of identification, and act for me during " +
+  "the inspection. I accept responsibility for their conduct and confirm the " +
+  "details above are accurate.";
 
 // ── Helpers ──
 
@@ -359,6 +370,23 @@ export function BookingModal({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedSlot, setSelectedSlot] = useState<AvailableSlot | null>(null);
 
+  // Step 4: attendee declaration
+  const [attendeeType, setAttendeeType] = useState<"self" | "representative">("self");
+  const [repName, setRepName] = useState("");
+  const [repIdType, setRepIdType] = useState("");
+  const [repIdNumber, setRepIdNumber] = useState("");
+  const [consent, setConsent] = useState(false);
+
+  // Assistance (no centers in state)
+  const [assistanceMessage, setAssistanceMessage] = useState("");
+  const [assistanceSent, setAssistanceSent] = useState(false);
+  const createAssistance = useCreateAssistanceRequest();
+
+  const { data: me } = useMe();
+  const ownerProfile = me?.owner_profile;
+  const hasIdOnFile = !!(ownerProfile?.id_type && ownerProfile?.id_document);
+  const showIdGate = mode !== "reschedule" && !!me && !hasIdOnFile;
+
   const { data: locations, isLoading: isLoadingLocations } = useLocations();
   const { data: centers, isLoading: isLoadingCenters } = useCentersByCity({
     country: country || undefined,
@@ -397,6 +425,32 @@ export function BookingModal({
   }, [allCenterSlots]);
 
   const todayDate = today();
+
+  // Calendar opens on the month of the earliest available date, not today's
+  // month (which may have no openings at all).
+  const firstAvailableMonth = useMemo(() => {
+    const dates = (allCenterSlots ?? [])
+      .filter((s) => s.spots_remaining > 0)
+      .map((s) => s.date)
+      .sort();
+    const first = dates[0];
+    if (!first) return undefined;
+    const [y = 0, m = 1, d = 1] = first.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }, [allCenterSlots]);
+
+  // Pre-fill country/state from the owner's profile once, when the modal opens
+  // (state-adjustment-during-render — avoids a setState-in-effect cascade). Runs
+  // when the profile becomes available even if that's after `open` flips true.
+  const [prefilledForOpen, setPrefilledForOpen] = useState(false);
+  if (open && !prefilledForOpen && mode !== "reschedule" && ownerProfile) {
+    setPrefilledForOpen(true);
+    setCountry((prev) => prev || ownerProfile.country || "");
+    setState((prev) => prev || ownerProfile.state || "");
+  }
+  if (!open && prefilledForOpen) {
+    setPrefilledForOpen(false);
+  }
 
   function isDisabled(date: Date) {
     if (date < todayDate) return true;
@@ -459,7 +513,19 @@ export function BookingModal({
         await rescheduleBooking.mutateAsync({ bookingId, slot_id: selectedSlot.id });
         toast.success("Inspection rescheduled. Attend your inspection at the selected center.");
       } else {
-        await createBooking.mutateAsync({ car_id: carId, slot_id: selectedSlot.id });
+        await createBooking.mutateAsync({
+          car_id: carId,
+          slot_id: selectedSlot.id,
+          attendee_type: attendeeType,
+          ...(attendeeType === "representative"
+            ? {
+                rep_name: repName.trim(),
+                rep_id_type: repIdType as never,
+                rep_id_number: repIdNumber.trim(),
+                consent_accepted: consent,
+              }
+            : {}),
+        });
         toast.success("Inspection booked! Attend your inspection at the selected center.");
       }
       onSuccess();
@@ -482,6 +548,13 @@ export function BookingModal({
     setSelectedCenter(null);
     setSelectedDate(undefined);
     setSelectedSlot(null);
+    setAttendeeType("self");
+    setRepName("");
+    setRepIdType("");
+    setRepIdNumber("");
+    setConsent(false);
+    setAssistanceMessage("");
+    setAssistanceSent(false);
   }
 
   function handleOpenChange(isOpen: boolean) {
@@ -497,9 +570,30 @@ export function BookingModal({
   }, [open]);
 
   const isConfirming = createBooking.isPending || rescheduleBooking.isPending;
-  const canProceedStep1 = !!city;
+  const canProceedStep1 = !!city && !showIdGate;
   const canProceedStep3 = !!selectedSlot;
-  const canConfirm = !!selectedSlot && !isConfirming;
+  const attendeeValid =
+    isReschedule ||
+    attendeeType === "self" ||
+    (!!repName.trim() && !!repIdType && !!repIdNumber.trim() && consent);
+  const canConfirm = !!selectedSlot && !isConfirming && attendeeValid;
+
+  async function handleRequestAssistance() {
+    try {
+      await createAssistance.mutateAsync({
+        car_id: carId,
+        country: country || undefined,
+        state: state || undefined,
+        message: assistanceMessage.trim() || undefined,
+      });
+      setAssistanceSent(true);
+      toast.success("Request sent — our staff will reach out to help you book.");
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError ? error.message : "Could not send request.",
+      );
+    }
+  }
 
   const selectedDateLabel = dateStr ? formatDateLabel(dateStr) : undefined;
   const availableDateCount = availableDates.size;
@@ -581,8 +675,35 @@ export function BookingModal({
                 )}
               </div>
 
-              {/* Step 1: Location */}
-              {step === 1 && (
+              {/* Step 1: Location (or the ID-verification gate) */}
+              {step === 1 && showIdGate && (
+                <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 py-10 text-center">
+                  <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-primary-tint) text-(--brc-primary)">
+                    <ShieldCheckIcon size={22} />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                      Complete your ID verification
+                    </p>
+                    <p className="mt-1 max-w-sm text-xs leading-5 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                      Add your means of identification to your profile before booking an
+                      inspection. You only need to do this once.
+                    </p>
+                  </div>
+                  <Link
+                    href="/owner/profile"
+                    onClick={() => onClose()}
+                    className={cn(
+                      "inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-black no-underline [font-family:var(--brc-font-ui)]",
+                      primaryButtonClass,
+                    )}
+                  >
+                    Go to profile
+                  </Link>
+                </div>
+              )}
+
+              {step === 1 && !showIdGate && (
                 <div className="flex flex-col gap-4">
                   {isLoadingLocations ? (
                     <div className="flex h-[220px] w-full items-center justify-center">
@@ -643,19 +764,60 @@ export function BookingModal({
                       <Loader2Icon size={24} className="animate-spin text-(--brc-primary)" />
                     </div>
                   ) : !centers || centers.length === 0 ? (
-                    <div className="flex h-[220px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 text-center">
-                      <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-bg-muted) text-(--brc-text-muted)">
-                        <Building2Icon size={22} />
-                      </span>
-                      <div>
-                        <p className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
-                          No centers in this city
-                        </p>
-                        <p className="mt-1 text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                          Go back and pick another location.
-                        </p>
+                    assistanceSent ? (
+                      <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 py-10 text-center">
+                        <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-primary-tint) text-(--brc-primary)">
+                          <CheckCircle2Icon size={22} />
+                        </span>
+                        <div>
+                          <p className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                            Request sent
+                          </p>
+                          <p className="mt-1 max-w-sm text-xs leading-5 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                            Our staff will contact you to arrange an inspection in your
+                            area.
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex flex-col gap-4 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 py-8">
+                        <div className="flex flex-col items-center gap-3 text-center">
+                          <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-bg-muted) text-(--brc-text-muted)">
+                            <Building2Icon size={22} />
+                          </span>
+                          <div>
+                            <p className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                              No centers in this area yet
+                            </p>
+                            <p className="mt-1 max-w-sm text-xs leading-5 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                              Request staff assistance and we&apos;ll help arrange an
+                              inspection for you.
+                            </p>
+                          </div>
+                        </div>
+                        <textarea
+                          value={assistanceMessage}
+                          onChange={(e) => setAssistanceMessage(e.target.value)}
+                          placeholder="Anything we should know? (optional)"
+                          rows={3}
+                          className="w-full resize-none rounded-lg border border-(--brc-border) bg-white p-3 text-sm text-(--brc-text) outline-none focus:border-(--brc-primary) [font-family:var(--brc-font-ui)]"
+                        />
+                        <button
+                          type="button"
+                          disabled={createAssistance.isPending}
+                          onClick={handleRequestAssistance}
+                          className={cn(
+                            "mx-auto flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-5 text-sm font-black transition-all duration-200 [font-family:var(--brc-font-ui)]",
+                            primaryButtonClass,
+                          )}
+                        >
+                          {createAssistance.isPending ? (
+                            <Loader2Icon size={15} className="animate-spin" />
+                          ) : null}
+                          Request staff assistance
+                        </button>
+                      </div>
+                    )
                   ) : (
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       {centers.map((center) => (
@@ -689,6 +851,7 @@ export function BookingModal({
                           onSelect={handleDateSelect}
                           disabled={isDisabled}
                           startMonth={todayDate}
+                          defaultMonth={firstAvailableMonth}
                           modifiers={{
                             available: (date) => availableDates.has(toDateString(date)),
                           }}
@@ -846,6 +1009,73 @@ export function BookingModal({
                         </div>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Attendee declaration */}
+                  <div className="rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle) p-5">
+                    <span className="block text-[11px] font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                      Who will attend the inspection?
+                    </span>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {(["self", "representative"] as const).map((opt) => (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => setAttendeeType(opt)}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-left text-sm font-bold transition [font-family:var(--brc-font-ui)]",
+                            attendeeType === opt
+                              ? "border-(--brc-primary) bg-(--brc-primary-tint) text-(--brc-primary)"
+                              : "border-(--brc-border) bg-white text-(--brc-text)",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "flex size-4 shrink-0 items-center justify-center rounded-full border",
+                              attendeeType === opt
+                                ? "border-(--brc-primary)"
+                                : "border-(--brc-border)",
+                            )}
+                          >
+                            {attendeeType === opt && (
+                              <span className="size-2 rounded-full bg-(--brc-primary)" />
+                            )}
+                          </span>
+                          {opt === "self" ? "I will attend" : "Someone on my behalf"}
+                        </button>
+                      ))}
+                    </div>
+
+                    {attendeeType === "representative" && (
+                      <div className="mt-4 flex flex-col gap-3">
+                        <input
+                          value={repName}
+                          onChange={(e) => setRepName(e.target.value)}
+                          placeholder="Representative's full name"
+                          className="w-full rounded-lg border border-(--brc-border) bg-white p-3 text-sm outline-none focus:border-(--brc-primary) [font-family:var(--brc-font-ui)]"
+                        />
+                        <IdTypeSelect
+                          value={repIdType}
+                          onChange={setRepIdType}
+                          label="Representative's ID type"
+                        />
+                        <input
+                          value={repIdNumber}
+                          onChange={(e) => setRepIdNumber(e.target.value)}
+                          placeholder="Representative's ID number"
+                          className="w-full rounded-lg border border-(--brc-border) bg-white p-3 text-sm outline-none focus:border-(--brc-primary) [font-family:var(--brc-font-ui)]"
+                        />
+                        <label className="flex items-start gap-2 text-xs leading-5 text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+                          <input
+                            type="checkbox"
+                            checked={consent}
+                            onChange={(e) => setConsent(e.target.checked)}
+                            className="mt-0.5 size-4 shrink-0 accent-(--brc-primary)"
+                          />
+                          <span>{CONSENT_TEXT}</span>
+                        </label>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
