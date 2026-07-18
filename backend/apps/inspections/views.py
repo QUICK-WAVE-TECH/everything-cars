@@ -239,9 +239,21 @@ class StaffSlotListCreateView(APIView):
         is_active = request.query_params.get("is_active")
 
         if date_from:
-            slots = slots.filter(date__gte=date_from)
+            parsed = _valid_date_or_none(date_from)
+            if parsed is None:
+                return Response(
+                    {"detail": "Invalid date_from."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            slots = slots.filter(date__gte=parsed)
         if date_to:
-            slots = slots.filter(date__lte=date_to)
+            parsed = _valid_date_or_none(date_to)
+            if parsed is None:
+                return Response(
+                    {"detail": "Invalid date_to."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            slots = slots.filter(date__lte=parsed)
         if is_active is not None:
             slots = slots.filter(is_active=is_active.lower() == "true")
 
@@ -305,13 +317,27 @@ class StaffSlotListCreateView(APIView):
                     )
             current += timedelta(days=1)
 
-        created = InspectionSlot.objects.bulk_create(
-            to_create, ignore_conflicts=True
-        )
+        InspectionSlot.objects.bulk_create(to_create, ignore_conflicts=True)
+
+        # Re-fetch the intended-new rows instead of trusting bulk_create's return
+        # value: with ignore_conflicts, conflicting rows come back without a PK
+        # (would serialize as null id), and a concurrent insert could otherwise
+        # skew the count. Pre-existing keys were filtered out above, so matching
+        # on the intended keys yields exactly the slots created for this batch.
+        new_keys = {(s.date, s.start_time, s.end_time) for s in to_create}
+        created = [
+            slot
+            for slot in InspectionSlot.objects.filter(
+                center=center, date__range=(date_from, date_to)
+            )
+            .select_related("center", "created_by")
+            .order_by("date", "start_time")
+            if (slot.date, slot.start_time, slot.end_time) in new_keys
+        ]
 
         return Response(
             {
-                "created_count": len(to_create),
+                "created_count": len(created),
                 "slots": InspectionSlotSerializer(created, many=True).data,
             },
             status=status.HTTP_201_CREATED,
@@ -432,6 +458,10 @@ class AvailableSlotsView(APIView):
     # behalf from the assistance queue.
     permission_classes = [IsOwner | IsStaff]
 
+    # Cap how far ahead a single read may reach, and the default look-ahead when
+    # no upper bound is supplied, so a caller can't pull every future slot.
+    MAX_WINDOW_DAYS = 180
+
     def get(self, request):
         now = timezone.localtime()
         slots = (
@@ -460,23 +490,43 @@ class AvailableSlotsView(APIView):
                 )
             slots = slots.filter(center_id=center_uuid)
 
-        # Exact-day, or a bounded [date_from, date_to] window so callers load one
-        # visible calendar month at a time instead of every future slot.
-        for param, lookup in (
-            ("date", "date"),
-            ("date_from", "date__gte"),
-            ("date_to", "date__lte"),
-        ):
+        # Validate the optional date filters up front.
+        parsed = {}
+        for param in ("date", "date_from", "date_to"):
             raw = request.query_params.get(param)
             if not raw:
                 continue
-            parsed = _valid_date_or_none(raw)
-            if parsed is None:
+            value = _valid_date_or_none(raw)
+            if value is None:
                 return Response(
                     {"detail": f"Invalid {param}."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            slots = slots.filter(**{lookup: parsed})
+            parsed[param] = value
+
+        if "date" in parsed:
+            # Exact-day lookup — inherently bounded.
+            slots = slots.filter(date=parsed["date"])
+        else:
+            # Bound the read to a window so a bare ?center=<id> call can't pull
+            # every future slot. Default to a MAX_WINDOW_DAYS look-ahead when no
+            # upper bound is given, and reject an over-large explicit range.
+            window_from = parsed.get("date_from") or now.date()
+            window_to = parsed.get("date_to") or (
+                window_from + timedelta(days=self.MAX_WINDOW_DAYS)
+            )
+            if (window_to - window_from).days > self.MAX_WINDOW_DAYS:
+                return Response(
+                    {
+                        "detail": (
+                            f"Date range cannot exceed {self.MAX_WINDOW_DAYS} days."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if "date_from" in parsed:
+                slots = slots.filter(date__gte=parsed["date_from"])
+            slots = slots.filter(date__lte=window_to)
 
         # spots_remaining is derived per row from the booking-count annotation.
         for slot in slots:

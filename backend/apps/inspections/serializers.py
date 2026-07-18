@@ -89,6 +89,7 @@ class InspectionSlotCreateSerializer(serializers.Serializer):
     date_to = serializers.DateField()
     days = serializers.ListField(
         child=serializers.IntegerField(min_value=0, max_value=6),
+        max_length=7,
         help_text="0=Monday, 6=Sunday",
     )
     time_slots = serializers.ListField(
@@ -150,6 +151,8 @@ class InspectionSlotCreateSerializer(serializers.Serializer):
                     )
                 }
             )
+        # Dedupe weekdays so a repeated list can't bloat the creation loop.
+        data["days"] = set(data["days"])
         normalized_slots = []
         for slot in data["time_slots"]:
             if "start_time" not in slot or "end_time" not in slot:
