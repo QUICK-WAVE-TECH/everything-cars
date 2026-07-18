@@ -11,7 +11,9 @@ import {
   CheckCircle2Icon,
   ChevronDownIcon,
   ClockIcon,
+  LifeBuoyIcon,
   Loader2Icon,
+  LockIcon,
   MapPinIcon,
   ShieldCheckIcon,
 } from "lucide-react";
@@ -415,6 +417,10 @@ export function BookingModal({
     () => states.find((s) => s.state === state)?.cities ?? [],
     [states, state],
   );
+  const countryLabel = useMemo(
+    () => locations?.find((l) => l.country === country)?.country_name || country,
+    [locations, country],
+  );
 
   // Build set of dates that have at least one slot with spots remaining
   const availableDates = useMemo(() => {
@@ -458,17 +464,7 @@ export function BookingModal({
     return !availableDates.has(ds);
   }
 
-  function handleCountryChange(value: string | null) {
-    setCountry(value ?? "");
-    setState("");
-    setCity("");
-  }
-
-  function handleStateChange(value: string | null) {
-    setState(value ?? "");
-    setCity("");
-  }
-
+  // Country + state are locked to the owner's profile; only the city is chosen.
   function handleCityChange(value: string | null) {
     setCity(value ?? "");
   }
@@ -655,7 +651,7 @@ export function BookingModal({
                     {step === 4 && "Confirm your appointment"}
                   </h3>
                   <p className="mt-1 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
-                    {step === 1 && "Pick the country, state, and city closest to you."}
+                    {step === 1 && "Your country and state are set from your profile — pick your city, or ask staff to book for you."}
                     {step === 2 && "These centers serve your selected city."}
                     {step === 3 &&
                       (selectedDateLabel ?? "Only dates with staff-created openings are selectable.")}
@@ -703,55 +699,93 @@ export function BookingModal({
                 </div>
               )}
 
-              {step === 1 && !showIdGate && (
+              {step === 1 && !showIdGate && assistanceSent && (
+                <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 py-10 text-center">
+                  <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-primary-tint) text-(--brc-primary)">
+                    <CheckCircle2Icon size={22} />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                      Request sent
+                    </p>
+                    <p className="mt-1 max-w-sm text-xs leading-5 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                      Our staff will book the inspection on your behalf and email
+                      you the confirmed details.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {step === 1 && !showIdGate && !assistanceSent && (
                 <div className="flex flex-col gap-4">
                   {isLoadingLocations ? (
                     <div className="flex h-[220px] w-full items-center justify-center">
                       <Loader2Icon size={26} className="animate-spin text-(--brc-primary)" />
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                          Country
-                        </span>
-                        <LocationDropdown
-                          value={country}
-                          placeholder="Select country"
-                          options={(locations ?? []).map((l) => ({
-                            value: l.country,
-                            label: l.country_name || l.country,
-                          }))}
-                          onChange={handleCountryChange}
-                        />
-                      </label>
+                    <>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        {/* Country — locked to the owner's profile */}
+                        <div className="flex flex-col gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                            Country
+                          </span>
+                          <div className="flex h-11 items-center justify-between gap-2 rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) px-3 text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                            <span className="truncate">{countryLabel || "—"}</span>
+                            <LockIcon size={14} className="shrink-0 text-(--brc-text-muted)" />
+                          </div>
+                        </div>
 
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                          State
-                        </span>
-                        <LocationDropdown
-                          value={state}
-                          placeholder="Select state"
-                          options={states.map((s) => ({ value: s.state, label: s.state }))}
-                          disabled={!country}
-                          onChange={handleStateChange}
-                        />
-                      </label>
+                        {/* State — locked to the owner's profile */}
+                        <div className="flex flex-col gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                            State
+                          </span>
+                          <div className="flex h-11 items-center justify-between gap-2 rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) px-3 text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                            <span className="truncate">{state || "—"}</span>
+                            <LockIcon size={14} className="shrink-0 text-(--brc-text-muted)" />
+                          </div>
+                        </div>
 
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                          City
-                        </span>
-                        <LocationDropdown
-                          value={city}
-                          placeholder="Select city"
-                          options={cities.map((c) => ({ value: c, label: c }))}
-                          disabled={!state}
-                          onChange={handleCityChange}
-                        />
-                      </label>
-                    </div>
+                        {/* City — the only selectable field */}
+                        <label className="flex flex-col gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                            City
+                          </span>
+                          <LocationDropdown
+                            value={city}
+                            placeholder="Select city"
+                            options={cities.map((c) => ({ value: c, label: c }))}
+                            disabled={!state}
+                            onChange={handleCityChange}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Always-available staff-booking request */}
+                      <div className="flex flex-col gap-3 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-xs leading-5 text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+                          No center near you, or prefer we handle it? Ask our staff to
+                          book the inspection on your behalf.
+                        </p>
+                        <button
+                          type="button"
+                          disabled={createAssistance.isPending}
+                          onClick={handleRequestAssistance}
+                          className={cn(
+                            "inline-flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition-all duration-200 [font-family:var(--brc-font-ui)]",
+                            secondaryButtonClass,
+                          )}
+                        >
+                          {createAssistance.isPending ? (
+                            <Loader2Icon size={15} className="animate-spin" />
+                          ) : (
+                            <LifeBuoyIcon size={15} />
+                          )}
+                          Request staff to book for you
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
               )}
@@ -1162,7 +1196,7 @@ export function BookingModal({
             </button>
           )}
 
-          {step === 1 && (
+          {step === 1 && !assistanceSent && (
             <button
               type="button"
               disabled={!canProceedStep1}
