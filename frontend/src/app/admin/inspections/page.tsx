@@ -194,7 +194,7 @@ const ALL_DAYS = [
   { label: "Sun", value: 6 },
 ];
 
-type TimeSlotRow = { start_time: string; end_time: string };
+type TimeSlotRow = { start_time: string; end_time: string; capacity?: number };
 
 function countPreviewSlots(dateFrom: string, dateTo: string, days: number[], timeSlots: TimeSlotRow[]): number {
   if (!dateFrom || !dateTo || days.length === 0 || timeSlots.length === 0) return 0;
@@ -263,6 +263,11 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
 
   function updateTimeSlot(i: number, field: "start_time" | "end_time", value: string) {
     setTimeSlots((prev) => prev.map((s, idx) => (idx === i ? { ...s, [field]: value } : s)));
+  }
+
+  function updateTimeSlotCapacity(i: number, value: string) {
+    const n = value === "" ? undefined : Math.max(1, parseInt(value, 10) || 1);
+    setTimeSlots((prev) => prev.map((s, idx) => (idx === i ? { ...s, capacity: n } : s)));
   }
 
   function handleDateFromChange(value: string) {
@@ -516,6 +521,16 @@ function CreateSlotsModal({ open, onClose }: { open: boolean; onClose: () => voi
                       value={slot.end_time}
                       onChange={(e) => updateTimeSlot(i, "end_time", e.target.value)}
                       style={{ ...inputStyle, flex: 1 }}
+                    />
+                    <input
+                      type="number"
+                      min={1}
+                      value={slot.capacity ?? ""}
+                      onChange={(e) => updateTimeSlotCapacity(i, e.target.value)}
+                      placeholder={`${capacity}`}
+                      title="Capacity for this time slot (defaults to the value above)"
+                      aria-label="Slot capacity"
+                      style={{ ...inputStyle, width: 72, flexShrink: 0 }}
                     />
                   </div>
                   {timeSlots.length > 1 && (
