@@ -730,6 +730,22 @@ class StaffInspectionFlowTest(APITestCase):
         insp = PhysicalInspection.objects.get(car=self.car)
         self.assertEqual(insp.presented_attendee, "owner")
 
+    def test_booking_detail_exposes_inspection_record(self):
+        self._start()
+        self._submit_with_documents(result="passed")
+        res = self.client.get(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(res.data["inspection"])
+        self.assertEqual(res.data["inspection"]["presented_attendee"], "owner")
+        self.assertEqual(
+            res.data["inspection"]["presented_id_number"], "22334455667"
+        )
+        # Sale-car documents are surfaced for staff review.
+        self.assertIsNotNone(res.data["inspection"]["documents"])
+        self.assertTrue(res.data["inspection"]["documents"]["car_documents"])
+
     def test_presented_id_is_stored(self):
         self._start()
         res = self._submit_with_documents(result="passed")

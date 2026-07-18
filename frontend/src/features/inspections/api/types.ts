@@ -71,12 +71,36 @@ export type InspectionBooking = {
   updated_at: string;
 };
 
+/** Files + fields the inspector recorded — staff-only. */
+export type StaffInspectionRecord = {
+  id: string;
+  result: "passed" | "needs_clearance" | "failed";
+  mileage: number;
+  fuel_type: string;
+  staff_notes: string;
+  presented_attendee: "owner" | "representative" | "other" | "";
+  presented_id_type: IdType | "";
+  presented_id_number: string;
+  presented_id_document: string | null;
+  inspected_at: string;
+  inspector_name: string;
+  documents: {
+    id: string;
+    car_documents: string | null;
+    receipt_upload: string | null;
+    custom_duty_status: string;
+    receipt_type: string;
+    additional_notes: string;
+  } | null;
+};
+
 /** Staff-only booking detail — includes the representative's ID (never on the
  * owner-facing list). */
 export type InspectionBookingDetail = Omit<InspectionBooking, "car_id" | "car_title"> & {
   car: import("@/features/listings/api/types").CarDetail;
   rep_id_type: IdType | "";
   rep_id_number: string;
+  inspection: StaffInspectionRecord | null;
 };
 
 /** Attendee declaration sent when creating a booking. `attendee_type` defaults

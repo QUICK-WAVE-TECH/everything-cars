@@ -221,6 +221,7 @@ class InspectionBookingDetailSerializer(InspectionBookingSerializer):
     """Includes full car detail for staff review."""
 
     car = CarDetailSerializer(read_only=True)
+    inspection = serializers.SerializerMethodField()
 
     class Meta(InspectionBookingSerializer.Meta):
         # Staff-only detail — rep_id_type/number are exposed here (never on the
@@ -237,9 +238,18 @@ class InspectionBookingDetailSerializer(InspectionBookingSerializer):
             "rep_name",
             "rep_id_type",
             "rep_id_number",
+            "inspection",
             "created_at",
             "updated_at",
         ]
+
+    def get_inspection(self, obj):
+        # Reverse OneToOne — absent until the inspection is submitted.
+        try:
+            inspection = obj.inspection
+        except PhysicalInspection.DoesNotExist:
+            return None
+        return StaffInspectionReadSerializer(inspection, context=self.context).data
 
 
 class BookingCreateSerializer(serializers.Serializer):
@@ -378,6 +388,44 @@ class InspectionDocumentSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]
+
+
+class StaffInspectionReadSerializer(serializers.ModelSerializer):
+    """Staff-only read view of a completed inspection, including the files the
+    inspector uploaded (presented ID + sale documents)."""
+
+    documents = InspectionDocumentSerializer(read_only=True)
+    inspector_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PhysicalInspection
+        fields = [
+            "id",
+            "result",
+            "condition",
+            "mileage",
+            "fuel_type",
+            "car_type",
+            "features",
+            "engine_condition",
+            "chassis_condition",
+            "ac_condition",
+            "is_flooded",
+            "has_accident_history",
+            "staff_notes",
+            "presented_attendee",
+            "presented_id_type",
+            "presented_id_number",
+            "presented_id_document",
+            "inspected_at",
+            "inspector_name",
+            "documents",
+        ]
+
+    def get_inspector_name(self, obj):
+        if not obj.inspector_id:
+            return ""
+        return f"{obj.inspector.first_name} {obj.inspector.last_name}".strip()
 
 
 class CarStatusHistorySerializer(serializers.ModelSerializer):

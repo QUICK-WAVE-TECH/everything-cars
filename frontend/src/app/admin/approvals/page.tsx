@@ -20,6 +20,7 @@ import {
 } from "@/features/listings/api/admin-api";
 import type { CarListItem } from "@/features/listings/api/types";
 import { CarStatusTimeline } from "@/features/listings/components/car-status-timeline";
+import { InspectionRecordPanel } from "@/features/inspections/components/inspection-record-panel";
 import {
   useStaffBookings,
   useStartInspection,
@@ -634,6 +635,11 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
                   viewer="staff"
                 />
               </section>
+
+              {/* Inspector-uploaded files (presented ID + documents) */}
+              <InspectionRecordPanel
+                bookingId={clearanceBooking?.id ?? booking?.id ?? null}
+              />
 
               {/* Needs clearance note */}
               {isNeedsClearance && (
