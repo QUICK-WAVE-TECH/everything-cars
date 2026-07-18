@@ -6,6 +6,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { ArrowLeftIcon, Loader2Icon, PlusIcon, XIcon, UploadIcon } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
+import { IdTypeSelect } from "@/features/auth/components";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -132,11 +133,18 @@ export default function StaffInspectionFormPage() {
   const [receiptType, setReceiptType] = useState("");
   const [additionalNotes, setAdditionalNotes] = useState("");
 
+  // ── Attendee identity section ──
+  const [presentedIdType, setPresentedIdType] = useState("");
+  const [presentedIdNumber, setPresentedIdNumber] = useState("");
+  const [presentedIdDocument, setPresentedIdDocument] = useState<File | null>(null);
+
   // ── Result section ──
   const [result, setResult] = useState<PhysicalInspectionPayload["result"] | "">("");
   const [staffNotes, setStaffNotes] = useState("");
 
   const needsDocuments = !!booking?.car.sale_price;
+  // A non-failed inspection means someone attended — record their presented ID.
+  const presentedIdRequired = result !== "" && result !== "failed";
   const notesRequired = result === "needs_clearance" || result === "failed";
   // Sale-car paperwork is mandatory unless the inspection failed outright —
   // a failed car never publishes, so missing docs can't leak a car live.
@@ -166,7 +174,8 @@ export default function StaffInspectionFormPage() {
     !!acCondition &&
     !!result &&
     (!notesRequired || staffNotes.trim().length > 0) &&
-    (!documentsRequired || documentsComplete);
+    (!documentsRequired || documentsComplete) &&
+    (!presentedIdRequired || (!!presentedIdType && presentedIdNumber.trim().length > 0));
 
   const isSubmitting = submitInspection.isPending;
 
@@ -189,6 +198,13 @@ export default function StaffInspectionFormPage() {
     formData.append("has_accident_history", String(hasAccidentHistory));
     formData.append("staff_notes", staffNotes.trim());
     formData.append("result", result);
+
+    // Attendee's presented ID (staff-only). Required for non-failed results.
+    if (presentedIdType) formData.append("presented_id_type", presentedIdType);
+    if (presentedIdNumber.trim())
+      formData.append("presented_id_number", presentedIdNumber.trim());
+    if (presentedIdDocument)
+      formData.append("presented_id_document", presentedIdDocument);
 
     // Failed inspections don't require documents — and the backend treats ANY
     // document field as "documents provided" and then demands all of them, so
@@ -517,6 +533,44 @@ export default function StaffInspectionFormPage() {
             </div>
           </FormSection>
         )}
+
+        {/* Attendee identity — who physically presented for the inspection */}
+        <FormSection
+          title="Attendee identity"
+          subtitle="Record the ID the attendee presented. Required unless the inspection failed. Staff-only — never shown to the owner or public."
+        >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <IdTypeSelect
+              value={presentedIdType}
+              onChange={setPresentedIdType}
+              label="ID type presented"
+            />
+            <label className="flex flex-col gap-2">
+              <span className="text-base text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                ID number
+              </span>
+              <Input
+                value={presentedIdNumber}
+                onChange={(e) => setPresentedIdNumber(e.target.value)}
+                placeholder="ID number presented"
+              />
+            </label>
+          </div>
+          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-(--brc-border) bg-white px-4 py-3 text-sm [font-family:var(--brc-font-ui)]">
+            <span className="flex items-center gap-2 text-(--brc-text-secondary)">
+              <UploadIcon size={16} />
+              <span className="truncate">
+                {presentedIdDocument?.name ?? "Upload a photo of the ID (optional)"}
+              </span>
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => setPresentedIdDocument(e.target.files?.[0] ?? null)}
+            />
+          </label>
+        </FormSection>
 
         {/* Result */}
         <FormSection title="Inspection result" subtitle="Choose the outcome of this physical inspection.">
