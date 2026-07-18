@@ -93,6 +93,16 @@ class AssistanceStatus(models.TextChoices):
 
 ACTIVE_BOOKING_STATUSES = [BookingStatus.PENDING, BookingStatus.APPROVED]
 
+# Bookings that actually took the slot — used for the staff calendar's display
+# count so a completed/no-show inspection still reads as "booked" (it happened),
+# matching the day-activity view. Only cancelled/rejected free the slot.
+OCCUPIED_BOOKING_STATUSES = [
+    BookingStatus.PENDING,
+    BookingStatus.APPROVED,
+    BookingStatus.COMPLETED,
+    BookingStatus.NO_SHOW,
+]
+
 MAX_RESCHEDULES = 2
 
 

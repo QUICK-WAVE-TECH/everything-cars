@@ -33,6 +33,7 @@ from apps.notifications.email_service import (
 )
 from .models import (
     ACTIVE_BOOKING_STATUSES,
+    OCCUPIED_BOOKING_STATUSES,
     ActorRole,
     AttendeeType,
     BookingStatus,
@@ -234,11 +235,12 @@ class StaffSlotListCreateView(APIView):
         if is_active is not None:
             slots = slots.filter(is_active=is_active.lower() == "true")
 
-        # Annotate with booking count
+        # Display count for the staff calendar — include completed/no-show so a
+        # slot that was attended still reads as booked (matches the day view).
         slots = slots.annotate(
             bookings_count=Count(
                 "bookings",
-                filter=Q(bookings__status__in=ACTIVE_BOOKING_STATUSES),
+                filter=Q(bookings__status__in=OCCUPIED_BOOKING_STATUSES),
             )
         ).order_by("date", "start_time", "created_at")
 

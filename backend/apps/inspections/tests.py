@@ -187,6 +187,31 @@ class StaffSlotManagementTest(APITestCase):
         res = self.client.get("/api/v1/inspections/slots/")
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_calendar_count_includes_completed_excludes_cancelled(self):
+        # The staff calendar count reflects slots that were actually taken:
+        # completed/no-show still count; cancelled/rejected free the slot.
+        slot = create_slot(self.staff)
+        owner = create_user("owner-count@test.com", "owner")
+        create_owner_profile(owner)
+        completed_car = create_car(owner, status=CarStatus.DRAFT)
+        InspectionBooking.objects.create(
+            car=completed_car,
+            slot=slot,
+            booked_by=owner,
+            status=BookingStatus.COMPLETED,
+        )
+        cancelled_car = create_car(owner, status=CarStatus.DRAFT)
+        InspectionBooking.objects.create(
+            car=cancelled_car,
+            slot=slot,
+            booked_by=owner,
+            status=BookingStatus.CANCELLED,
+        )
+        res = self.client.get("/api/v1/inspections/slots/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        row = next(s for s in res.data["results"] if s["id"] == str(slot.id))
+        self.assertEqual(row["bookings_count"], 1)
+
 
 class OwnerBookingTest(APITestCase):
     def setUp(self):

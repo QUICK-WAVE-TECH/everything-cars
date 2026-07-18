@@ -86,6 +86,12 @@ const selectContentClass =
   "rounded-xl border-(--brc-border) bg-white p-1 shadow-[0_18px_48px_rgba(18,18,18,0.14)] [font-family:var(--brc-font-ui)]";
 const selectItemClass =
   "cursor-pointer rounded-lg px-3 py-2 text-sm font-bold text-(--brc-text) focus:bg-(--brc-primary-tint) focus:text-(--brc-primary) data-highlighted:bg-(--brc-primary-tint) data-highlighted:text-(--brc-primary)";
+const inputClass =
+  "h-12 rounded-xl border-(--brc-border) bg-white px-4 text-sm font-bold text-(--brc-text) shadow-[var(--brc-shadow-xs)] transition-all duration-200 placeholder:text-(--brc-text-muted) hover:border-(--brc-primary)/40 focus-visible:ring-2 focus-visible:ring-(--brc-primary)/20 [font-family:var(--brc-font-ui)]";
+const textareaClass =
+  "rounded-xl border-(--brc-border) bg-white px-4 py-3 text-sm font-semibold leading-6 text-(--brc-text) shadow-[var(--brc-shadow-xs)] transition-all duration-200 placeholder:text-(--brc-text-muted) hover:border-(--brc-primary)/40 focus-visible:ring-2 focus-visible:ring-(--brc-primary)/20 [font-family:var(--brc-font-ui)]";
+const uploadClass =
+  "group flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-dashed border-(--brc-border) bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] px-4 text-sm font-bold text-(--brc-text-muted) shadow-[var(--brc-shadow-xs)] transition-all duration-200 hover:-translate-y-0.5 hover:border-(--brc-primary)/50 hover:text-(--brc-primary) [font-family:var(--brc-font-ui)]";
 
 // ── Section wrapper ──
 function FormSection({
@@ -307,7 +313,7 @@ export default function StaffInspectionFormPage() {
     null;
 
   return (
-    <>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_14%_0%,rgba(230,241,250,0.72),transparent_30%),linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_42%,#FFFFFF_100%)]">
       {/* Hero / header band */}
       <section className="border-b border-(--brc-border) bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)]">
         <div className="mx-auto flex max-w-[1180px] flex-col gap-6 px-4 pb-8 pt-8 sm:px-6">
@@ -400,8 +406,8 @@ export default function StaffInspectionFormPage() {
                     type="button"
                     onClick={() => setCondition(c)}
                     className={cn(
-                      "flex h-9 flex-1 cursor-pointer items-center justify-center rounded-lg border text-[13px] font-semibold transition-colors [font-family:var(--brc-font-ui)]",
-                      condition === c ? "border-(--brc-primary) bg-(--brc-primary-tint) text-(--brc-primary)" : "border-(--brc-border) bg-white text-(--brc-text-secondary) hover:bg-(--brc-bg-subtle)"
+                      "flex h-12 flex-1 cursor-pointer items-center justify-center rounded-xl border text-sm font-black shadow-[var(--brc-shadow-xs)] transition-all duration-200 [font-family:var(--brc-font-ui)]",
+                      condition === c ? "border-(--brc-primary) bg-(--brc-primary) text-white shadow-[0_14px_30px_rgba(0,0,139,0.18)]" : "border-(--brc-border) bg-white text-(--brc-text-secondary) hover:-translate-y-0.5 hover:border-(--brc-primary)/40 hover:bg-(--brc-primary-tint) hover:text-(--brc-primary)"
                     )}
                   >
                     {c === "used" ? "Used" : "Brand New"}
@@ -413,6 +419,7 @@ export default function StaffInspectionFormPage() {
             <div>
               <FieldLabel>Mileage (km)</FieldLabel>
               <Input
+                className={inputClass}
                 type="number"
                 min={0}
                 value={mileage}
@@ -463,6 +470,7 @@ export default function StaffInspectionFormPage() {
             <FieldLabel>Features observed</FieldLabel>
             <div className="flex gap-2">
               <Input
+                className={inputClass}
                 value={featureInput}
                 onChange={(e) => setFeatureInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -476,7 +484,7 @@ export default function StaffInspectionFormPage() {
               <button
                 type="button"
                 onClick={addFeature}
-                className="flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) px-3 text-[13px] font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-muted) [font-family:var(--brc-font-ui)]"
+                className="flex h-12 shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border border-(--brc-border) bg-white px-4 text-sm font-black text-(--brc-text) shadow-[var(--brc-shadow-xs)] transition-all hover:-translate-y-0.5 hover:border-(--brc-primary)/40 hover:bg-(--brc-primary-tint) hover:text-(--brc-primary) [font-family:var(--brc-font-ui)]"
               >
                 <PlusIcon size={14} /> Add
               </button>
@@ -484,7 +492,7 @@ export default function StaffInspectionFormPage() {
             {features.length > 0 && (
               <div className="mt-2.5 flex flex-wrap gap-2">
                 {features.map((f) => (
-                  <span key={f} className="inline-flex items-center gap-1.5 rounded-full bg-(--brc-bg-subtle) py-1 pl-3 pr-1.5 text-xs font-medium text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                  <span key={f} className="inline-flex items-center gap-1.5 rounded-full bg-(--brc-primary-tint) py-1.5 pl-3 pr-1.5 text-xs font-bold text-(--brc-primary) [font-family:var(--brc-font-ui)]">
                     {f}
                     <button type="button" onClick={() => removeFeature(f)} className="flex size-4 cursor-pointer items-center justify-center rounded-full border-none bg-(--brc-bg-muted) text-(--brc-text-muted) hover:bg-(--brc-danger-bg) hover:text-(--brc-danger)">
                       <XIcon size={10} />
@@ -511,7 +519,7 @@ export default function StaffInspectionFormPage() {
             <ConditionPicker value={acCondition} onChange={setAcCondition} />
           </div>
 
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-(--brc-border) px-3.5 py-3">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-(--brc-border) bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] px-4 py-4 shadow-[var(--brc-shadow-xs)]">
             <div>
               <span className="block text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">Flood damage</span>
               <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Is there any evidence the vehicle was flooded?</span>
@@ -523,7 +531,7 @@ export default function StaffInspectionFormPage() {
             />
           </div>
 
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-(--brc-border) px-3.5 py-3">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-(--brc-border) bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] px-4 py-4 shadow-[var(--brc-shadow-xs)]">
             <div>
               <span className="block text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">Accident history</span>
               <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Is there any evidence of prior accident damage?</span>
@@ -550,8 +558,10 @@ export default function StaffInspectionFormPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <FieldLabel>Car documents</FieldLabel>
-                <label className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-3 text-[13px] font-medium text-(--brc-text-muted) transition-colors hover:border-(--brc-primary) hover:text-(--brc-text) [font-family:var(--brc-font-ui)]">
-                  <UploadIcon size={14} />
+                <label className={uploadClass}>
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--brc-primary-tint) text-(--brc-primary)">
+                    <UploadIcon size={16} />
+                  </span>
                   <span className="truncate">{carDocuments?.name ?? "Upload file"}</span>
                   <input type="file" className="hidden" onChange={(e) => setCarDocuments(e.target.files?.[0] ?? null)} />
                 </label>
@@ -559,8 +569,10 @@ export default function StaffInspectionFormPage() {
 
               <div>
                 <FieldLabel>Receipt upload</FieldLabel>
-                <label className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-3 text-[13px] font-medium text-(--brc-text-muted) transition-colors hover:border-(--brc-primary) hover:text-(--brc-text) [font-family:var(--brc-font-ui)]">
-                  <UploadIcon size={14} />
+                <label className={uploadClass}>
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--brc-primary-tint) text-(--brc-primary)">
+                    <UploadIcon size={16} />
+                  </span>
                   <span className="truncate">{receiptUpload?.name ?? "Upload file"}</span>
                   <input type="file" className="hidden" onChange={(e) => setReceiptUpload(e.target.files?.[0] ?? null)} />
                 </label>
@@ -606,6 +618,7 @@ export default function StaffInspectionFormPage() {
             <div>
               <FieldLabel>Additional notes</FieldLabel>
               <Textarea
+                className={textareaClass}
                 value={additionalNotes}
                 onChange={(e) => setAdditionalNotes(e.target.value)}
                 placeholder="Any further notes about the documentation..."
@@ -622,7 +635,7 @@ export default function StaffInspectionFormPage() {
           subtitle="Confirm who showed up against the booking. The owner's ID is already on file — only a representative's ID is captured here. Required unless the inspection failed. Staff-only."
         >
           {/* What the owner declared at booking */}
-          <div className="rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) p-4 [font-family:var(--brc-font-ui)]">
+          <div className="rounded-2xl border border-(--brc-border) bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] p-4 shadow-[var(--brc-shadow-xs)] [font-family:var(--brc-font-ui)]">
             <span className="text-[11px] font-bold uppercase tracking-wide text-(--brc-text-muted)">
               Declared at booking
             </span>
@@ -671,10 +684,10 @@ export default function StaffInspectionFormPage() {
                     }
                   }}
                   className={cn(
-                    "cursor-pointer rounded-lg border p-3 text-left text-sm font-bold transition [font-family:var(--brc-font-ui)]",
+                    "cursor-pointer rounded-2xl border p-4 text-left text-sm font-black shadow-[var(--brc-shadow-xs)] transition-all duration-200 [font-family:var(--brc-font-ui)]",
                     presentedAttendee === opt.key
-                      ? "border-(--brc-primary) bg-(--brc-primary-tint) text-(--brc-primary)"
-                      : "border-(--brc-border) bg-white text-(--brc-text)",
+                      ? "border-(--brc-primary) bg-(--brc-primary) text-white shadow-[0_14px_30px_rgba(0,0,139,0.20)]"
+                      : "border-(--brc-border) bg-white text-(--brc-text) hover:-translate-y-0.5 hover:border-(--brc-primary)/40 hover:bg-(--brc-primary-tint) hover:text-(--brc-primary)",
                   )}
                 >
                   {opt.label}
@@ -703,15 +716,18 @@ export default function StaffInspectionFormPage() {
                     ID number
                   </span>
                   <Input
+                    className={inputClass}
                     value={presentedIdNumber}
                     onChange={(e) => setPresentedIdNumber(e.target.value)}
                     placeholder="ID number presented"
                   />
                 </label>
               </div>
-              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-(--brc-border) bg-white px-4 py-3 text-sm [font-family:var(--brc-font-ui)]">
+              <label className={uploadClass}>
                 <span className="flex items-center gap-2 text-(--brc-text-secondary)">
-                  <UploadIcon size={16} />
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--brc-primary-tint) text-(--brc-primary)">
+                    <UploadIcon size={16} />
+                  </span>
                   <span className="truncate">
                     {presentedIdDocument?.name ?? "Upload a photo of the ID (optional)"}
                   </span>
@@ -736,8 +752,8 @@ export default function StaffInspectionFormPage() {
                 <label
                   key={opt.value}
                   className={cn(
-                    "flex cursor-pointer items-start gap-3 rounded-lg border px-3.5 py-3 transition-colors",
-                    active ? "border-(--brc-primary) bg-(--brc-primary-tint)" : "border-(--brc-border) bg-white hover:bg-(--brc-bg-subtle)"
+                    "flex cursor-pointer items-start gap-4 rounded-2xl border px-4 py-4 shadow-[var(--brc-shadow-xs)] transition-all duration-200",
+                    active ? "border-(--brc-primary) bg-(--brc-primary-tint) shadow-[0_14px_30px_rgba(0,0,139,0.10)]" : "border-(--brc-border) bg-white hover:-translate-y-0.5 hover:border-(--brc-primary)/40 hover:bg-(--brc-bg-subtle)"
                   )}
                 >
                   <RadioGroupItem
@@ -758,6 +774,7 @@ export default function StaffInspectionFormPage() {
               Staff notes {notesRequired ? <span className="text-(--brc-danger)">*</span> : <span className="font-normal text-(--brc-text-muted)">(optional)</span>}
             </FieldLabel>
             <Textarea
+              className={textareaClass}
               value={staffNotes}
               onChange={(e) => setStaffNotes(e.target.value)}
               placeholder={notesRequired ? "Explain why this inspection needs clearance or failed..." : "Any notes about this inspection..."}
@@ -859,6 +876,6 @@ export default function StaffInspectionFormPage() {
           </div>
         </aside>
       </div>
-    </>
+    </div>
   );
 }
