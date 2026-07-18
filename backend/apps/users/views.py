@@ -32,6 +32,8 @@ from .services import (
 
 logger = logging.getLogger(__name__)
 
+LOCKED_OWNER_IDENTITY_FIELDS = {"id_type", "national_id", "id_document"}
+
 
 class SignUpView(APIView):
     permission_classes = [AllowAny]
@@ -274,6 +276,17 @@ class MeView(APIView):
 
     def patch(self, request):
         user = self._get_user(request)
+        if user.role == "owner" and hasattr(user, "owner_profile"):
+            locked_fields = LOCKED_OWNER_IDENTITY_FIELDS.intersection(request.data)
+            if locked_fields:
+                return Response(
+                    {
+                        field: "Means of identity cannot be edited from profile."
+                        for field in sorted(locked_fields)
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         serializer = UserProfileSerializer(user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()

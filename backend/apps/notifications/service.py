@@ -1,10 +1,18 @@
 import logging
 import time
 
+from django.conf import settings
+
 from .models import Notification, NotificationType
+from .email_service import send_email
 from apps.users.models import User
 
 logger = logging.getLogger("notifications")
+
+
+def _fe(path=""):
+    """Absolute frontend URL for email CTA buttons."""
+    return f"{settings.FRONTEND_URL.rstrip('/')}{path}"
 
 
 def _push_ws(notif):
@@ -106,6 +114,15 @@ def notify_request_approved(request_obj):
             "car_title": request_obj.car.title,
         },
     )
+    send_email(
+        recipient=request_obj.customer.email,
+        subject="Your request was approved",
+        template_key="request_approved",
+        context={
+            "car_title": request_obj.car.title,
+            "action_url": _fe(f"/customer/requests/{request_obj.id}"),
+        },
+    )
 
 
 def notify_request_rejected(request_obj):
@@ -174,6 +191,17 @@ def notify_payment_confirmed(request_obj):
                 "car_title": request_obj.car.title,
             },
         )
+
+    send_email(
+        recipient=request_obj.customer.email,
+        subject="Payment confirmed",
+        template_key="payment_confirmed",
+        context={
+            "car_title": request_obj.car.title,
+            "amount": f"{request_obj.currency} {request_obj.price_offered}",
+            "action_url": _fe(f"/customer/requests/{request_obj.id}"),
+        },
+    )
 
 
 # ── Rental lifecycle notifications ──
@@ -281,6 +309,16 @@ def notify_changes_requested(car):
         ),
         data={"car_id": str(car.id), "car_title": car.title},
     )
+    send_email(
+        recipient=car.owner.email,
+        subject="Action needed: changes to your listing",
+        template_key="changes_requested",
+        context={
+            "car_title": car.title,
+            "admin_note": car.admin_note or "",
+            "action_url": _fe(f"/owner/my-cars/{car.id}"),
+        },
+    )
 
 
 def notify_listing_approved(car):
@@ -294,6 +332,15 @@ def notify_listing_approved(car):
             "you can now book an inspection."
         ),
         data={"car_id": str(car.id), "car_title": car.title},
+    )
+    send_email(
+        recipient=car.owner.email,
+        subject="Your listing is approved — book an inspection",
+        template_key="listing_approved",
+        context={
+            "car_title": car.title,
+            "action_url": _fe(f"/owner/my-cars/{car.id}"),
+        },
     )
 
 
@@ -350,6 +397,16 @@ def notify_needs_clearance(booking):
             "staff_note": booking.staff_note,
         },
     )
+    send_email(
+        recipient=booking.booked_by.email,
+        subject="Your inspection needs further clearance",
+        template_key="inspection_needs_clearance",
+        context={
+            "car_title": booking.car.title,
+            "clearance_note": booking.staff_note or "",
+            "action_url": _fe(f"/owner/my-cars/{booking.car_id}"),
+        },
+    )
 
 
 def notify_clearance_response(booking, response_message=""):
@@ -385,6 +442,16 @@ def notify_inspection_passed(booking):
             "car_title": booking.car.title,
         },
     )
+    send_email(
+        recipient=booking.booked_by.email,
+        subject="Passed! Your car is now live",
+        template_key="inspection_passed",
+        context={
+            "first_name": booking.booked_by.first_name,
+            "car_title": booking.car.title,
+            "action_url": _fe(f"/cars/{booking.car_id}"),
+        },
+    )
 
 
 def notify_inspection_failed(booking):
@@ -399,6 +466,16 @@ def notify_inspection_failed(booking):
             "car_id": str(booking.car_id),
             "car_title": booking.car.title,
             "staff_note": booking.staff_note,
+        },
+    )
+    send_email(
+        recipient=booking.booked_by.email,
+        subject="Inspection outcome for your car",
+        template_key="inspection_failed",
+        context={
+            "car_title": booking.car.title,
+            "reason": booking.staff_note or "",
+            "action_url": _fe(f"/owner/my-cars/{booking.car_id}"),
         },
     )
 
@@ -437,6 +514,19 @@ def notify_inspection_rescheduled(booking):
             },
         )
 
+    # Updated-appointment email to the owner.
+    send_email(
+        recipient=booking.booked_by.email,
+        subject="Your inspection has been rescheduled",
+        template_key="inspection_rescheduled",
+        context={
+            "car_title": booking.car.title,
+            "date": booking.slot.date.strftime("%a, %d %b %Y"),
+            "time": booking.slot.start_time.strftime("%I:%M %p").lstrip("0"),
+            "center": booking.slot.center.company_name,
+        },
+    )
+
 
 def notify_assistance_requested(assistance):
     """All staff get notified when an owner requests booking assistance"""
@@ -455,5 +545,15 @@ def notify_assistance_requested(assistance):
                 "assistance_id": str(assistance.id),
                 "owner_id": str(assistance.owner_id),
                 "state": assistance.state,
+            },
+        )
+        send_email(
+            recipient=staff.email,
+            subject="Owner needs booking assistance",
+            template_key="staff_assistance_request",
+            context={
+                "owner_name": assistance.owner.get_full_name(),
+                "state": assistance.state or "—",
+                "message": assistance.message or "—",
             },
         )

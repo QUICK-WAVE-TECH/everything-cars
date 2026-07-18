@@ -26,7 +26,11 @@ from apps.notifications.service import (
     notify_inspection_rescheduled,
     notify_assistance_requested,
 )
-from apps.notifications.email_service import send_booking_confirmation
+from apps.notifications.email_service import (
+    send_assistance_booked,
+    send_assistance_received,
+    send_booking_confirmation,
+)
 from .models import (
     ACTIVE_BOOKING_STATUSES,
     ActorRole,
@@ -1378,6 +1382,13 @@ class OwnerAssistanceCreateView(APIView):
                 "owner", "car"
             ).get(id=aid),
         )
+        # Confirmation email to the owner.
+        schedule_notification(
+            send_assistance_received,
+            lambda aid=assistance.id: AssistanceRequest.objects.select_related(
+                "owner"
+            ).get(id=aid),
+        )
         return Response(
             AssistanceRequestSerializer(assistance).data,
             status=status.HTTP_201_CREATED,
@@ -1479,8 +1490,9 @@ class StaffBookForOwnerView(APIView):
             notify_inspection_booked,
             lambda bid=booking.id: booking_detail_queryset().get(id=bid),
         )
+        # Staff booked on the owner's behalf → the "we booked it for you" email.
         schedule_notification(
-            send_booking_confirmation,
+            send_assistance_booked,
             lambda bid=booking.id: booking_detail_queryset().get(id=bid),
         )
         detail = booking_detail_queryset().get(id=booking.id)

@@ -173,8 +173,6 @@ export const ownerProfileUpdateSchema = z.object({
   phone: phoneSchema,
   // Owner fields
   fleet_name: z.string().trim().optional(),
-  id_type: z.enum(ID_TYPE_VALUES).optional(),
-  national_id: z.string().trim().optional(),
   location: z.string().trim().optional(),
   rc_number: z.string().trim().optional(),
   country: z.string().trim().optional(),

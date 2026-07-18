@@ -65,6 +65,40 @@ def send_email(*, recipient, subject, template_key, context, booking=None):
     return log
 
 
+def send_assistance_received(assistance):
+    """Owner confirmation that their booking-assistance request was received."""
+    return send_email(
+        recipient=assistance.owner.email,
+        subject="We got your request for help",
+        template_key="assistance_received",
+        context={
+            "first_name": assistance.owner.first_name,
+            "state": assistance.state or "your area",
+        },
+    )
+
+
+def send_assistance_booked(booking):
+    """Owner email when staff books an inspection on their behalf."""
+    slot = booking.slot
+    center = slot.center
+    return send_email(
+        recipient=booking.booked_by.email,
+        subject="We booked your inspection",
+        template_key="assistance_booked_for_you",
+        context={
+            "first_name": booking.booked_by.first_name,
+            "car_title": booking.car.title,
+            "date": slot.date.strftime("%a, %d %b %Y"),
+            "time": slot.start_time.strftime("%I:%M %p").lstrip("0"),
+            "center": center.company_name,
+            "address": center.address,
+            "tracking_id": booking.car.tracking_id,
+        },
+        booking=booking,
+    )
+
+
 def send_booking_confirmation(booking):
     """Inspection booking confirmed — tells the attendee to bring a valid ID.
 

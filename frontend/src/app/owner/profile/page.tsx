@@ -5,7 +5,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { PencilIcon, XIcon, Loader2Icon } from "lucide-react";
+import { LockIcon, PencilIcon, XIcon, Loader2Icon } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
 import {
@@ -14,8 +14,6 @@ import {
   CountrySelect,
   StateSelect,
   CityCombobox,
-  IdTypeSelect,
-  UploadField,
 } from "@/features/auth/components";
 import { useMe, useUpdateProfile, useChangePassword } from "@/features/auth/api";
 import {
@@ -44,17 +42,30 @@ function isoToName(iso: string): string {
   return COUNTRIES.find((c) => c.iso === iso.toLowerCase())?.name ?? "";
 }
 
-type Field = { label: string; value: string; icon: IconName };
+type Field = { label: string; value: string; icon: IconName; locked?: boolean };
 
 function ReadonlyField({ field }: { field: Field }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <span className="flex items-center gap-2 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
-        <Icon name={field.icon} size={16} stroke="var(--brc-text-secondary)" />
-        {field.label}
+      <span className="flex items-center justify-between gap-2 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+        <span className="flex min-w-0 items-center gap-2">
+          <Icon name={field.icon} size={16} stroke="var(--brc-text-secondary)" />
+          <span className="truncate">{field.label}</span>
+        </span>
+        {field.locked && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-(--brc-bg-subtle) px-2 py-0.5 text-[11px] font-semibold text-(--brc-text-muted)">
+            <LockIcon size={12} />
+            Locked
+          </span>
+        )}
       </span>
-      <div className="flex h-[52px] items-center overflow-hidden text-ellipsis whitespace-nowrap rounded-(--brc-radius-sm) border border-(--brc-border) bg-(--brc-bg-subtle) px-4 text-sm text-(--brc-text) [font-family:var(--brc-font-ui)]">
-        {field.value}
+      <div className="flex h-[52px] items-center justify-between gap-3 overflow-hidden rounded-(--brc-radius-sm) border border-(--brc-border) bg-(--brc-bg-subtle) px-4 text-sm text-(--brc-text) [font-family:var(--brc-font-ui)]">
+        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+          {field.value}
+        </span>
+        {field.locked && (
+          <LockIcon size={16} className="shrink-0 text-(--brc-text-muted)" />
+        )}
       </div>
     </div>
   );
@@ -66,7 +77,6 @@ export default function OwnerProfilePage() {
   const changePassword = useChangePassword();
   const [editing, setEditing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [idDocument, setIdDocument] = useState<File | null>(null);
 
   const profile = user?.owner_profile;
 
@@ -77,8 +87,6 @@ export default function OwnerProfilePage() {
       last_name: user?.last_name ?? "",
       phone: user?.phone ?? "",
       fleet_name: profile?.fleet_name ?? "",
-      id_type: (profile?.id_type as ProfileInput["id_type"]) || undefined,
-      national_id: profile?.national_id ?? "",
       location: profile?.location ?? "",
       rc_number: profile?.rc_number ?? "",
       country: profile?.country ?? "",
@@ -109,8 +117,6 @@ export default function OwnerProfilePage() {
       last_name: user?.last_name ?? "",
       phone: user?.phone ?? "",
       fleet_name: profile?.fleet_name ?? "",
-      id_type: (profile?.id_type as ProfileInput["id_type"]) || undefined,
-      national_id: profile?.national_id ?? "",
       location: profile?.location ?? "",
       rc_number: profile?.rc_number ?? "",
       country: profile?.country ?? "",
@@ -130,7 +136,6 @@ export default function OwnerProfilePage() {
 
   function handleSave(values: ProfileInput) {
     const payload: Record<string, unknown> = { ...values };
-    if (idDocument) payload.id_document = idDocument;
     updateProfile.mutate(payload, {
       onSuccess: () => {
         toast.success("Profile updated successfully");
@@ -188,16 +193,19 @@ export default function OwnerProfilePage() {
       label: "ID Type",
       value: idTypeLabel(profile?.id_type) || "—",
       icon: "idcard",
+      locked: true,
     },
     {
       label: idTypeLabel(profile?.id_type) ? `${idTypeLabel(profile?.id_type)} Number` : "ID Number",
       value: profile?.national_id || "—",
       icon: "idcard",
+      locked: true,
     },
     {
       label: "ID Document",
-      value: profile?.id_document ? "On file" : "Not uploaded",
+      value: profile?.id_document ? "Uploaded" : "Not uploaded",
       icon: "idcard",
+      locked: true,
     },
     { label: "Location", value: profile?.location || "—", icon: "pin" },
     { label: "RC Number", value: profile?.rc_number || "—", icon: "idcard" },
@@ -390,59 +398,42 @@ export default function OwnerProfilePage() {
                         </FormItem>
                       )}
                     />
-                    <div className="flex flex-col gap-4 rounded-xl border border-(--brc-border) p-4 sm:col-span-2">
-                      <span className="text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                    <div className="flex flex-col gap-4 rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle) p-4 sm:col-span-2">
+                      <span className="flex items-center gap-2 text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                        <LockIcon size={15} className="text-(--brc-text-muted)" />
                         Identity Verification
                       </span>
-                      <FormField
-                        control={form.control}
-                        name="id_type"
-                        render={({ field }) => (
-                          <FormItem>
-                            <IdTypeSelect
-                              value={field.value ?? ""}
-                              onChange={field.onChange}
-                            />
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="national_id"
-                        render={({ field }) => {
-                          const t = form.getValues("id_type");
-                          return (
-                            <FormItem>
-                              <AuthField
-                                label={t === "nin" ? "NIN" : `${idTypeLabel(t) || "ID"} Number`}
-                                placeholder="ID number"
-                                value={field.value ?? ""}
-                                onChange={(value) =>
-                                  field.onChange(
-                                    t === "nin" ? value.replace(/\D/g, "") : value,
-                                  )
-                                }
-                              />
-                              <FormMessage />
-                            </FormItem>
-                          );
-                        }}
-                      />
-                      <UploadField
-                        label={
-                          profile?.id_document
-                            ? "Replace ID Document"
-                            : "Upload ID Document"
-                        }
-                        hint={
-                          profile?.id_document
-                            ? "A document is on file — upload to replace it."
-                            : "A clear photo or PDF of your ID — PDF, PNG, or JPEG (Max 9MB)"
-                        }
-                        value={idDocument?.name}
-                        onPick={setIdDocument}
-                      />
+                      <p className="m-0 text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                        Means of identity is locked for now. Contact support if these details need to change.
+                      </p>
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <ReadonlyField
+                          field={{
+                            label: "ID Type",
+                            value: idTypeLabel(profile?.id_type) || "—",
+                            icon: "idcard",
+                            locked: true,
+                          }}
+                        />
+                        <ReadonlyField
+                          field={{
+                            label: idTypeLabel(profile?.id_type)
+                              ? `${idTypeLabel(profile?.id_type)} Number`
+                              : "ID Number",
+                            value: profile?.national_id || "—",
+                            icon: "idcard",
+                            locked: true,
+                          }}
+                        />
+                        <ReadonlyField
+                          field={{
+                            label: "ID Document",
+                            value: profile?.id_document ? "Uploaded" : "Not uploaded",
+                            icon: "idcard",
+                            locked: true,
+                          }}
+                        />
+                      </div>
                     </div>
                     <FormField
                       control={form.control}
