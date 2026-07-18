@@ -17,6 +17,23 @@ from .models import (
 )
 
 
+def _latest_passed_inspection(car):
+    """The car's most recent passed physical inspection, or None.
+
+    Uses the view's `_passed_inspections` prefetch when present (no N+1); falls
+    back to a query for single-object views that don't prefetch. Uses the string
+    "passed" rather than importing InspectionResult to avoid an import cycle.
+    """
+    passed = getattr(car, "_passed_inspections", None)
+    if passed is not None:
+        return passed[0] if passed else None
+    return (
+        car.physical_inspections.filter(result="passed")
+        .order_by("-inspected_at")
+        .first()
+    )
+
+
 class CarImageSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
     thumbnail = serializers.SerializerMethodField()
@@ -74,6 +91,7 @@ class CarListSerializer(serializers.ModelSerializer):
     primary_image = serializers.SerializerMethodField()
     owner = CarOwnerSummarySerializer(read_only=True)
     availability_status = serializers.SerializerMethodField()
+    is_verified = serializers.SerializerMethodField()
 
     class Meta:
         model = Car
@@ -95,7 +113,13 @@ class CarListSerializer(serializers.ModelSerializer):
             "primary_image",
             "availability_status",
             "created_at",
+            "availability_status",
+            "is_verified",
+            "created_at",
         ]
+
+    def get_is_verified(self, obj):
+        return _latest_passed_inspection(obj) is not None
 
     def get_primary_image(self, obj):
         # prefetch related("images") should be used in view
@@ -153,7 +177,11 @@ class CarListSerializer(serializers.ModelSerializer):
             if req.request_type == "buy":
                 return "reserved"
             # Active rental currently in period → rented
-            if req.status == RequestStatus.ACTIVE and req.start_date and req.duration_days:
+            if (
+                req.status == RequestStatus.ACTIVE
+                and req.start_date
+                and req.duration_days
+            ):
                 end = req.start_date + timedelta(days=req.duration_days)
                 if req.start_date <= today < end:
                     return "rented"
@@ -171,6 +199,11 @@ class CarDetailSerializer(serializers.ModelSerializer):
     availability_status = serializers.SerializerMethodField()
     booked_periods = serializers.SerializerMethodField()
     available_from = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
+    mileage = serializers.SerializerMethodField()
+    fuel_type = serializers.SerializerMethodField()
+    is_verified = serializers.SerializerMethodField()
+    verified_report = serializers.SerializerMethodField()
 
     class Meta:
         model = Car
@@ -207,7 +240,12 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "availability_status",
             "booked_periods",
             "available_from",
+            "features",
+            "is_verified",
+            "verified_report",
+            "availability_status",
         ]
+        read_only_fields = ["id"]
 
     def get_primary_image(self, obj):
         return CarListSerializer(context=self.context).get_primary_image(obj)
@@ -269,7 +307,11 @@ class CarDetailSerializer(serializers.ModelSerializer):
         today = date.today()
         for req in self._get_booked_requests(obj):
             # Active rental currently in period → rented
-            if req.status == RequestStatus.ACTIVE and req.start_date and req.duration_days:
+            if (
+                req.status == RequestStatus.ACTIVE
+                and req.start_date
+                and req.duration_days
+            ):
                 end = req.start_date + timedelta(days=req.duration_days)
                 if req.start_date <= today < end:
                     return "rented"
@@ -312,6 +354,51 @@ class CarDetailSerializer(serializers.ModelSerializer):
         if latest_end is None:
             return None
         return latest_end.isoformat()
+
+    def _verified_source(self, obj):
+        """Inspection that overrides owner input — ONLY in public context, so the
+        owner keeps seeing their own values on their own pages."""
+        if not self.context.get("public"):
+            return None
+        return _latest_passed_inspection(obj)
+
+    def get_description(self, obj):
+        insp = self._verified_source(obj)
+        if insp and insp.staff_notes:
+            return insp.staff_notes
+        return obj.description
+
+    def get_mileage(self, obj):
+        insp = self._verified_source(obj)
+        return insp.mileage if insp else obj.mileage
+
+    def get_fuel_type(self, obj):
+        insp = self._verified_source(obj)
+        return insp.fuel_type if insp else obj.fuel_type
+
+    def get_is_verified(self, obj):
+        return _latest_passed_inspection(obj) is not None
+
+    def get_verified_report(self, obj):
+        insp = _latest_passed_inspection(obj)
+        if not insp:
+            return None
+        # NOTE: deliberately excludes presented_id_* and inspector identity —
+        # the verified report is public and must never leak those.
+        return {
+            "condition": insp.condition,
+            "car_type": insp.car_type,
+            "mileage": insp.mileage,
+            "fuel_type": insp.fuel_type,
+            "features": insp.features,
+            "engine_condition": insp.engine_condition,
+            "chassis_condition": insp.chassis_condition,
+            "ac_condition": insp.ac_condition,
+            "is_flooded": insp.is_flooded,
+            "has_accident_history": insp.has_accident_history,
+            "notes": insp.staff_notes,
+            "inspected_at": insp.inspected_at,
+        }
 
 
 class CarCreateSerializer(serializers.ModelSerializer):

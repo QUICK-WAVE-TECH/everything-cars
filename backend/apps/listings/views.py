@@ -73,6 +73,8 @@ from apps.inspections.models import (
     ActorRole,
     BookingStatus,
     InspectionBooking,
+    PhysicalInspection,
+    InspectionResult,
 )
 from apps.inspections.serializers import CarStatusHistorySerializer
 from apps.inspections.services import record_status_change
@@ -579,6 +581,13 @@ class PublicCarListView(APIView):
             .prefetch_related("images")
             .annotate(**availability_annotations())
         )
+        passed_prefetch = Prefetch(
+            "physical_inspections",
+            queryset=PhysicalInspection.objects.filter(
+                result=InspectionResult.PASSED
+            ).order_by("-inspected_at"),
+            to_attr="_passed_inspections",
+        )
 
         # Basic filters
         listing_type = request.query_params.get("listing_type")
@@ -664,14 +673,19 @@ class PublicCarDetailView(APIView):
             ).only("id", "start_date", "duration_days", "status"),
             to_attr="_booked_requests",
         )
+        passed_prefetch = Prefetch(
+            "physical_inspections",
+            queryset=PhysicalInspection.objects.filter(
+                result=InspectionResult.PASSED
+            ).order_by("-inspected_at"),
+            to_attr="_passed_inspections",
+        )
 
         try:
             car = (
                 Car.objects.select_related("owner__owner_profile")
                 .prefetch_related("images", "features", booked_prefetch)
-                .annotate(
-                    _is_sold=sold_annotation(), **availability_annotations()
-                )
+                .annotate(_is_sold=sold_annotation(), **availability_annotations())
                 .filter(Q(status=CarStatus.PUBLISHED) | Q(_is_sold=True))
                 .get(
                     id=car_id,
@@ -682,7 +696,9 @@ class PublicCarDetailView(APIView):
             return Response(
                 {"detail": "Car does not exist"}, status=status.HTTP_404_NOT_FOUND
             )
-        return Response(CarDetailSerializer(car, context={"request": request}).data)
+        return Response(
+            CarDetailSerializer(car, context={"request": request, "public": True}).data
+        )
 
 
 class MyCarHistoryView(APIView):
