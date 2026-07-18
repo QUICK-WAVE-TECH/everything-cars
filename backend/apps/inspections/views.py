@@ -292,7 +292,7 @@ class StaffSlotListCreateView(APIView):
                         end_time=end,
                         center=center,
                         defaults={
-                            "capacity": capacity,
+                            "capacity": ts.get("capacity", capacity),
                             "created_by": request.user,
                         },
                     )

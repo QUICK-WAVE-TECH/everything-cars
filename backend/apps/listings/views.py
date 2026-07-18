@@ -76,7 +76,10 @@ from apps.inspections.models import (
     PhysicalInspection,
     InspectionResult,
 )
-from apps.inspections.serializers import CarStatusHistorySerializer
+from apps.inspections.serializers import (
+    CarStatusHistorySerializer,
+    StaffCarStatusHistorySerializer,
+)
 from apps.inspections.services import record_status_change
 
 
@@ -1557,8 +1560,8 @@ class AdminCarHistoryView(APIView):
             return Response(
                 {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
             )
-        history = car.status_history.all()
-        return Response(CarStatusHistorySerializer(history, many=True).data)
+        history = car.status_history.select_related("actor").all()
+        return Response(StaffCarStatusHistorySerializer(history, many=True).data)
 
 
 class AdminCarStatusCountsView(APIView):

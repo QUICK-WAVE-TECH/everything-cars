@@ -152,7 +152,21 @@ class InspectionSlotCreateSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     {"time_slots": "End time must be after start time."}
                 )
-            normalized_slots.append({"start_time": start, "end_time": end})
+            row = {"start_time": start, "end_time": end}
+            # Optional per-row capacity — overrides the batch-level default.
+            if slot.get("capacity") is not None:
+                try:
+                    row_capacity = int(slot["capacity"])
+                except (TypeError, ValueError):
+                    raise serializers.ValidationError(
+                        {"time_slots": "Row capacity must be a number."}
+                    )
+                if row_capacity < 1:
+                    raise serializers.ValidationError(
+                        {"time_slots": "Row capacity must be at least 1."}
+                    )
+                row["capacity"] = row_capacity
+            normalized_slots.append(row)
         data["time_slots"] = normalized_slots
         return data
 
@@ -356,6 +370,23 @@ class CarStatusHistorySerializer(serializers.ModelSerializer):
             "note",
             "created_at",
         ]
+
+
+class StaffCarStatusHistorySerializer(CarStatusHistorySerializer):
+    """Staff-facing variant — adds the actor's name (from the audit snapshot,
+    falling back to the live FK). Owners never receive this serializer."""
+
+    actor_name = serializers.SerializerMethodField()
+
+    class Meta(CarStatusHistorySerializer.Meta):
+        fields = CarStatusHistorySerializer.Meta.fields + ["actor_name"]
+
+    def get_actor_name(self, obj):
+        if obj.actor_name:
+            return obj.actor_name
+        if obj.actor_id:
+            return obj.actor.get_full_name()
+        return ""
 
 
 class AssistanceRequestCreateSerializer(serializers.Serializer):

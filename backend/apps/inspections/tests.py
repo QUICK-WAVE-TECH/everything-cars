@@ -39,11 +39,66 @@ def create_slot(staff, days_ahead=7, **overrides):
     return InspectionSlot.objects.create(**defaults)
 
 
+class StaffHistoryNamesTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user(
+            "staff-hist@test.com",
+            "owner",
+            is_staff=True,
+            first_name="Jane",
+            last_name="Doe",
+        )
+        self.owner = create_user("owner-hist@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner, status=CarStatus.DRAFT)
+
+    def test_staff_history_shows_name_owner_does_not(self):
+        self.client.force_authenticate(user=self.staff)
+        self.client.post(
+            f"/api/v1/listings/admin/cars/{self.car.id}/approve-listing"
+        )
+        staff_res = self.client.get(
+            f"/api/v1/listings/admin/cars/{self.car.id}/history"
+        )
+        self.assertEqual(staff_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(staff_res.data[0]["actor_name"], "Jane Doe")
+
+        self.client.force_authenticate(user=self.owner)
+        owner_res = self.client.get(
+            f"/api/v1/listings/my-cars/{self.car.id}/history"
+        )
+        self.assertEqual(owner_res.status_code, status.HTTP_200_OK)
+        self.assertNotIn("actor_name", owner_res.data[0])
+
+
 class StaffSlotManagementTest(APITestCase):
     def setUp(self):
         self.staff = create_user("staff@test.com", "owner", is_staff=True)
         self.center = create_center(self.staff)
         self.client.force_authenticate(user=self.staff)
+
+    def test_per_row_capacity(self):
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        res = self.client.post(
+            "/api/v1/inspections/slots/",
+            {
+                "date_from": tomorrow.isoformat(),
+                "date_to": tomorrow.isoformat(),
+                "days": [tomorrow.weekday()],
+                "time_slots": [
+                    {"start_time": "09:00", "end_time": "10:00", "capacity": 3},
+                    {"start_time": "10:00", "end_time": "11:00"},
+                ],
+                "capacity": 1,
+                "center": str(self.center.id),
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        first = InspectionSlot.objects.get(start_time=time(9, 0), date=tomorrow)
+        second = InspectionSlot.objects.get(start_time=time(10, 0), date=tomorrow)
+        self.assertEqual(first.capacity, 3)  # row override
+        self.assertEqual(second.capacity, 1)  # falls back to top-level
 
     def test_create_slots_batch(self):
         tomorrow = timezone.localdate() + timedelta(days=1)
