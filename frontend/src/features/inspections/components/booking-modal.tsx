@@ -34,6 +34,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import {
   availabilityWindow,
+  useAvailabilitySummary,
   useAvailableSlots,
   useCentersByCity,
   useCreateAssistanceRequest,
@@ -412,13 +413,11 @@ export function BookingModal({
   });
 
   const dateStr = selectedDate ? toDateString(selectedDate) : undefined;
-  // Bound the read to a rolling window instead of every future slot.
+  // The calendar only needs per-day availability counts (tiny payload); the
+  // full slot rows are fetched per selected day below.
   const slotWindow = useMemo(() => availabilityWindow(), []);
-  const { data: allCenterSlots, isLoading: isLoadingAllSlots } = useAvailableSlots(
-    selectedCenter?.id,
-    undefined,
-    slotWindow,
-  );
+  const { data: availabilitySummary, isLoading: isLoadingAllSlots } =
+    useAvailabilitySummary(selectedCenter?.id, slotWindow);
   const { data: daySlots, isLoading: isLoadingDaySlots } = useAvailableSlots(
     selectedCenter?.id,
     dateStr,
@@ -444,28 +443,22 @@ export function BookingModal({
     [locations, country],
   );
 
-  // Build set of dates that have at least one slot with spots remaining
-  const availableDates = useMemo(() => {
-    if (!allCenterSlots) return new Set<string>();
-    return new Set(
-      allCenterSlots.filter((s) => s.spots_remaining > 0).map((s) => s.date),
-    );
-  }, [allCenterSlots]);
+  // Days with at least one open slot — straight from the summary.
+  const availableDates = useMemo(
+    () => new Set((availabilitySummary ?? []).map((s) => s.date)),
+    [availabilitySummary],
+  );
 
   const todayDate = today();
 
   // Calendar opens on the month of the earliest available date, not today's
-  // month (which may have no openings at all).
+  // month (which may have no openings at all). The summary is date-ordered.
   const firstAvailableMonth = useMemo(() => {
-    const dates = (allCenterSlots ?? [])
-      .filter((s) => s.spots_remaining > 0)
-      .map((s) => s.date)
-      .sort();
-    const first = dates[0];
+    const first = availabilitySummary?.[0]?.date;
     if (!first) return undefined;
     const [y = 0, m = 1, d = 1] = first.split("-").map(Number);
     return new Date(y, m - 1, d);
-  }, [allCenterSlots]);
+  }, [availabilitySummary]);
 
   // Pre-fill country/state from the owner's profile once, when the modal opens
   // (state-adjustment-during-render — avoids a setState-in-effect cascade). Runs

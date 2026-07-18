@@ -52,6 +52,13 @@ export type AvailableSlot = {
   spots_remaining: number;
 };
 
+/** One row per day with open slots — powers calendar highlighting without
+ * shipping every slot row. */
+export type AvailabilitySummaryEntry = {
+  date: string;
+  open_count: number;
+};
+
 export type IdType = "intl_passport" | "nin" | "voters_card" | "drivers_licence";
 
 export type AttendeeType = "self" | "representative";

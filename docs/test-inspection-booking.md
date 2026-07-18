@@ -187,6 +187,7 @@ Prereqs: `mailpit` running (inbox at [http://localhost:8025](http://localhost:80
 
 - [ ] `?center=not-a-uuid` → 400; `?date=13/07/2026` → 400; `date_from > date_to` → 400.
 - [ ] Range wider than 180 days → 400; bare `?center=<id>` only returns slots within ~180 days.
+- [ ] `GET /available-slots/summary/?center=<id>` returns tiny `{date, open_count}` rows (fully-booked days omitted); booking modal + staff book-for-owner calendars highlight days from it and fetch full slot rows only for the clicked day (check Network tab: no full-window slot fetch).
 - [ ] Staff slot list + staff bookings list also reject malformed/reversed dates → 400.
 
 ## Reschedule + consent

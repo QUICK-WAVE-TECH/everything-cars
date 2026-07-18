@@ -710,6 +710,43 @@ class OwnerBookingTest(APITestCase):
         self.assertIn(str(self.slot.id), ids)
         self.assertNotIn(str(far.id), ids)
 
+    def test_availability_summary_counts_open_slots_per_day(self):
+        # Two open slots on one day, a second day with one slot that is full —
+        # the summary counts only open slots and omits fully-booked days.
+        create_slot(
+            self.staff,
+            center=self.center,
+            days_ahead=7,
+            start_time=time(14, 0),
+            end_time=time(15, 0),
+        )
+        full_slot = create_slot(self.staff, center=self.center, days_ahead=8)
+        full_slot.capacity = 1
+        full_slot.save(update_fields=["capacity"])
+        blocker_car = create_car(self.owner, status=CarStatus.DRAFT)
+        InspectionBooking.objects.create(
+            car=blocker_car, slot=full_slot, booked_by=self.owner
+        )
+        res = self.client.get(
+            f"/api/v1/inspections/available-slots/summary/?center={self.center.id}"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        by_date = {str(row["date"]): row["open_count"] for row in res.data}
+        self.assertEqual(by_date.get(self.slot.date.isoformat()), 2)
+        self.assertNotIn(full_slot.date.isoformat(), by_date)
+
+    def test_availability_summary_validates_params(self):
+        res = self.client.get(
+            "/api/v1/inspections/available-slots/summary/?center=nope"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        start = timezone.localdate()
+        res = self.client.get(
+            "/api/v1/inspections/available-slots/summary/"
+            f"?date_from={(start + timedelta(days=181)).isoformat()}&date_to={start.isoformat()}"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_available_slots_rejects_reversed_range(self):
         start = timezone.localdate()
         res = self.client.get(

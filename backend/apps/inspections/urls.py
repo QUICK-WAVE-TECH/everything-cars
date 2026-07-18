@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    AvailableSlotsSummaryView,
     AvailableSlotsView,
     LocationsView,
     OwnerAssistanceCreateView,
@@ -43,6 +44,11 @@ urlpatterns = [
     path("locations/", LocationsView.as_view(), name="locations"),
     path("centers/", PublicCentersView.as_view(), name="public-centers"),
     path("available-slots/", AvailableSlotsView.as_view(), name="available-slots"),
+    path(
+        "available-slots/summary/",
+        AvailableSlotsSummaryView.as_view(),
+        name="available-slots-summary",
+    ),
     # Owner booking
     path("bookings/", OwnerBookingCreateView.as_view(), name="create-booking"),
     path("bookings/my/", OwnerBookingListView.as_view(), name="my-bookings"),

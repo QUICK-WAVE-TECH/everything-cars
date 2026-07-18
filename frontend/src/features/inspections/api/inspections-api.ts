@@ -4,6 +4,7 @@ import type { PaginatedResponse } from "@/shared/types/api";
 import type {
   AssistanceRequest,
   AttendeePayload,
+  AvailabilitySummaryEntry,
   AvailableSlot,
   CarStatusHistoryEntry,
   InspectionBooking,
@@ -61,6 +62,20 @@ export const inspectionKeys = {
       "available-slots",
       centerId ?? "all",
       date ?? "all",
+      range?.date_from ?? "all",
+      range?.date_to ?? "all",
+    ] as const,
+  // Shares the ["inspections", "available-slots"] prefix so the existing
+  // WebSocket invalidations refresh the summary too.
+  availabilitySummary: (
+    centerId?: string,
+    range?: { date_from?: string; date_to?: string },
+  ) =>
+    [
+      "inspections",
+      "available-slots",
+      "summary",
+      centerId ?? "all",
       range?.date_from ?? "all",
       range?.date_to ?? "all",
     ] as const,
@@ -224,6 +239,30 @@ export function useAvailableSlots(
     queryFn: () =>
       apiClient.get<AvailableSlot[]>(
         `/inspections/available-slots/${query ? `?${query}` : ""}`,
+      ),
+    enabled: !!centerId,
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Per-day availability counts for the calendar. One tiny row per day with open
+ * slots — replaces fetching every slot row just to highlight dates.
+ */
+export function useAvailabilitySummary(
+  centerId?: string,
+  range?: { date_from?: string; date_to?: string },
+) {
+  const query = buildQuery({
+    center: centerId,
+    date_from: range?.date_from,
+    date_to: range?.date_to,
+  });
+  return useQuery({
+    queryKey: inspectionKeys.availabilitySummary(centerId, range),
+    queryFn: () =>
+      apiClient.get<AvailabilitySummaryEntry[]>(
+        `/inspections/available-slots/summary/${query ? `?${query}` : ""}`,
       ),
     enabled: !!centerId,
     staleTime: 30_000,
