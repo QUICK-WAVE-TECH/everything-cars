@@ -238,22 +238,30 @@ class StaffSlotListCreateView(APIView):
         date_to = request.query_params.get("date_to")
         is_active = request.query_params.get("is_active")
 
+        parsed_from = parsed_to = None
         if date_from:
-            parsed = _valid_date_or_none(date_from)
-            if parsed is None:
+            parsed_from = _valid_date_or_none(date_from)
+            if parsed_from is None:
                 return Response(
                     {"detail": "Invalid date_from."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            slots = slots.filter(date__gte=parsed)
         if date_to:
-            parsed = _valid_date_or_none(date_to)
-            if parsed is None:
+            parsed_to = _valid_date_or_none(date_to)
+            if parsed_to is None:
                 return Response(
                     {"detail": "Invalid date_to."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            slots = slots.filter(date__lte=parsed)
+        if parsed_from and parsed_to and parsed_from > parsed_to:
+            return Response(
+                {"detail": "date_from cannot be after date_to."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if parsed_from:
+            slots = slots.filter(date__gte=parsed_from)
+        if parsed_to:
+            slots = slots.filter(date__lte=parsed_to)
         if is_active is not None:
             slots = slots.filter(is_active=is_active.lower() == "true")
 
@@ -508,6 +516,15 @@ class AvailableSlotsView(APIView):
             # Exact-day lookup — inherently bounded.
             slots = slots.filter(date=parsed["date"])
         else:
+            if (
+                "date_from" in parsed
+                and "date_to" in parsed
+                and parsed["date_from"] > parsed["date_to"]
+            ):
+                return Response(
+                    {"detail": "date_from cannot be after date_to."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             # Bound the read to a window so a bare ?center=<id> call can't pull
             # every future slot. Default to a MAX_WINDOW_DAYS look-ahead when no
             # upper bound is given, and reject an over-large explicit range.
@@ -775,12 +792,19 @@ class OwnerBookingRescheduleView(APIView):
             booking.status = BookingStatus.CANCELLED
             booking.save(update_fields=["status", "updated_at"])
 
-            # Create new booking with incremented reschedule count
+            # Create new booking with incremented reschedule count. Carry over the
+            # attendee declaration — rescheduling moves the same appointment, so a
+            # representative booking must not silently reset to the owner.
             new_booking = InspectionBooking.objects.create(
                 car=booking.car,
                 slot=new_slot,
                 booked_by=request.user,
                 reschedule_count=booking.reschedule_count + 1,
+                attendee_type=booking.attendee_type,
+                rep_name=booking.rep_name,
+                rep_id_type=booking.rep_id_type,
+                rep_id_number=booking.rep_id_number,
+                consent_accepted_at=booking.consent_accepted_at,
             )
 
             if car.status != CarStatus.INSPECTION_PENDING:
@@ -818,7 +842,13 @@ class StaffBookingListView(APIView):
 
         date_filter = request.query_params.get("date")
         if date_filter:
-            bookings = bookings.filter(slot__date=date_filter)
+            parsed_date = _valid_date_or_none(date_filter)
+            if parsed_date is None:
+                return Response(
+                    {"detail": "Invalid date."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            bookings = bookings.filter(slot__date=parsed_date)
 
         car_filter = request.query_params.get("car")
         if car_filter:

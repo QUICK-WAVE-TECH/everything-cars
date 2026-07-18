@@ -145,6 +145,15 @@ class StaffSlotManagementTest(APITestCase):
         res = self.client.get("/api/v1/inspections/slots/?date_from=13-2026")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_slot_list_rejects_reversed_range(self):
+        today = timezone.localdate()
+        res = self.client.get(
+            "/api/v1/inspections/slots/"
+            f"?date_from={(today + timedelta(days=5)).isoformat()}"
+            f"&date_to={today.isoformat()}"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_create_slots_skips_existing_and_counts_accurately(self):
         # Re-running the same batch must not duplicate slots (unique constraint)
         # and created_count must reflect only newly-created rows.
@@ -679,6 +688,45 @@ class OwnerBookingTest(APITestCase):
         self.assertIn(str(self.slot.id), ids)
         self.assertNotIn(str(far.id), ids)
 
+    def test_available_slots_rejects_reversed_range(self):
+        start = timezone.localdate()
+        res = self.client.get(
+            "/api/v1/inspections/available-slots/"
+            f"?date_from={(start + timedelta(days=5)).isoformat()}"
+            f"&date_to={start.isoformat()}"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_reschedule_preserves_representative(self):
+        # Rescheduling moves the same appointment — the representative
+        # declaration must carry over, not reset to the owner.
+        self.car.status = CarStatus.INSPECTION_PENDING
+        self.car.save(update_fields=["status"])
+        booking = InspectionBooking.objects.create(
+            car=self.car,
+            slot=self.slot,
+            booked_by=self.owner,
+            status=BookingStatus.PENDING,
+            attendee_type="representative",
+            rep_name="Jane Rep",
+            rep_id_type="nin",
+            rep_id_number="99887766",
+            consent_accepted_at=timezone.now(),
+        )
+        new_slot = create_slot(self.staff, center=self.center, days_ahead=10)
+        res = self.client.post(
+            f"/api/v1/inspections/bookings/{booking.id}/reschedule/",
+            {"slot_id": str(new_slot.id)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        new_booking = InspectionBooking.objects.get(slot=new_slot, car=self.car)
+        self.assertEqual(new_booking.attendee_type, "representative")
+        self.assertEqual(new_booking.rep_name, "Jane Rep")
+        self.assertEqual(new_booking.rep_id_type, "nin")
+        self.assertEqual(new_booking.rep_id_number, "99887766")
+        self.assertIsNotNone(new_booking.consent_accepted_at)
+
 
 def inspection_form_payload(**overrides):
     base = {
@@ -845,6 +893,10 @@ class StaffInspectionFlowTest(APITestCase):
         res = self.client.get(f"/api/v1/inspections/admin/bookings/{self.booking.id}/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn("car", res.data)
+
+    def test_staff_bookings_list_rejects_malformed_date(self):
+        res = self.client.get("/api/v1/inspections/admin/bookings/?date=notadate")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_representative_requires_presented_id(self):
         self._start()
