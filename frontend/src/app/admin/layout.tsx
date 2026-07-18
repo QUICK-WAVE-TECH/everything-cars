@@ -11,6 +11,7 @@ import { NotificationDropdown } from "@/features/notifications/components/notifi
 
 const NAV_LINKS = [
   { label: "Approvals", href: "/admin/approvals" },
+  { label: "Owners", href: "/admin/owners" },
   { label: "Inspections", href: "/admin/inspections" },
   { label: "Payments", href: "/admin/payments" },
   { label: "Transactions", href: "/admin/transactions" },

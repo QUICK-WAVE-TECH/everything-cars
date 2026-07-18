@@ -66,6 +66,7 @@ class WiredEmailTemplatesTest(APITestCase):
     CASES = {
         "auth_login_code": {"code": "123456", "expires_minutes": 10},
         "auth_signup_code": {"code": "123456", "expires_minutes": 10},
+        "owner_verified": {"first_name": "Ada", "action_url": "http://fe/x"},
         "listing_approved": {"car_title": "Lexus NX", "action_url": "http://fe/x"},
         "changes_requested": {
             "car_title": "Lexus NX",
@@ -136,6 +137,47 @@ class WiredEmailTemplatesTest(APITestCase):
                 )
 
 
+class AdminOwnerVerifyTest(APITestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            email="staff-ov@test.com", first_name="S", last_name="T",
+            password="securepass123", role="owner", is_staff=True, is_active=True,
+        )
+        self.owner = User.objects.create_user(
+            email="owner-ov@test.com", first_name="Ada", last_name="B",
+            password="securepass123", role="owner", is_active=True,
+        )
+        self.profile = OwnerProfile.objects.create(
+            user=self.owner, owner_type="individual",
+            bank_account="1", bank_name="B", id_type="nin", national_id="123",
+        )
+
+    def test_staff_lists_and_verifies_owner(self):
+        from django.core import mail
+
+        self.client.force_authenticate(user=self.staff)
+        res = self.client.get("/api/v1/users/admin/owners?verified=false")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["count"], 1)
+        self.assertFalse(res.data["results"][0]["is_verified"])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                f"/api/v1/users/admin/owners/{self.owner.id}/verify"
+            )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.profile.refresh_from_db()
+        self.assertTrue(self.profile.is_verified)
+        # Owner gets the "you're verified" email once.
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["owner-ov@test.com"])
+
+    def test_owner_cannot_access_admin_owners(self):
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.get("/api/v1/users/admin/owners")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
 class AccessCodeEmailTest(APITestCase):
     def test_sign_in_code_emailed_with_code(self):
         from django.core import mail
@@ -181,6 +223,7 @@ class OwnerSignUpIDTest(APITestCase):
             "bank_name": "Test Bank",
             "national_id": "12345678901",
             "id_type": "nin",
+            "address": "24 Awolowo Rd",
             "document": id_image("ownership.jpg"),
             "id_document": id_image("id.jpg"),
         }
@@ -265,6 +308,7 @@ class OwnerSignUpIDTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         profile = OwnerProfile.objects.get(user__email="newowner@test.com")
         self.assertEqual(profile.id_type, "nin")
+        self.assertEqual(profile.address, "24 Awolowo Rd")
         self.assertTrue(profile.id_document.name)
 
 

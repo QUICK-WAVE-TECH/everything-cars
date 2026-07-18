@@ -557,3 +557,23 @@ def notify_assistance_requested(assistance):
                 "message": assistance.message or "—",
             },
         )
+
+
+def notify_owner_verified(user):
+    """Owner is notified (and emailed) when staff verifies their account."""
+    _create_notification(
+        recipient=user,
+        notification_type=NotificationType.SYSTEM,
+        title="Your account is verified",
+        message="Your account has been verified — you can now list cars.",
+        data={},
+    )
+    send_email(
+        recipient=user.email,
+        subject="You're verified — start listing",
+        template_key="owner_verified",
+        context={
+            "first_name": user.first_name,
+            "action_url": _fe("/owner/my-cars/new"),
+        },
+    )

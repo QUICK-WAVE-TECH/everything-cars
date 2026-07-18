@@ -236,6 +236,42 @@ class MeSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "email", "role", "is_staff", "date_joined"]
 
 
+class AdminOwnerSerializer(serializers.ModelSerializer):
+    """Staff-facing owner record for KYC review + verification."""
+
+    user_id = serializers.UUIDField(source="user.id", read_only=True)
+    first_name = serializers.CharField(source="user.first_name", read_only=True)
+    last_name = serializers.CharField(source="user.last_name", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
+    phone = serializers.CharField(source="user.phone", read_only=True)
+    id_type_display = serializers.CharField(source="get_id_type_display", read_only=True)
+    country = serializers.CharField(source="country.code", default="", read_only=True)
+
+    class Meta:
+        model = OwnerProfile
+        fields = [
+            "user_id",
+            "first_name",
+            "last_name",
+            "email",
+            "phone",
+            "owner_type",
+            "fleet_name",
+            "rc_number",
+            "id_type",
+            "id_type_display",
+            "national_id",
+            "id_document",
+            "document",
+            "country",
+            "state",
+            "city",
+            "address",
+            "is_verified",
+            "created_at",
+        ]
+
+
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
