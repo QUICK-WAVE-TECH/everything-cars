@@ -710,6 +710,43 @@ class OwnerBookingTest(APITestCase):
         self.assertIn(str(self.slot.id), ids)
         self.assertNotIn(str(far.id), ids)
 
+    def test_availability_summary_counts_open_slots_per_day(self):
+        # Two open slots on one day, a second day with one slot that is full —
+        # the summary counts only open slots and omits fully-booked days.
+        create_slot(
+            self.staff,
+            center=self.center,
+            days_ahead=7,
+            start_time=time(14, 0),
+            end_time=time(15, 0),
+        )
+        full_slot = create_slot(self.staff, center=self.center, days_ahead=8)
+        full_slot.capacity = 1
+        full_slot.save(update_fields=["capacity"])
+        blocker_car = create_car(self.owner, status=CarStatus.DRAFT)
+        InspectionBooking.objects.create(
+            car=blocker_car, slot=full_slot, booked_by=self.owner
+        )
+        res = self.client.get(
+            f"/api/v1/inspections/available-slots/summary/?center={self.center.id}"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        by_date = {str(row["date"]): row["open_count"] for row in res.data}
+        self.assertEqual(by_date.get(self.slot.date.isoformat()), 2)
+        self.assertNotIn(full_slot.date.isoformat(), by_date)
+
+    def test_availability_summary_validates_params(self):
+        res = self.client.get(
+            "/api/v1/inspections/available-slots/summary/?center=nope"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        start = timezone.localdate()
+        res = self.client.get(
+            "/api/v1/inspections/available-slots/summary/"
+            f"?date_from={(start + timedelta(days=181)).isoformat()}&date_to={start.isoformat()}"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_available_slots_rejects_reversed_range(self):
         start = timezone.localdate()
         res = self.client.get(
@@ -719,12 +756,10 @@ class OwnerBookingTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_reschedule_preserves_representative(self):
-        # Rescheduling moves the same appointment — the representative
-        # declaration must carry over, not reset to the owner.
+    def _make_representative_booking(self):
         self.car.status = CarStatus.INSPECTION_PENDING
         self.car.save(update_fields=["status"])
-        booking = InspectionBooking.objects.create(
+        return InspectionBooking.objects.create(
             car=self.car,
             slot=self.slot,
             booked_by=self.owner,
@@ -735,10 +770,16 @@ class OwnerBookingTest(APITestCase):
             rep_id_number="99887766",
             consent_accepted_at=timezone.now(),
         )
+
+    def test_reschedule_preserves_representative(self):
+        # Rescheduling moves the same appointment — the representative
+        # declaration must carry over, not reset to the owner.
+        booking = self._make_representative_booking()
+        original_consent = booking.consent_accepted_at
         new_slot = create_slot(self.staff, center=self.center, days_ahead=10)
         res = self.client.post(
             f"/api/v1/inspections/bookings/{booking.id}/reschedule/",
-            {"slot_id": str(new_slot.id)},
+            {"slot_id": str(new_slot.id), "consent_accepted": True},
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
@@ -747,7 +788,44 @@ class OwnerBookingTest(APITestCase):
         self.assertEqual(new_booking.rep_name, "Jane Rep")
         self.assertEqual(new_booking.rep_id_type, "nin")
         self.assertEqual(new_booking.rep_id_number, "99887766")
+        # Consent is re-captured for the new date, not the old timestamp.
         self.assertIsNotNone(new_booking.consent_accepted_at)
+        self.assertGreaterEqual(new_booking.consent_accepted_at, original_consent)
+
+    def test_reschedule_representative_requires_consent(self):
+        booking = self._make_representative_booking()
+        new_slot = create_slot(self.staff, center=self.center, days_ahead=10)
+        res = self.client.post(
+            f"/api/v1/inspections/bookings/{booking.id}/reschedule/",
+            {"slot_id": str(new_slot.id)},  # no consent_accepted
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("consent_accepted", res.data)
+        # The original booking is untouched — no new booking created.
+        self.assertFalse(
+            InspectionBooking.objects.filter(slot=new_slot).exists()
+        )
+
+    def test_reschedule_self_booking_needs_no_consent(self):
+        # A self booking reschedules without any consent field.
+        self.car.status = CarStatus.INSPECTION_PENDING
+        self.car.save(update_fields=["status"])
+        booking = InspectionBooking.objects.create(
+            car=self.car,
+            slot=self.slot,
+            booked_by=self.owner,
+            status=BookingStatus.PENDING,
+        )
+        new_slot = create_slot(self.staff, center=self.center, days_ahead=10)
+        res = self.client.post(
+            f"/api/v1/inspections/bookings/{booking.id}/reschedule/",
+            {"slot_id": str(new_slot.id)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        new_booking = InspectionBooking.objects.get(slot=new_slot, car=self.car)
+        self.assertIsNone(new_booking.consent_accepted_at)
 
 
 def inspection_form_payload(**overrides):

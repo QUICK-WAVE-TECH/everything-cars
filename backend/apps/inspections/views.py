@@ -463,84 +463,10 @@ class AvailableSlotsView(APIView):
     # behalf from the assistance queue.
     permission_classes = [IsOwner | IsStaff]
 
-    # Cap how far ahead a single read may reach, and the default look-ahead when
-    # no upper bound is supplied, so a caller can't pull every future slot.
-    MAX_WINDOW_DAYS = 180
-
     def get(self, request):
-        now = timezone.localtime()
-        slots = (
-            InspectionSlot.objects.filter(is_active=True)
-            .filter(
-                Q(date__gt=now.date()) | Q(date=now.date(), start_time__gt=now.time())
-            )
-            .select_related("center")
-            .annotate(
-                bookings_count=Count(
-                    "bookings",
-                    filter=Q(bookings__status__in=ACTIVE_BOOKING_STATUSES),
-                )
-            )
-            .filter(bookings_count__lt=F("capacity"))
-            .order_by("date", "start_time")
-        )
-
-        center_filter = request.query_params.get("center")
-        if center_filter:
-            center_uuid = _valid_uuid_or_none(center_filter)
-            if center_uuid is None:
-                return Response(
-                    {"detail": "Invalid center id."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            slots = slots.filter(center_id=center_uuid)
-
-        # Validate the optional date filters up front.
-        parsed = {}
-        for param in ("date", "date_from", "date_to"):
-            raw = request.query_params.get(param)
-            if not raw:
-                continue
-            value = _valid_date_or_none(raw)
-            if value is None:
-                return Response(
-                    {"detail": f"Invalid {param}."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            parsed[param] = value
-
-        if "date" in parsed:
-            # Exact-day lookup — inherently bounded.
-            slots = slots.filter(date=parsed["date"])
-        else:
-            if (
-                "date_from" in parsed
-                and "date_to" in parsed
-                and parsed["date_from"] > parsed["date_to"]
-            ):
-                return Response(
-                    {"detail": "date_from cannot be after date_to."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            # Bound the read to a window so a bare ?center=<id> call can't pull
-            # every future slot. Default to a MAX_WINDOW_DAYS look-ahead when no
-            # upper bound is given, and reject an over-large explicit range.
-            window_from = parsed.get("date_from") or now.date()
-            window_to = parsed.get("date_to") or (
-                window_from + timedelta(days=self.MAX_WINDOW_DAYS)
-            )
-            if (window_to - window_from).days > self.MAX_WINDOW_DAYS:
-                return Response(
-                    {
-                        "detail": (
-                            f"Date range cannot exceed {self.MAX_WINDOW_DAYS} days."
-                        )
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if "date_from" in parsed:
-                slots = slots.filter(date__gte=parsed["date_from"])
-            slots = slots.filter(date__lte=window_to)
+        slots, error = _open_available_slots(request)
+        if error:
+            return error
 
         # spots_remaining is derived per row from the booking-count annotation.
         for slot in slots:
@@ -548,6 +474,116 @@ class AvailableSlotsView(APIView):
 
         serializer = AvailableSlotSerializer(slots, many=True)
         return Response(serializer.data)
+
+
+class AvailableSlotsSummaryView(APIView):
+    """Per-day availability counts for the booking calendar.
+
+    The calendar only needs "which days have open slots?" to highlight dates and
+    open on the first available month. Serving that from the full slot list
+    duplicates the nested center on every row and scales with slot density; this
+    aggregate returns at most one tiny row per day in the window."""
+
+    permission_classes = [IsOwner | IsStaff]
+
+    def get(self, request):
+        slots, error = _open_available_slots(request)
+        if error:
+            return error
+
+        # Aggregate over the open slots' PKs via a subquery — grouping the
+        # annotated queryset directly would multiply rows through the bookings
+        # join and miscount.
+        summary = (
+            InspectionSlot.objects.filter(id__in=slots.values("id"))
+            .values("date")
+            .annotate(open_count=Count("id"))
+            .order_by("date")
+        )
+        return Response(list(summary))
+
+
+# Cap how far ahead a single availability read may reach, and the default
+# look-ahead when no upper bound is supplied, so a caller can't pull every
+# future slot.
+AVAILABLE_WINDOW_DAYS = 180
+
+
+def _open_available_slots(request):
+    """Shared queryset for the availability endpoints: future-only, active,
+    open-capacity slots, with validated center/date filters and a bounded
+    window. Returns (queryset, None) or (None, error Response)."""
+    now = timezone.localtime()
+    slots = (
+        InspectionSlot.objects.filter(is_active=True)
+        .filter(
+            Q(date__gt=now.date()) | Q(date=now.date(), start_time__gt=now.time())
+        )
+        .select_related("center")
+        .annotate(
+            bookings_count=Count(
+                "bookings",
+                filter=Q(bookings__status__in=ACTIVE_BOOKING_STATUSES),
+            )
+        )
+        .filter(bookings_count__lt=F("capacity"))
+        .order_by("date", "start_time")
+    )
+
+    center_filter = request.query_params.get("center")
+    if center_filter:
+        center_uuid = _valid_uuid_or_none(center_filter)
+        if center_uuid is None:
+            return None, Response(
+                {"detail": "Invalid center id."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        slots = slots.filter(center_id=center_uuid)
+
+    # Validate the optional date filters up front.
+    parsed = {}
+    for param in ("date", "date_from", "date_to"):
+        raw = request.query_params.get(param)
+        if not raw:
+            continue
+        value = _valid_date_or_none(raw)
+        if value is None:
+            return None, Response(
+                {"detail": f"Invalid {param}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        parsed[param] = value
+
+    if "date" in parsed:
+        # Exact-day lookup — inherently bounded.
+        slots = slots.filter(date=parsed["date"])
+        return slots, None
+
+    if (
+        "date_from" in parsed
+        and "date_to" in parsed
+        and parsed["date_from"] > parsed["date_to"]
+    ):
+        return None, Response(
+            {"detail": "date_from cannot be after date_to."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    # Bound the read to a window so a bare ?center=<id> call can't pull every
+    # future slot. Default to an AVAILABLE_WINDOW_DAYS look-ahead when no upper
+    # bound is given, and reject an over-large explicit range.
+    window_from = parsed.get("date_from") or now.date()
+    window_to = parsed.get("date_to") or (
+        window_from + timedelta(days=AVAILABLE_WINDOW_DAYS)
+    )
+    if (window_to - window_from).days > AVAILABLE_WINDOW_DAYS:
+        return None, Response(
+            {"detail": f"Date range cannot exceed {AVAILABLE_WINDOW_DAYS} days."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if "date_from" in parsed:
+        slots = slots.filter(date__gte=parsed["date_from"])
+    slots = slots.filter(date__lte=window_to)
+    return slots, None
 
 
 # ── Owner Booking ──
@@ -716,6 +752,7 @@ class OwnerBookingRescheduleView(APIView):
                 {"detail": "slot_id is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        consent_accepted = bool(request.data.get("consent_accepted"))
 
         with transaction.atomic():
             try:
@@ -739,6 +776,22 @@ class OwnerBookingRescheduleView(APIView):
             if booking.slot.date <= timezone.localdate():
                 return Response(
                     {"detail": DAY_OF_LOCK_MESSAGE},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # A representative booking carries a signed authorization; moving the
+            # appointment requires the owner to re-accept it for the new date.
+            if (
+                booking.attendee_type == AttendeeType.REPRESENTATIVE
+                and not consent_accepted
+            ):
+                return Response(
+                    {
+                        "consent_accepted": (
+                            "You must re-accept the authorization agreement to "
+                            "reschedule."
+                        )
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -797,7 +850,8 @@ class OwnerBookingRescheduleView(APIView):
 
             # Create new booking with incremented reschedule count. Carry over the
             # attendee declaration — rescheduling moves the same appointment, so a
-            # representative booking must not silently reset to the owner.
+            # representative booking must not silently reset to the owner. Consent
+            # is re-captured for the new date (validated above), so stamp it fresh.
             new_booking = InspectionBooking.objects.create(
                 car=booking.car,
                 slot=new_slot,
@@ -807,7 +861,11 @@ class OwnerBookingRescheduleView(APIView):
                 rep_name=booking.rep_name,
                 rep_id_type=booking.rep_id_type,
                 rep_id_number=booking.rep_id_number,
-                consent_accepted_at=booking.consent_accepted_at,
+                consent_accepted_at=(
+                    timezone.now()
+                    if booking.attendee_type == AttendeeType.REPRESENTATIVE
+                    else None
+                ),
             )
 
             if car.status != CarStatus.INSPECTION_PENDING:

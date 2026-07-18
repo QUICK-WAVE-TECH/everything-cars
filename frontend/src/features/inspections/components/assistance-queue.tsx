@@ -28,6 +28,7 @@ import {
   availabilityWindow,
   useAdminCenters,
   useAssistanceRequests,
+  useAvailabilitySummary,
   useAvailableSlots,
   useBookForOwner,
   useHandleAssistance,
@@ -213,38 +214,36 @@ function BookForOwnerDialog({
     () => allCenters.filter((c) => !stateFilter || c.state === stateFilter),
     [allCenters, stateFilter],
   );
-  // Bound the read to a rolling window instead of every future slot.
+  // The calendar only needs per-day availability counts (tiny payload); the
+  // full slot rows are fetched per selected day below.
   const slotWindow = useMemo(() => availabilityWindow(), []);
-  const { data: slots, isLoading: slotsLoading } = useAvailableSlots(
+  const { data: availabilitySummary, isLoading: slotsLoading } =
+    useAvailabilitySummary(centerId || undefined, slotWindow);
+  const dateStr = selectedDate ? toDateString(selectedDate) : undefined;
+  const { data: dayData, isLoading: daySlotsLoading } = useAvailableSlots(
     centerId || undefined,
-    undefined,
-    slotWindow,
-  );
-  const openSlots = useMemo(
-    () => (slots ?? []).filter((s) => s.spots_remaining > 0),
-    [slots],
+    dateStr,
   );
   const selectedCenter = useMemo(
     () => allCenters.find((c) => c.id === centerId),
     [allCenters, centerId],
   );
+  const daySlots = useMemo(
+    () => (dayData ?? []).filter((s) => s.spots_remaining > 0),
+    [dayData],
+  );
   const selectedSlot = useMemo(
-    () => openSlots.find((s) => s.id === slotId),
-    [openSlots, slotId],
+    () => daySlots.find((s) => s.id === slotId),
+    [daySlots, slotId],
   );
   const availableDates = useMemo(
-    () => new Set(openSlots.map((s) => s.date)),
-    [openSlots],
+    () => new Set((availabilitySummary ?? []).map((s) => s.date)),
+    [availabilitySummary],
   );
-  const firstAvailableMonth = useMemo(
-    () => (openSlots[0] ? parseDateString(openSlots[0].date) : today()),
-    [openSlots],
-  );
-  const daySlots = useMemo(() => {
-    if (!selectedDate) return [];
-    const iso = toDateString(selectedDate);
-    return openSlots.filter((s) => s.date === iso);
-  }, [openSlots, selectedDate]);
+  const firstAvailableMonth = useMemo(() => {
+    const first = availabilitySummary?.[0]?.date;
+    return first ? parseDateString(first) : today();
+  }, [availabilitySummary]);
 
   function handleCenterSelect(id: string) {
     setCenterId(id);
@@ -462,7 +461,7 @@ function BookForOwnerDialog({
                     <div className="flex min-h-[260px] items-center justify-center rounded-2xl border border-(--brc-border) bg-(--brc-bg-subtle)">
                       <Loader2Icon size={24} className="animate-spin text-(--brc-primary)" />
                     </div>
-                  ) : openSlots.length === 0 ? (
+                  ) : availableDates.size === 0 ? (
                     <div className="flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 text-center">
                       <CalendarIcon size={28} className="text-(--brc-text-muted)" />
                       <div>
@@ -480,6 +479,10 @@ function BookForOwnerDialog({
                       <p className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
                         Choose an available date
                       </p>
+                    </div>
+                  ) : daySlotsLoading ? (
+                    <div className="flex min-h-[260px] items-center justify-center rounded-2xl border border-(--brc-border) bg-(--brc-bg-subtle)">
+                      <Loader2Icon size={24} className="animate-spin text-(--brc-primary)" />
                     </div>
                   ) : daySlots.length === 0 ? (
                     <div className="flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 text-center">
