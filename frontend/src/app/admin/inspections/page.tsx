@@ -27,6 +27,7 @@ import {
   useDeactivateSlot,
 } from "@/features/inspections/api/inspections-api";
 import type { InspectionSlot } from "@/features/inspections/api/types";
+import { AssistanceQueue } from "@/features/inspections/components/assistance-queue";
 
 // ── Date helpers ──
 
@@ -965,6 +966,10 @@ export default function AdminInspectionsPage() {
           </div>
         </div>
       </section>
+
+      <div style={{ paddingTop: 24 }}>
+        <AssistanceQueue />
+      </div>
 
       <div
         className="px-4 sm:px-6 lg:px-[var(--brc-space-10,40px)]"
