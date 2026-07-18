@@ -812,7 +812,9 @@ class VerifiedOverlayTest(APITestCase):
         self._add_passed_inspection()
         res = self.client.get(f"/api/v1/listings/cars/{self.car.id}")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertEqual(res.data["description"], "Inspector verified notes")
+        # Description stays the owner's; inspector notes live in the report.
+        self.assertEqual(res.data["description"], "Owner description")
+        self.assertEqual(res.data["verified_report"]["notes"], "Inspector verified notes")
         self.assertEqual(res.data["mileage"], 99999)
         self.assertEqual(res.data["fuel_type"], "diesel")
         self.assertTrue(res.data["is_verified"])

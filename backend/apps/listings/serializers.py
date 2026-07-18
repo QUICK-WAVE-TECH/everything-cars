@@ -363,9 +363,9 @@ class CarDetailSerializer(serializers.ModelSerializer):
         return _latest_passed_inspection(obj)
 
     def get_description(self, obj):
-        insp = self._verified_source(obj)
-        if insp and insp.staff_notes:
-            return insp.staff_notes
+        # Always the owner's own description. The inspector's notes are surfaced
+        # separately in the verified report (`verified_report.notes`), so the
+        # description no longer needs to be overwritten with them.
         return obj.description
 
     def get_mileage(self, obj):

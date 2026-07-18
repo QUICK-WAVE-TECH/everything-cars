@@ -497,12 +497,47 @@ export function CarDetailPage({ carId }: { carId: string }) {
                   </div>
                 )}
 
-                <h2 style={{ fontFamily: "var(--brc-font-display)", fontSize: 22, fontWeight: 800, color: "var(--brc-text)", margin: "0 0 16px" }}>
-                  {car.is_verified ? "Inspector's Notes" : "About This Car"}
-                </h2>
-                <p style={{ fontSize: 15, lineHeight: 1.7, color: "var(--brc-text-secondary)", marginBottom: 32 }}>
-                  {car.description || "No description provided."}
-                </p>
+                <div
+                  style={{
+                    background: "white",
+                    border: "1px solid var(--brc-border)",
+                    borderRadius: 20,
+                    padding: "26px 28px",
+                    boxShadow: "0 14px 40px rgba(18,18,18,0.06)",
+                    marginBottom: 32,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+                    <span
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 12,
+                        background: "var(--brc-primary-tint)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Icon name="file" size={19} stroke="var(--brc-primary)" />
+                    </span>
+                    <h2 style={{ fontFamily: "var(--brc-font-display)", fontSize: 22, fontWeight: 800, color: "var(--brc-text)", margin: 0 }}>
+                      Description
+                    </h2>
+                  </div>
+                  <p
+                    style={{
+                      fontSize: 15,
+                      lineHeight: 1.8,
+                      color: "var(--brc-text-secondary)",
+                      margin: 0,
+                      whiteSpace: "pre-line",
+                    }}
+                  >
+                    {car.description || "No description provided."}
+                  </p>
+                </div>
 
                 {car.features.length > 0 && (
                   <>
