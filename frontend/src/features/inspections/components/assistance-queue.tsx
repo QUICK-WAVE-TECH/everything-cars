@@ -20,10 +20,10 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
+  useAdminCenters,
   useAssistanceRequests,
   useAvailableSlots,
   useBookForOwner,
-  useCentersByCity,
   useHandleAssistance,
 } from "@/features/inspections/api/inspections-api";
 import type { AssistanceRequest } from "@/features/inspections/api/types";
@@ -59,15 +59,43 @@ function BookForOwnerDialog({
   const [slotId, setSlotId] = useState<string>("");
   const bookForOwner = useBookForOwner();
 
-  // Centers are city-scoped in the public endpoint; staff pick by the owner's
-  // state, so query without a city and filter client-side by state.
-  const { data: centers } = useCentersByCity({
-    country: undefined,
-    state: request.state || undefined,
-    city: request.state || undefined,
+  // Staff pick from all active centers (owner's state surfaced first).
+  const { data: centersPage } = useAdminCenters({
+    is_active: "true",
+    page_size: 100,
   });
+  const centers = useMemo(() => {
+    const all = centersPage?.results ?? [];
+    if (!request.state) return all;
+    return [...all].sort(
+      (a, b) =>
+        (b.state === request.state ? 1 : 0) - (a.state === request.state ? 1 : 0),
+    );
+  }, [centersPage, request.state]);
   const { data: slots } = useAvailableSlots(centerId || undefined);
-  const openSlots = (slots ?? []).filter((s) => s.spots_remaining > 0);
+  const openSlots = useMemo(
+    () => (slots ?? []).filter((s) => s.spots_remaining > 0),
+    [slots],
+  );
+
+  // Base UI Select needs value→label maps to render the chosen label.
+  const centerItems = useMemo(
+    () =>
+      Object.fromEntries(
+        centers.map((c) => [c.id, `${c.company_name} — ${c.city}`]),
+      ),
+    [centers],
+  );
+  const slotItems = useMemo(
+    () =>
+      Object.fromEntries(
+        openSlots.map((s) => [
+          s.id,
+          `${s.date} · ${fmtTime(s.start_time)}–${fmtTime(s.end_time)} (${s.spots_remaining} left)`,
+        ]),
+      ),
+    [openSlots],
+  );
 
   async function handleBook() {
     if (!request.car || !slotId) return;
@@ -108,6 +136,7 @@ function BookForOwnerDialog({
             <label className="flex flex-col gap-1.5 text-sm">
               <span className="font-bold text-(--brc-text)">Center</span>
               <Select
+                items={centerItems}
                 value={centerId || undefined}
                 onValueChange={(v) => {
                   setCenterId(v ?? "");
@@ -130,6 +159,7 @@ function BookForOwnerDialog({
             <label className="flex flex-col gap-1.5 text-sm">
               <span className="font-bold text-(--brc-text)">Slot</span>
               <Select
+                items={slotItems}
                 value={slotId || undefined}
                 onValueChange={(v) => setSlotId(v ?? "")}
                 disabled={!centerId}
