@@ -270,40 +270,39 @@ function BookForOwnerDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="flex max-h-[92vh] flex-col overflow-hidden rounded-[28px] border border-white/40 bg-white p-0 shadow-[0_32px_90px_rgba(18,18,18,0.28)] sm:max-w-[1120px]">
-        <DialogHeader className="relative shrink-0 overflow-hidden border-b border-white/10 bg-[radial-gradient(circle_at_18%_20%,rgba(230,241,250,0.35),transparent_28%),linear-gradient(135deg,#09094A_0%,#00008B_50%,#1E4ED8_100%)] px-6 py-6 text-white sm:px-8">
-          <div className="absolute right-8 top-8 size-40 rounded-full bg-white/10 blur-3xl" />
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <DialogHeader className="relative shrink-0 overflow-hidden border-b border-(--brc-border) bg-white px-6 py-6 sm:px-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 gap-4">
-              <span className="flex size-13 shrink-0 items-center justify-center rounded-2xl bg-white text-(--brc-primary) shadow-[0_16px_40px_rgba(0,0,0,0.18)]">
+              <span className="flex size-13 shrink-0 items-center justify-center rounded-2xl border border-(--brc-border) bg-(--brc-primary-tint) text-(--brc-primary) shadow-[var(--brc-shadow-xs)]">
                 <ShieldCheckIcon size={25} />
               </span>
               <div className="min-w-0">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-white/78 [font-family:var(--brc-font-ui)]">
+                  <span className="rounded-full border border-(--brc-border) bg-(--brc-bg-subtle) px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
                     Staff assisted booking
                   </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/12 px-3 py-1 text-xs font-bold text-white/86 [font-family:var(--brc-font-ui)]">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-(--brc-primary-tint) px-3 py-1 text-xs font-bold text-(--brc-primary) [font-family:var(--brc-font-ui)]">
                     <SparklesIcon size={13} />
                     Concierge flow
                   </span>
                 </div>
-                <DialogTitle className="text-2xl font-black leading-tight text-white [font-family:var(--brc-font-display)] sm:text-[32px]">
+                <DialogTitle className="text-2xl font-black leading-tight text-(--brc-text) [font-family:var(--brc-font-display)] sm:text-[32px]">
                   Book for {request.owner_name}
                 </DialogTitle>
-                <DialogDescription className="mt-2 max-w-2xl text-sm leading-6 text-white/74 [font-family:var(--brc-font-ui)]">
+                <DialogDescription className="mt-2 max-w-2xl text-sm leading-6 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
                   Choose the best inspection center and appointment window for{" "}
                   {request.car_title || "this owner's vehicle"}. The owner receives the confirmed booking details immediately.
                 </DialogDescription>
               </div>
             </div>
 
-            <div className="relative rounded-2xl border border-white/16 bg-white/10 p-3 text-sm text-white/88 backdrop-blur [font-family:var(--brc-font-ui)] sm:min-w-[240px]">
-              <div className="flex items-center gap-2 font-black text-white">
+            <div className="relative rounded-2xl border border-(--brc-border) bg-(--brc-bg-subtle) p-3 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)] sm:min-w-[240px]">
+              <div className="flex items-center gap-2 font-black text-(--brc-text)">
                 <UserRoundIcon size={16} />
                 {request.owner_name}
               </div>
-              <div className="mt-2 truncate text-xs text-white/68">{request.owner_email}</div>
-              {request.owner_phone && <div className="mt-1 text-xs text-white/68">{request.owner_phone}</div>}
+              <div className="mt-2 truncate text-xs text-(--brc-text-muted)">{request.owner_email}</div>
+              {request.owner_phone && <div className="mt-1 text-xs text-(--brc-text-muted)">{request.owner_phone}</div>}
             </div>
           </div>
         </DialogHeader>

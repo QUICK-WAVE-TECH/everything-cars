@@ -81,6 +81,7 @@ export const ownerSignUpSchema = z
     }),
     national_id: z.string().trim().min(1, "ID number is required"),
     location: z.string().trim().optional(),
+    address: z.string().trim().optional(),
     rc_number: z.string().trim().optional(),
     country: z.string().trim().optional(),
     state: z.string().trim().optional(),
@@ -119,11 +120,11 @@ export const ownerSignUpSchema = z
     }
 
     if (data.owner_type === "individual") {
-      if (isBlank(data.location)) {
+      if (isBlank(data.address)) {
         ctx.addIssue({
           code: "custom",
-          message: "Location is required",
-          path: ["location"],
+          message: "Address is required",
+          path: ["address"],
         });
       }
     }

@@ -4,7 +4,7 @@ import { useMemo, useState, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { XIcon, CheckIcon, SearchIcon, Loader2Icon } from "lucide-react";
+import { ArrowRightIcon, ClipboardCheckIcon, XIcon, CheckIcon, SearchIcon, Loader2Icon } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -190,7 +190,7 @@ const CHECKLIST = [
 
 // ── Inspection Booking Card ──
 function InspectionBookingCard({ carId, trackingId, phase }: { carId: string; trackingId: string | null; phase: "pending" | "in_progress" }) {
-  const { data: bookingsData, isLoading } = useStaffBookings({ status: "pending", car: carId });
+  const { data: bookingsData, isLoading } = useStaffBookings({ car: carId });
   const bookingResults = bookingsData?.results;
 
   const booking = useMemo(() => {
@@ -301,10 +301,7 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
 
   // Fetch the relevant booking directly instead of depending on the first page
   // of the admin booking list.
-  const { data: bookingsData } = useStaffBookings({
-    status: "pending",
-    car: carId ?? undefined,
-  });
+  const { data: bookingsData } = useStaffBookings({ car: carId ?? undefined });
   const drawerBookingResults = bookingsData?.results;
   const booking = useMemo(() => {
     if (!drawerBookingResults || !carId) return null;
@@ -743,11 +740,19 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
               ) : isInspectionInProgress ? (
                 <div className="flex flex-col gap-2">
                   <button type="button" disabled={!booking} onClick={handleContinueInspection}
-                    className="group relative flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-xl border border-(--brc-primary)/15 bg-(--brc-primary) px-4 text-sm font-black text-white shadow-[0_14px_30px_rgba(0,0,139,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) hover:shadow-[0_18px_38px_rgba(0,0,139,0.26)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 [font-family:var(--brc-font-ui)]">
-                    <span className="relative z-10 whitespace-nowrap">Continue Inspection</span>
-                    <span className="relative z-10 flex size-7 items-center justify-center rounded-lg bg-white/14 transition-transform duration-200 group-hover:translate-x-0.5">
-                      <Icon name="chevright" size={15} stroke="currentColor" />
+                    className="group flex min-h-[58px] w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border border-(--brc-primary)/20 bg-(--brc-primary) px-4 text-left text-white shadow-[0_16px_34px_rgba(0,0,139,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) hover:shadow-[0_22px_42px_rgba(0,0,139,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-(--brc-bg-muted) disabled:text-(--brc-text-muted) disabled:shadow-none disabled:hover:translate-y-0 [font-family:var(--brc-font-ui)]">
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/16 group-disabled:bg-white">
+                        <ClipboardCheckIcon size={19} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-black">Continue inspection</span>
+                        <span className="mt-0.5 block truncate text-xs font-semibold text-white/75 group-disabled:text-(--brc-text-muted)">
+                          Resume the physical inspection form
+                        </span>
+                      </span>
                     </span>
+                    <ArrowRightIcon size={18} className="shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" />
                   </button>
                   {!booking && (
                     <span className="text-center text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">

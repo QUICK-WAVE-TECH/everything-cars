@@ -33,6 +33,7 @@ export type OwnerSignUpData = BaseSignUpData & {
   national_id: string;
   id_document?: File;
   location?: string;
+  address?: string;
   rc_number?: string;
   country?: string;
   state?: string;

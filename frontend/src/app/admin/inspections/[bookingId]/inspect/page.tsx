@@ -136,7 +136,7 @@ export default function StaffInspectionFormPage() {
 
   // ── Attendee identity section ──
   const [presentedAttendee, setPresentedAttendee] = useState<
-    "owner" | "representative" | "other" | ""
+    "owner" | "representative" | ""
   >("");
   const [presentedIdType, setPresentedIdType] = useState("");
   const [presentedIdNumber, setPresentedIdNumber] = useState("");
@@ -147,8 +147,12 @@ export default function StaffInspectionFormPage() {
   const [staffNotes, setStaffNotes] = useState("");
 
   const needsDocuments = !!booking?.car.sale_price;
-  // A non-failed inspection means someone attended — record their presented ID.
-  const presentedIdRequired = result !== "" && result !== "failed";
+  // A non-failed inspection means someone attended — record who presented.
+  const attendeeRequired = result !== "" && result !== "failed";
+  // The owner's ID is already on file from sign-up; only capture an ID when a
+  // representative attends in their place.
+  const presentedIdRequired =
+    attendeeRequired && presentedAttendee === "representative";
   const notesRequired = result === "needs_clearance" || result === "failed";
   // Sale-car paperwork is mandatory unless the inspection failed outright —
   // a failed car never publishes, so missing docs can't leak a car live.
@@ -179,12 +183,9 @@ export default function StaffInspectionFormPage() {
     !!result &&
     (!notesRequired || staffNotes.trim().length > 0) &&
     (!documentsRequired || documentsComplete) &&
+    (!attendeeRequired || !!presentedAttendee) &&
     (!presentedIdRequired ||
-      (!!presentedAttendee &&
-        !!presentedIdType &&
-        presentedIdNumber.trim().length > 0)) &&
-    // An undeclared attendee ("other") must be explained in the notes.
-    (presentedAttendee !== "other" || staffNotes.trim().length > 0);
+      (!!presentedIdType && presentedIdNumber.trim().length > 0));
 
   const isSubmitting = submitInspection.isPending;
 
@@ -208,13 +209,16 @@ export default function StaffInspectionFormPage() {
     formData.append("staff_notes", staffNotes.trim());
     formData.append("result", result);
 
-    // Attendee's presented ID (staff-only). Required for non-failed results.
+    // Who presented (staff-only). The owner's ID is already on file from
+    // sign-up, so only a representative's presented ID is captured here.
     if (presentedAttendee) formData.append("presented_attendee", presentedAttendee);
-    if (presentedIdType) formData.append("presented_id_type", presentedIdType);
-    if (presentedIdNumber.trim())
-      formData.append("presented_id_number", presentedIdNumber.trim());
-    if (presentedIdDocument)
-      formData.append("presented_id_document", presentedIdDocument);
+    if (presentedAttendee === "representative") {
+      if (presentedIdType) formData.append("presented_id_type", presentedIdType);
+      if (presentedIdNumber.trim())
+        formData.append("presented_id_number", presentedIdNumber.trim());
+      if (presentedIdDocument)
+        formData.append("presented_id_document", presentedIdDocument);
+    }
 
     // Failed inspections don't require documents — and the backend treats ANY
     // document field as "documents provided" and then demands all of them, so
@@ -547,7 +551,7 @@ export default function StaffInspectionFormPage() {
         {/* Attendee identity — who physically presented for the inspection */}
         <FormSection
           title="Attendee identity"
-          subtitle="Confirm who showed up against the booking, then record the ID they presented. Required unless the inspection failed. Staff-only."
+          subtitle="Confirm who showed up against the booking. The owner's ID is already on file — only a representative's ID is captured here. Required unless the inspection failed. Staff-only."
         >
           {/* What the owner declared at booking */}
           <div className="rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) p-4 [font-family:var(--brc-font-ui)]">
@@ -575,12 +579,11 @@ export default function StaffInspectionFormPage() {
             <span className="text-base text-(--brc-text) [font-family:var(--brc-font-ui)]">
               Who presented for the inspection?
             </span>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {(
                 [
                   { key: "owner", label: "The owner" },
                   { key: "representative", label: "Declared representative" },
-                  { key: "other", label: "Someone else" },
                 ] as const
               ).map((opt) => (
                 <button
@@ -610,46 +613,50 @@ export default function StaffInspectionFormPage() {
                 </button>
               ))}
             </div>
-            {presentedAttendee === "other" && (
-              <p className="rounded-lg bg-(--brc-warning-bg) px-3 py-2 text-xs font-semibold text-[#9a7400] [font-family:var(--brc-font-ui)]">
-                This person was not the owner or the declared representative.
-                Confirm their authorization and explain in the notes below before
-                passing.
+            {presentedAttendee === "owner" && (
+              <p className="rounded-lg bg-(--brc-bg-subtle) px-3 py-2 text-xs font-medium text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                The owner&apos;s identity was verified at sign-up — no ID capture
+                needed.
               </p>
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <IdTypeSelect
-              value={presentedIdType}
-              onChange={setPresentedIdType}
-              label="ID type presented"
-            />
-            <label className="flex flex-col gap-2">
-              <span className="text-base text-(--brc-text) [font-family:var(--brc-font-ui)]">
-                ID number
-              </span>
-              <Input
-                value={presentedIdNumber}
-                onChange={(e) => setPresentedIdNumber(e.target.value)}
-                placeholder="ID number presented"
-              />
-            </label>
-          </div>
-          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-(--brc-border) bg-white px-4 py-3 text-sm [font-family:var(--brc-font-ui)]">
-            <span className="flex items-center gap-2 text-(--brc-text-secondary)">
-              <UploadIcon size={16} />
-              <span className="truncate">
-                {presentedIdDocument?.name ?? "Upload a photo of the ID (optional)"}
-              </span>
-            </span>
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => setPresentedIdDocument(e.target.files?.[0] ?? null)}
-            />
-          </label>
+          {/* A representative's ID is captured here; the owner's is already on file. */}
+          {presentedAttendee === "representative" && (
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <IdTypeSelect
+                  value={presentedIdType}
+                  onChange={setPresentedIdType}
+                  label="ID type presented"
+                />
+                <label className="flex flex-col gap-2">
+                  <span className="text-base text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                    ID number
+                  </span>
+                  <Input
+                    value={presentedIdNumber}
+                    onChange={(e) => setPresentedIdNumber(e.target.value)}
+                    placeholder="ID number presented"
+                  />
+                </label>
+              </div>
+              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-(--brc-border) bg-white px-4 py-3 text-sm [font-family:var(--brc-font-ui)]">
+                <span className="flex items-center gap-2 text-(--brc-text-secondary)">
+                  <UploadIcon size={16} />
+                  <span className="truncate">
+                    {presentedIdDocument?.name ?? "Upload a photo of the ID (optional)"}
+                  </span>
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setPresentedIdDocument(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            </>
+          )}
         </FormSection>
 
         {/* Result */}

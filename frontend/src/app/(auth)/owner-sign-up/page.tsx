@@ -55,6 +55,7 @@ export default function OwnerSignUpPage() {
       id_type: undefined,
       national_id: "",
       location: "",
+      address: "",
       rc_number: "",
       bank_account: "",
       bank_name: "",
@@ -121,6 +122,7 @@ export default function OwnerSignUpPage() {
         id_document: idDocument ?? undefined,
         national_id: values.national_id,
         location: values.location,
+        address: values.address,
         rc_number: values.rc_number,
         country: values.country,
         state: values.state,
@@ -284,7 +286,7 @@ export default function OwnerSignUpPage() {
                             <FormMessage />
                           </FormItem>
                         )} />
-                        <FormField control={form.control} name="location" render={({ field }) => (
+                        <FormField control={form.control} name="address" render={({ field }) => (
                           <FormItem>
                             <AuthField label="Company Address" placeholder="Enter company address" value={field.value ?? ""} onChange={field.onChange} />
                             <FormMessage />
@@ -320,7 +322,7 @@ export default function OwnerSignUpPage() {
                             <FormMessage />
                           </FormItem>
                         )} />
-                        <FormField control={form.control} name="location" render={({ field }) => (
+                        <FormField control={form.control} name="address" render={({ field }) => (
                           <FormItem>
                             <AuthField label="Address" placeholder="Enter your address" value={field.value ?? ""} onChange={field.onChange} />
                             <FormMessage />

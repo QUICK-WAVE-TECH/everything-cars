@@ -690,13 +690,27 @@ class StaffInspectionFlowTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn("car", res.data)
 
-    def test_passed_requires_presented_id(self):
+    def test_representative_requires_presented_id(self):
         self._start()
         res = self._submit(
-            result="passed", presented_id_type="", presented_id_number=""
+            result="passed",
+            presented_attendee="representative",
+            presented_id_type="",
+            presented_id_number="",
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("presented_id_type", res.data)
+
+    def test_owner_does_not_require_presented_id(self):
+        # The owner's ID is already on file from sign-up.
+        self._start()
+        res = self._submit_with_documents(
+            result="passed",
+            presented_attendee="owner",
+            presented_id_type="",
+            presented_id_number="",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
     def test_failed_allows_missing_presented_id(self):
         self._start()
@@ -715,13 +729,12 @@ class StaffInspectionFlowTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("presented_attendee", res.data)
 
-    def test_undeclared_attendee_requires_note(self):
+    def test_other_attendee_is_rejected(self):
+        # Only the owner or the declared representative may attend.
         self._start()
-        res = self._submit(
-            result="passed", presented_attendee="other", staff_notes=""
-        )
+        res = self._submit(result="passed", presented_attendee="other")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("staff_notes", res.data)
+        self.assertIn("presented_attendee", res.data)
 
     def test_presented_attendee_is_stored(self):
         self._start()

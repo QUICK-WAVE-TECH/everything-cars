@@ -184,12 +184,11 @@ class InspectionResult(models.TextChoices):
 
 
 class PresentedAttendee(models.TextChoices):
-    """Who the inspector determined actually presented, vs. the booking's
-    declared attendee — 'other' is an undeclared third party (a mismatch)."""
+    """Who the inspector confirmed presented — only the owner or the declared
+    representative are permitted to attend."""
 
     OWNER = "owner", "Owner"
     REPRESENTATIVE = "representative", "Declared representative"
-    OTHER = "other", "Someone else"
 
 
 class PhysicalInspection(models.Model):

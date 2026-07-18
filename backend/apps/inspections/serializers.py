@@ -341,37 +341,32 @@ class PhysicalInspectionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"staff_notes": "A reason is required for this result."}
             )
-        # A non-failed inspection means someone attended and was inspected —
-        # record who presented (owner/representative/other) and their ID.
+        # A non-failed inspection means someone attended — record whether it was
+        # the owner or the declared representative.
         if result and result != InspectionResult.FAILED:
-            missing = [
-                f
-                for f in (
-                    "presented_attendee",
-                    "presented_id_type",
-                    "presented_id_number",
-                )
-                if not attrs.get(f)
-            ]
-            if missing:
+            if not attrs.get("presented_attendee"):
                 raise serializers.ValidationError(
                     {
-                        f: "Required to record who presented for the inspection."
-                        for f in missing
+                        "presented_attendee": (
+                            "Record who presented for the inspection."
+                        )
                     }
                 )
-        # An undeclared third party ("other") is a mismatch — require a note.
-        if attrs.get("presented_attendee") == "other" and not attrs.get(
-            "staff_notes", ""
-        ).strip():
-            raise serializers.ValidationError(
-                {
-                    "staff_notes": (
-                        "Explain the attendee mismatch — the person who presented "
-                        "was neither the owner nor the declared representative."
+            # The owner's ID is already on file from sign-up; only capture an ID
+            # when a representative attends in their place.
+            if attrs.get("presented_attendee") == "representative":
+                missing = [
+                    f
+                    for f in ("presented_id_type", "presented_id_number")
+                    if not attrs.get(f)
+                ]
+                if missing:
+                    raise serializers.ValidationError(
+                        {
+                            f: "Required when a representative attends."
+                            for f in missing
+                        }
                     )
-                }
-            )
         return attrs
 
 
