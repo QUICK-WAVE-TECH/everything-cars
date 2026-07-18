@@ -1401,6 +1401,21 @@ class AssistanceRequestTest(APITestCase):
         res = self.client.get("/api/v1/inspections/admin/assistance/")
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_owner_sees_own_open_request_for_car(self):
+        AssistanceRequest.objects.create(owner=self.owner, car=self.car, state="Kano")
+        res = self.client.get(
+            f"/api/v1/inspections/assistance/?car={self.car.id}&status=open"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+        # A different owner sees nothing for this car.
+        other = create_user("other-asst@test.com", "owner")
+        self.client.force_authenticate(user=other)
+        res = self.client.get(
+            f"/api/v1/inspections/assistance/?car={self.car.id}&status=open"
+        )
+        self.assertEqual(len(res.data), 0)
+
 
 class StaffBookForOwnerTest(APITestCase):
     def setUp(self):

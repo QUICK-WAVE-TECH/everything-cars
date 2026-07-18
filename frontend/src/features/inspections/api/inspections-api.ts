@@ -55,6 +55,8 @@ export const inspectionKeys = {
   assistance: ["inspections", "assistance"] as const,
   assistanceList: (params?: Record<string, string | number | undefined>) =>
     ["inspections", "assistance", params ?? {}] as const,
+  myAssistance: (params?: Record<string, string | number | undefined>) =>
+    ["inspections", "assistance", "my", params ?? {}] as const,
 };
 
 // ── Staff Center Management ──
@@ -396,6 +398,22 @@ export function useCreateAssistanceRequest() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: inspectionKeys.assistance });
     },
+  });
+}
+
+export function useMyAssistanceRequests(
+  params?: { car?: string; status?: string },
+  options?: { enabled?: boolean },
+) {
+  const query = buildQuery(params);
+  return useQuery({
+    queryKey: inspectionKeys.myAssistance(params),
+    queryFn: () =>
+      apiClient.get<AssistanceRequest[]>(
+        `/inspections/assistance/${query ? `?${query}` : ""}`,
+      ),
+    enabled: options?.enabled ?? true,
+    staleTime: 15_000,
   });
 }
 

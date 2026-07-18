@@ -36,6 +36,7 @@ import {
   useAvailableSlots,
   useCentersByCity,
   useCreateAssistanceRequest,
+  useMyAssistanceRequests,
   useCreateBooking,
   useLocations,
   useRescheduleBooking,
@@ -384,6 +385,15 @@ export function BookingModal({
   const [assistanceSent, setAssistanceSent] = useState(false);
   const createAssistance = useCreateAssistanceRequest();
 
+  // An already-open request for this car (from the server) — so closing and
+  // reopening the modal still shows "sent" instead of letting them re-request.
+  const { data: openAssistance } = useMyAssistanceRequests(
+    { car: carId, status: "open" },
+    { enabled: open && mode !== "reschedule" },
+  );
+  const hasOpenAssistance = (openAssistance?.length ?? 0) > 0;
+  const alreadyRequested = assistanceSent || hasOpenAssistance;
+
   const { data: me } = useMe();
   const ownerProfile = me?.owner_profile;
   const hasIdOnFile = !!(ownerProfile?.id_type && ownerProfile?.id_document);
@@ -699,7 +709,7 @@ export function BookingModal({
                 </div>
               )}
 
-              {step === 1 && !showIdGate && assistanceSent && (
+              {step === 1 && !showIdGate && alreadyRequested && (
                 <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 py-10 text-center">
                   <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-primary-tint) text-(--brc-primary)">
                     <CheckCircle2Icon size={22} />
@@ -716,7 +726,7 @@ export function BookingModal({
                 </div>
               )}
 
-              {step === 1 && !showIdGate && !assistanceSent && (
+              {step === 1 && !showIdGate && !alreadyRequested && (
                 <div className="flex flex-col gap-4">
                   {isLoadingLocations ? (
                     <div className="flex h-[220px] w-full items-center justify-center">
@@ -798,7 +808,7 @@ export function BookingModal({
                       <Loader2Icon size={24} className="animate-spin text-(--brc-primary)" />
                     </div>
                   ) : !centers || centers.length === 0 ? (
-                    assistanceSent ? (
+                    alreadyRequested ? (
                       <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 py-10 text-center">
                         <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-primary-tint) text-(--brc-primary)">
                           <CheckCircle2Icon size={22} />
@@ -1196,7 +1206,7 @@ export function BookingModal({
             </button>
           )}
 
-          {step === 1 && !assistanceSent && (
+          {step === 1 && !alreadyRequested && (
             <button
               type="button"
               disabled={!canProceedStep1}

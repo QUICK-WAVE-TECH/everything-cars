@@ -1345,6 +1345,28 @@ class PublicCentersView(APIView):
 class OwnerAssistanceCreateView(APIView):
     permission_classes = [IsOwner]
 
+    def get(self, request):
+        """The owner's own assistance requests — lets the UI show an already-sent
+        state instead of allowing a duplicate."""
+        qs = (
+            AssistanceRequest.objects.filter(owner=request.user)
+            .select_related("car")
+            .order_by("-created_at")
+        )
+        car = request.query_params.get("car")
+        if car:
+            car_uuid = _valid_uuid_or_none(car)
+            if car_uuid is None:
+                return Response(
+                    {"detail": "Invalid car id."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            qs = qs.filter(car_id=car_uuid)
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return Response(AssistanceRequestSerializer(qs, many=True).data)
+
     def post(self, request):
         serializer = AssistanceRequestCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
