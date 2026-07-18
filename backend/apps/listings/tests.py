@@ -835,3 +835,22 @@ class VerifiedOverlayTest(APITestCase):
         self.assertEqual(res.data["description"], "Owner description")
         self.assertFalse(res.data["is_verified"])
         self.assertIsNone(res.data["verified_report"])
+
+
+class ListingSubmittedEmailTest(APITestCase):
+    def test_staff_emailed_when_listing_submitted(self):
+        from django.core import mail
+
+        from apps.notifications.service import notify_listing_submitted
+
+        staff = create_user("staff-nl@test.com", "owner", is_staff=True)
+        owner = create_user(
+            "owner-nl@test.com", "owner", first_name="Ada", last_name="Bello"
+        )
+        car = create_car(owner, status=CarStatus.DRAFT)
+        notify_listing_submitted(car)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [staff.email])
+        html = mail.outbox[0].alternatives[0][0]
+        self.assertIn("Ada Bello", html)
+        self.assertIn(car.title, html)

@@ -287,6 +287,8 @@ def notify_listing_submitted(car, resubmitted=False):
         if resubmitted
         else f"A new listing '{car.title}' is awaiting review."
     )
+    owner_name = car.owner.get_full_name() or car.owner.email
+    review_url = _fe("/admin/approvals")
     for staff in staff_users:
         _create_notification(
             recipient=staff,
@@ -294,6 +296,16 @@ def notify_listing_submitted(car, resubmitted=False):
             title=title,
             message=message,
             data={"car_id": str(car.id), "car_title": car.title},
+        )
+        send_email(
+            recipient=staff.email,
+            subject=title,
+            template_key="staff_new_listing",
+            context={
+                "car_title": car.title,
+                "owner_name": owner_name,
+                "review_url": review_url,
+            },
         )
 
 
@@ -554,7 +566,8 @@ def notify_assistance_requested(assistance):
             context={
                 "owner_name": assistance.owner.get_full_name(),
                 "state": assistance.state or "—",
-                "message": assistance.message or "—",
+                # Empty → the template hides the whole Message block.
+                "message": assistance.message or "",
             },
         )
 

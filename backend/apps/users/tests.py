@@ -101,6 +101,11 @@ class WiredEmailTemplatesTest(APITestCase):
             "action_url": "http://fe/x",
         },
         "assistance_received": {"first_name": "Ada", "state": "Kano"},
+        "staff_new_listing": {
+            "car_title": "Lexus NX",
+            "owner_name": "Ada Bello",
+            "review_url": "http://fe/admin",
+        },
         "staff_assistance_request": {
             "owner_name": "Ada Bello",
             "state": "Kano",
@@ -135,6 +140,21 @@ class WiredEmailTemplatesTest(APITestCase):
                 self.assertIn(
                     str(value), html, msg=f"{value!r} missing from emails/{key}.html"
                 )
+
+    def test_assistance_message_block_hidden_when_empty(self):
+        from django.template.loader import render_to_string
+
+        shown = render_to_string(
+            "emails/staff_assistance_request.html",
+            {"owner_name": "A", "state": "Kano", "message": "Please help"},
+        )
+        self.assertIn("Please help", shown)
+        hidden = render_to_string(
+            "emails/staff_assistance_request.html",
+            {"owner_name": "A", "state": "Kano", "message": ""},
+        )
+        # The whole MESSAGE block (label + value) disappears when empty.
+        self.assertNotIn("Message", hidden)
 
 
 class AdminOwnerVerifyTest(APITestCase):
