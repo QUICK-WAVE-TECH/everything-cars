@@ -18,10 +18,15 @@ import {
   CountrySelect,
   StateSelect,
   CityCombobox,
+  IdTypeSelect,
 } from "@/features/auth/components";
 import { COUNTRIES } from "@/features/auth/data/countries";
 import { useSignUp } from "@/features/auth/api";
-import { ownerSignUpSchema, type OwnerSignUpInput } from "@/features/auth/schemas";
+import {
+  ownerSignUpSchema,
+  idTypeLabel,
+  type OwnerSignUpInput,
+} from "@/features/auth/schemas";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
 
@@ -31,6 +36,7 @@ export default function OwnerSignUpPage() {
   const [step, setStep] = useState(1);
   const [agree, setAgree] = useState(false);
   const [document, setDocument] = useState<File | null>(null);
+  const [idDocument, setIdDocument] = useState<File | null>(null);
   const [phoneCode, setPhoneCode] = useState("+234");
   const router = useRouter();
   const signUp = useSignUp();
@@ -46,6 +52,7 @@ export default function OwnerSignUpPage() {
       confirmPassword: "",
       owner_type: undefined,
       fleet_name: "",
+      id_type: undefined,
       national_id: "",
       location: "",
       rc_number: "",
@@ -58,6 +65,7 @@ export default function OwnerSignUpPage() {
   });
 
   const ownerType = useWatch({ control: form.control, name: "owner_type" });
+  const idType = useWatch({ control: form.control, name: "id_type" });
   const countryIso = useWatch({ control: form.control, name: "country" });
   const stateName = useWatch({ control: form.control, name: "state" });
   const countryName = COUNTRIES.find((c) => c.iso === countryIso)?.name ?? "";
@@ -92,6 +100,12 @@ export default function OwnerSignUpPage() {
       });
       return;
     }
+    if (!idDocument) {
+      toast.error("Please upload your ID document", {
+        description: "A photo of your selected means of identification is required",
+      });
+      return;
+    }
 
     signUp.mutate(
       {
@@ -103,6 +117,8 @@ export default function OwnerSignUpPage() {
         phone: values.phone,
         owner_type: values.owner_type,
         fleet_name: values.fleet_name,
+        id_type: values.id_type,
+        id_document: idDocument ?? undefined,
         national_id: values.national_id,
         location: values.location,
         rc_number: values.rc_number,
@@ -235,20 +251,6 @@ export default function OwnerSignUpPage() {
                             <FormMessage />
                           </FormItem>
                         )} />
-                        <FormField control={form.control} name="national_id" render={({ field }) => (
-                          <FormItem>
-                            <AuthField
-                              label="NIN"
-                              placeholder="Enter your NIN"
-                              value={field.value ?? ""}
-                              onChange={(value) => field.onChange(onlyDigits(value))}
-                              type="tel"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                            />
-                            <FormMessage />
-                          </FormItem>
-                        )} />
                         <UploadField
                           label="Upload CAC Document"
                           hint="PDF, DOC, DOCX, JPG, PNG, or WEBP (Max 9MB)"
@@ -324,20 +326,6 @@ export default function OwnerSignUpPage() {
                             <FormMessage />
                           </FormItem>
                         )} />
-                        <FormField control={form.control} name="national_id" render={({ field }) => (
-                          <FormItem>
-                            <AuthField
-                              label="NIN"
-                              placeholder="Enter your NIN"
-                              value={field.value ?? ""}
-                              onChange={(value) => field.onChange(onlyDigits(value))}
-                              type="tel"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                            />
-                            <FormMessage />
-                          </FormItem>
-                        )} />
                         <UploadField
                           label="Upload Car Ownership Document"
                           hint="PDF, DOC, DOCX, JPG, PNG, or WEBP (Max 9MB)"
@@ -346,6 +334,40 @@ export default function OwnerSignUpPage() {
                         />
                       </>
                     )}
+
+                    {/* Identity verification — captured once so we never ask for
+                        the owner's ID again at booking (unless a rep attends). */}
+                    <div className="flex flex-col gap-4 rounded-xl border border-(--brc-border) p-4">
+                      <span className="text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                        Identity Verification
+                      </span>
+                      <FormField control={form.control} name="id_type" render={({ field }) => (
+                        <FormItem>
+                          <IdTypeSelect value={field.value ?? ""} onChange={field.onChange} />
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="national_id" render={({ field }) => (
+                        <FormItem>
+                          <AuthField
+                            label={idType === "nin" ? "NIN" : `${idTypeLabel(idType) || "ID"} Number`}
+                            placeholder={idType === "nin" ? "Enter your NIN" : "Enter your ID number"}
+                            value={field.value ?? ""}
+                            onChange={(value) =>
+                              field.onChange(idType === "nin" ? onlyDigits(value) : value)
+                            }
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <UploadField
+                        label="Upload ID Document"
+                        hint="A clear photo of your selected ID — JPG, PNG, or WEBP (Max 9MB)"
+                        value={idDocument?.name}
+                        onPick={setIdDocument}
+                      />
+                    </div>
+
                     <FormField control={form.control} name="bank_account" render={({ field }) => (
                       <FormItem>
                         <AuthField

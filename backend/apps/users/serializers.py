@@ -185,6 +185,8 @@ class OwnerProfileSerializer(serializers.ModelSerializer):
         fields = [
             "owner_type",
             "fleet_name",
+            "id_type",
+            "id_document",
             "national_id",
             "location",
             "rc_number",

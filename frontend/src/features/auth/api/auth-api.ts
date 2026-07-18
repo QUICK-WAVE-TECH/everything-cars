@@ -29,7 +29,9 @@ export type OwnerSignUpData = BaseSignUpData & {
   role: "owner";
   owner_type: "individual" | "fleet";
   fleet_name?: string;
+  id_type: string;
   national_id: string;
+  id_document?: File;
   location?: string;
   rc_number?: string;
   country?: string;
@@ -86,6 +88,8 @@ export type UserProfile = {
   owner_profile: {
     owner_type: string;
     fleet_name: string;
+    id_type: string;
+    id_document: string | null;
     national_id: string;
     location: string;
     rc_number: string;
@@ -108,7 +112,7 @@ function isFile(value: unknown): value is File {
 }
 
 function toSignUpBody(data: SignUpData): SignUpData | FormData {
-  if (data.role !== "owner" || !data.document) {
+  if (data.role !== "owner" || (!data.document && !data.id_document)) {
     return data;
   }
 
@@ -203,8 +207,20 @@ export function useSignOut() {
 export function useUpdateProfile() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Record<string, unknown>) =>
-      apiClient.patch<UserProfile>("/users/me", data),
+    mutationFn: (data: Record<string, unknown>) => {
+      // Switch to multipart when a file (e.g. id_document) is present.
+      const hasFile = Object.values(data).some((value) => isFile(value));
+      let body: Record<string, unknown> | FormData = data;
+      if (hasFile) {
+        const formData = new FormData();
+        Object.entries(data).forEach(([key, value]) => {
+          if (value === undefined || value === null) return;
+          formData.append(key, isFile(value) ? value : String(value));
+        });
+        body = formData;
+      }
+      return apiClient.patch<UserProfile>("/users/me", body);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["me"] });
     },

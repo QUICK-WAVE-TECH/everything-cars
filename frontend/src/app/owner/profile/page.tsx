@@ -14,11 +14,14 @@ import {
   CountrySelect,
   StateSelect,
   CityCombobox,
+  IdTypeSelect,
+  UploadField,
 } from "@/features/auth/components";
 import { useMe, useUpdateProfile, useChangePassword } from "@/features/auth/api";
 import {
   ownerProfileUpdateSchema,
   changePasswordSchema,
+  idTypeLabel,
 } from "@/features/auth/schemas";
 import { COUNTRIES } from "@/features/auth/data/countries";
 import { ApiError } from "@/lib/api-client";
@@ -63,6 +66,7 @@ export default function OwnerProfilePage() {
   const changePassword = useChangePassword();
   const [editing, setEditing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [idDocument, setIdDocument] = useState<File | null>(null);
 
   const profile = user?.owner_profile;
 
@@ -73,6 +77,7 @@ export default function OwnerProfilePage() {
       last_name: user?.last_name ?? "",
       phone: user?.phone ?? "",
       fleet_name: profile?.fleet_name ?? "",
+      id_type: (profile?.id_type as ProfileInput["id_type"]) || undefined,
       national_id: profile?.national_id ?? "",
       location: profile?.location ?? "",
       rc_number: profile?.rc_number ?? "",
@@ -104,6 +109,7 @@ export default function OwnerProfilePage() {
       last_name: user?.last_name ?? "",
       phone: user?.phone ?? "",
       fleet_name: profile?.fleet_name ?? "",
+      id_type: (profile?.id_type as ProfileInput["id_type"]) || undefined,
       national_id: profile?.national_id ?? "",
       location: profile?.location ?? "",
       rc_number: profile?.rc_number ?? "",
@@ -123,7 +129,9 @@ export default function OwnerProfilePage() {
   }
 
   function handleSave(values: ProfileInput) {
-    updateProfile.mutate(values, {
+    const payload: Record<string, unknown> = { ...values };
+    if (idDocument) payload.id_document = idDocument;
+    updateProfile.mutate(payload, {
       onSuccess: () => {
         toast.success("Profile updated successfully");
         setEditing(false);
@@ -176,7 +184,21 @@ export default function OwnerProfilePage() {
       icon: "car",
     },
     { label: "Fleet Name", value: profile?.fleet_name || "—", icon: "car" },
-    { label: "National ID", value: profile?.national_id || "—", icon: "idcard" },
+    {
+      label: "ID Type",
+      value: idTypeLabel(profile?.id_type) || "—",
+      icon: "idcard",
+    },
+    {
+      label: idTypeLabel(profile?.id_type) ? `${idTypeLabel(profile?.id_type)} Number` : "ID Number",
+      value: profile?.national_id || "—",
+      icon: "idcard",
+    },
+    {
+      label: "ID Document",
+      value: profile?.id_document ? "On file" : "Not uploaded",
+      icon: "idcard",
+    },
     { label: "Location", value: profile?.location || "—", icon: "pin" },
     { label: "RC Number", value: profile?.rc_number || "—", icon: "idcard" },
     { label: "Address", value: profile?.address || "—", icon: "pin" },
@@ -368,21 +390,60 @@ export default function OwnerProfilePage() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={form.control}
-                      name="national_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <AuthField
-                            label="National ID"
-                            placeholder="National ID number"
-                            value={field.value ?? ""}
-                            onChange={field.onChange}
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="flex flex-col gap-4 rounded-xl border border-(--brc-border) p-4 sm:col-span-2">
+                      <span className="text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                        Identity Verification
+                      </span>
+                      <FormField
+                        control={form.control}
+                        name="id_type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <IdTypeSelect
+                              value={field.value ?? ""}
+                              onChange={field.onChange}
+                            />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="national_id"
+                        render={({ field }) => {
+                          const t = form.getValues("id_type");
+                          return (
+                            <FormItem>
+                              <AuthField
+                                label={t === "nin" ? "NIN" : `${idTypeLabel(t) || "ID"} Number`}
+                                placeholder="ID number"
+                                value={field.value ?? ""}
+                                onChange={(value) =>
+                                  field.onChange(
+                                    t === "nin" ? value.replace(/\D/g, "") : value,
+                                  )
+                                }
+                              />
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
+                      />
+                      <UploadField
+                        label={
+                          profile?.id_document
+                            ? "Replace ID Document"
+                            : "Upload ID Document"
+                        }
+                        hint={
+                          profile?.id_document
+                            ? "A document is on file — upload to replace it."
+                            : "A clear photo of your ID — JPG, PNG, or WEBP (Max 9MB)"
+                        }
+                        value={idDocument?.name}
+                        onPick={setIdDocument}
+                      />
+                    </div>
                     <FormField
                       control={form.control}
                       name="location"
