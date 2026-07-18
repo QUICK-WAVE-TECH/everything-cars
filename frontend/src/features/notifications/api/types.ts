@@ -17,6 +17,7 @@ export type NotificationType =
   | "inspection_failed"
   | "inspection_no_show"
   | "inspection_rescheduled"
+  | "inspection_cancelled"
   | "payment_submitted"
   | "payment_confirmed"
   | "rental_active"

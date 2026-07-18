@@ -509,6 +509,25 @@ def notify_inspection_no_show(booking):
     )
 
 
+def notify_inspection_cancelled(booking):
+    """All staff get notified when an owner cancels an inspection booking, so
+    their queue and slot calendar free the slot in real time."""
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    for staff in staff_users:
+        _create_notification(
+            recipient=staff,
+            notification_type=NotificationType.INSPECTION_CANCELLED,
+            title="Inspection cancelled",
+            message=f"{booking.booked_by.first_name} {booking.booked_by.last_name} cancelled the inspection for {booking.car.title} on {booking.slot.date.strftime('%b %d')}, {booking.slot.start_time.strftime('%I:%M %p')}",
+            data={
+                "booking_id": str(booking.id),
+                "car_id": str(booking.car_id),
+                "car_title": booking.car.title,
+                "owner_name": f"{booking.booked_by.first_name} {booking.booked_by.last_name}",
+            },
+        )
+
+
 def notify_inspection_rescheduled(booking):
     """All staff get notified when owner reschedules inspection."""
     staff_users = User.objects.filter(is_staff=True, is_active=True)
