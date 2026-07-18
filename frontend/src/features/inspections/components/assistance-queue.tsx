@@ -55,23 +55,26 @@ function BookForOwnerDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  const [stateFilter, setStateFilter] = useState<string>(request.state || "");
   const [centerId, setCenterId] = useState<string>("");
   const [slotId, setSlotId] = useState<string>("");
   const bookForOwner = useBookForOwner();
 
-  // Staff pick from all active centers (owner's state surfaced first).
+  // Staff pick a state, then a center within that state.
   const { data: centersPage } = useAdminCenters({
     is_active: "true",
     page_size: 100,
   });
-  const centers = useMemo(() => {
-    const all = centersPage?.results ?? [];
-    if (!request.state) return all;
-    return [...all].sort(
-      (a, b) =>
-        (b.state === request.state ? 1 : 0) - (a.state === request.state ? 1 : 0),
-    );
-  }, [centersPage, request.state]);
+  const allCenters = useMemo(() => centersPage?.results ?? [], [centersPage]);
+  const states = useMemo(
+    () =>
+      Array.from(new Set(allCenters.map((c) => c.state).filter(Boolean))).sort(),
+    [allCenters],
+  );
+  const centers = useMemo(
+    () => allCenters.filter((c) => !stateFilter || c.state === stateFilter),
+    [allCenters, stateFilter],
+  );
   const { data: slots } = useAvailableSlots(centerId || undefined);
   const openSlots = useMemo(
     () => (slots ?? []).filter((s) => s.spots_remaining > 0),
@@ -79,6 +82,10 @@ function BookForOwnerDialog({
   );
 
   // Base UI Select needs value→label maps to render the chosen label.
+  const stateItems = useMemo(
+    () => Object.fromEntries(states.map((s) => [s, s])),
+    [states],
+  );
   const centerItems = useMemo(
     () =>
       Object.fromEntries(
@@ -134,6 +141,30 @@ function BookForOwnerDialog({
         ) : (
           <div className="flex flex-col gap-3 [font-family:var(--brc-font-ui)]">
             <label className="flex flex-col gap-1.5 text-sm">
+              <span className="font-bold text-(--brc-text)">State</span>
+              <Select
+                items={stateItems}
+                value={stateFilter || undefined}
+                onValueChange={(v) => {
+                  setStateFilter(v ?? "");
+                  setCenterId("");
+                  setSlotId("");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a state" />
+                </SelectTrigger>
+                <SelectContent>
+                  {states.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+
+            <label className="flex flex-col gap-1.5 text-sm">
               <span className="font-bold text-(--brc-text)">Center</span>
               <Select
                 items={centerItems}
@@ -142,6 +173,7 @@ function BookForOwnerDialog({
                   setCenterId(v ?? "");
                   setSlotId("");
                 }}
+                disabled={!stateFilter}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a center" />
