@@ -483,6 +483,8 @@ def inspection_form_payload(**overrides):
         "has_accident_history": False,
         "staff_notes": "",
         "result": "passed",
+        "presented_id_type": "nin",
+        "presented_id_number": "22334455667",
     }
     base.update(overrides)
     return base
@@ -631,6 +633,40 @@ class StaffInspectionFlowTest(APITestCase):
         res = self.client.get(f"/api/v1/inspections/admin/bookings/{self.booking.id}/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn("car", res.data)
+
+    def test_passed_requires_presented_id(self):
+        self._start()
+        res = self._submit(
+            result="passed", presented_id_type="", presented_id_number=""
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("presented_id_type", res.data)
+
+    def test_failed_allows_missing_presented_id(self):
+        self._start()
+        res = self._submit(
+            result="failed",
+            staff_notes="Engine seized",
+            presented_id_type="",
+            presented_id_number="",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    def test_presented_id_is_stored(self):
+        self._start()
+        res = self._submit_with_documents(result="passed")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        insp = PhysicalInspection.objects.get(car=self.car)
+        self.assertEqual(insp.presented_id_type, "nin")
+        self.assertEqual(insp.presented_id_number, "22334455667")
+
+    def test_presented_id_never_leaks_to_owner(self):
+        self._start()
+        self._submit_with_documents(result="passed")
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.get(f"/api/v1/inspections/bookings/my/?car={self.car.id}")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertNotIn("presented_id", json.dumps(res.data))
 
 
 class InspectionDocumentsTest(APITestCase):

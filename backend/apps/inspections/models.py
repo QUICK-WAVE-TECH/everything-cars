@@ -210,6 +210,16 @@ class PhysicalInspection(models.Model):
     has_accident_history = models.BooleanField(default=False)
     result = models.CharField(max_length=20, choices=InspectionResult.choices)
     staff_notes = models.TextField(blank=True, default="")
+    # Day-of identity capture — the ID the attendee physically presented.
+    # Staff-only: never serialized to owner/public responses.
+    presented_id_type = models.CharField(
+        max_length=20, choices=IDType.choices, blank=True, default=""
+    )
+    presented_id_number = models.CharField(max_length=50, blank=True, default="")
+    presented_id_document = models.ImageField(
+        upload_to="identity-docs/presented/%Y/%m/", blank=True, null=True
+    )
+
     inspected_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

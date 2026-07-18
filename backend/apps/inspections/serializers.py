@@ -285,6 +285,10 @@ class PhysicalInspectionSerializer(serializers.ModelSerializer):
             "result",
             "inspected_at",
             "inspector_name",
+            "presented_id_type",
+            "presented_id_number",
+            "presented_id_document",
+            "created_at",
             "created_at",
         ]
         read_only_fields = ["id", "inspector_name", "created_at"]
@@ -295,6 +299,8 @@ class PhysicalInspectionSerializer(serializers.ModelSerializer):
         return f"{obj.inspector.first_name} {obj.inspector.last_name}".strip()
 
     def validate(self, attrs):
+        result = attrs.get("result")
+
         needs_note = attrs.get("result") in (
             InspectionResult.NEEDS_CLEARANCE,
             InspectionResult.FAILED,
@@ -303,6 +309,21 @@ class PhysicalInspectionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"staff_notes": "A reason is required for this result."}
             )
+        # A non-failed inspection means someone attended and was inspected
+        # record who, by the ID they presented . (photo optional)
+        if result and result != InspectionResult.FAILED:
+            missing = [
+                f
+                for f in ("presented_id_type", "presented_id_number")
+                if not attrs.get(f)
+            ]
+            if missing:
+                raise serializers.ValidationError(
+                    {
+                        f: "Required to record who presented for the inspection."
+                        for f in missing
+                    }
+                )
         return attrs
 
 
