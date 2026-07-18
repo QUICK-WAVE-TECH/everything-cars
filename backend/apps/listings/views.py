@@ -587,6 +587,8 @@ class PublicCarListView(APIView):
             .prefetch_related("images")
             .annotate(**availability_annotations())
         )
+        # Prefetch each car's passed inspection so the serializer's is_verified /
+        # verified overlay reads it without a per-car query (N+1).
         passed_prefetch = Prefetch(
             "physical_inspections",
             queryset=PhysicalInspection.objects.filter(
@@ -594,6 +596,7 @@ class PublicCarListView(APIView):
             ).order_by("-inspected_at"),
             to_attr="_passed_inspections",
         )
+        cars = cars.prefetch_related(passed_prefetch)
 
         # Basic filters
         listing_type = request.query_params.get("listing_type")
@@ -690,7 +693,9 @@ class PublicCarDetailView(APIView):
         try:
             car = (
                 Car.objects.select_related("owner__owner_profile")
-                .prefetch_related("images", "features", booked_prefetch)
+                .prefetch_related(
+                    "images", "features", booked_prefetch, passed_prefetch
+                )
                 .annotate(_is_sold=sold_annotation(), **availability_annotations())
                 .filter(Q(status=CarStatus.PUBLISHED) | Q(_is_sold=True))
                 .get(
