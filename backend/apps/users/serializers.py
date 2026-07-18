@@ -4,6 +4,26 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import AccessCode, User, CustomerProfile, OwnerProfile, IDType
 
+# Ownership documents and ID uploads accept only these types.
+ALLOWED_UPLOAD_TYPES = [
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/jpg",  # some browsers report jpg as image/jpg
+]
+
+
+def validate_upload_file(value):
+    """Shared validator for document/ID uploads: PDF, PNG, or JPEG, under 9MB."""
+    if value:
+        if value.size > 9 * 1024 * 1024:
+            raise serializers.ValidationError("File size must be under 9MB.")
+        if getattr(value, "content_type", None) not in ALLOWED_UPLOAD_TYPES:
+            raise serializers.ValidationError(
+                "Only PDF, PNG, and JPEG files are allowed."
+            )
+    return value
+
 
 class SignUpSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -42,24 +62,10 @@ class SignUpSerializer(serializers.Serializer):
         return value
 
     def validate_document(self, value):
-        if value:
-            if value.size > 9 * 1024 * 1024:
-                raise serializers.ValidationError("File size must be under 9MB.")
-            allowed = [
-                "application/pdf",
-                "application/msword",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "image/jpeg",
-                "image/png",
-                "image/webp",
-                "image/heic",
-                "image/heif",
-            ]
-            if value.content_type not in allowed:
-                raise serializers.ValidationError(
-                    "Only PDF, DOC, DOCX, JPG, PNG, and WEBP files are allowed."
-                )
-        return value
+        return validate_upload_file(value)
+
+    def validate_id_document(self, value):
+        return validate_upload_file(value)
 
     def validate_country(self, value):
         if value:
@@ -199,6 +205,9 @@ class OwnerProfileSerializer(serializers.ModelSerializer):
             "is_verified",
         ]
         read_only_fields = ["is_verified"]
+
+    def validate_id_document(self, value):
+        return validate_upload_file(value)
 
     def validate_country(self, value):
         if value:

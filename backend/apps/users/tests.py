@@ -54,6 +54,10 @@ def id_image(name="id.jpg"):
     return SimpleUploadedFile(name, buf.getvalue(), content_type="image/jpeg")
 
 
+def fake_upload(name, content_type, data=b"x"):
+    return SimpleUploadedFile(name, data, content_type=content_type)
+
+
 class OwnerSignUpIDTest(APITestCase):
     def _owner_payload(self, **overrides):
         payload = {
@@ -84,6 +88,41 @@ class OwnerSignUpIDTest(APITestCase):
         payload = self._owner_payload()
         payload.pop("id_document")
         res = self.client.post("/api/v1/auth/sign-up", payload, format="multipart")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("id_document", res.data)
+
+    def test_uploads_accept_png_and_pdf(self):
+        res = self.client.post(
+            "/api/v1/auth/sign-up",
+            self._owner_payload(
+                email="fmt@test.com",
+                document=fake_upload("own.pdf", "application/pdf", b"%PDF-1.4"),
+                id_document=fake_upload("id.png", "image/png"),
+            ),
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    def test_document_rejects_docx(self):
+        res = self.client.post(
+            "/api/v1/auth/sign-up",
+            self._owner_payload(
+                document=fake_upload(
+                    "own.docx",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ),
+            ),
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("document", res.data)
+
+    def test_id_document_rejects_disallowed_type(self):
+        res = self.client.post(
+            "/api/v1/auth/sign-up",
+            self._owner_payload(id_document=fake_upload("id.gif", "image/gif")),
+            format="multipart",
+        )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("id_document", res.data)
 

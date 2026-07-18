@@ -90,7 +90,9 @@ class OwnerProfile(models.Model):
     owner_type = models.CharField(max_length=10, choices=OwnerType.choices)
     fleet_name = models.CharField(max_length=200, blank=True, default="")
     id_type = models.CharField(max_length=20, choices=IDType.choices, blank=True)
-    id_document = models.ImageField(
+    # FileField (not ImageField) so a PDF scan of an ID is accepted too; the
+    # allowed types (PDF/PNG/JPEG) are enforced in the serializers.
+    id_document = models.FileField(
         upload_to="identity-docs/%Y/%m/", blank=True, null=True
     )
     national_id = models.CharField(max_length=50, blank=True, default="")

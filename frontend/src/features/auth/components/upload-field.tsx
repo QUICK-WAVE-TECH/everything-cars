@@ -8,9 +8,19 @@ type UploadFieldProps = {
   hint: string;
   value?: string;
   onPick: (file: File | null) => void;
+  /** Overridable file filter. Defaults to PDF / PNG / JPEG. */
+  accept?: string;
 };
 
-export function UploadField({ label, hint, value, onPick }: UploadFieldProps) {
+const DEFAULT_ACCEPT = ".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg";
+
+export function UploadField({
+  label,
+  hint,
+  value,
+  onPick,
+  accept = DEFAULT_ACCEPT,
+}: UploadFieldProps) {
   const id = useId();
 
   return (
@@ -32,7 +42,7 @@ export function UploadField({ label, hint, value, onPick }: UploadFieldProps) {
         <input
           id={id}
           type="file"
-          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          accept={accept}
           className="sr-only"
           onChange={(event) => onPick(event.target.files?.[0] ?? null)}
         />

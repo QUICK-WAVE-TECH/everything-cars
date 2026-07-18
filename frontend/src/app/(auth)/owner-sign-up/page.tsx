@@ -253,7 +253,7 @@ export default function OwnerSignUpPage() {
                         )} />
                         <UploadField
                           label="Upload CAC Document"
-                          hint="PDF, DOC, DOCX, JPG, PNG, or WEBP (Max 9MB)"
+                          hint="PDF, PNG, or JPEG (Max 9MB)"
                           value={document?.name}
                           onPick={setDocument}
                         />
@@ -328,7 +328,7 @@ export default function OwnerSignUpPage() {
                         )} />
                         <UploadField
                           label="Upload Car Ownership Document"
-                          hint="PDF, DOC, DOCX, JPG, PNG, or WEBP (Max 9MB)"
+                          hint="PDF, PNG, or JPEG (Max 9MB)"
                           value={document?.name}
                           onPick={setDocument}
                         />
@@ -362,7 +362,7 @@ export default function OwnerSignUpPage() {
                       )} />
                       <UploadField
                         label="Upload ID Document"
-                        hint="A clear photo of your selected ID — JPG, PNG, or WEBP (Max 9MB)"
+                        hint="A clear photo or PDF of your selected ID — PDF, PNG, or JPEG (Max 9MB)"
                         value={idDocument?.name}
                         onPick={setIdDocument}
                       />

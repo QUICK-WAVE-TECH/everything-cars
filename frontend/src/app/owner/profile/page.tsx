@@ -438,7 +438,7 @@ export default function OwnerProfilePage() {
                         hint={
                           profile?.id_document
                             ? "A document is on file — upload to replace it."
-                            : "A clear photo of your ID — JPG, PNG, or WEBP (Max 9MB)"
+                            : "A clear photo or PDF of your ID — PDF, PNG, or JPEG (Max 9MB)"
                         }
                         value={idDocument?.name}
                         onPick={setIdDocument}
