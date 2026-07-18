@@ -31,7 +31,7 @@ export function IdTypeSelect({
       </span>
       <Select
         items={ID_TYPE_ITEMS}
-        value={value || undefined}
+        value={value || null}
         onValueChange={(v) => onChange(v ?? "")}
       >
         <SelectTrigger className="w-full">

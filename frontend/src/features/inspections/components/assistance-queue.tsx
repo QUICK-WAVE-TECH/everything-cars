@@ -144,7 +144,7 @@ function BookForOwnerDialog({
               <span className="font-bold text-(--brc-text)">State</span>
               <Select
                 items={stateItems}
-                value={stateFilter || undefined}
+                value={stateFilter || null}
                 onValueChange={(v) => {
                   setStateFilter(v ?? "");
                   setCenterId("");
@@ -168,7 +168,7 @@ function BookForOwnerDialog({
               <span className="font-bold text-(--brc-text)">Center</span>
               <Select
                 items={centerItems}
-                value={centerId || undefined}
+                value={centerId || null}
                 onValueChange={(v) => {
                   setCenterId(v ?? "");
                   setSlotId("");
@@ -192,7 +192,7 @@ function BookForOwnerDialog({
               <span className="font-bold text-(--brc-text)">Slot</span>
               <Select
                 items={slotItems}
-                value={slotId || undefined}
+                value={slotId || null}
                 onValueChange={(v) => setSlotId(v ?? "")}
                 disabled={!centerId}
               >
@@ -208,6 +208,12 @@ function BookForOwnerDialog({
                   ))}
                 </SelectContent>
               </Select>
+              {centerId && openSlots.length === 0 && (
+                <span className="text-xs text-(--brc-text-muted)">
+                  No open slots at this center. Create slots for it on the
+                  Inspections page, then book here.
+                </span>
+              )}
             </label>
           </div>
         )}
