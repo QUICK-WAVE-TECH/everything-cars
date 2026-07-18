@@ -39,9 +39,22 @@ const NOTIFICATION_QUERY_DEPS: Partial<Record<NotificationType, string[][]>> = {
   listing_approved: [["cars", "owner"], ["inspections", "car-history"]],
   listing_submitted: [["cars", "admin"]],
   changes_requested: [["cars", "owner"], ["inspections", "car-history"]],
-  inspection_booked: [["inspections", "admin-bookings"], ["cars", "admin"]],
+  // A new booking occupies a slot — refresh the staff calendar counts and the
+  // owner/staff available-slot lists so the taken spot disappears live.
+  inspection_booked: [
+    ["inspections", "admin-bookings"],
+    ["inspections", "slots"],
+    ["inspections", "available-slots"],
+    ["cars", "admin"],
+  ],
   inspection_booking_approved: [["cars", "owner"], ["inspections", "bookings"]],
-  inspection_booking_rejected: [["cars", "owner"], ["inspections", "bookings"]],
+  // Rejecting frees the slot — the calendar count drops and the spot reopens.
+  inspection_booking_rejected: [
+    ["cars", "owner"],
+    ["inspections", "bookings"],
+    ["inspections", "slots"],
+    ["inspections", "available-slots"],
+  ],
   inspection_started: [
     ["cars", "owner"],
     ["inspections", "bookings"],
@@ -64,12 +77,23 @@ const NOTIFICATION_QUERY_DEPS: Partial<Record<NotificationType, string[][]>> = {
     ["inspections", "bookings"],
     ["inspections", "car-history"],
   ],
+  // A no-show still counts as "attended" on the calendar (OCCUPIED), so the
+  // slot count is unchanged — but it frees an ACTIVE spot, so available-slots
+  // must refresh.
   inspection_no_show: [
     ["cars", "owner"],
     ["inspections", "bookings"],
+    ["inspections", "available-slots"],
     ["inspections", "car-history"],
   ],
-  inspection_rescheduled: [["inspections", "admin-bookings"], ["cars", "admin"]],
+  // Reschedule frees the old slot and takes a new one — refresh both the
+  // calendar counts and the available-slot lists.
+  inspection_rescheduled: [
+    ["inspections", "admin-bookings"],
+    ["inspections", "slots"],
+    ["inspections", "available-slots"],
+    ["cars", "admin"],
+  ],
 };
 
 const PING_INTERVAL_MS = 25_000;
