@@ -58,6 +58,38 @@ def fake_upload(name, content_type, data=b"x"):
     return SimpleUploadedFile(name, data, content_type=content_type)
 
 
+class AccessCodeEmailTest(APITestCase):
+    def test_sign_in_code_emailed_with_code(self):
+        from django.core import mail
+
+        from apps.notifications.models import EmailLog
+        from apps.users.services import generate_and_send_code
+
+        code = generate_and_send_code("emmafrank@test.com", "sign_in")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["emmafrank@test.com"])
+        self.assertIn("login code", mail.outbox[0].subject.lower())
+        html = mail.outbox[0].alternatives[0][0]
+        self.assertIn(code.plain_code, html)
+        log = EmailLog.objects.get(recipient="emmafrank@test.com")
+        self.assertTrue(log.success)
+        self.assertEqual(log.template_key, "auth_login_code")
+
+    def test_signup_code_uses_signup_template(self):
+        from django.core import mail
+
+        from apps.notifications.models import EmailLog
+        from apps.users.services import generate_and_send_code
+
+        code = generate_and_send_code("newbie@test.com", "sign_up_verify")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(code.plain_code, mail.outbox[0].alternatives[0][0])
+        self.assertEqual(
+            EmailLog.objects.get(recipient="newbie@test.com").template_key,
+            "auth_signup_code",
+        )
+
+
 class OwnerSignUpIDTest(APITestCase):
     def _owner_payload(self, **overrides):
         payload = {

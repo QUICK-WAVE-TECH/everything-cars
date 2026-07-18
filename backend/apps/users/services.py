@@ -2,7 +2,6 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import jwt
-import resend
 from django.conf import settings
 
 from .models import AccessCode, RefreshTokenBlacklist
@@ -79,21 +78,36 @@ def blacklist_token(jti: str) -> None:
     RefreshTokenBlacklist.objects.get_or_create(jti=jti)
 
 
+ACCESS_CODE_EXPIRY_MINUTES = 10
+
+
 def generate_and_send_code(email: str, purpose: str, user=None) -> AccessCode:
     code_obj = AccessCode.create_code(email=email, purpose=purpose, user=user)
 
-    if settings.RESEND_API_KEY:
-        resend.api_key = settings.RESEND_API_KEY
-        resend.Emails.send(
-            {
-                "from": settings.DEFAULT_FROM_EMAIL,
-                "to": [email],
-                "subject": "Your EverythingCars Access Code",
-                "text": f"Your access code is: {code_obj.plain_code}\n\nIt expires in 10 minutes.",
-            }
-        )
+    # Deliver through the shared email engine (Mailpit in dev, SMTP in prod).
+    # Lazy import avoids any users<->notifications import-order issues.
+    from apps.notifications.email_service import send_email
+
+    if purpose == AccessCode.Purpose.SIGN_UP_VERIFY:
+        template_key = "auth_signup_code"
+        subject = "Verify your email — your code inside"
     else:
-        # Dev fallback: print to console
+        template_key = "auth_login_code"
+        subject = "Your EverythingCars login code"
+
+    send_email(
+        recipient=email,
+        subject=subject,
+        template_key=template_key,
+        context={
+            "code": code_obj.plain_code,
+            "expires_minutes": ACCESS_CODE_EXPIRY_MINUTES,
+        },
+    )
+
+    # Dev convenience: still echo the code to the console so you don't have to
+    # open Mailpit for every login.
+    if settings.DEBUG:
         print(f"\n[DEV] Access code for {email}: {code_obj.plain_code}\n")
 
     return code_obj
