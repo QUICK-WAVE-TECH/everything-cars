@@ -77,13 +77,12 @@ const NOTIFICATION_QUERY_DEPS: Partial<Record<NotificationType, string[][]>> = {
     ["inspections", "bookings"],
     ["inspections", "car-history"],
   ],
-  // A no-show still counts as "attended" on the calendar (OCCUPIED), so the
-  // slot count is unchanged — but it frees an ACTIVE spot, so available-slots
-  // must refresh.
+  // A no-show is recorded only after the appointment time, so its slot is
+  // already in the past — it changes neither the calendar's OCCUPIED count nor
+  // the future-only available-slots set. No slot keys needed.
   inspection_no_show: [
     ["cars", "owner"],
     ["inspections", "bookings"],
-    ["inspections", "available-slots"],
     ["inspections", "car-history"],
   ],
   // Reschedule frees the old slot and takes a new one — refresh both the

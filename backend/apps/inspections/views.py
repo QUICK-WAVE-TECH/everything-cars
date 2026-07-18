@@ -328,21 +328,17 @@ class StaffSlotListCreateView(APIView):
 
         InspectionSlot.objects.bulk_create(to_create, ignore_conflicts=True)
 
-        # Re-fetch the intended-new rows instead of trusting bulk_create's return
-        # value: with ignore_conflicts, conflicting rows come back without a PK
-        # (would serialize as null id), and a concurrent insert could otherwise
-        # skew the count. Pre-existing keys were filtered out above, so matching
-        # on the intended keys yields exactly the slots created for this batch.
-        new_keys = {(s.date, s.start_time, s.end_time) for s in to_create}
-        created = [
-            slot
-            for slot in InspectionSlot.objects.filter(
-                center=center, date__range=(date_from, date_to)
-            )
+        # Re-fetch by the client-generated UUIDs of the rows we tried to insert.
+        # ignore_conflicts disables PK return on the objects (they'd serialize as
+        # null id), so we re-query. Because a conflicting row keeps the *existing*
+        # row's id — never ours — matching on our ids counts exactly what this
+        # request inserted, accurate even against a concurrent duplicate batch.
+        new_ids = [slot.id for slot in to_create]
+        created = list(
+            InspectionSlot.objects.filter(id__in=new_ids)
             .select_related("center", "created_by")
             .order_by("date", "start_time")
-            if (slot.date, slot.start_time, slot.end_time) in new_keys
-        ]
+        )
 
         return Response(
             {
