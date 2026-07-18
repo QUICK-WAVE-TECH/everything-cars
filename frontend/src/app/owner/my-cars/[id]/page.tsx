@@ -1400,6 +1400,13 @@ export default function CarDetailPage() {
             ? noShowBooking.id
             : undefined
         }
+        rescheduleAttendeeType={
+          reschedulingPending && pendingBooking
+            ? pendingBooking.attendee_type
+            : car.status === "inspection_no_show" && noShowBooking
+            ? noShowBooking.attendee_type
+            : undefined
+        }
         open={bookingOpen}
         onClose={() => {
           setBookingOpen(false);

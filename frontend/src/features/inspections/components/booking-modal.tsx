@@ -347,6 +347,9 @@ export interface BookingModalProps {
   /** When rescheduling an existing booking instead of creating a new one. */
   mode?: "book" | "reschedule";
   bookingId?: string;
+  /** Attendee type of the booking being rescheduled — a representative booking
+   * requires the owner to re-accept consent for the new date. */
+  rescheduleAttendeeType?: "self" | "representative";
 }
 
 // ── Component ──
@@ -359,6 +362,7 @@ export function BookingModal({
   onSuccess,
   mode = "book",
   bookingId,
+  rescheduleAttendeeType,
 }: BookingModalProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
@@ -423,6 +427,9 @@ export function BookingModal({
   const createBooking = useCreateBooking();
   const rescheduleBooking = useRescheduleBooking();
   const isReschedule = mode === "reschedule";
+  // A representative booking's authorization must be re-accepted for the new date.
+  const needsRescheduleConsent =
+    isReschedule && rescheduleAttendeeType === "representative";
 
   const states = useMemo(
     () => locations?.find((l) => l.country === country)?.states ?? [],
@@ -521,7 +528,11 @@ export function BookingModal({
     if (!selectedSlot) return;
     try {
       if (isReschedule && bookingId) {
-        await rescheduleBooking.mutateAsync({ bookingId, slot_id: selectedSlot.id });
+        await rescheduleBooking.mutateAsync({
+          bookingId,
+          slot_id: selectedSlot.id,
+          ...(needsRescheduleConsent ? { consent_accepted: consent } : {}),
+        });
         toast.success("Inspection rescheduled. Attend your inspection at the selected center.");
       } else {
         await createBooking.mutateAsync({
@@ -583,10 +594,10 @@ export function BookingModal({
   const isConfirming = createBooking.isPending || rescheduleBooking.isPending;
   const canProceedStep1 = !!city && !showIdGate;
   const canProceedStep3 = !!selectedSlot;
-  const attendeeValid =
-    isReschedule ||
-    attendeeType === "self" ||
-    (!!repName.trim() && !!repIdType && !!repIdNumber.trim() && consent);
+  const attendeeValid = isReschedule
+    ? !needsRescheduleConsent || consent
+    : attendeeType === "self" ||
+      (!!repName.trim() && !!repIdType && !!repIdNumber.trim() && consent);
   const canConfirm = !!selectedSlot && !isConfirming && attendeeValid;
 
   async function handleRequestAssistance() {
@@ -1060,7 +1071,9 @@ export function BookingModal({
                     </div>
                   </div>
 
-                  {/* Attendee declaration */}
+                  {/* Attendee declaration — book mode only. Reschedule keeps the
+                      original attendee (server-side); only consent is re-captured. */}
+                  {!isReschedule && (
                   <div className="rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle) p-5">
                     <span className="block text-[11px] font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
                       Who will attend the inspection?
@@ -1126,6 +1139,29 @@ export function BookingModal({
                       </div>
                     )}
                   </div>
+                  )}
+
+                  {/* Reschedule of a representative booking — re-accept consent. */}
+                  {needsRescheduleConsent && (
+                    <div className="rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle) p-5">
+                      <span className="block text-[11px] font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                        Confirm authorization
+                      </span>
+                      <p className="mt-2 text-xs leading-5 text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+                        A representative will attend, as originally booked. Please
+                        re-accept the authorization for this new appointment.
+                      </p>
+                      <label className="mt-3 flex items-start gap-2 text-xs leading-5 text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+                        <input
+                          type="checkbox"
+                          checked={consent}
+                          onChange={(e) => setConsent(e.target.checked)}
+                          className="mt-0.5 size-4 shrink-0 accent-(--brc-primary)"
+                        />
+                        <span>{CONSENT_TEXT}</span>
+                      </label>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

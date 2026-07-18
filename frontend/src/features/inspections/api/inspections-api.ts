@@ -274,8 +274,19 @@ export function useCancelBooking() {
 export function useRescheduleBooking() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ bookingId, slot_id }: { bookingId: string; slot_id: string }) =>
-      apiClient.post<InspectionBooking>(`/inspections/bookings/${bookingId}/reschedule/`, { slot_id }),
+    mutationFn: ({
+      bookingId,
+      slot_id,
+      consent_accepted,
+    }: {
+      bookingId: string;
+      slot_id: string;
+      consent_accepted?: boolean;
+    }) =>
+      apiClient.post<InspectionBooking>(
+        `/inspections/bookings/${bookingId}/reschedule/`,
+        { slot_id, ...(consent_accepted !== undefined ? { consent_accepted } : {}) },
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: inspectionKeys.bookings });
       queryClient.invalidateQueries({ queryKey: ["inspections", "available-slots"] });

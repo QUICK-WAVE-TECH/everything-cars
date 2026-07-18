@@ -716,6 +716,7 @@ class OwnerBookingRescheduleView(APIView):
                 {"detail": "slot_id is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        consent_accepted = bool(request.data.get("consent_accepted"))
 
         with transaction.atomic():
             try:
@@ -739,6 +740,22 @@ class OwnerBookingRescheduleView(APIView):
             if booking.slot.date <= timezone.localdate():
                 return Response(
                     {"detail": DAY_OF_LOCK_MESSAGE},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # A representative booking carries a signed authorization; moving the
+            # appointment requires the owner to re-accept it for the new date.
+            if (
+                booking.attendee_type == AttendeeType.REPRESENTATIVE
+                and not consent_accepted
+            ):
+                return Response(
+                    {
+                        "consent_accepted": (
+                            "You must re-accept the authorization agreement to "
+                            "reschedule."
+                        )
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -797,7 +814,8 @@ class OwnerBookingRescheduleView(APIView):
 
             # Create new booking with incremented reschedule count. Carry over the
             # attendee declaration — rescheduling moves the same appointment, so a
-            # representative booking must not silently reset to the owner.
+            # representative booking must not silently reset to the owner. Consent
+            # is re-captured for the new date (validated above), so stamp it fresh.
             new_booking = InspectionBooking.objects.create(
                 car=booking.car,
                 slot=new_slot,
@@ -807,7 +825,11 @@ class OwnerBookingRescheduleView(APIView):
                 rep_name=booking.rep_name,
                 rep_id_type=booking.rep_id_type,
                 rep_id_number=booking.rep_id_number,
-                consent_accepted_at=booking.consent_accepted_at,
+                consent_accepted_at=(
+                    timezone.now()
+                    if booking.attendee_type == AttendeeType.REPRESENTATIVE
+                    else None
+                ),
             )
 
             if car.status != CarStatus.INSPECTION_PENDING:

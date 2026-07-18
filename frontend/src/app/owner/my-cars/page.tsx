@@ -994,6 +994,7 @@ export default function MyCarsPage() {
             carId={bookingCarId}
             mode={isRebooking ? "reschedule" : "book"}
             bookingId={isRebooking ? lastBooking.id : undefined}
+            rescheduleAttendeeType={isRebooking ? lastBooking.attendee_type : undefined}
             open={bookingOpen}
             onClose={handleCloseBooking}
             onSuccess={handleCloseBooking}
