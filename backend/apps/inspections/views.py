@@ -423,7 +423,9 @@ class StaffSlotDetailView(APIView):
 
 
 class AvailableSlotsView(APIView):
-    permission_classes = [IsOwner]
+    # Owners browse slots to book; staff also need them to book on an owner's
+    # behalf from the assistance queue.
+    permission_classes = [IsOwner | IsStaff]
 
     def get(self, request):
         now = timezone.localtime()

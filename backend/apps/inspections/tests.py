@@ -1427,6 +1427,14 @@ class StaffBookForOwnerTest(APITestCase):
         self.slot = create_slot(self.staff, center=self.center)
         self.client.force_authenticate(user=self.staff)
 
+    def test_staff_can_fetch_available_slots(self):
+        res = self.client.get(
+            f"/api/v1/inspections/available-slots/?center={self.center.id}"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.data[0]["id"], str(self.slot.id))
+
     def test_staff_books_for_owner(self):
         from django.core import mail
 
