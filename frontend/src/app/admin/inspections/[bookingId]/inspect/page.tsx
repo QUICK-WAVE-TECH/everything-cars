@@ -4,7 +4,25 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
-import { ArrowLeftIcon, Loader2Icon, PlusIcon, XIcon, UploadIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  CalendarCheckIcon,
+  CarFrontIcon,
+  ClipboardCheckIcon,
+  ClockIcon,
+  FileCheckIcon,
+  FuelIcon,
+  GaugeIcon,
+  Loader2Icon,
+  MapPinIcon,
+  PlusIcon,
+  ShieldCheckIcon,
+  UserCheckIcon,
+  WrenchIcon,
+  XIcon,
+  UploadIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import { IdTypeSelect } from "@/features/auth/components";
 import { idTypeLabel } from "@/features/auth/schemas";
@@ -62,13 +80,37 @@ const RESULT_OPTIONS: { value: PhysicalInspectionPayload["result"]; label: strin
   { value: "failed", label: "Fail inspection", hint: "Vehicle does not meet listing requirements.", color: "var(--brc-danger)" },
 ];
 
+const selectTriggerClass =
+  "h-12 w-full rounded-xl border-(--brc-border) bg-white px-4 text-sm font-bold text-(--brc-text) shadow-[var(--brc-shadow-xs)] transition-all duration-200 hover:border-(--brc-primary)/40 hover:bg-(--brc-primary-tint)/35 focus:ring-2 focus:ring-(--brc-primary)/20 [font-family:var(--brc-font-ui)]";
+const selectContentClass =
+  "rounded-xl border-(--brc-border) bg-white p-1 shadow-[0_18px_48px_rgba(18,18,18,0.14)] [font-family:var(--brc-font-ui)]";
+const selectItemClass =
+  "cursor-pointer rounded-lg px-3 py-2 text-sm font-bold text-(--brc-text) focus:bg-(--brc-primary-tint) focus:text-(--brc-primary) data-highlighted:bg-(--brc-primary-tint) data-highlighted:text-(--brc-primary)";
+
 // ── Section wrapper ──
-function FormSection({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function FormSection({
+  title,
+  subtitle,
+  icon: SectionIcon,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  icon?: LucideIcon;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-(--brc-border) bg-white p-5 shadow-[var(--brc-shadow-xs)] sm:p-6">
-      <div>
-        <h2 className="m-0 text-base font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">{title}</h2>
-        {subtitle && <p className="mt-1 text-[13px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{subtitle}</p>}
+    <section className="flex flex-col gap-5 rounded-3xl border border-(--brc-border) bg-white p-5 shadow-[0_18px_48px_rgba(18,18,18,0.07)] sm:p-6">
+      <div className="flex items-start gap-3">
+        {SectionIcon && (
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-(--brc-primary-tint) text-(--brc-primary)">
+            <SectionIcon size={20} />
+          </span>
+        )}
+        <div className="min-w-0">
+          <h2 className="m-0 text-lg font-black text-(--brc-text) [font-family:var(--brc-font-display)]">{title}</h2>
+          {subtitle && <p className="mt-1 text-sm leading-6 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{subtitle}</p>}
+        </div>
       </div>
       {children}
     </section>
@@ -76,7 +118,7 @@ function FormSection({ title, subtitle, children }: { title: string; subtitle?: 
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="mb-1.5 block text-[13px] font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">{children}</label>;
+  return <label className="mb-2 block text-[12px] font-black uppercase tracking-[0.12em] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{children}</label>;
 }
 
 // ── Condition level picker ──
@@ -91,8 +133,8 @@ function ConditionPicker({ value, onChange }: { value: ConditionLevel | ""; onCh
             type="button"
             onClick={() => onChange(c.value)}
             className={cn(
-              "flex min-h-10 cursor-pointer items-center justify-center rounded-lg border px-1 py-1.5 text-center text-[13px] font-semibold leading-tight transition-colors [font-family:var(--brc-font-ui)]",
-              active ? "border-(--brc-primary) bg-(--brc-primary-tint) text-(--brc-primary)" : "border-(--brc-border) bg-white text-(--brc-text-secondary) hover:bg-(--brc-bg-subtle)"
+              "flex min-h-11 cursor-pointer items-center justify-center rounded-xl border px-2 py-2 text-center text-[13px] font-black leading-tight transition-all duration-200 [font-family:var(--brc-font-ui)]",
+              active ? "border-(--brc-primary) bg-(--brc-primary) text-white shadow-[0_12px_26px_rgba(0,0,139,0.18)]" : "border-(--brc-border) bg-white text-(--brc-text-secondary) hover:-translate-y-0.5 hover:border-(--brc-primary)/40 hover:bg-(--brc-primary-tint) hover:text-(--brc-primary)"
             )}
           >
             {c.label}
@@ -267,8 +309,8 @@ export default function StaffInspectionFormPage() {
   return (
     <>
       {/* Hero / header band */}
-      <section className="border-b border-(--brc-border) bg-white">
-        <div className="mx-auto flex max-w-[900px] flex-col gap-5 px-4 pb-7 pt-8 sm:px-6">
+      <section className="border-b border-(--brc-border) bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)]">
+        <div className="mx-auto flex max-w-[1180px] flex-col gap-6 px-4 pb-8 pt-8 sm:px-6">
           <button
             type="button"
             onClick={() => router.push("/admin/approvals")}
@@ -277,53 +319,77 @@ export default function StaffInspectionFormPage() {
             <ArrowLeftIcon size={15} /> Back to approvals
           </button>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle)">
+          <div className="rounded-[28px] border border-(--brc-border) bg-white p-4 shadow-[0_18px_48px_rgba(18,18,18,0.07)] sm:p-5">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
+              <span className="relative flex h-[150px] w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-(--brc-border) bg-(--brc-bg-subtle) lg:size-[132px]">
               {primaryImage ? (
                 <Image src={primaryImage} alt={car.title} fill className="object-cover" />
               ) : (
-                <Icon name="car" size={24} stroke="var(--brc-text-muted)" />
+                <Icon name="car" size={32} stroke="var(--brc-text-muted)" />
               )}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="m-0 truncate text-xl font-extrabold text-(--brc-text) [font-family:var(--brc-font-display)]">{car.title}</h1>
-                {car.tracking_id && (
-                  <span className="rounded-full bg-(--brc-primary-tint) px-2.5 py-1 text-[11px] font-bold text-(--brc-primary) [font-family:var(--brc-font-ui)]">
-                    #{car.tracking_id}
-                  </span>
-                )}
-              </div>
-              <span className="text-[13px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                {car.year} · {car.body_type || car.brand} · Owner: {booking.booked_by_name}
               </span>
+              <div className="min-w-0 flex-1">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-(--brc-primary-tint) px-3 py-1 text-xs font-black text-(--brc-primary) [font-family:var(--brc-font-ui)]">
+                    <ClipboardCheckIcon size={13} />
+                    Physical inspection
+                  </span>
+                  {car.tracking_id && (
+                    <span className="rounded-full border border-(--brc-border) bg-white px-3 py-1 text-xs font-black tabular-nums text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                      #{car.tracking_id}
+                    </span>
+                  )}
+                </div>
+                <h1 className="m-0 text-2xl font-black leading-tight text-(--brc-text) [font-family:var(--brc-font-display)] sm:text-[34px]">
+                  {car.title}
+                </h1>
+                <p className="mt-2 text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                  {car.year} · {car.body_type || car.brand} · Owner: {booking.booked_by_name}
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="flex flex-col gap-[3px] rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) px-3 py-2.5">
-              <span className="text-[11px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Date</span>
-              <span className="text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">{formatDate(booking.slot.date)}</span>
-            </div>
-            <div className="flex flex-col gap-[3px] rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) px-3 py-2.5">
-              <span className="text-[11px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Time</span>
-              <span className="text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
-                {formatTime(booking.slot.start_time)} – {formatTime(booking.slot.end_time)}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="flex items-center gap-3 rounded-2xl border border-(--brc-border) bg-white px-4 py-3 shadow-[var(--brc-shadow-xs)]">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-(--brc-primary-tint) text-(--brc-primary)">
+                <CalendarCheckIcon size={18} />
               </span>
+              <div className="min-w-0">
+                <span className="block text-[11px] font-black uppercase tracking-[0.12em] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Date</span>
+                <span className="block truncate text-sm font-black text-(--brc-text) [font-family:var(--brc-font-ui)]">{formatDate(booking.slot.date)}</span>
+              </div>
             </div>
-            <div className="col-span-2 flex flex-col gap-[3px] rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) px-3 py-2.5">
-              <span className="text-[11px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Center</span>
-              <span className="truncate text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
-                {booking.slot.center.company_name} · {booking.slot.center.city}
+            <div className="flex items-center gap-3 rounded-2xl border border-(--brc-border) bg-white px-4 py-3 shadow-[var(--brc-shadow-xs)]">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-(--brc-primary-tint) text-(--brc-primary)">
+                <ClockIcon size={18} />
               </span>
+              <div className="min-w-0">
+                <span className="block text-[11px] font-black uppercase tracking-[0.12em] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Time</span>
+                <span className="block truncate text-sm font-black text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                  {formatTime(booking.slot.start_time)} – {formatTime(booking.slot.end_time)}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-2xl border border-(--brc-border) bg-white px-4 py-3 shadow-[var(--brc-shadow-xs)]">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-(--brc-primary-tint) text-(--brc-primary)">
+                <MapPinIcon size={18} />
+              </span>
+              <div className="min-w-0">
+                <span className="block text-[11px] font-black uppercase tracking-[0.12em] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Center</span>
+                <span className="block truncate text-sm font-black text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                  {booking.slot.center.company_name} · {booking.slot.center.city}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="mx-auto flex w-full max-w-[900px] flex-col gap-5 px-4 py-8 sm:px-6">
+      <div className="mx-auto grid w-full max-w-[1180px] grid-cols-1 gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex min-w-0 flex-col gap-5">
         {/* Vehicle */}
-        <FormSection title="Vehicle" subtitle="Confirm the vehicle's core attributes as physically inspected.">
+        <FormSection title="Vehicle" icon={CarFrontIcon} subtitle="Confirm the vehicle's core attributes as physically inspected.">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <FieldLabel>Condition</FieldLabel>
@@ -362,14 +428,14 @@ export default function StaffInspectionFormPage() {
                 value={fuelType}
                 onValueChange={(v) => setFuelType((v ?? "") as typeof fuelType)}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className={selectTriggerClass}>
                   <SelectValue placeholder="Select fuel type" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="petrol">Petrol</SelectItem>
-                  <SelectItem value="diesel">Diesel</SelectItem>
-                  <SelectItem value="hybrid">Hybrid</SelectItem>
-                  <SelectItem value="electric">Electric</SelectItem>
+                <SelectContent className={selectContentClass}>
+                  <SelectItem className={selectItemClass} value="petrol">Petrol</SelectItem>
+                  <SelectItem className={selectItemClass} value="diesel">Diesel</SelectItem>
+                  <SelectItem className={selectItemClass} value="hybrid">Hybrid</SelectItem>
+                  <SelectItem className={selectItemClass} value="electric">Electric</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -381,13 +447,13 @@ export default function StaffInspectionFormPage() {
                 value={carType}
                 onValueChange={(v) => setCarType((v ?? "") as typeof carType)}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger className={selectTriggerClass}>
                   <SelectValue placeholder="Select car type" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="foreign_used">Foreign Used</SelectItem>
-                  <SelectItem value="brand_new">Brand New</SelectItem>
-                  <SelectItem value="local_used">Local Used</SelectItem>
+                <SelectContent className={selectContentClass}>
+                  <SelectItem className={selectItemClass} value="foreign_used">Foreign Used</SelectItem>
+                  <SelectItem className={selectItemClass} value="brand_new">Brand New</SelectItem>
+                  <SelectItem className={selectItemClass} value="local_used">Local Used</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -431,7 +497,7 @@ export default function StaffInspectionFormPage() {
         </FormSection>
 
         {/* Condition */}
-        <FormSection title="Condition assessment" subtitle="Rate the physical condition of each component.">
+        <FormSection title="Condition assessment" icon={WrenchIcon} subtitle="Rate the physical condition of each component.">
           <div>
             <FieldLabel>Engine condition</FieldLabel>
             <ConditionPicker value={engineCondition} onChange={setEngineCondition} />
@@ -474,6 +540,7 @@ export default function StaffInspectionFormPage() {
         {needsDocuments && (
           <FormSection
             title="Documents"
+            icon={FileCheckIcon}
             subtitle={
               documentsRequired && !documentsComplete
                 ? "Required for vehicles listed for sale — uploads, custom duty status and receipt type must be provided before submitting."
@@ -506,13 +573,13 @@ export default function StaffInspectionFormPage() {
                   value={customDutyStatus}
                   onValueChange={(v) => setCustomDutyStatus(v ?? "")}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className={selectTriggerClass}>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="fully_paid">Fully Paid</SelectItem>
-                    <SelectItem value="partly_paid">Partly Paid</SelectItem>
-                    <SelectItem value="not_available">Not Available</SelectItem>
+                  <SelectContent className={selectContentClass}>
+                    <SelectItem className={selectItemClass} value="fully_paid">Fully Paid</SelectItem>
+                    <SelectItem className={selectItemClass} value="partly_paid">Partly Paid</SelectItem>
+                    <SelectItem className={selectItemClass} value="not_available">Not Available</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -524,13 +591,13 @@ export default function StaffInspectionFormPage() {
                   value={receiptType}
                   onValueChange={(v) => setReceiptType(v ?? "")}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className={selectTriggerClass}>
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="company">Company</SelectItem>
-                    <SelectItem value="dealership">Dealership</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                  <SelectContent className={selectContentClass}>
+                    <SelectItem className={selectItemClass} value="company">Company</SelectItem>
+                    <SelectItem className={selectItemClass} value="dealership">Dealership</SelectItem>
+                    <SelectItem className={selectItemClass} value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -551,6 +618,7 @@ export default function StaffInspectionFormPage() {
         {/* Attendee identity — who physically presented for the inspection */}
         <FormSection
           title="Attendee identity"
+          icon={UserCheckIcon}
           subtitle="Confirm who showed up against the booking. The owner's ID is already on file — only a representative's ID is captured here. Required unless the inspection failed. Staff-only."
         >
           {/* What the owner declared at booking */}
@@ -660,7 +728,7 @@ export default function StaffInspectionFormPage() {
         </FormSection>
 
         {/* Result */}
-        <FormSection title="Inspection result" subtitle="Choose the outcome of this physical inspection.">
+        <FormSection title="Inspection result" icon={ShieldCheckIcon} subtitle="Choose the outcome of this physical inspection.">
           <RadioGroup value={result} onValueChange={(v) => setResult((v ?? "") as typeof result)}>
             {RESULT_OPTIONS.map((opt) => {
               const active = result === opt.value;
@@ -702,11 +770,11 @@ export default function StaffInspectionFormPage() {
         </FormSection>
 
         {/* Submit bar */}
-        <div className="flex flex-col-reverse gap-3 pb-4 sm:flex-row sm:items-center sm:justify-end">
+        <div className="sticky bottom-4 z-10 flex flex-col-reverse gap-3 rounded-2xl border border-(--brc-border) bg-white/95 p-3 shadow-[0_18px_48px_rgba(18,18,18,0.12)] backdrop-blur sm:flex-row sm:items-center sm:justify-end">
           <button
             type="button"
             onClick={() => router.push("/admin/approvals")}
-            className="flex h-[46px] w-full cursor-pointer items-center justify-center rounded-lg border border-(--brc-border) bg-white px-5 text-sm font-bold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)] sm:w-auto"
+            className="flex h-12 w-full cursor-pointer items-center justify-center rounded-xl border border-(--brc-border) bg-white px-5 text-sm font-black text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)] sm:w-auto"
           >
             Cancel
           </button>
@@ -714,12 +782,82 @@ export default function StaffInspectionFormPage() {
             type="button"
             disabled={!isFormValid || isSubmitting}
             onClick={handleSubmit}
-            className="flex h-[46px] w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) px-6 text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)] sm:w-auto"
+            className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-none bg-(--brc-primary) px-6 text-sm font-black text-white shadow-[0_14px_30px_rgba(0,0,139,0.22)] transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)] sm:w-auto"
           >
             {isSubmitting ? <Loader2Icon size={16} className="animate-spin" /> : null}
             Submit Inspection
           </button>
         </div>
+        </div>
+
+        <aside className="lg:sticky lg:top-6 lg:self-start">
+          <div className="overflow-hidden rounded-3xl border border-(--brc-border) bg-white shadow-[0_18px_48px_rgba(18,18,18,0.08)]">
+            <div className="relative h-44 bg-(--brc-bg-subtle)">
+              {primaryImage ? (
+                <Image src={primaryImage} alt={car.title} fill className="object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <Icon name="car" size={34} stroke="var(--brc-text-muted)" />
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-5 p-5 [font-family:var(--brc-font-ui)]">
+              <div>
+                <p className="m-0 text-[11px] font-black uppercase tracking-[0.14em] text-(--brc-text-muted)">
+                  Inspection snapshot
+                </p>
+                <h2 className="m-0 mt-2 text-base font-black leading-6 text-(--brc-text) [font-family:var(--brc-font-display)]">
+                  {car.title}
+                </h2>
+                <p className="m-0 mt-1 text-sm text-(--brc-text-muted)">
+                  {booking.booked_by_name}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-(--brc-border) bg-(--brc-bg-subtle) p-3">
+                  <GaugeIcon size={17} className="mb-2 text-(--brc-primary)" />
+                  <p className="m-0 text-[11px] font-black uppercase tracking-[0.1em] text-(--brc-text-muted)">Mileage</p>
+                  <p className="m-0 mt-1 text-sm font-black text-(--brc-text)">
+                    {mileage ? `${Number(mileage).toLocaleString("en-NG")} km` : "—"}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-(--brc-border) bg-(--brc-bg-subtle) p-3">
+                  <FuelIcon size={17} className="mb-2 text-(--brc-primary)" />
+                  <p className="m-0 text-[11px] font-black uppercase tracking-[0.1em] text-(--brc-text-muted)">Fuel</p>
+                  <p className="m-0 mt-1 text-sm font-black text-(--brc-text)">
+                    {fuelType ? fuelType.replace("_", " ") : "—"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-(--brc-border) bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FAFC_100%)] p-4">
+                <p className="m-0 text-sm font-black text-(--brc-text)">Completion checklist</p>
+                <div className="mt-3 flex flex-col gap-2 text-sm">
+                  {[
+                    ["Vehicle details", !!condition && !!mileage && !!fuelType && !!carType],
+                    ["Condition ratings", !!engineCondition && !!chassisCondition && !!acCondition],
+                    ["Attendee confirmed", !attendeeRequired || !!presentedAttendee],
+                    ["Documents", !documentsRequired || documentsComplete],
+                    ["Result selected", !!result && (!notesRequired || staffNotes.trim().length > 0)],
+                  ].map(([label, done]) => (
+                    <div key={label as string} className="flex items-center justify-between gap-3">
+                      <span className="text-(--brc-text-secondary)">{label}</span>
+                      <span className={cn("size-2.5 rounded-full", done ? "bg-(--brc-success)" : "bg-(--brc-bg-muted) ring-1 ring-(--brc-border)")} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-(--brc-primary-tint) p-4">
+                <p className="m-0 text-sm font-black text-(--brc-primary)">Before submitting</p>
+                <p className="m-0 mt-2 text-sm leading-6 text-(--brc-text-secondary)">
+                  Confirm every field reflects the physical vehicle. A passed result can publish the listing.
+                </p>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
     </>
   );

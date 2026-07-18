@@ -272,7 +272,10 @@ export function useCarHistory(carId: string | null) {
 
 // ── Staff Booking Management & Physical Inspection ──
 
-export function useStaffBookings(params?: { status?: string; date?: string; car?: string }) {
+export function useStaffBookings(
+  params?: { status?: string; date?: string; car?: string },
+  options?: { enabled?: boolean },
+) {
   const query = buildQuery(params);
   return useQuery({
     queryKey: inspectionKeys.adminBookingsList(params),
@@ -280,6 +283,7 @@ export function useStaffBookings(params?: { status?: string; date?: string; car?
       apiClient.get<PaginatedResponse<InspectionBooking>>(
         `/inspections/admin/bookings/${query ? `?${query}` : ""}`,
       ),
+    enabled: options?.enabled ?? true,
     staleTime: 15_000,
   });
 }
