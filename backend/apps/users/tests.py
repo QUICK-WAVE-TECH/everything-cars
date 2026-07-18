@@ -191,6 +191,8 @@ class AccessCodeEmailTest(APITestCase):
         self.assertIn("login code", mail.outbox[0].subject.lower())
         html = mail.outbox[0].alternatives[0][0]
         self.assertIn(code.plain_code, html)
+        # The header logo is injected into every email.
+        self.assertIn("/logo.png", html)
         log = EmailLog.objects.get(recipient="emmafrank@test.com")
         self.assertTrue(log.success)
         self.assertEqual(log.template_key, "auth_login_code")

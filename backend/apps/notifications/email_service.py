@@ -23,6 +23,12 @@ from .models import EmailLog
 logger = logging.getLogger("notifications")
 
 
+def _brand_context():
+    """Context every email gets — the header logo, served from the frontend."""
+    base = settings.FRONTEND_URL.rstrip("/")
+    return {"logo_url": f"{base}/logo.png"}
+
+
 def _plain_text(html):
     """Best-effort plain-text alternative from the rendered HTML.
 
@@ -46,7 +52,9 @@ def send_email(*, recipient, subject, template_key, context, booking=None):
         booking=booking,
     )
     try:
-        html_body = render_to_string(f"emails/{template_key}.html", context)
+        html_body = render_to_string(
+            f"emails/{template_key}.html", {**_brand_context(), **context}
+        )
         message = EmailMultiAlternatives(
             subject=subject,
             body=_plain_text(html_body),
