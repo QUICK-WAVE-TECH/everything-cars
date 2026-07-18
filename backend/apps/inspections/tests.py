@@ -120,6 +120,30 @@ class StaffSlotManagementTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertGreater(res.data["created_count"], 0)
+        # Returned slots must carry real DB ids (not null from ignore_conflicts).
+        self.assertTrue(res.data["slots"])
+        self.assertTrue(all(s["id"] for s in res.data["slots"]))
+
+    def test_create_slots_rejects_too_many_days(self):
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        res = self.client.post(
+            "/api/v1/inspections/slots/",
+            {
+                "date_from": tomorrow.isoformat(),
+                "date_to": tomorrow.isoformat(),
+                "days": [0, 1, 2, 3, 4, 5, 6, 0],  # 8 items > max_length 7
+                "time_slots": [{"start_time": "09:00", "end_time": "10:00"}],
+                "capacity": 1,
+                "center": str(self.center.id),
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("days", res.data)
+
+    def test_slot_list_rejects_malformed_date(self):
+        res = self.client.get("/api/v1/inspections/slots/?date_from=13-2026")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_create_slots_skips_existing_and_counts_accurately(self):
         # Re-running the same batch must not duplicate slots (unique constraint)
@@ -630,9 +654,30 @@ class OwnerBookingTest(APITestCase):
         self.assertIn(str(self.slot.id), [s["id"] for s in in_range.data])
         after = (self.slot.date + timedelta(days=1)).isoformat()
         out_of_range = self.client.get(
-            f"/api/v1/inspections/available-slots/?date_from={after}"
+            f"/api/v1/inspections/available-slots/?date_from={after}&date_to={after}"
         )
         self.assertNotIn(str(self.slot.id), [s["id"] for s in out_of_range.data])
+
+    def test_available_slots_rejects_oversized_range(self):
+        start = timezone.localdate()
+        end = start + timedelta(days=181)  # exceeds the 180-day cap
+        res = self.client.get(
+            "/api/v1/inspections/available-slots/"
+            f"?date_from={start.isoformat()}&date_to={end.isoformat()}"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_available_slots_default_window_excludes_far_future(self):
+        # A bare call is bounded to the default look-ahead; a slot 200 days out
+        # is excluded, while the near slot from setUp is still returned.
+        far = create_slot(self.staff, center=self.center, days_ahead=200)
+        res = self.client.get(
+            f"/api/v1/inspections/available-slots/?center={self.center.id}"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        ids = [s["id"] for s in res.data]
+        self.assertIn(str(self.slot.id), ids)
+        self.assertNotIn(str(far.id), ids)
 
 
 def inspection_form_payload(**overrides):
