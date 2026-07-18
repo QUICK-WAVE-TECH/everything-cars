@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePublicCarDetail } from "@/features/listings/api";
+import { VerifiedReport, VerifiedBadge } from "@/features/listings/components/verified-report";
 import { useCarReviews } from "@/features/reviews/api";
 import { StarRating } from "@/features/reviews/components/star-rating";
 import { useAuthStore } from "@/features/auth/store";
@@ -240,9 +241,12 @@ export function CarDetailPage({ carId }: { carId: string }) {
             {effectiveMode === "rent" ? "Available for Rent" : "Available for Purchase"}
           </p>
 
-          <h1 style={{ fontFamily: "var(--brc-font-display)", fontSize: "clamp(24px, 4vw, 32px)", fontWeight: 800, color: "var(--brc-text)", margin: "0 0 8px", lineHeight: 1.2 }}>
-            {car.title}
-          </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "0 0 8px" }}>
+            <h1 style={{ fontFamily: "var(--brc-font-display)", fontSize: "clamp(24px, 4vw, 32px)", fontWeight: 800, color: "var(--brc-text)", margin: 0, lineHeight: 1.2 }}>
+              {car.title}
+            </h1>
+            {car.is_verified && <VerifiedBadge />}
+          </div>
 
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 14, color: "var(--brc-text-secondary)", marginBottom: 12 }}>
             <span>Colour: <strong style={{ color: "var(--brc-text)" }}>{car.color || "—"}</strong></span>
@@ -487,12 +491,53 @@ export function CarDetailPage({ carId }: { carId: string }) {
           <TabsContent value="description">
             <div className="car-detail-desc-grid" style={{ display: "grid", gridTemplateColumns: "1fr minmax(0, 320px)", gap: 40, alignItems: "start" }}>
               <div>
-                <h2 style={{ fontFamily: "var(--brc-font-display)", fontSize: 22, fontWeight: 800, color: "var(--brc-text)", margin: "0 0 16px" }}>
-                  About This Car
-                </h2>
-                <p style={{ fontSize: 15, lineHeight: 1.7, color: "var(--brc-text-secondary)", marginBottom: 32 }}>
-                  {car.description || "No description provided."}
-                </p>
+                {car.verified_report && (
+                  <div style={{ marginBottom: 28 }}>
+                    <VerifiedReport report={car.verified_report} />
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    background: "white",
+                    border: "1px solid var(--brc-border)",
+                    borderRadius: 20,
+                    padding: "26px 28px",
+                    boxShadow: "0 14px 40px rgba(18,18,18,0.06)",
+                    marginBottom: 32,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+                    <span
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 12,
+                        background: "var(--brc-primary-tint)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Icon name="file" size={19} stroke="var(--brc-primary)" />
+                    </span>
+                    <h2 style={{ fontFamily: "var(--brc-font-display)", fontSize: 22, fontWeight: 800, color: "var(--brc-text)", margin: 0 }}>
+                      Description
+                    </h2>
+                  </div>
+                  <p
+                    style={{
+                      fontSize: 15,
+                      lineHeight: 1.8,
+                      color: "var(--brc-text-secondary)",
+                      margin: 0,
+                      whiteSpace: "pre-line",
+                    }}
+                  >
+                    {car.description || "No description provided."}
+                  </p>
+                </div>
 
                 {car.features.length > 0 && (
                   <>

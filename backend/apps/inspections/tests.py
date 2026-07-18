@@ -16,6 +16,7 @@ from .models import (
     CarStatusHistory,
     InspectionCenter,
     PhysicalInspection,
+    AssistanceRequest,
 )
 from .services import generate_tracking_id, record_status_change
 
@@ -38,11 +39,66 @@ def create_slot(staff, days_ahead=7, **overrides):
     return InspectionSlot.objects.create(**defaults)
 
 
+class StaffHistoryNamesTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user(
+            "staff-hist@test.com",
+            "owner",
+            is_staff=True,
+            first_name="Jane",
+            last_name="Doe",
+        )
+        self.owner = create_user("owner-hist@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner, status=CarStatus.DRAFT)
+
+    def test_staff_history_shows_name_owner_does_not(self):
+        self.client.force_authenticate(user=self.staff)
+        self.client.post(
+            f"/api/v1/listings/admin/cars/{self.car.id}/approve-listing"
+        )
+        staff_res = self.client.get(
+            f"/api/v1/listings/admin/cars/{self.car.id}/history"
+        )
+        self.assertEqual(staff_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(staff_res.data[0]["actor_name"], "Jane Doe")
+
+        self.client.force_authenticate(user=self.owner)
+        owner_res = self.client.get(
+            f"/api/v1/listings/my-cars/{self.car.id}/history"
+        )
+        self.assertEqual(owner_res.status_code, status.HTTP_200_OK)
+        self.assertNotIn("actor_name", owner_res.data[0])
+
+
 class StaffSlotManagementTest(APITestCase):
     def setUp(self):
         self.staff = create_user("staff@test.com", "owner", is_staff=True)
         self.center = create_center(self.staff)
         self.client.force_authenticate(user=self.staff)
+
+    def test_per_row_capacity(self):
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        res = self.client.post(
+            "/api/v1/inspections/slots/",
+            {
+                "date_from": tomorrow.isoformat(),
+                "date_to": tomorrow.isoformat(),
+                "days": [tomorrow.weekday()],
+                "time_slots": [
+                    {"start_time": "09:00", "end_time": "10:00", "capacity": 3},
+                    {"start_time": "10:00", "end_time": "11:00"},
+                ],
+                "capacity": 1,
+                "center": str(self.center.id),
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        first = InspectionSlot.objects.get(start_time=time(9, 0), date=tomorrow)
+        second = InspectionSlot.objects.get(start_time=time(10, 0), date=tomorrow)
+        self.assertEqual(first.capacity, 3)  # row override
+        self.assertEqual(second.capacity, 1)  # falls back to top-level
 
     def test_create_slots_batch(self):
         tomorrow = timezone.localdate() + timedelta(days=1)
@@ -64,6 +120,68 @@ class StaffSlotManagementTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertGreater(res.data["created_count"], 0)
+
+    def test_create_slots_skips_existing_and_counts_accurately(self):
+        # Re-running the same batch must not duplicate slots (unique constraint)
+        # and created_count must reflect only newly-created rows.
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        payload = {
+            "date_from": tomorrow.isoformat(),
+            "date_to": tomorrow.isoformat(),
+            "days": [tomorrow.weekday()],
+            "time_slots": [{"start_time": "09:00", "end_time": "10:00"}],
+            "capacity": 1,
+            "center": str(self.center.id),
+        }
+        first = self.client.post("/api/v1/inspections/slots/", payload, format="json")
+        self.assertEqual(first.data["created_count"], 1)
+        second = self.client.post("/api/v1/inspections/slots/", payload, format="json")
+        self.assertEqual(second.data["created_count"], 0)
+        self.assertEqual(
+            InspectionSlot.objects.filter(
+                center=self.center, date=tomorrow, start_time=time(9, 0)
+            ).count(),
+            1,
+        )
+
+    def test_create_slots_rejects_range_over_90_days(self):
+        start = timezone.localdate() + timedelta(days=1)
+        end = start + timedelta(days=90)  # 91 days inclusive
+        res = self.client.post(
+            "/api/v1/inspections/slots/",
+            {
+                "date_from": start.isoformat(),
+                "date_to": end.isoformat(),
+                "days": [0, 1, 2, 3, 4, 5, 6],
+                "time_slots": [{"start_time": "09:00", "end_time": "10:00"}],
+                "capacity": 1,
+                "center": str(self.center.id),
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("date_to", res.data)
+
+    def test_create_slots_rejects_too_many_time_rows(self):
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        rows = [
+            {"start_time": f"{6 + i:02d}:00", "end_time": f"{6 + i:02d}:30"}
+            for i in range(21)  # 21 rows > cap of 20
+        ]
+        res = self.client.post(
+            "/api/v1/inspections/slots/",
+            {
+                "date_from": tomorrow.isoformat(),
+                "date_to": tomorrow.isoformat(),
+                "days": [tomorrow.weekday()],
+                "time_slots": rows,
+                "capacity": 1,
+                "center": str(self.center.id),
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("time_slots", res.data)
 
     def test_create_slots_rejects_past_start_date(self):
         yesterday = timezone.localdate() - timedelta(days=1)
@@ -131,6 +249,31 @@ class StaffSlotManagementTest(APITestCase):
         res = self.client.get("/api/v1/inspections/slots/")
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_calendar_count_includes_completed_excludes_cancelled(self):
+        # The staff calendar count reflects slots that were actually taken:
+        # completed/no-show still count; cancelled/rejected free the slot.
+        slot = create_slot(self.staff)
+        owner = create_user("owner-count@test.com", "owner")
+        create_owner_profile(owner)
+        completed_car = create_car(owner, status=CarStatus.DRAFT)
+        InspectionBooking.objects.create(
+            car=completed_car,
+            slot=slot,
+            booked_by=owner,
+            status=BookingStatus.COMPLETED,
+        )
+        cancelled_car = create_car(owner, status=CarStatus.DRAFT)
+        InspectionBooking.objects.create(
+            car=cancelled_car,
+            slot=slot,
+            booked_by=owner,
+            status=BookingStatus.CANCELLED,
+        )
+        res = self.client.get("/api/v1/inspections/slots/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        row = next(s for s in res.data["results"] if s["id"] == str(slot.id))
+        self.assertEqual(row["bookings_count"], 1)
+
 
 class OwnerBookingTest(APITestCase):
     def setUp(self):
@@ -155,6 +298,79 @@ class OwnerBookingTest(APITestCase):
         self.car.refresh_from_db()
         self.assertEqual(self.car.status, CarStatus.INSPECTION_PENDING)
         self.assertRegex(self.car.tracking_id, r"^NG-LOS-\d{6}$")
+
+    def test_representative_requires_consent(self):
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {
+                "car_id": str(self.car.id),
+                "slot_id": str(self.slot.id),
+                "attendee_type": "representative",
+                "rep_name": "Jane Doe",
+                "rep_id_type": "nin",
+                "rep_id_number": "22334455667",
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("consent_accepted", res.data)
+
+    def test_representative_requires_rep_fields(self):
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {
+                "car_id": str(self.car.id),
+                "slot_id": str(self.slot.id),
+                "attendee_type": "representative",
+                "consent_accepted": True,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("rep_name", res.data)
+        self.assertIn("rep_id_type", res.data)
+        self.assertIn("rep_id_number", res.data)
+
+    def test_representative_booking_stamps_consent(self):
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {
+                "car_id": str(self.car.id),
+                "slot_id": str(self.slot.id),
+                "attendee_type": "representative",
+                "rep_name": "Jane Doe",
+                "rep_id_type": "nin",
+                "rep_id_number": "22334455667",
+                "consent_accepted": True,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        booking = InspectionBooking.objects.get(car=self.car)
+        self.assertEqual(booking.attendee_type, "representative")
+        self.assertEqual(booking.rep_name, "Jane Doe")
+        self.assertIsNotNone(booking.consent_accepted_at)
+
+    def test_booking_blocked_without_id_on_file(self):
+        from apps.users.models import OwnerProfile
+
+        owner = create_user("noid-owner@test.com", "owner")
+        OwnerProfile.objects.create(
+            user=owner,
+            owner_type="individual",
+            bank_account="1",
+            bank_name="B",
+            is_verified=True,
+        )
+        car = create_car(owner, status=CarStatus.LISTING_APPROVED)
+        self.client.force_authenticate(user=owner)
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {"car_id": str(car.id), "slot_id": str(self.slot.id)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("ID verification", res.data["detail"])
 
     def test_cannot_book_unapproved_draft(self):
         self.car.status = CarStatus.DRAFT
@@ -317,6 +533,35 @@ class OwnerBookingTest(APITestCase):
         ).first()
         self.assertEqual(new_booking.reschedule_count, 1)
 
+    def test_cannot_cancel_on_appointment_day(self):
+        # Build the booking directly on a today-dated slot (the create endpoint
+        # would reject a slot whose start time has already passed).
+        today_slot = create_slot(self.staff, days_ahead=0, center=self.center)
+        self.car.status = CarStatus.INSPECTION_PENDING
+        self.car.save(update_fields=["status"])
+        booking = InspectionBooking.objects.create(
+            car=self.car, slot=today_slot, booked_by=self.owner
+        )
+        res = self.client.post(f"/api/v1/inspections/bookings/{booking.id}/cancel/")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("day of", res.data["detail"].lower())
+
+    def test_cannot_reschedule_on_appointment_day(self):
+        today_slot = create_slot(self.staff, days_ahead=0, center=self.center)
+        future_slot = create_slot(self.staff, days_ahead=5, center=self.center)
+        self.car.status = CarStatus.INSPECTION_PENDING
+        self.car.save(update_fields=["status"])
+        booking = InspectionBooking.objects.create(
+            car=self.car, slot=today_slot, booked_by=self.owner
+        )
+        res = self.client.post(
+            f"/api/v1/inspections/bookings/{booking.id}/reschedule/",
+            {"slot_id": str(future_slot.id)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("day of", res.data["detail"].lower())
+
     def test_reschedule_blocked_after_max(self):
         self.client.post(
             "/api/v1/inspections/bookings/",
@@ -365,6 +610,30 @@ class OwnerBookingTest(APITestCase):
         slot_ids = [s["id"] for s in res.data]
         self.assertNotIn(str(self.slot.id), slot_ids)
 
+    def test_available_slots_rejects_malformed_center(self):
+        res = self.client.get(
+            "/api/v1/inspections/available-slots/?center=not-a-uuid"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_available_slots_rejects_malformed_date(self):
+        res = self.client.get(
+            "/api/v1/inspections/available-slots/?date=13/07/2026"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_available_slots_date_range_filter(self):
+        iso = self.slot.date.isoformat()
+        in_range = self.client.get(
+            f"/api/v1/inspections/available-slots/?date_from={iso}&date_to={iso}"
+        )
+        self.assertIn(str(self.slot.id), [s["id"] for s in in_range.data])
+        after = (self.slot.date + timedelta(days=1)).isoformat()
+        out_of_range = self.client.get(
+            f"/api/v1/inspections/available-slots/?date_from={after}"
+        )
+        self.assertNotIn(str(self.slot.id), [s["id"] for s in out_of_range.data])
+
 
 def inspection_form_payload(**overrides):
     base = {
@@ -380,6 +649,9 @@ def inspection_form_payload(**overrides):
         "has_accident_history": False,
         "staff_notes": "",
         "result": "passed",
+        "presented_attendee": "owner",
+        "presented_id_type": "nin",
+        "presented_id_number": "22334455667",
     }
     base.update(overrides)
     return base
@@ -500,9 +772,7 @@ class StaffInspectionFlowTest(APITestCase):
     def test_submissions_write_history(self):
         self._start()
         self._submit_with_documents(result="passed")
-        transitions = list(
-            self.car.status_history.values_list("to_status", flat=True)
-        )
+        transitions = list(self.car.status_history.values_list("to_status", flat=True))
         self.assertEqual(
             transitions,
             [CarStatus.INSPECTION_IN_PROGRESS, CarStatus.PUBLISHED],
@@ -531,6 +801,91 @@ class StaffInspectionFlowTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn("car", res.data)
 
+    def test_representative_requires_presented_id(self):
+        self._start()
+        res = self._submit(
+            result="passed",
+            presented_attendee="representative",
+            presented_id_type="",
+            presented_id_number="",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("presented_id_type", res.data)
+
+    def test_owner_does_not_require_presented_id(self):
+        # The owner's ID is already on file from sign-up.
+        self._start()
+        res = self._submit_with_documents(
+            result="passed",
+            presented_attendee="owner",
+            presented_id_type="",
+            presented_id_number="",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    def test_failed_allows_missing_presented_id(self):
+        self._start()
+        res = self._submit(
+            result="failed",
+            staff_notes="Engine seized",
+            presented_attendee="",
+            presented_id_type="",
+            presented_id_number="",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    def test_passed_requires_presented_attendee(self):
+        self._start()
+        res = self._submit(result="passed", presented_attendee="")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("presented_attendee", res.data)
+
+    def test_other_attendee_is_rejected(self):
+        # Only the owner or the declared representative may attend.
+        self._start()
+        res = self._submit(result="passed", presented_attendee="other")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("presented_attendee", res.data)
+
+    def test_presented_attendee_is_stored(self):
+        self._start()
+        res = self._submit_with_documents(result="passed")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        insp = PhysicalInspection.objects.get(car=self.car)
+        self.assertEqual(insp.presented_attendee, "owner")
+
+    def test_booking_detail_exposes_inspection_record(self):
+        self._start()
+        self._submit_with_documents(result="passed")
+        res = self.client.get(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(res.data["inspection"])
+        self.assertEqual(res.data["inspection"]["presented_attendee"], "owner")
+        self.assertEqual(
+            res.data["inspection"]["presented_id_number"], "22334455667"
+        )
+        # Sale-car documents are surfaced for staff review.
+        self.assertIsNotNone(res.data["inspection"]["documents"])
+        self.assertTrue(res.data["inspection"]["documents"]["car_documents"])
+
+    def test_presented_id_is_stored(self):
+        self._start()
+        res = self._submit_with_documents(result="passed")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        insp = PhysicalInspection.objects.get(car=self.car)
+        self.assertEqual(insp.presented_id_type, "nin")
+        self.assertEqual(insp.presented_id_number, "22334455667")
+
+    def test_presented_id_never_leaks_to_owner(self):
+        self._start()
+        self._submit_with_documents(result="passed")
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.get(f"/api/v1/inspections/bookings/my/?car={self.car.id}")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertNotIn("presented_id", json.dumps(res.data))
+
 
 class InspectionDocumentsTest(APITestCase):
     def setUp(self):
@@ -549,7 +904,9 @@ class InspectionDocumentsTest(APITestCase):
         self.client.post(f"/api/v1/inspections/admin/bookings/{booking.id}/start/")
         res = self.client.post(
             f"/api/v1/inspections/admin/bookings/{booking.id}/inspection/",
-            inspection_form_payload(result="failed", staff_notes="Legacy document upload test"),
+            inspection_form_payload(
+                result="failed", staff_notes="Legacy document upload test"
+            ),
             format="json",
         )
         return res.data["id"]
@@ -843,9 +1200,7 @@ class ReviewFixesTest(APITestCase):
 
     def _start_inspection(self):
         self.client.force_authenticate(user=self.staff)
-        self.client.post(
-            f"/api/v1/inspections/admin/bookings/{self.booking.id}/start/"
-        )
+        self.client.post(f"/api/v1/inspections/admin/bookings/{self.booking.id}/start/")
 
     def test_cannot_cancel_mid_inspection(self):
         self._start_inspection()
@@ -975,9 +1330,7 @@ class AdminCarHistoryTest(APITestCase):
         create_owner_profile(owner)
         car = create_car(owner, status=CarStatus.INSPECTION_PENDING)
         slot = create_slot(staff)
-        booking = InspectionBooking.objects.create(
-            car=car, slot=slot, booked_by=owner
-        )
+        booking = InspectionBooking.objects.create(car=car, slot=slot, booked_by=owner)
         client = self.client
         client.force_authenticate(user=staff)
         client.post(f"/api/v1/inspections/admin/bookings/{booking.id}/start/")
@@ -1019,8 +1372,11 @@ class CycleCountResetTest(APITestCase):
         old_slot = create_slot(staff, center=center)
         # Previous cycle ended with a completed inspection at the cap
         InspectionBooking.objects.create(
-            car=car, slot=old_slot, booked_by=owner,
-            status=BookingStatus.COMPLETED, reschedule_count=2,
+            car=car,
+            slot=old_slot,
+            booked_by=owner,
+            status=BookingStatus.COMPLETED,
+            reschedule_count=2,
         )
         new_slot = create_slot(staff, days_ahead=9, center=center)
         self.client.force_authenticate(user=owner)
@@ -1059,8 +1415,11 @@ class ClearanceResolveGuardTest(APITestCase):
         car = create_car(owner, status=CarStatus.NEEDS_CLEARANCE)
         slot = create_slot(staff)
         booking = InspectionBooking.objects.create(
-            car=car, slot=slot, booked_by=owner,
-            status=BookingStatus.COMPLETED, staff_note="old clearance note",
+            car=car,
+            slot=slot,
+            booked_by=owner,
+            status=BookingStatus.COMPLETED,
+            staff_note="old clearance note",
         )
         self.client.force_authenticate(user=staff)
         res = self.client.post(
@@ -1080,3 +1439,205 @@ class BookingCarFilterValidationTest(APITestCase):
         self.client.force_authenticate(user=owner)
         res = self.client.get("/api/v1/inspections/bookings/my/?car=not-a-uuid")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class AuditHardeningTest(APITestCase):
+    def test_history_snapshots_actor_identify(self):
+
+        staff = create_user("staff-audit@test.com", "owner", is_staff=True)
+        owner = create_user("owner-audit@test.com", "owner")
+        create_owner_profile(owner)
+        car = create_car(owner, status=CarStatus.DRAFT)
+        self.client.force_authenticate(user=staff)
+        self.client.post(f"/api/v1/listings/admin/cars/{car.id}/approve-listing")
+        entry = car.status_history.get()
+        self.assertEqual(entry.actor_name, f"{staff.first_name} {staff.last_name}")
+        self.assertEqual(entry.actor_email, staff.email)
+        # The snapshot must survive account deletion -> that's  it's whole purpose
+        staff.delete()
+        entry.refresh_from_db()
+        self.assertIsNone(entry.actor)
+        self.assertEqual(entry.actor_email, "staff-audit@test.com")
+
+    def test_history_captures(self):
+        staff = create_user("staff-audit@test.com", "owner", is_staff=True)
+        owner = create_user("owner-audit@test.com", "owner")
+        create_owner_profile(owner)
+        car = create_car(owner, status=CarStatus.DRAFT)
+        self.client.force_authenticate(user=staff)
+        self.client.post(
+            f"/api/v1/listings/admin/cars/{car.id}/approve-listing",
+            HTTP_USER_AGENT="TestBrowser/1.0",
+        )
+        entry = car.status_history.get()
+        self.assertEqual(entry.ip_address, "127.0.0.1")
+        self.assertEqual(entry.user_agent, "TestBrowser/1.0")
+
+
+class BookingEmailTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user("staff-em@test.com", "owner", is_staff=True)
+        self.owner = create_user("owner-em@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner, status=CarStatus.LISTING_APPROVED)
+        self.center = create_center(self.staff)
+        self.slot = create_slot(self.staff, center=self.center)
+        self.client.force_authenticate(user=self.owner)
+
+    def test_booking_sends_confirmation_and_logs(self):
+        from django.core import mail
+
+        from apps.notifications.models import EmailLog
+
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                "/api/v1/inspections/bookings/",
+                {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
+                format="json",
+            )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        # One email, addressed to the owner, telling them to bring ID.
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["owner-em@test.com"])
+        self.assertIn("bring a valid", mail.outbox[0].body.lower())
+        # The HTML alternative carries the real booking data (car title).
+        html_body = mail.outbox[0].alternatives[0][0]
+        self.assertIn(self.car.title, html_body)
+        # Logged as a successful send tied to the booking.
+        log = EmailLog.objects.get(recipient="owner-em@test.com")
+        self.assertTrue(log.success)
+        self.assertEqual(log.template_key, "inspection_booking_confirmed")
+        self.assertIsNotNone(log.booking_id)
+
+
+class AssistanceRequestTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user("staff-asst@test.com", "owner", is_staff=True)
+        self.owner = create_user("owner-asst@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner, status=CarStatus.LISTING_APPROVED)
+        self.client.force_authenticate(user=self.owner)
+
+    def test_create_assistance_notifies_staff(self):
+        from apps.notifications.models import Notification
+
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                "/api/v1/inspections/assistance/",
+                {"car_id": str(self.car.id), "state": "Kano", "message": "No centers"},
+                format="json",
+            )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(AssistanceRequest.objects.count(), 1)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.staff, notification_type="assistance_requested"
+            ).exists()
+        )
+
+    def test_duplicate_open_request_rejected(self):
+        AssistanceRequest.objects.create(owner=self.owner, car=self.car, state="Kano")
+        res = self.client.post(
+            "/api/v1/inspections/assistance/",
+            {"car_id": str(self.car.id)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_staff_can_list_and_handle(self):
+        assistance = AssistanceRequest.objects.create(
+            owner=self.owner, car=self.car, state="Kano"
+        )
+        self.client.force_authenticate(user=self.staff)
+        res = self.client.get("/api/v1/inspections/admin/assistance/?status=open")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["count"], 1)
+        res = self.client.post(
+            f"/api/v1/inspections/admin/assistance/{assistance.id}/handle/"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        assistance.refresh_from_db()
+        self.assertEqual(assistance.status, "handled")
+        self.assertEqual(assistance.handled_by, self.staff)
+
+    def test_owner_cannot_access_staff_queue(self):
+        res = self.client.get("/api/v1/inspections/admin/assistance/")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_owner_sees_own_open_request_for_car(self):
+        AssistanceRequest.objects.create(owner=self.owner, car=self.car, state="Kano")
+        res = self.client.get(
+            f"/api/v1/inspections/assistance/?car={self.car.id}&status=open"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+        # A different owner sees nothing for this car.
+        other = create_user("other-asst@test.com", "owner")
+        self.client.force_authenticate(user=other)
+        res = self.client.get(
+            f"/api/v1/inspections/assistance/?car={self.car.id}&status=open"
+        )
+        self.assertEqual(len(res.data), 0)
+
+
+class StaffBookForOwnerTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user("staff-bfo@test.com", "owner", is_staff=True)
+        self.owner = create_user("owner-bfo@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner, status=CarStatus.LISTING_APPROVED)
+        self.center = create_center(self.staff)
+        self.slot = create_slot(self.staff, center=self.center)
+        self.client.force_authenticate(user=self.staff)
+
+    def test_staff_can_fetch_available_slots(self):
+        res = self.client.get(
+            f"/api/v1/inspections/available-slots/?center={self.center.id}"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.data[0]["id"], str(self.slot.id))
+
+    def test_staff_books_for_owner(self):
+        from django.core import mail
+
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                "/api/v1/inspections/admin/bookings/book-for-owner/",
+                {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
+                format="json",
+            )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        booking = InspectionBooking.objects.get(car=self.car)
+        self.assertEqual(booking.booked_by, self.owner)
+        # History actor is the staff member, not the owner.
+        entry = self.car.status_history.filter(
+            to_status=CarStatus.INSPECTION_PENDING
+        ).first()
+        self.assertEqual(entry.actor_email, "staff-bfo@test.com")
+        self.assertEqual(entry.actor_role, "staff")
+        # Owner still receives the confirmation email.
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["owner-bfo@test.com"])
+
+    def test_book_for_owner_closes_assistance(self):
+        assistance = AssistanceRequest.objects.create(
+            owner=self.owner, car=self.car, state="Kano"
+        )
+        self.client.post(
+            "/api/v1/inspections/admin/bookings/book-for-owner/",
+            {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
+            format="json",
+        )
+        assistance.refresh_from_db()
+        self.assertEqual(assistance.status, "handled")
+        self.assertEqual(assistance.handled_by, self.staff)
+
+    def test_non_staff_cannot_book_for_owner(self):
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.post(
+            "/api/v1/inspections/admin/bookings/book-for-owner/",
+            {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)

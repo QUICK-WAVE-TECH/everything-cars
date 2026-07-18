@@ -178,8 +178,47 @@ export function RequestsTable() {
         />
       </div>
 
-      {/* Table */}
-      <div style={{ overflowX: "auto" }}>
+      {/* Mobile card list — the table scrolls awkwardly on phones */}
+      <div className="flex flex-col gap-2.5 md:hidden">
+        {rows.length === 0 ? (
+          <div className="rounded-xl border border-(--brc-border) py-10 text-center text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+            No requests match your filters.
+          </div>
+        ) : (
+          rows.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => router.push(`/customer/requests/${r.id}`)}
+              className="flex w-full flex-col gap-2 rounded-xl border border-(--brc-border) bg-white p-3.5 text-left transition-colors hover:bg-[rgba(0,0,139,0.035)] [font-family:var(--brc-font-ui)]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <span className="min-w-0 text-sm font-semibold text-(--brc-text)">{r.car.title}</span>
+                <span className="shrink-0"><StatusBadge status={r.status} /></span>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-(--brc-text-secondary)">
+                <span className="font-semibold text-(--brc-text)">{formatPrice(r.price_offered, r.currency)}</span>
+                <span aria-hidden>·</span>
+                <span>{r.request_type === "rent" ? "Rent" : "Buy"}</span>
+                <span aria-hidden>·</span>
+                <span>{formatDate(r.created_at)}</span>
+                {r.duration_days ? (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>{r.duration_days} days</span>
+                  </>
+                ) : null}
+              </div>
+              <span className="text-xs text-(--brc-text-muted)">
+                {r.car.owner.first_name} {r.car.owner.last_name}
+              </span>
+            </button>
+          ))
+        )}
+      </div>
+
+      {/* Table (desktop) */}
+      <div className="hidden md:block" style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 930, tableLayout: "fixed" }}>
           <colgroup>
             {COLUMN_WIDTHS.map((width, index) => (

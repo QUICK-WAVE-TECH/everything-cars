@@ -512,6 +512,15 @@ export default function CarDetailPage() {
       )[0];
   }, [myBookings, carId]);
 
+  // Cancel/reschedule lock on the day of the appointment (mirrors the backend).
+  const localTodayStr = useMemo(() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(
+      n.getDate(),
+    ).padStart(2, "0")}`;
+  }, []);
+  const isAppointmentToday = pendingBooking?.slot.date === localTodayStr;
+
   const form = useForm<CreateCarFormValues, unknown, CreateCarInput>({
     resolver: zodResolver(createCarSchema),
     defaultValues: car ? populateForm(car) : undefined,
@@ -757,25 +766,34 @@ export default function CarDetailPage() {
                         {pendingBooking.slot.center.max_reschedules}
                       </span>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setReschedulingPending(true);
-                        setBookingOpen(true);
-                      }}
-                      className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-primary)/30 bg-white px-4 text-sm font-extrabold text-(--brc-primary) shadow-[0_12px_28px_rgba(0,0,139,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-tint) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 [font-family:var(--brc-font-ui)]"
-                    >
-                      <RotateCcwIcon size={16} strokeWidth={2.4} />
-                      Reschedule
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCancelDialogOpen(true)}
-                      disabled={cancelBooking.isPending}
-                      className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-danger)/40 bg-white px-4 text-sm font-extrabold text-(--brc-danger) transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-danger-bg) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-danger) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
-                    >
-                      Cancel Booking
-                    </button>
+                    {isAppointmentToday ? (
+                      <span className="inline-flex h-11 max-w-full items-center gap-2 whitespace-normal rounded-lg border border-(--brc-warning)/40 bg-(--brc-warning-bg) px-4 text-xs font-bold text-[#9a7400] [font-family:var(--brc-font-ui)]">
+                        <Icon name="clock" size={15} stroke="currentColor" />
+                        Appointment is today — contact staff if you can&apos;t make it.
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReschedulingPending(true);
+                            setBookingOpen(true);
+                          }}
+                          className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-primary)/30 bg-white px-4 text-sm font-extrabold text-(--brc-primary) shadow-[0_12px_28px_rgba(0,0,139,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-tint) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 [font-family:var(--brc-font-ui)]"
+                        >
+                          <RotateCcwIcon size={16} strokeWidth={2.4} />
+                          Reschedule
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCancelDialogOpen(true)}
+                          disabled={cancelBooking.isPending}
+                          className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-danger)/40 bg-white px-4 text-sm font-extrabold text-(--brc-danger) transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-danger-bg) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-danger) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+                        >
+                          Cancel Booking
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
                 {["needs_changes", "inspection_rejected"].includes(car.status) && (
@@ -820,7 +838,7 @@ export default function CarDetailPage() {
                     Republish
                   </button>
                 )}
-                {["draft", "needs_changes", "needs_clearance", "inspection_rejected"].includes(car.status) && (
+                {car.status === "needs_changes" && (
                   <button
                     type="button"
                     onClick={startEditing}

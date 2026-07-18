@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -11,6 +11,7 @@ import { NotificationDropdown } from "@/features/notifications/components/notifi
 
 const NAV_LINKS = [
   { label: "Approvals", href: "/admin/approvals" },
+  { label: "Owners", href: "/admin/owners" },
   { label: "Inspections", href: "/admin/inspections" },
   { label: "Payments", href: "/admin/payments" },
   { label: "Transactions", href: "/admin/transactions" },
@@ -21,6 +22,15 @@ function AdminNavbar() {
   const router = useRouter();
   const signOut = useSignOut();
   const { data: unreadData } = useUnreadCount();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Close the mobile menu on navigation
+  // (state-adjustment-during-render pattern — avoids an effect re-render)
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
+    setMenuOpen(false);
+  }
 
   function handleSignOut() {
     signOut.mutate(undefined, {
@@ -29,25 +39,76 @@ function AdminNavbar() {
   }
 
   return (
-    <header className="sticky top-0 z-50 flex h-[72px] items-center justify-between border-b border-(--brc-border) bg-white px-6 sm:h-[84px] sm:px-[var(--brc-space-10,40px)]">
-      <div className="flex items-center gap-3">
-        <Link href="/">
-          <Image src="/logo.png" alt="Buy & Rent Cars" width={140} height={43} className="h-[43px] w-auto" />
-        </Link>
-        <span className="rounded-full bg-(--brc-success-bg) px-2.5 py-1 text-[11px] font-bold uppercase tracking-widest text-(--brc-success) [font-family:var(--brc-font-ui)]">
-          Staff
-        </span>
+    <header className="sticky top-0 z-50 border-b border-(--brc-border) bg-white">
+      <div className="flex h-[72px] items-center justify-between px-4 sm:h-[84px] sm:px-[var(--brc-space-10,40px)]">
+        <div className="flex items-center gap-3">
+          <Link href="/">
+            <Image src="/logo.png" alt="Buy & Rent Cars" width={140} height={43} className="h-[43px] w-auto" />
+          </Link>
+          <span className="hidden rounded-full bg-(--brc-success-bg) px-2.5 py-1 text-[11px] font-bold uppercase tracking-widest text-(--brc-success) [font-family:var(--brc-font-ui)] sm:inline-block">
+            Staff
+          </span>
+        </div>
+
+        <div className="flex items-center gap-4 sm:gap-10">
+          <nav className="hidden items-center gap-7 sm:flex">
+            {NAV_LINKS.map((link) => {
+              const active = pathname.startsWith(link.href);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`text-base no-underline transition-colors [font-family:var(--brc-font-ui)] ${
+                    active ? "font-bold text-(--brc-primary)" : "font-medium text-(--brc-text) hover:text-(--brc-primary)"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="flex items-center gap-4 sm:gap-5">
+            <NotificationDropdown role="admin" unreadCount={unreadData?.unread_count ?? 0} />
+            <button type="button" className="flex cursor-pointer border-none bg-transparent p-0">
+              <Icon name="user" size={22} stroke="var(--brc-text)" />
+            </button>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="hidden cursor-pointer border-none bg-transparent p-0 sm:flex"
+              title="Sign out"
+            >
+              <Icon name="logout" size={20} stroke="var(--brc-text-muted)" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label="Toggle navigation menu"
+              aria-expanded={menuOpen}
+              className="flex cursor-pointer flex-col items-center justify-center gap-[5px] border-none bg-transparent p-0 sm:hidden"
+            >
+              <span
+                className={`block h-[2px] w-[22px] bg-(--brc-text) transition-transform ${menuOpen ? "translate-y-[7px] rotate-45" : ""}`}
+              />
+              <span className={`block h-[2px] w-[22px] bg-(--brc-text) transition-opacity ${menuOpen ? "opacity-0" : ""}`} />
+              <span
+                className={`block h-[2px] w-[22px] bg-(--brc-text) transition-transform ${menuOpen ? "-translate-y-[7px] -rotate-45" : ""}`}
+              />
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="flex items-center gap-6 sm:gap-10">
-        <nav className="hidden items-center gap-7 sm:flex">
+      {menuOpen && (
+        <nav className="flex flex-col gap-1 border-t border-(--brc-border) bg-white px-4 py-3 sm:hidden">
           {NAV_LINKS.map((link) => {
             const active = pathname.startsWith(link.href);
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`text-base no-underline transition-colors [font-family:var(--brc-font-ui)] ${
+                className={`rounded-md px-2 py-2.5 text-base no-underline transition-colors [font-family:var(--brc-font-ui)] ${
                   active ? "font-bold text-(--brc-primary)" : "font-medium text-(--brc-text) hover:text-(--brc-primary)"
                 }`}
               >
@@ -55,23 +116,16 @@ function AdminNavbar() {
               </Link>
             );
           })}
-        </nav>
-
-        <div className="flex items-center gap-5">
-          <NotificationDropdown role="admin" unreadCount={unreadData?.unread_count ?? 0} />
-          <button type="button" className="flex cursor-pointer border-none bg-transparent p-0">
-            <Icon name="user" size={22} stroke="var(--brc-text)" />
-          </button>
           <button
             type="button"
             onClick={handleSignOut}
-            className="flex cursor-pointer border-none bg-transparent p-0"
-            title="Sign out"
+            className="flex cursor-pointer items-center gap-2 rounded-md border-none bg-transparent px-2 py-2.5 text-left text-base font-medium text-(--brc-text-muted) [font-family:var(--brc-font-ui)]"
           >
-            <Icon name="logout" size={20} stroke="var(--brc-text-muted)" />
+            <Icon name="logout" size={18} stroke="var(--brc-text-muted)" />
+            Sign out
           </button>
-        </div>
-      </div>
+        </nav>
+      )}
     </header>
   );
 }

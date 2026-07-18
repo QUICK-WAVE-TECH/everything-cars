@@ -13,3 +13,4 @@ export { AuthFooter } from "./auth-footer";
 export { CountrySelect } from "./country-select";
 export { StateSelect } from "./state-select";
 export { CityCombobox } from "./city-combobox";
+export { IdTypeSelect } from "./id-type-select";

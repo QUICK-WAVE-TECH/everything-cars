@@ -1,9 +1,11 @@
 import shutil
 import tempfile
 from io import BytesIO
-
+import json
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
+from django.utils import timezone
+from datetime import time, date
 from PIL import Image
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -39,6 +41,9 @@ def create_owner_profile(user):
         bank_account="1234567890",
         bank_name="Test Bank",
         is_verified=True,
+        national_id="12345678901",
+        id_type="nin",
+        id_document=create_test_image("id.jpg"),
     )
 
 
@@ -115,13 +120,15 @@ class EditLockdownTest(APITestCase):
         self.car = create_car(self.owner)
         self.client.force_authenticate(user=self.owner)
 
-    def test_edit_allowed_in_draft(self):
+    def test_edit_blocked_in_draft(self):
+        # Draft locks the moment it is submitted for review — only staff-requested
+        # changes reopen editing.
         self.car.status = CarStatus.DRAFT
         self.car.save(update_fields=["status"])
         res = self.client.patch(
             f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Red"}
         )
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_edit_allowed_in_needs_changes(self):
         self.car.status = CarStatus.NEEDS_CHANGES
@@ -131,22 +138,24 @@ class EditLockdownTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
-    def test_edit_allowed_in_needs_clearance(self):
+    def test_edit_blocked_in_needs_clearance(self):
+        # Clearance is answered with a message, not by editing the listing.
         self.car.status = CarStatus.NEEDS_CLEARANCE
         self.car.save(update_fields=["status"])
         res = self.client.patch(
             f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Green"}
         )
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_edit_allowed_in_inspection_rejected(self):
-        # failed inspections are recoverable — owner fixes and resubmits
+    def test_edit_blocked_in_inspection_rejected(self):
+        # A rejected inspection is fixed on the physical car and resubmitted —
+        # the listing content stays locked.
         self.car.status = CarStatus.INSPECTION_REJECTED
         self.car.save(update_fields=["status"])
         res = self.client.patch(
             f"/api/v1/listings/my-cars/{self.car.id}", {"color": "Green"}
         )
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_edit_blocked_in_inspection_no_show(self):
         # no_show cars rebook the inspection; the listing itself stays locked
@@ -551,11 +560,20 @@ class PublicListingTypeFilterTest(APITestCase):
     def setUp(self):
         owner = create_user("owner-pub@test.com", "owner")
         create_owner_profile(owner)
-        create_car(owner, title="Rent Only", listing_type=ListingType.RENT,
-                   sale_price=None, rent_price_per_day="20000.00")
+        create_car(
+            owner,
+            title="Rent Only",
+            listing_type=ListingType.RENT,
+            sale_price=None,
+            rent_price_per_day="20000.00",
+        )
         create_car(owner, title="Buy Only", listing_type=ListingType.BUY)
-        create_car(owner, title="Both Ways", listing_type=ListingType.BOTH,
-                   rent_price_per_day="30000.00")
+        create_car(
+            owner,
+            title="Both Ways",
+            listing_type=ListingType.BOTH,
+            rent_price_per_day="30000.00",
+        )
 
     def _titles(self, res):
         return {c["title"] for c in res.data["results"]}
@@ -621,9 +639,7 @@ class PublicArchivedVisibilityTest(APITestCase):
             status=RequestStatus.COMPLETED,
         )
         res = self.client.get("/api/v1/listings/cars")
-        sold = next(
-            (c for c in res.data["results"] if c["title"] == "Sold Car"), None
-        )
+        sold = next((c for c in res.data["results"] if c["title"] == "Sold Car"), None)
         self.assertIsNotNone(sold)
         self.assertEqual(sold["availability_status"], "sold")
 
@@ -681,12 +697,21 @@ class SuspendReinstateTest(APITestCase):
 
         car = create_car(self.owner, status=CarStatus.INSPECTION_PENDING)
         center = InspectionCenter.objects.create(
-            company_name="C", address="a", country="NG", country_code="NG",
-            state="Lagos", city="Lagos", city_code="LOS", created_by=self.staff,
+            company_name="C",
+            address="a",
+            country="NG",
+            country_code="NG",
+            state="Lagos",
+            city="Lagos",
+            city_code="LOS",
+            created_by=self.staff,
         )
         slot = InspectionSlot.objects.create(
-            date=tz.localdate() + td(days=3), start_time=dtime(9), end_time=dtime(10),
-            center=center, created_by=self.staff,
+            date=tz.localdate() + td(days=3),
+            start_time=dtime(9),
+            end_time=dtime(10),
+            center=center,
+            created_by=self.staff,
         )
         booking = InspectionBooking.objects.create(
             car=car, slot=slot, booked_by=self.owner
@@ -719,3 +744,115 @@ class SuspendReinstateTest(APITestCase):
         res = self.client.get("/api/v1/listings/my-cars?status=archived")
         row = next(c for c in res.data["results"] if c["id"] == str(car.id))
         self.assertEqual(row["availability_status"], "archived")
+
+
+class VerifiedOverlayTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("owner-vf@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.staff = create_user("staff-vf@test.com", "owner", is_staff=True)
+        self.car = create_car(
+            self.owner,
+            status=CarStatus.PUBLISHED,
+            description="Owner description",
+            mileage=50000,
+            fuel_type="petrol",
+        )
+
+    def _add_passed_inspection(self):
+        from apps.inspections.models import (
+            InspectionBooking,
+            InspectionCenter,
+            InspectionSlot,
+            PhysicalInspection,
+        )
+
+        center = InspectionCenter.objects.create(
+            company_name="C",
+            address="A",
+            state="Lagos",
+            city="Lekki",
+            city_code="LEK",
+            country_code="NG",
+            created_by=self.staff,
+        )
+        slot = InspectionSlot.objects.create(
+            date=date.today(),
+            start_time=time(9, 0),
+            end_time=time(10, 0),
+            capacity=1,
+            center=center,
+            created_by=self.staff,
+        )
+        booking = InspectionBooking.objects.create(
+            car=self.car, slot=slot, booked_by=self.owner
+        )
+        return PhysicalInspection.objects.create(
+            booking=booking,
+            car=self.car,
+            inspector=self.staff,
+            condition="used",
+            mileage=99999,
+            fuel_type="diesel",
+            car_type="foreign_used",
+            features=["ABS"],
+            engine_condition="good",
+            chassis_condition="good",
+            ac_condition="good",
+            is_flooded=False,
+            has_accident_history=False,
+            result="passed",
+            staff_notes="Inspector verified notes",
+            inspected_at=timezone.now(),
+            presented_id_type="nin",
+            presented_id_number="22334455667",
+        )
+
+    def test_public_detail_shows_inspector_data(self):
+        self._add_passed_inspection()
+        res = self.client.get(f"/api/v1/listings/cars/{self.car.id}")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        # Description stays the owner's; inspector notes live in the report.
+        self.assertEqual(res.data["description"], "Owner description")
+        self.assertEqual(res.data["verified_report"]["notes"], "Inspector verified notes")
+        self.assertEqual(res.data["mileage"], 99999)
+        self.assertEqual(res.data["fuel_type"], "diesel")
+        self.assertTrue(res.data["is_verified"])
+        self.assertIsNotNone(res.data["verified_report"])
+        # No ID / staff-identity leak anywhere in the payload.
+        body = json.dumps(res.data, default=str)
+
+        self.assertNotIn("presented_id", body)
+        self.assertNotIn("22334455667", body)
+
+    def test_owner_detail_keeps_own_data(self):
+        self._add_passed_inspection()
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.get(f"/api/v1/listings/my-cars/{self.car.id}")
+        self.assertEqual(res.data["description"], "Owner description")
+        self.assertEqual(res.data["mileage"], 50000)
+
+    def test_unverified_public_shows_owner_data(self):
+        res = self.client.get(f"/api/v1/listings/cars/{self.car.id}")
+        self.assertEqual(res.data["description"], "Owner description")
+        self.assertFalse(res.data["is_verified"])
+        self.assertIsNone(res.data["verified_report"])
+
+
+class ListingSubmittedEmailTest(APITestCase):
+    def test_staff_emailed_when_listing_submitted(self):
+        from django.core import mail
+
+        from apps.notifications.service import notify_listing_submitted
+
+        staff = create_user("staff-nl@test.com", "owner", is_staff=True)
+        owner = create_user(
+            "owner-nl@test.com", "owner", first_name="Ada", last_name="Bello"
+        )
+        car = create_car(owner, status=CarStatus.DRAFT)
+        notify_listing_submitted(car)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [staff.email])
+        html = mail.outbox[0].alternatives[0][0]
+        self.assertIn("Ada Bello", html)
+        self.assertIn(car.title, html)

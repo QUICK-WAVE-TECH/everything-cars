@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   ArrowLeftIcon,
@@ -10,7 +11,9 @@ import {
   CheckCircle2Icon,
   ChevronDownIcon,
   ClockIcon,
+  LifeBuoyIcon,
   Loader2Icon,
+  LockIcon,
   MapPinIcon,
   ShieldCheckIcon,
 } from "lucide-react";
@@ -30,14 +33,26 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import {
+  availabilityWindow,
   useAvailableSlots,
   useCentersByCity,
+  useCreateAssistanceRequest,
+  useMyAssistanceRequests,
   useCreateBooking,
   useLocations,
   useRescheduleBooking,
 } from "@/features/inspections/api/inspections-api";
 import type { AvailableSlot, InspectionCenter } from "@/features/inspections/api/types";
+import { useMe } from "@/features/auth/api";
+import { IdTypeSelect } from "@/features/auth/components";
 import { ApiError } from "@/lib/api-client";
+
+// Placeholder authorization text — replace with legal-approved copy.
+const CONSENT_TEXT =
+  "I authorize the named representative to attend the vehicle inspection on my " +
+  "behalf, present the declared means of identification, and act for me during " +
+  "the inspection. I accept responsibility for their conduct and confirm the " +
+  "details above are accurate.";
 
 // ── Helpers ──
 
@@ -185,7 +200,14 @@ function StepDot({ step, current, label }: { step: number; current: number; labe
       >
         {done ? <CheckCircle2Icon size={14} /> : step}
       </span>
-      <span className="truncate text-sm font-bold [font-family:var(--brc-font-ui)]">
+      <span
+        className={cn(
+          "truncate text-sm font-bold [font-family:var(--brc-font-ui)]",
+          // On phones only the active step shows its label so the stepper
+          // stays on one compact row; all labels show from sm up.
+          active ? "inline" : "hidden sm:inline",
+        )}
+      >
         {label}
       </span>
     </div>
@@ -352,6 +374,32 @@ export function BookingModal({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedSlot, setSelectedSlot] = useState<AvailableSlot | null>(null);
 
+  // Step 4: attendee declaration
+  const [attendeeType, setAttendeeType] = useState<"self" | "representative">("self");
+  const [repName, setRepName] = useState("");
+  const [repIdType, setRepIdType] = useState("");
+  const [repIdNumber, setRepIdNumber] = useState("");
+  const [consent, setConsent] = useState(false);
+
+  // Assistance (no centers in state)
+  const [assistanceMessage, setAssistanceMessage] = useState("");
+  const [assistanceSent, setAssistanceSent] = useState(false);
+  const createAssistance = useCreateAssistanceRequest();
+
+  // An already-open request for this car (from the server) — so closing and
+  // reopening the modal still shows "sent" instead of letting them re-request.
+  const { data: openAssistance } = useMyAssistanceRequests(
+    { car: carId, status: "open" },
+    { enabled: open && mode !== "reschedule" },
+  );
+  const hasOpenAssistance = (openAssistance?.length ?? 0) > 0;
+  const alreadyRequested = assistanceSent || hasOpenAssistance;
+
+  const { data: me } = useMe();
+  const ownerProfile = me?.owner_profile;
+  const hasIdOnFile = !!(ownerProfile?.id_type && ownerProfile?.id_document);
+  const showIdGate = mode !== "reschedule" && !!me && !hasIdOnFile;
+
   const { data: locations, isLoading: isLoadingLocations } = useLocations();
   const { data: centers, isLoading: isLoadingCenters } = useCentersByCity({
     country: country || undefined,
@@ -360,8 +408,12 @@ export function BookingModal({
   });
 
   const dateStr = selectedDate ? toDateString(selectedDate) : undefined;
+  // Bound the read to a rolling window instead of every future slot.
+  const slotWindow = useMemo(() => availabilityWindow(), []);
   const { data: allCenterSlots, isLoading: isLoadingAllSlots } = useAvailableSlots(
     selectedCenter?.id,
+    undefined,
+    slotWindow,
   );
   const { data: daySlots, isLoading: isLoadingDaySlots } = useAvailableSlots(
     selectedCenter?.id,
@@ -380,6 +432,10 @@ export function BookingModal({
     () => states.find((s) => s.state === state)?.cities ?? [],
     [states, state],
   );
+  const countryLabel = useMemo(
+    () => locations?.find((l) => l.country === country)?.country_name || country,
+    [locations, country],
+  );
 
   // Build set of dates that have at least one slot with spots remaining
   const availableDates = useMemo(() => {
@@ -391,23 +447,39 @@ export function BookingModal({
 
   const todayDate = today();
 
+  // Calendar opens on the month of the earliest available date, not today's
+  // month (which may have no openings at all).
+  const firstAvailableMonth = useMemo(() => {
+    const dates = (allCenterSlots ?? [])
+      .filter((s) => s.spots_remaining > 0)
+      .map((s) => s.date)
+      .sort();
+    const first = dates[0];
+    if (!first) return undefined;
+    const [y = 0, m = 1, d = 1] = first.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }, [allCenterSlots]);
+
+  // Pre-fill country/state from the owner's profile once, when the modal opens
+  // (state-adjustment-during-render — avoids a setState-in-effect cascade). Runs
+  // when the profile becomes available even if that's after `open` flips true.
+  const [prefilledForOpen, setPrefilledForOpen] = useState(false);
+  if (open && !prefilledForOpen && mode !== "reschedule" && ownerProfile) {
+    setPrefilledForOpen(true);
+    setCountry((prev) => prev || ownerProfile.country || "");
+    setState((prev) => prev || ownerProfile.state || "");
+  }
+  if (!open && prefilledForOpen) {
+    setPrefilledForOpen(false);
+  }
+
   function isDisabled(date: Date) {
     if (date < todayDate) return true;
     const ds = toDateString(date);
     return !availableDates.has(ds);
   }
 
-  function handleCountryChange(value: string | null) {
-    setCountry(value ?? "");
-    setState("");
-    setCity("");
-  }
-
-  function handleStateChange(value: string | null) {
-    setState(value ?? "");
-    setCity("");
-  }
-
+  // Country + state are locked to the owner's profile; only the city is chosen.
   function handleCityChange(value: string | null) {
     setCity(value ?? "");
   }
@@ -452,7 +524,19 @@ export function BookingModal({
         await rescheduleBooking.mutateAsync({ bookingId, slot_id: selectedSlot.id });
         toast.success("Inspection rescheduled. Attend your inspection at the selected center.");
       } else {
-        await createBooking.mutateAsync({ car_id: carId, slot_id: selectedSlot.id });
+        await createBooking.mutateAsync({
+          car_id: carId,
+          slot_id: selectedSlot.id,
+          attendee_type: attendeeType,
+          ...(attendeeType === "representative"
+            ? {
+                rep_name: repName.trim(),
+                rep_id_type: repIdType as never,
+                rep_id_number: repIdNumber.trim(),
+                consent_accepted: consent,
+              }
+            : {}),
+        });
         toast.success("Inspection booked! Attend your inspection at the selected center.");
       }
       onSuccess();
@@ -475,6 +559,13 @@ export function BookingModal({
     setSelectedCenter(null);
     setSelectedDate(undefined);
     setSelectedSlot(null);
+    setAttendeeType("self");
+    setRepName("");
+    setRepIdType("");
+    setRepIdNumber("");
+    setConsent(false);
+    setAssistanceMessage("");
+    setAssistanceSent(false);
   }
 
   function handleOpenChange(isOpen: boolean) {
@@ -490,9 +581,30 @@ export function BookingModal({
   }, [open]);
 
   const isConfirming = createBooking.isPending || rescheduleBooking.isPending;
-  const canProceedStep1 = !!city;
+  const canProceedStep1 = !!city && !showIdGate;
   const canProceedStep3 = !!selectedSlot;
-  const canConfirm = !!selectedSlot && !isConfirming;
+  const attendeeValid =
+    isReschedule ||
+    attendeeType === "self" ||
+    (!!repName.trim() && !!repIdType && !!repIdNumber.trim() && consent);
+  const canConfirm = !!selectedSlot && !isConfirming && attendeeValid;
+
+  async function handleRequestAssistance() {
+    try {
+      await createAssistance.mutateAsync({
+        car_id: carId,
+        country: country || undefined,
+        state: state || undefined,
+        message: assistanceMessage.trim() || undefined,
+      });
+      setAssistanceSent(true);
+      toast.success("Request sent — our staff will reach out to help you book.");
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError ? error.message : "Could not send request.",
+      );
+    }
+  }
 
   const selectedDateLabel = dateStr ? formatDateLabel(dateStr) : undefined;
   const availableDateCount = availableDates.size;
@@ -502,7 +614,7 @@ export function BookingModal({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="max-h-[calc(100vh-2rem)] gap-0 overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-0 shadow-[0_34px_90px_rgba(18,18,18,0.22)] sm:max-w-[940px]"
+        className="grid max-h-[calc(100vh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-0 shadow-[0_34px_90px_rgba(18,18,18,0.22)] sm:max-w-[940px]"
         showCloseButton={!isConfirming}
       >
         <DialogHeader className="border-b border-(--brc-border) bg-white px-5 py-5 sm:px-7">
@@ -542,7 +654,7 @@ export function BookingModal({
           </div>
         </DialogHeader>
 
-        <div className="grid max-h-[calc(100dvh-250px)] min-h-[min(430px,calc(100dvh-300px))] overflow-y-auto bg-(--brc-bg-subtle) lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid min-h-0 overflow-y-auto bg-(--brc-bg-subtle) lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="min-w-0 p-4 sm:p-6">
             <div className="rounded-2xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] sm:p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -554,7 +666,7 @@ export function BookingModal({
                     {step === 4 && "Confirm your appointment"}
                   </h3>
                   <p className="mt-1 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
-                    {step === 1 && "Pick the country, state, and city closest to you."}
+                    {step === 1 && "Your country and state are set from your profile — pick your city, or ask staff to book for you."}
                     {step === 2 && "These centers serve your selected city."}
                     {step === 3 &&
                       (selectedDateLabel ?? "Only dates with staff-created openings are selectable.")}
@@ -574,56 +686,121 @@ export function BookingModal({
                 )}
               </div>
 
-              {/* Step 1: Location */}
-              {step === 1 && (
+              {/* Step 1: Location (or the ID-verification gate) */}
+              {step === 1 && showIdGate && (
+                <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 py-10 text-center">
+                  <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-primary-tint) text-(--brc-primary)">
+                    <ShieldCheckIcon size={22} />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                      Complete your ID verification
+                    </p>
+                    <p className="mt-1 max-w-sm text-xs leading-5 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                      Add your means of identification to your profile before booking an
+                      inspection. You only need to do this once.
+                    </p>
+                  </div>
+                  <Link
+                    href="/owner/profile"
+                    onClick={() => onClose()}
+                    className={cn(
+                      "inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-black no-underline [font-family:var(--brc-font-ui)]",
+                      primaryButtonClass,
+                    )}
+                  >
+                    Go to profile
+                  </Link>
+                </div>
+              )}
+
+              {step === 1 && !showIdGate && alreadyRequested && (
+                <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 py-10 text-center">
+                  <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-primary-tint) text-(--brc-primary)">
+                    <CheckCircle2Icon size={22} />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                      Request sent
+                    </p>
+                    <p className="mt-1 max-w-sm text-xs leading-5 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                      Our staff will book the inspection on your behalf and email
+                      you the confirmed details.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {step === 1 && !showIdGate && !alreadyRequested && (
                 <div className="flex flex-col gap-4">
                   {isLoadingLocations ? (
                     <div className="flex h-[220px] w-full items-center justify-center">
                       <Loader2Icon size={26} className="animate-spin text-(--brc-primary)" />
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                          Country
-                        </span>
-                        <LocationDropdown
-                          value={country}
-                          placeholder="Select country"
-                          options={(locations ?? []).map((l) => ({
-                            value: l.country,
-                            label: l.country_name || l.country,
-                          }))}
-                          onChange={handleCountryChange}
-                        />
-                      </label>
+                    <>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        {/* Country — locked to the owner's profile */}
+                        <div className="flex flex-col gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                            Country
+                          </span>
+                          <div className="flex h-11 items-center justify-between gap-2 rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) px-3 text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                            <span className="truncate">{countryLabel || "—"}</span>
+                            <LockIcon size={14} className="shrink-0 text-(--brc-text-muted)" />
+                          </div>
+                        </div>
 
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                          State
-                        </span>
-                        <LocationDropdown
-                          value={state}
-                          placeholder="Select state"
-                          options={states.map((s) => ({ value: s.state, label: s.state }))}
-                          disabled={!country}
-                          onChange={handleStateChange}
-                        />
-                      </label>
+                        {/* State — locked to the owner's profile */}
+                        <div className="flex flex-col gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                            State
+                          </span>
+                          <div className="flex h-11 items-center justify-between gap-2 rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) px-3 text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                            <span className="truncate">{state || "—"}</span>
+                            <LockIcon size={14} className="shrink-0 text-(--brc-text-muted)" />
+                          </div>
+                        </div>
 
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                          City
-                        </span>
-                        <LocationDropdown
-                          value={city}
-                          placeholder="Select city"
-                          options={cities.map((c) => ({ value: c, label: c }))}
-                          disabled={!state}
-                          onChange={handleCityChange}
-                        />
-                      </label>
-                    </div>
+                        {/* City — the only selectable field */}
+                        <label className="flex flex-col gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                            City
+                          </span>
+                          <LocationDropdown
+                            value={city}
+                            placeholder="Select city"
+                            options={cities.map((c) => ({ value: c, label: c }))}
+                            disabled={!state}
+                            onChange={handleCityChange}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Always-available staff-booking request */}
+                      <div className="flex flex-col gap-3 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-xs leading-5 text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+                          No center near you, or prefer we handle it? Ask our staff to
+                          book the inspection on your behalf.
+                        </p>
+                        <button
+                          type="button"
+                          disabled={createAssistance.isPending}
+                          onClick={handleRequestAssistance}
+                          className={cn(
+                            "inline-flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition-all duration-200 [font-family:var(--brc-font-ui)]",
+                            secondaryButtonClass,
+                          )}
+                        >
+                          {createAssistance.isPending ? (
+                            <Loader2Icon size={15} className="animate-spin" />
+                          ) : (
+                            <LifeBuoyIcon size={15} />
+                          )}
+                          Request staff to book for you
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
               )}
@@ -636,19 +813,60 @@ export function BookingModal({
                       <Loader2Icon size={24} className="animate-spin text-(--brc-primary)" />
                     </div>
                   ) : !centers || centers.length === 0 ? (
-                    <div className="flex h-[220px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 text-center">
-                      <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-bg-muted) text-(--brc-text-muted)">
-                        <Building2Icon size={22} />
-                      </span>
-                      <div>
-                        <p className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
-                          No centers in this city
-                        </p>
-                        <p className="mt-1 text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                          Go back and pick another location.
-                        </p>
+                    alreadyRequested ? (
+                      <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 py-10 text-center">
+                        <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-primary-tint) text-(--brc-primary)">
+                          <CheckCircle2Icon size={22} />
+                        </span>
+                        <div>
+                          <p className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                            Request sent
+                          </p>
+                          <p className="mt-1 max-w-sm text-xs leading-5 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                            Our staff will contact you to arrange an inspection in your
+                            area.
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex flex-col gap-4 rounded-xl border border-dashed border-(--brc-border) bg-(--brc-bg-subtle) px-6 py-8">
+                        <div className="flex flex-col items-center gap-3 text-center">
+                          <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-bg-muted) text-(--brc-text-muted)">
+                            <Building2Icon size={22} />
+                          </span>
+                          <div>
+                            <p className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                              No centers in this area yet
+                            </p>
+                            <p className="mt-1 max-w-sm text-xs leading-5 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                              Request staff assistance and we&apos;ll help arrange an
+                              inspection for you.
+                            </p>
+                          </div>
+                        </div>
+                        <textarea
+                          value={assistanceMessage}
+                          onChange={(e) => setAssistanceMessage(e.target.value)}
+                          placeholder="Anything we should know? (optional)"
+                          rows={3}
+                          className="w-full resize-none rounded-lg border border-(--brc-border) bg-white p-3 text-sm text-(--brc-text) outline-none focus:border-(--brc-primary) [font-family:var(--brc-font-ui)]"
+                        />
+                        <button
+                          type="button"
+                          disabled={createAssistance.isPending}
+                          onClick={handleRequestAssistance}
+                          className={cn(
+                            "mx-auto flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-5 text-sm font-black transition-all duration-200 [font-family:var(--brc-font-ui)]",
+                            primaryButtonClass,
+                          )}
+                        >
+                          {createAssistance.isPending ? (
+                            <Loader2Icon size={15} className="animate-spin" />
+                          ) : null}
+                          Request staff assistance
+                        </button>
+                      </div>
+                    )
                   ) : (
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       {centers.map((center) => (
@@ -682,6 +900,7 @@ export function BookingModal({
                           onSelect={handleDateSelect}
                           disabled={isDisabled}
                           startMonth={todayDate}
+                          defaultMonth={firstAvailableMonth}
                           modifiers={{
                             available: (date) => availableDates.has(toDateString(date)),
                           }}
@@ -840,6 +1059,73 @@ export function BookingModal({
                       </div>
                     </div>
                   </div>
+
+                  {/* Attendee declaration */}
+                  <div className="rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle) p-5">
+                    <span className="block text-[11px] font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                      Who will attend the inspection?
+                    </span>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {(["self", "representative"] as const).map((opt) => (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => setAttendeeType(opt)}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-left text-sm font-bold transition [font-family:var(--brc-font-ui)]",
+                            attendeeType === opt
+                              ? "border-(--brc-primary) bg-(--brc-primary-tint) text-(--brc-primary)"
+                              : "border-(--brc-border) bg-white text-(--brc-text)",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "flex size-4 shrink-0 items-center justify-center rounded-full border",
+                              attendeeType === opt
+                                ? "border-(--brc-primary)"
+                                : "border-(--brc-border)",
+                            )}
+                          >
+                            {attendeeType === opt && (
+                              <span className="size-2 rounded-full bg-(--brc-primary)" />
+                            )}
+                          </span>
+                          {opt === "self" ? "I will attend" : "Someone on my behalf"}
+                        </button>
+                      ))}
+                    </div>
+
+                    {attendeeType === "representative" && (
+                      <div className="mt-4 flex flex-col gap-3">
+                        <input
+                          value={repName}
+                          onChange={(e) => setRepName(e.target.value)}
+                          placeholder="Representative's full name"
+                          className="w-full rounded-lg border border-(--brc-border) bg-white p-3 text-sm outline-none focus:border-(--brc-primary) [font-family:var(--brc-font-ui)]"
+                        />
+                        <IdTypeSelect
+                          value={repIdType}
+                          onChange={setRepIdType}
+                          label="Representative's ID type"
+                        />
+                        <input
+                          value={repIdNumber}
+                          onChange={(e) => setRepIdNumber(e.target.value)}
+                          placeholder="Representative's ID number"
+                          className="w-full rounded-lg border border-(--brc-border) bg-white p-3 text-sm outline-none focus:border-(--brc-primary) [font-family:var(--brc-font-ui)]"
+                        />
+                        <label className="flex items-start gap-2 text-xs leading-5 text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+                          <input
+                            type="checkbox"
+                            checked={consent}
+                            onChange={(e) => setConsent(e.target.checked)}
+                            className="mt-0.5 size-4 shrink-0 accent-(--brc-primary)"
+                          />
+                          <span>{CONSENT_TEXT}</span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -925,7 +1211,7 @@ export function BookingModal({
             </button>
           )}
 
-          {step === 1 && (
+          {step === 1 && !alreadyRequested && (
             <button
               type="button"
               disabled={!canProceedStep1}

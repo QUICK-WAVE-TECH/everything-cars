@@ -1,5 +1,24 @@
 import { z } from "zod";
 
+/** Accepted means of identification. Shared by sign-up, profile, and the
+ * booking representative flow. */
+export const ID_TYPE_OPTIONS = [
+  { value: "intl_passport", label: "International Passport" },
+  { value: "nin", label: "NIN" },
+  { value: "voters_card", label: "Voter's Card" },
+  { value: "drivers_licence", label: "Driver's Licence" },
+] as const;
+
+export const ID_TYPE_VALUES = [
+  "intl_passport",
+  "nin",
+  "voters_card",
+  "drivers_licence",
+] as const;
+
+export const idTypeLabel = (value?: string) =>
+  ID_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? "";
+
 const isBlank = (value?: string) => !value?.trim();
 const phoneSchema = z
   .string()
@@ -57,11 +76,12 @@ export const ownerSignUpSchema = z
       message: "Select ownership type",
     }),
     fleet_name: z.string().trim().optional(),
-    national_id: requiredDigitsSchema(
-      "NIN is required",
-      "NIN must contain digits only",
-    ),
+    id_type: z.enum(ID_TYPE_VALUES, {
+      message: "Select a means of identification",
+    }),
+    national_id: z.string().trim().min(1, "ID number is required"),
     location: z.string().trim().optional(),
+    address: z.string().trim().optional(),
     rc_number: z.string().trim().optional(),
     country: z.string().trim().optional(),
     state: z.string().trim().optional(),
@@ -100,13 +120,22 @@ export const ownerSignUpSchema = z
     }
 
     if (data.owner_type === "individual") {
-      if (isBlank(data.location)) {
+      if (isBlank(data.address)) {
         ctx.addIssue({
           code: "custom",
-          message: "Location is required",
-          path: ["location"],
+          message: "Address is required",
+          path: ["address"],
         });
       }
+    }
+
+    // A NIN is all digits; other ID types (passport, licence) allow letters.
+    if (data.id_type === "nin" && !/^\d+$/.test(data.national_id)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "NIN must contain digits only",
+        path: ["national_id"],
+      });
     }
   });
 
@@ -145,7 +174,6 @@ export const ownerProfileUpdateSchema = z.object({
   phone: phoneSchema,
   // Owner fields
   fleet_name: z.string().trim().optional(),
-  national_id: z.string().trim().optional(),
   location: z.string().trim().optional(),
   rc_number: z.string().trim().optional(),
   country: z.string().trim().optional(),

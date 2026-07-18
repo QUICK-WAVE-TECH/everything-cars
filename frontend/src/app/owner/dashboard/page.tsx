@@ -14,6 +14,7 @@ import Link from "next/link";
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
 import { useMe } from "@/features/auth/api";
+import { PromoBanner } from "@/shared/components";
 import { useOwnerRequests } from "@/features/requests/api";
 import { useMyCarsList } from "@/features/listings/api";
 import { useTransactions } from "@/features/payments/api";
@@ -32,7 +33,7 @@ type QuickLink = {
 const OWNER_STAT_DEFS = [
   { icon: "car" as IconName, label: "Listed Cars", key: "listed", color: "var(--brc-primary)", href: "/owner/my-cars" },
   { icon: "clock" as IconName, label: "Pending Requests", key: "pending", color: "var(--brc-warning)" },
-  { icon: "handshake" as IconName, label: "Approved", key: "approved", color: "var(--brc-success)" },
+  { icon: "check" as IconName, label: "Approved", key: "approved", color: "var(--brc-success)" },
   { icon: "banknote" as IconName, label: "Earnings", key: "earnings", color: "var(--brc-accent)" },
 ];
 
@@ -429,7 +430,21 @@ export default function OwnerDashboard() {
       <div className="mx-auto flex w-full max-w-[1232px] flex-col gap-7 px-5 py-7 sm:px-8 sm:py-9 lg:px-[104px] lg:py-12">
         {/* Hero */}
         <section className="brc-dashboard-hero brc-dashboard-reveal relative overflow-hidden rounded-3xl border border-(--brc-border) bg-white shadow-[0_20px_48px_rgba(18,18,18,0.06)]">
-          <div className="grid min-h-[260px] gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_360px] lg:p-10">
+          <div className="relative grid min-h-[260px] gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_360px] lg:p-10">
+            {/* Mobile-only verified tick, top-right corner */}
+            <span
+              className="absolute right-4 top-4 z-20 inline-flex lg:hidden"
+              title="Verified owner"
+              aria-label="Verified owner"
+            >
+              <svg viewBox="0 0 22 22" width="30" height="30" aria-hidden="true" className="drop-shadow-[0_2px_5px_rgba(29,155,240,0.35)]">
+                <path
+                  fill="#1d9bf0"
+                  d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568s-.969.854-1.24 1.44c-.608-.223-1.267-.272-1.902-.14-.635.13-1.22.436-1.69.882-.445.47-.749 1.055-.878 1.688-.13.633-.08 1.29.144 1.896-.587.274-1.087.705-1.443 1.245-.356.54-.555 1.17-.574 1.817.02.647.218 1.276.574 1.817.356.54.856.972 1.443 1.245-.224.606-.274 1.263-.144 1.896.13.634.433 1.218.877 1.688.47.443 1.054.747 1.687.878.633.132 1.29.084 1.897-.136.274.586.705 1.084 1.246 1.439.54.354 1.17.551 1.816.569.647-.018 1.276-.215 1.817-.569.541-.354.972-.853 1.245-1.439.604.239 1.266.296 1.903.164.636-.132 1.22-.447 1.68-.907.46-.46.776-1.044.908-1.681s.075-1.299-.165-1.903c.586-.274 1.084-.705 1.439-1.246.354-.54.551-1.17.569-1.816z"
+                />
+                <path fill="#fff" d="M9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246z" />
+              </svg>
+            </span>
             <div className="relative z-10 flex flex-col justify-between gap-8">
               <div>
                 <span className="brc-dashboard-pill mb-4 inline-flex items-center gap-2 rounded-full bg-(--brc-accent-bg) px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.12em] text-(--brc-accent) [font-family:var(--brc-font-ui)]">
@@ -437,25 +452,23 @@ export default function OwnerDashboard() {
                   Owner dashboard
                 </span>
                 <h1 className="m-0 max-w-2xl text-[clamp(2rem,6vw,3.4rem)] font-black leading-[1.04] text-(--brc-text) [font-family:var(--brc-font-display)]">{greetingText}</h1>
-                <p className="mt-4 max-w-xl text-base leading-7 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                  You have {requests.filter((r) => r.status === "pending").length} pending request{requests.filter((r) => r.status === "pending").length !== 1 ? "s" : ""} and {cars.length} car{cars.length !== 1 ? "s" : ""} listed.
-                </p>
               </div>
-              <div className="flex flex-wrap gap-3">
+              <p className="max-w-xl text-base leading-7 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                You have {requests.filter((r) => r.status === "pending").length} pending request{requests.filter((r) => r.status === "pending").length !== 1 ? "s" : ""} and {cars.length} car{cars.length !== 1 ? "s" : ""} listed.
+              </p>
+            </div>
+            <div className="relative z-10 flex flex-col justify-between gap-6">
+              <div className="brc-dashboard-badge-pop hidden self-start rounded-2xl border border-(--brc-border) bg-(--brc-bg-subtle) px-4 py-3 text-sm font-bold text-(--brc-text-secondary) shadow-[var(--brc-shadow-xs)] [font-family:var(--brc-font-ui)] lg:block lg:self-end">Verified owner</div>
+              <div className="grid grid-cols-2 gap-2.5 self-stretch [&>a]:w-full [&>a]:whitespace-nowrap [&>a]:px-2.5 [&_.brc-dashboard-arrow]:hidden sm:flex sm:flex-wrap sm:self-start sm:[&>a]:w-auto sm:[&>a]:px-5 sm:[&_.brc-dashboard-arrow]:flex lg:justify-end lg:self-end">
                 <DashboardButton href="/owner/my-cars">Manage Cars</DashboardButton>
                 <DashboardButton href="/owner/requests" variant="soft">View Requests</DashboardButton>
               </div>
-            </div>
-            <div className="relative hidden min-h-[220px] items-end justify-center lg:flex">
-              <div className="brc-dashboard-car-shadow absolute inset-x-8 bottom-7 h-8 rounded-full bg-[rgba(195,101,35,0.12)] blur-xl" />
-              <div className="brc-dashboard-badge-pop absolute right-0 top-0 rounded-2xl border border-(--brc-border) bg-(--brc-bg-subtle) px-4 py-3 text-sm font-bold text-(--brc-text-secondary) shadow-[var(--brc-shadow-xs)] [font-family:var(--brc-font-ui)]">Verified owner</div>
-              <Image src="/car-lexus.png" alt="Lexus car" width={360} height={230} priority className="brc-dashboard-hero-car relative z-10 object-contain" style={{ width: "100%", maxWidth: 360, height: "auto" }} />
             </div>
           </div>
         </section>
 
         {/* Stats */}
-        <section aria-label="Owner summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section aria-label="Owner summary" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           {ownerStats.map((stat, index) => (
             <StatCard key={stat.label} stat={stat} delay={80 + index * 70} />
           ))}
@@ -466,7 +479,7 @@ export default function OwnerDashboard() {
           <div className="flex min-w-0 flex-col gap-7">
             <section className="flex flex-col gap-4">
               <SectionHeader eyebrow="Shortcuts" title="Quick Actions" />
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 {OWNER_QUICK_LINKS.map((link, index) => (
                   <QuickActionTile key={link.label} link={link} delay={220 + index * 70} />
                 ))}
@@ -502,6 +515,16 @@ export default function OwnerDashboard() {
               </div>
             </section>
             <EarningsSnapshot />
+            <PromoBanner
+              tag="Earn more"
+              title="List Another Car"
+              subtitle="Reach thousands of renters and grow your earnings."
+              ctaLabel="Add a Car"
+              href="/owner/my-cars/new"
+              image="/owner-banner.jpg"
+              imagePosition="55% 32%"
+              className="flex-1"
+            />
           </aside>
         </div>
       </div>

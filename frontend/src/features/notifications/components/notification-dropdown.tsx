@@ -287,17 +287,32 @@ export function NotificationDropdown({ role, unreadCount }: NotificationDropdown
         )}
       </button>
 
+      <style>{`
+        @media (max-width: 768px) {
+          .brc-notif-panel {
+            position: fixed !important;
+            top: 78px !important;
+            left: 50% !important;
+            right: auto !important;
+            transform: translateX(-50%) !important;
+            width: min(360px, calc(100vw - 24px)) !important;
+            max-height: calc(100dvh - 96px) !important;
+          }
+        }
+      `}</style>
+
       {/* Dropdown panel */}
       {open && (
         <div
           role="dialog"
           aria-label="Notifications"
+          className="brc-notif-panel"
           style={{
             position: "absolute",
             top: "calc(100% + 10px)",
             right: 0,
             zIndex: 200,
-            width: 360,
+            width: "min(360px, calc(100vw - 32px))",
             maxHeight: 480,
             background: "#fff",
             border: "1px solid var(--brc-border)",

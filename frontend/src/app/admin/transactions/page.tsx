@@ -2,7 +2,7 @@ import { TransactionsTable } from "@/features/payments";
 
 export default function AdminTransactionsPage() {
   return (
-    <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-7 px-4 py-10 sm:px-6 lg:px-[var(--brc-space-10,40px)] lg:py-12">
+    <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-5 px-4 py-6 sm:gap-7 sm:px-6 sm:py-10 lg:px-[var(--brc-space-10,40px)] lg:py-12">
       <div>
         <span className="text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
           Finance · Overview

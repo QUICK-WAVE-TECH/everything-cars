@@ -17,16 +17,21 @@ export function OwnerStats() {
   ], [requests]);
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))",
-        gap: "clamp(14px, 2vw, 20px)",
-      }}
-    >
-      {stats.map((s) => (
-        <StatCard key={s.label} {...s} />
-      ))}
-    </div>
+    <>
+      <div
+        className="owner-stats-grid"
+        style={{ display: "grid", gap: "clamp(12px, 2vw, 20px)" }}
+      >
+        {stats.map((s) => (
+          <StatCard key={s.label} {...s} />
+        ))}
+      </div>
+      <style>{`
+        .owner-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        @media (min-width: 1024px) {
+          .owner-stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+      `}</style>
+    </>
   );
 }

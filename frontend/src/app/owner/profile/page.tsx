@@ -5,7 +5,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { PencilIcon, XIcon, Loader2Icon } from "lucide-react";
+import { LockIcon, PencilIcon, XIcon, Loader2Icon } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
 import {
@@ -19,6 +19,7 @@ import { useMe, useUpdateProfile, useChangePassword } from "@/features/auth/api"
 import {
   ownerProfileUpdateSchema,
   changePasswordSchema,
+  idTypeLabel,
 } from "@/features/auth/schemas";
 import { COUNTRIES } from "@/features/auth/data/countries";
 import { ApiError } from "@/lib/api-client";
@@ -41,17 +42,30 @@ function isoToName(iso: string): string {
   return COUNTRIES.find((c) => c.iso === iso.toLowerCase())?.name ?? "";
 }
 
-type Field = { label: string; value: string; icon: IconName };
+type Field = { label: string; value: string; icon: IconName; locked?: boolean };
 
 function ReadonlyField({ field }: { field: Field }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <span className="flex items-center gap-2 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
-        <Icon name={field.icon} size={16} stroke="var(--brc-text-secondary)" />
-        {field.label}
+      <span className="flex items-center justify-between gap-2 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+        <span className="flex min-w-0 items-center gap-2">
+          <Icon name={field.icon} size={16} stroke="var(--brc-text-secondary)" />
+          <span className="truncate">{field.label}</span>
+        </span>
+        {field.locked && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-(--brc-bg-subtle) px-2 py-0.5 text-[11px] font-semibold text-(--brc-text-muted)">
+            <LockIcon size={12} />
+            Locked
+          </span>
+        )}
       </span>
-      <div className="flex h-[52px] items-center overflow-hidden text-ellipsis whitespace-nowrap rounded-(--brc-radius-sm) border border-(--brc-border) bg-(--brc-bg-subtle) px-4 text-sm text-(--brc-text) [font-family:var(--brc-font-ui)]">
-        {field.value}
+      <div className="flex h-[52px] items-center justify-between gap-3 overflow-hidden rounded-(--brc-radius-sm) border border-(--brc-border) bg-(--brc-bg-subtle) px-4 text-sm text-(--brc-text) [font-family:var(--brc-font-ui)]">
+        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+          {field.value}
+        </span>
+        {field.locked && (
+          <LockIcon size={16} className="shrink-0 text-(--brc-text-muted)" />
+        )}
       </div>
     </div>
   );
@@ -73,7 +87,6 @@ export default function OwnerProfilePage() {
       last_name: user?.last_name ?? "",
       phone: user?.phone ?? "",
       fleet_name: profile?.fleet_name ?? "",
-      national_id: profile?.national_id ?? "",
       location: profile?.location ?? "",
       rc_number: profile?.rc_number ?? "",
       country: profile?.country ?? "",
@@ -104,7 +117,6 @@ export default function OwnerProfilePage() {
       last_name: user?.last_name ?? "",
       phone: user?.phone ?? "",
       fleet_name: profile?.fleet_name ?? "",
-      national_id: profile?.national_id ?? "",
       location: profile?.location ?? "",
       rc_number: profile?.rc_number ?? "",
       country: profile?.country ?? "",
@@ -123,7 +135,8 @@ export default function OwnerProfilePage() {
   }
 
   function handleSave(values: ProfileInput) {
-    updateProfile.mutate(values, {
+    const payload: Record<string, unknown> = { ...values };
+    updateProfile.mutate(payload, {
       onSuccess: () => {
         toast.success("Profile updated successfully");
         setEditing(false);
@@ -176,7 +189,24 @@ export default function OwnerProfilePage() {
       icon: "car",
     },
     { label: "Fleet Name", value: profile?.fleet_name || "—", icon: "car" },
-    { label: "National ID", value: profile?.national_id || "—", icon: "idcard" },
+    {
+      label: "ID Type",
+      value: idTypeLabel(profile?.id_type) || "—",
+      icon: "idcard",
+      locked: true,
+    },
+    {
+      label: idTypeLabel(profile?.id_type) ? `${idTypeLabel(profile?.id_type)} Number` : "ID Number",
+      value: profile?.national_id || "—",
+      icon: "idcard",
+      locked: true,
+    },
+    {
+      label: "ID Document",
+      value: profile?.id_document ? "Uploaded" : "Not uploaded",
+      icon: "idcard",
+      locked: true,
+    },
     { label: "Location", value: profile?.location || "—", icon: "pin" },
     { label: "RC Number", value: profile?.rc_number || "—", icon: "idcard" },
     { label: "Address", value: profile?.address || "—", icon: "pin" },
@@ -207,50 +237,67 @@ export default function OwnerProfilePage() {
         {/* Account card */}
         <Card className="rounded-(--brc-radius-lg) border border-(--brc-border) p-[clamp(20px,3vw,32px)] shadow-none">
           <CardContent className="flex flex-col gap-7 p-0">
-            {/* Identity row */}
-            <div className="flex flex-wrap items-center gap-[18px]">
-              <span className="flex size-[88px] shrink-0 items-center justify-center rounded-full bg-(--brc-primary-tint) text-[30px] font-extrabold text-(--brc-primary) [font-family:var(--brc-font-display)]">
-                {initials(`${user.first_name} ${user.last_name}`)}
-              </span>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[22px] font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
-                  {user.first_name} {user.last_name}
+            {/* Identity header */}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-start gap-4 sm:items-center sm:gap-[18px]">
+                <span className="flex size-16 shrink-0 items-center justify-center rounded-full bg-(--brc-primary-tint) text-2xl font-extrabold text-(--brc-primary) [font-family:var(--brc-font-display)] sm:size-[88px] sm:text-[30px]">
+                  {initials(`${user.first_name} ${user.last_name}`)}
                 </span>
-                <span className="text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                  {user.email}
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-(--brc-accent-bg) px-3 py-1 text-xs font-semibold text-(--brc-accent) [font-family:var(--brc-font-ui)]">
-                    <span className="size-[7px] rounded-full bg-(--brc-accent)" />
-                    Owner Account
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <span className="truncate text-lg font-bold text-(--brc-text) [font-family:var(--brc-font-ui)] sm:text-[22px]">
+                    {user.first_name} {user.last_name}
                   </span>
-                  {profile?.is_verified && (
-                    <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-(--brc-success-bg) px-3 py-1 text-xs font-semibold text-(--brc-success) [font-family:var(--brc-font-ui)]">
-                      Verified
+                  <span className="truncate text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                    {user.email}
+                  </span>
+                  {/* Badges — under the name on desktop */}
+                  <div className="hidden flex-wrap items-center gap-2 sm:flex">
+                    <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-(--brc-accent-bg) px-3 py-1 text-xs font-semibold text-(--brc-accent) [font-family:var(--brc-font-ui)]">
+                      <span className="size-[7px] rounded-full bg-(--brc-accent)" />
+                      Owner Account
                     </span>
+                    {profile?.is_verified && (
+                      <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-(--brc-success-bg) px-3 py-1 text-xs font-semibold text-(--brc-success) [font-family:var(--brc-font-ui)]">
+                        Verified
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {/* Edit button — pinned top-right; icon-only on mobile */}
+                <div className="shrink-0">
+                  {!editing ? (
+                    <button
+                      type="button"
+                      onClick={startEditing}
+                      aria-label="Edit Profile"
+                      className="flex cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-3 py-2.5 text-sm font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)] sm:px-4"
+                    >
+                      <PencilIcon size={16} />
+                      <span className="hidden sm:inline">Edit Profile</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={cancelEditing}
+                      aria-label="Cancel"
+                      className="flex cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-3 py-2.5 text-sm font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)] sm:px-4"
+                    >
+                      <XIcon size={16} />
+                      <span className="hidden sm:inline">Cancel</span>
+                    </button>
                   )}
                 </div>
               </div>
-              {/* Edit button */}
-              <div className="ml-auto">
-                {!editing ? (
-                  <button
-                    type="button"
-                    onClick={startEditing}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-4 py-2.5 text-sm font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
-                  >
-                    <PencilIcon size={16} />
-                    Edit Profile
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={cancelEditing}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-(--brc-border) bg-white px-4 py-2.5 text-sm font-semibold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
-                  >
-                    <XIcon size={16} />
-                    Cancel
-                  </button>
+              {/* Badges — full-width row on mobile so both fit on one line */}
+              <div className="flex flex-wrap items-center gap-2 sm:hidden">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-(--brc-accent-bg) px-3 py-1 text-xs font-semibold text-(--brc-accent) [font-family:var(--brc-font-ui)]">
+                  <span className="size-[7px] rounded-full bg-(--brc-accent)" />
+                  Owner Account
+                </span>
+                {profile?.is_verified && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-(--brc-success-bg) px-3 py-1 text-xs font-semibold text-(--brc-success) [font-family:var(--brc-font-ui)]">
+                    Verified
+                  </span>
                 )}
               </div>
             </div>
@@ -351,21 +398,43 @@ export default function OwnerProfilePage() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={form.control}
-                      name="national_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <AuthField
-                            label="National ID"
-                            placeholder="National ID number"
-                            value={field.value ?? ""}
-                            onChange={field.onChange}
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="flex flex-col gap-4 rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle) p-4 sm:col-span-2">
+                      <span className="flex items-center gap-2 text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                        <LockIcon size={15} className="text-(--brc-text-muted)" />
+                        Identity Verification
+                      </span>
+                      <p className="m-0 text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                        Means of identity is locked for now. Contact support if these details need to change.
+                      </p>
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <ReadonlyField
+                          field={{
+                            label: "ID Type",
+                            value: idTypeLabel(profile?.id_type) || "—",
+                            icon: "idcard",
+                            locked: true,
+                          }}
+                        />
+                        <ReadonlyField
+                          field={{
+                            label: idTypeLabel(profile?.id_type)
+                              ? `${idTypeLabel(profile?.id_type)} Number`
+                              : "ID Number",
+                            value: profile?.national_id || "—",
+                            icon: "idcard",
+                            locked: true,
+                          }}
+                        />
+                        <ReadonlyField
+                          field={{
+                            label: "ID Document",
+                            value: profile?.id_document ? "Uploaded" : "Not uploaded",
+                            icon: "idcard",
+                            locked: true,
+                          }}
+                        />
+                      </div>
+                    </div>
                     <FormField
                       control={form.control}
                       name="location"

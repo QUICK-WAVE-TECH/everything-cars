@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Icon } from "@/features/auth/components/icon";
 import { Chip } from "./chip";
 import { AvailabilityBadge } from "@/features/listings/components/availability-badge";
+import { VerifiedBadge } from "@/features/listings/components/verified-report";
 import type { CarListItem } from "@/features/listings/api/types";
 
 function currencySymbol(code: string) {
@@ -103,9 +104,14 @@ export function ApiCarCard({ car, displayMode }: ApiCarCardProps) {
             position: "absolute",
             top: 12,
             left: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            alignItems: "flex-start",
           }}
         >
           <Chip>{listingTypeLabel(car.listing_type)}</Chip>
+          {car.is_verified && <VerifiedBadge size="sm" />}
         </div>
         <div
           style={{

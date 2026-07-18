@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import type { PaginatedResponse } from "@/shared/types/api";
 import type {
+  AssistanceRequest,
+  AttendeePayload,
   AvailableSlot,
   CarStatusHistoryEntry,
   InspectionBooking,
@@ -11,9 +13,29 @@ import type {
   LocationCountry,
   PhysicalInspection,
   PhysicalInspectionPayload,
+  SlotTimeRow,
 } from "./types";
 import { listingKeys } from "@/features/listings/api/listings-api";
 import { adminListingKeys } from "@/features/listings/api/admin-api";
+
+/**
+ * Bounds an available-slots read to a rolling forward window so the payload
+ * can't grow without limit as more slots accumulate. Slot batches are capped at
+ * 90 days server-side, so 180 days covers all realistic upcoming availability.
+ */
+export function availabilityWindow(daysAhead = 180): {
+  date_from: string;
+  date_to: string;
+} {
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  const from = new Date();
+  const to = new Date();
+  to.setDate(to.getDate() + daysAhead);
+  return { date_from: iso(from), date_to: iso(to) };
+}
 
 function buildQuery(params?: Record<string, string | number | boolean | undefined>) {
   const query = new URLSearchParams();
@@ -29,8 +51,19 @@ export const inspectionKeys = {
   slots: ["inspections", "slots"] as const,
   slotsList: (params?: Record<string, string | number | undefined>) =>
     ["inspections", "slots", params ?? {}] as const,
-  availableSlots: (centerId?: string, date?: string) =>
-    ["inspections", "available-slots", centerId ?? "all", date ?? "all"] as const,
+  availableSlots: (
+    centerId?: string,
+    date?: string,
+    range?: { date_from?: string; date_to?: string },
+  ) =>
+    [
+      "inspections",
+      "available-slots",
+      centerId ?? "all",
+      date ?? "all",
+      range?.date_from ?? "all",
+      range?.date_to ?? "all",
+    ] as const,
   locations: ["inspections", "locations"] as const,
   publicCenters: (params?: Record<string, string | number | undefined>) =>
     ["inspections", "public-centers", params ?? {}] as const,
@@ -47,6 +80,13 @@ export const inspectionKeys = {
     ["inspections", "admin-bookings", "detail", id] as const,
   carHistory: (carId: string | null) =>
     ["inspections", "car-history", carId] as const,
+  staffCarHistory: (carId: string | null) =>
+    ["inspections", "staff-car-history", carId] as const,
+  assistance: ["inspections", "assistance"] as const,
+  assistanceList: (params?: Record<string, string | number | undefined>) =>
+    ["inspections", "assistance", params ?? {}] as const,
+  myAssistance: (params?: Record<string, string | number | undefined>) =>
+    ["inspections", "assistance", "my", params ?? {}] as const,
 };
 
 // ── Staff Center Management ──
@@ -135,7 +175,7 @@ export function useCreateSlots() {
       date_from: string;
       date_to: string;
       days: number[];
-      time_slots: { start_time: string; end_time: string }[];
+      time_slots: SlotTimeRow[];
       capacity: number;
       center: string;
     }) => apiClient.post<{ created_count: number; slots: InspectionSlot[] }>("/inspections/slots/", data),
@@ -168,10 +208,19 @@ export function useDeactivateSlot() {
 
 // ── Owner Available Slots ──
 
-export function useAvailableSlots(centerId?: string, date?: string) {
-  const query = buildQuery({ center: centerId, date });
+export function useAvailableSlots(
+  centerId?: string,
+  date?: string,
+  range?: { date_from?: string; date_to?: string },
+) {
+  const query = buildQuery({
+    center: centerId,
+    date,
+    date_from: range?.date_from,
+    date_to: range?.date_to,
+  });
   return useQuery({
-    queryKey: inspectionKeys.availableSlots(centerId, date),
+    queryKey: inspectionKeys.availableSlots(centerId, date, range),
     queryFn: () =>
       apiClient.get<AvailableSlot[]>(
         `/inspections/available-slots/${query ? `?${query}` : ""}`,
@@ -186,7 +235,7 @@ export function useAvailableSlots(centerId?: string, date?: string) {
 export function useCreateBooking() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { car_id: string; slot_id: string }) =>
+    mutationFn: (data: { car_id: string; slot_id: string } & AttendeePayload) =>
       apiClient.post<InspectionBooking>("/inspections/bookings/", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: inspectionKeys.bookings });
@@ -262,7 +311,10 @@ export function useCarHistory(carId: string | null) {
 
 // ── Staff Booking Management & Physical Inspection ──
 
-export function useStaffBookings(params?: { status?: string; date?: string; car?: string }) {
+export function useStaffBookings(
+  params?: { status?: string; date?: string; car?: string },
+  options?: { enabled?: boolean },
+) {
   const query = buildQuery(params);
   return useQuery({
     queryKey: inspectionKeys.adminBookingsList(params),
@@ -270,6 +322,7 @@ export function useStaffBookings(params?: { status?: string; date?: string; car?
       apiClient.get<PaginatedResponse<InspectionBooking>>(
         `/inspections/admin/bookings/${query ? `?${query}` : ""}`,
       ),
+    enabled: options?.enabled ?? true,
     staleTime: 15_000,
   });
 }
@@ -359,5 +412,91 @@ export function useResolveClearance() {
         { action, ...(staff_note ? { staff_note } : {}) },
       ),
     onSuccess: () => invalidateBookingCaches(queryClient),
+  });
+}
+
+// ── Staff Car Timeline (includes actor names) ──
+
+export function useStaffCarHistory(carId: string | null) {
+  return useQuery({
+    queryKey: inspectionKeys.staffCarHistory(carId),
+    queryFn: () =>
+      apiClient.get<CarStatusHistoryEntry[]>(`/listings/admin/cars/${carId}/history`),
+    enabled: !!carId,
+    staleTime: 15_000,
+  });
+}
+
+// ── Assistance Requests ──
+
+export function useCreateAssistanceRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      car_id?: string;
+      country?: string;
+      state?: string;
+      message?: string;
+    }) => apiClient.post<AssistanceRequest>("/inspections/assistance/", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: inspectionKeys.assistance });
+    },
+  });
+}
+
+export function useMyAssistanceRequests(
+  params?: { car?: string; status?: string },
+  options?: { enabled?: boolean },
+) {
+  const query = buildQuery(params);
+  return useQuery({
+    queryKey: inspectionKeys.myAssistance(params),
+    queryFn: () =>
+      apiClient.get<AssistanceRequest[]>(
+        `/inspections/assistance/${query ? `?${query}` : ""}`,
+      ),
+    enabled: options?.enabled ?? true,
+    staleTime: 15_000,
+  });
+}
+
+export function useAssistanceRequests(params?: { status?: string; page_size?: number }) {
+  const query = buildQuery(params);
+  return useQuery({
+    queryKey: inspectionKeys.assistanceList(params),
+    queryFn: () =>
+      apiClient.get<PaginatedResponse<AssistanceRequest>>(
+        `/inspections/admin/assistance/${query ? `?${query}` : ""}`,
+      ),
+    staleTime: 15_000,
+  });
+}
+
+export function useHandleAssistance() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (requestId: string) =>
+      apiClient.post<AssistanceRequest>(
+        `/inspections/admin/assistance/${requestId}/handle/`,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: inspectionKeys.assistance });
+    },
+  });
+}
+
+export function useBookForOwner() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { car_id: string; slot_id: string } & AttendeePayload) =>
+      apiClient.post<InspectionBookingDetail>(
+        "/inspections/admin/bookings/book-for-owner/",
+        data,
+      ),
+    onSuccess: () => {
+      invalidateBookingCaches(queryClient);
+      queryClient.invalidateQueries({ queryKey: inspectionKeys.assistance });
+      queryClient.invalidateQueries({ queryKey: ["inspections", "available-slots"] });
+    },
   });
 }

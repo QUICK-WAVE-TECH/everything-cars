@@ -4,6 +4,7 @@ from rest_framework import serializers
 from django.utils import timezone
 
 from .models import (
+    AttendeeType,
     CarStatusHistory,
     InspectionBooking,
     InspectionCenter,
@@ -11,8 +12,10 @@ from .models import (
     InspectionResult,
     InspectionSlot,
     PhysicalInspection,
+    AssistanceRequest,
 )
 from apps.listings.serializers import CarDetailSerializer
+from apps.users.models import IDType
 
 
 class InspectionCenterSerializer(serializers.ModelSerializer):
@@ -91,8 +94,13 @@ class InspectionSlotCreateSerializer(serializers.Serializer):
     time_slots = serializers.ListField(
         child=serializers.DictField(),
         min_length=1,
+        max_length=20,
     )
     capacity = serializers.IntegerField(min_value=1, default=1)
+
+    # Bound a single batch so one request can't schedule an unbounded number of
+    # slots (both a safety guard and a query-count cap).
+    MAX_RANGE_DAYS = 90
     center = serializers.PrimaryKeyRelatedField(
         queryset=InspectionCenter.objects.filter(is_active=True)
     )
@@ -134,6 +142,14 @@ class InspectionSlotCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {"date_from": "Start date cannot be in the past."}
             )
+        if (data["date_to"] - data["date_from"]).days + 1 > self.MAX_RANGE_DAYS:
+            raise serializers.ValidationError(
+                {
+                    "date_to": (
+                        f"Date range cannot exceed {self.MAX_RANGE_DAYS} days."
+                    )
+                }
+            )
         normalized_slots = []
         for slot in data["time_slots"]:
             if "start_time" not in slot or "end_time" not in slot:
@@ -149,7 +165,21 @@ class InspectionSlotCreateSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     {"time_slots": "End time must be after start time."}
                 )
-            normalized_slots.append({"start_time": start, "end_time": end})
+            row = {"start_time": start, "end_time": end}
+            # Optional per-row capacity — overrides the batch-level default.
+            if slot.get("capacity") is not None:
+                try:
+                    row_capacity = int(slot["capacity"])
+                except (TypeError, ValueError):
+                    raise serializers.ValidationError(
+                        {"time_slots": "Row capacity must be a number."}
+                    )
+                if row_capacity < 1:
+                    raise serializers.ValidationError(
+                        {"time_slots": "Row capacity must be at least 1."}
+                    )
+                row["capacity"] = row_capacity
+            normalized_slots.append(row)
         data["time_slots"] = normalized_slots
         return data
 
@@ -189,6 +219,8 @@ class InspectionBookingSerializer(serializers.ModelSerializer):
             "status",
             "reschedule_count",
             "staff_note",
+            "attendee_type",
+            "rep_name",
             "created_at",
             "updated_at",
         ]
@@ -202,8 +234,11 @@ class InspectionBookingDetailSerializer(InspectionBookingSerializer):
     """Includes full car detail for staff review."""
 
     car = CarDetailSerializer(read_only=True)
+    inspection = serializers.SerializerMethodField()
 
     class Meta(InspectionBookingSerializer.Meta):
+        # Staff-only detail — rep_id_type/number are exposed here (never on the
+        # owner-facing list serializer).
         fields = [
             "id",
             "car",
@@ -212,14 +247,61 @@ class InspectionBookingDetailSerializer(InspectionBookingSerializer):
             "status",
             "reschedule_count",
             "staff_note",
+            "attendee_type",
+            "rep_name",
+            "rep_id_type",
+            "rep_id_number",
+            "inspection",
             "created_at",
             "updated_at",
         ]
+
+    def get_inspection(self, obj):
+        # Reverse OneToOne — absent until the inspection is submitted.
+        try:
+            inspection = obj.inspection
+        except PhysicalInspection.DoesNotExist:
+            return None
+        return StaffInspectionReadSerializer(inspection, context=self.context).data
 
 
 class BookingCreateSerializer(serializers.Serializer):
     car_id = serializers.UUIDField()
     slot_id = serializers.UUIDField()
+    attendee_type = serializers.ChoiceField(
+        choices=AttendeeType.choices, default=AttendeeType.SELF
+    )
+    rep_name = serializers.CharField(
+        required=False, allow_blank=True, max_length=200, default=""
+    )
+    rep_id_type = serializers.ChoiceField(
+        choices=IDType.choices, required=False, allow_blank=True, default=""
+    )
+    rep_id_number = serializers.CharField(
+        required=False, allow_blank=True, max_length=50, default=""
+    )
+    consent_accepted = serializers.BooleanField(default=False)
+
+    def validate(self, data):
+        if data["attendee_type"] == AttendeeType.REPRESENTATIVE:
+            missing = [
+                f
+                for f in ("rep_name", "rep_id_type", "rep_id_number")
+                if not data.get(f)
+            ]
+            if missing:
+                raise serializers.ValidationError(
+                    {f: "Required when a representative attends." for f in missing}
+                )
+            if not data.get("consent_accepted"):
+                raise serializers.ValidationError(
+                    {
+                        "consent_accepted": (
+                            "You must accept the authorization agreement."
+                        )
+                    }
+                )
+        return data
 
 
 class StaffNoteSerializer(serializers.Serializer):
@@ -248,6 +330,10 @@ class PhysicalInspectionSerializer(serializers.ModelSerializer):
             "result",
             "inspected_at",
             "inspector_name",
+            "presented_attendee",
+            "presented_id_type",
+            "presented_id_number",
+            "presented_id_document",
             "created_at",
         ]
         read_only_fields = ["id", "inspector_name", "created_at"]
@@ -258,6 +344,8 @@ class PhysicalInspectionSerializer(serializers.ModelSerializer):
         return f"{obj.inspector.first_name} {obj.inspector.last_name}".strip()
 
     def validate(self, attrs):
+        result = attrs.get("result")
+
         needs_note = attrs.get("result") in (
             InspectionResult.NEEDS_CLEARANCE,
             InspectionResult.FAILED,
@@ -266,6 +354,32 @@ class PhysicalInspectionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"staff_notes": "A reason is required for this result."}
             )
+        # A non-failed inspection means someone attended — record whether it was
+        # the owner or the declared representative.
+        if result and result != InspectionResult.FAILED:
+            if not attrs.get("presented_attendee"):
+                raise serializers.ValidationError(
+                    {
+                        "presented_attendee": (
+                            "Record who presented for the inspection."
+                        )
+                    }
+                )
+            # The owner's ID is already on file from sign-up; only capture an ID
+            # when a representative attends in their place.
+            if attrs.get("presented_attendee") == "representative":
+                missing = [
+                    f
+                    for f in ("presented_id_type", "presented_id_number")
+                    if not attrs.get(f)
+                ]
+                if missing:
+                    raise serializers.ValidationError(
+                        {
+                            f: "Required when a representative attends."
+                            for f in missing
+                        }
+                    )
         return attrs
 
 
@@ -284,6 +398,48 @@ class InspectionDocumentSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at"]
 
 
+class StaffInspectionReadSerializer(serializers.ModelSerializer):
+    """Staff-only read view of a completed inspection, including the files the
+    inspector uploaded (presented ID + sale documents)."""
+
+    documents = InspectionDocumentSerializer(read_only=True)
+    inspector_name = serializers.SerializerMethodField()
+    inspector_email = serializers.EmailField(
+        source="inspector.email", read_only=True, default=""
+    )
+
+    class Meta:
+        model = PhysicalInspection
+        fields = [
+            "id",
+            "result",
+            "condition",
+            "mileage",
+            "fuel_type",
+            "car_type",
+            "features",
+            "engine_condition",
+            "chassis_condition",
+            "ac_condition",
+            "is_flooded",
+            "has_accident_history",
+            "staff_notes",
+            "presented_attendee",
+            "presented_id_type",
+            "presented_id_number",
+            "presented_id_document",
+            "inspected_at",
+            "inspector_name",
+            "inspector_email",
+            "documents",
+        ]
+
+    def get_inspector_name(self, obj):
+        if not obj.inspector_id:
+            return ""
+        return f"{obj.inspector.first_name} {obj.inspector.last_name}".strip()
+
+
 class CarStatusHistorySerializer(serializers.ModelSerializer):
     """Owner-facing timeline entries. `actor` is deliberately excluded —
     owners see the role (staff/owner/system) but never staff identity."""
@@ -298,3 +454,61 @@ class CarStatusHistorySerializer(serializers.ModelSerializer):
             "note",
             "created_at",
         ]
+
+
+class StaffCarStatusHistorySerializer(CarStatusHistorySerializer):
+    """Staff-facing variant — adds the actor's name (from the audit snapshot,
+    falling back to the live FK). Owners never receive this serializer."""
+
+    actor_name = serializers.SerializerMethodField()
+
+    class Meta(CarStatusHistorySerializer.Meta):
+        fields = CarStatusHistorySerializer.Meta.fields + ["actor_name"]
+
+    def get_actor_name(self, obj):
+        if obj.actor_name:
+            return obj.actor_name
+        if obj.actor_id:
+            return obj.actor.get_full_name()
+        return ""
+
+
+class AssistanceRequestCreateSerializer(serializers.Serializer):
+    car_id = serializers.UUIDField(required=False, allow_null=True)
+    country = serializers.CharField(
+        required=False, allow_blank=True, max_length=100, default=""
+    )
+    state = serializers.CharField(
+        required=False, allow_blank=True, max_length=250, default=""
+    )
+    message = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class AssistanceRequestSerializer(serializers.ModelSerializer):
+    owner_name = serializers.SerializerMethodField()
+    owner_email = serializers.EmailField(source="owner.email", read_only=True)
+    owner_phone = serializers.CharField(source="owner.phone", read_only=True)
+    car_title = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AssistanceRequest
+        fields = [
+            "id",
+            "owner_name",
+            "owner_email",
+            "owner_phone",
+            "car",
+            "car_title",
+            "country",
+            "state",
+            "message",
+            "status",
+            "created_at",
+            "handled_at",
+        ]
+
+    def get_owner_name(self, obj):
+        return obj.owner.get_full_name()
+
+    def get_car_title(self, obj):
+        return obj.car.title if obj.car_id else ""

@@ -64,25 +64,25 @@ describe("OwnerSignUpPage", () => {
 
     expect(await screen.findByText("Step 2 of 2")).toBeInTheDocument();
     expect(screen.getByText("Address")).toBeInTheDocument();
-    expect(screen.getByText("NIN")).toBeInTheDocument();
+    expect(screen.getByText("Identity Verification")).toBeInTheDocument();
+    // Default ID-number label before a type is chosen.
+    expect(screen.getByText("ID Number")).toBeInTheDocument();
+    expect(screen.getByText("Upload ID Document")).toBeInTheDocument();
     expect(screen.getByText("Upload Car Ownership Document")).toBeInTheDocument();
     expect(screen.getByText("Bank Account Number")).toBeInTheDocument();
     expect(screen.getByText("Bank Name")).toBeInTheDocument();
   });
 
-  it("keeps national id and bank account number digit-only", async () => {
+  it("keeps the bank account number digit-only", async () => {
     renderWithQueryClient(<OwnerSignUpPage />);
 
     fillStepOne();
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
-    const nationalId = await screen.findByPlaceholderText("Enter your NIN");
-    const bankAccount = screen.getByPlaceholderText("Enter bank account number");
-
-    fireEvent.change(nationalId, { target: { value: "12ab-34" } });
+    const bankAccount = await screen.findByPlaceholderText(
+      "Enter bank account number",
+    );
     fireEvent.change(bankAccount, { target: { value: "00x12#34" } });
-
-    expect(nationalId).toHaveValue("1234");
     expect(bankAccount).toHaveValue("001234");
   });
 });

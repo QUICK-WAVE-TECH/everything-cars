@@ -58,6 +58,26 @@ export type CarListItem = {
   owner: CarOwner;
   primary_image: string | null;
   created_at: string;
+  /** True when the car has a passed physical inspection — drives the
+   * "Verified" badge. Distinct from CarOwner.is_verified (KYC). */
+  is_verified: boolean;
+};
+
+/** Inspector-verified condition report, present on public detail once a car has
+ * passed inspection. Never contains ID or staff-identity data. */
+export type VerifiedReport = {
+  condition: string;
+  car_type: string;
+  mileage: number;
+  fuel_type: string;
+  features: string[];
+  engine_condition: string;
+  chassis_condition: string;
+  ac_condition: string;
+  is_flooded: boolean;
+  has_accident_history: boolean;
+  notes: string;
+  inspected_at: string;
 };
 
 export type CarDetail = CarListItem & {
@@ -76,4 +96,5 @@ export type CarDetail = CarListItem & {
   features: ListingFeature[];
   booked_periods: BookedPeriod[];
   available_from: string | null;
+  verified_report: VerifiedReport | null;
 };

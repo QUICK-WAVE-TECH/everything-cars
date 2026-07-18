@@ -1,5 +1,5 @@
 import json
-from datetime import timedelta, time
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
@@ -24,16 +24,26 @@ from apps.notifications.service import (
     notify_inspection_failed,
     notify_inspection_no_show,
     notify_inspection_rescheduled,
+    notify_assistance_requested,
+)
+from apps.notifications.email_service import (
+    send_assistance_booked,
+    send_assistance_received,
+    send_booking_confirmation,
 )
 from .models import (
     ACTIVE_BOOKING_STATUSES,
+    OCCUPIED_BOOKING_STATUSES,
     ActorRole,
+    AttendeeType,
     BookingStatus,
     InspectionBooking,
     InspectionCenter,
     InspectionResult,
     InspectionSlot,
     PhysicalInspection,
+    AssistanceStatus,
+    AssistanceRequest,
 )
 from .services import generate_tracking_id, record_status_change
 from .serializers import (
@@ -46,6 +56,8 @@ from .serializers import (
     InspectionSlotCreateSerializer,
     InspectionSlotSerializer,
     PhysicalInspectionSerializer,
+    AssistanceRequestCreateSerializer,
+    AssistanceRequestSerializer,
 )
 
 
@@ -64,6 +76,16 @@ def _valid_uuid_or_none(value):
     try:
         return uuid_module.UUID(value)
     except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def _valid_date_or_none(value):
+    """Query-param dates are user input — a malformed date must 400, not 500."""
+    from datetime import date as date_cls
+
+    try:
+        return date_cls.fromisoformat(value)
+    except (ValueError, TypeError):
         return None
 
 
@@ -86,6 +108,14 @@ def _parse_bool(value):
     return None
 
 
+# Cancel/reschedule are locked from the start of the appointment day onward; an
+# absence on the day itself becomes a staff-recorded no-show instead.
+DAY_OF_LOCK_MESSAGE = (
+    "Changes are locked on the day of the appointment. "
+    "Contact staff if you cannot attend."
+)
+
+
 def schedule_notification(notify_func, get_payload):
     transaction.on_commit(lambda: notify_func(get_payload()), robust=True)
 
@@ -99,7 +129,100 @@ def booking_detail_queryset():
         "slot__center",
         "slot__created_by",
         "booked_by",
+        "inspection",
+        "inspection__inspector",
+        "inspection__documents",
     ).prefetch_related("car__images", "car__features")
+
+
+def create_booking_core(
+    *, car, slot, booked_by, attendee, actor, actor_role, request=None
+):
+    """Shared booking rules for owner-self-booking and staff-books-for-owner.
+
+    Assumes `car` and `slot` are already locked (select_for_update) inside the
+    caller's transaction and the slot is active. Returns (booking, error_response)
+    — exactly one is non-None.
+    """
+    if car.status not in BOOKABLE_CAR_STATUSES:
+        return None, Response(
+            {
+                "detail": f"Cannot book inspection — car status is '{car.get_status_display()}'."
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if _slot_has_started(slot):
+        return None, Response(
+            {"detail": "Cannot book a slot that has already started."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    current_bookings = InspectionBooking.objects.filter(
+        slot=slot, status__in=ACTIVE_BOOKING_STATUSES
+    ).count()
+    if current_bookings >= slot.capacity:
+        return None, Response(
+            {"detail": "This slot is full. Please pick another."},
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    # Rebooking after a cancel/no-show counts toward the per-center cap.
+    last_booking = (
+        InspectionBooking.objects.filter(car=car).order_by("-created_at").first()
+    )
+    reschedule_count = 0
+    if last_booking and last_booking.status in (
+        BookingStatus.CANCELLED,
+        BookingStatus.NO_SHOW,
+    ):
+        reschedule_count = last_booking.reschedule_count + 1
+        if reschedule_count > slot.center.max_reschedules:
+            return None, Response(
+                {
+                    "detail": (
+                        f"Maximum rebookings ({slot.center.max_reschedules}) reached. "
+                        "Contact staff to rebook."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    try:
+        booking = InspectionBooking.objects.create(
+            car=car,
+            slot=slot,
+            booked_by=booked_by,
+            reschedule_count=reschedule_count,
+            attendee_type=attendee["attendee_type"],
+            rep_name=attendee.get("rep_name", ""),
+            rep_id_type=attendee.get("rep_id_type", ""),
+            rep_id_number=attendee.get("rep_id_number", ""),
+            consent_accepted_at=(
+                timezone.now()
+                if attendee["attendee_type"] == AttendeeType.REPRESENTATIVE
+                else None
+            ),
+        )
+    except IntegrityError:
+        return None, Response(
+            {"detail": "This car already has an active inspection booking."},
+            status=status.HTTP_409_CONFLICT,
+        )
+
+    extra = []
+    if not car.tracking_id:
+        car.tracking_id = generate_tracking_id(slot.center)
+        extra.append("tracking_id")
+    record_status_change(
+        car,
+        CarStatus.INSPECTION_PENDING,
+        actor=actor,
+        actor_role=actor_role,
+        extra_update_fields=extra,
+        request=request,
+    )
+    return booking, None
 
 
 # ── Staff Slot Management ──
@@ -122,11 +245,12 @@ class StaffSlotListCreateView(APIView):
         if is_active is not None:
             slots = slots.filter(is_active=is_active.lower() == "true")
 
-        # Annotate with booking count
+        # Display count for the staff calendar — include completed/no-show so a
+        # slot that was attended still reads as booked (matches the day view).
         slots = slots.annotate(
             bookings_count=Count(
                 "bookings",
-                filter=Q(bookings__status__in=ACTIVE_BOOKING_STATUSES),
+                filter=Q(bookings__status__in=OCCUPIED_BOOKING_STATUSES),
             )
         ).order_by("date", "start_time", "created_at")
 
@@ -150,54 +274,44 @@ class StaffSlotListCreateView(APIView):
         capacity = data["capacity"]
         center = data["center"]
 
-        created = []
+        # The serializer normalizes time_slots into `time` objects, so build the
+        # rows and insert them in one query. Skip combinations that already
+        # exist (the unique constraint) so we can report an accurate count, and
+        # let ignore_conflicts absorb any race with a concurrent create.
+        existing = set(
+            InspectionSlot.objects.filter(
+                center=center, date__range=(date_from, date_to)
+            ).values_list("date", "start_time", "end_time")
+        )
+        to_create = []
+        seen = set()  # de-dupe identical rows within a single payload
         current = date_from
         while current <= date_to:
             if current.weekday() in days:
                 for ts in time_slots:
-                    start = ts["start_time"]
-                    end = ts["end_time"]
-                    # Parse time strings if needed
-                    if isinstance(start, str):
-                        parts = (
-                            start.replace("AM", "").replace("PM", "").strip().split(":")
+                    key = (current, ts["start_time"], ts["end_time"])
+                    if key in existing or key in seen:
+                        continue
+                    seen.add(key)
+                    to_create.append(
+                        InspectionSlot(
+                            date=current,
+                            start_time=ts["start_time"],
+                            end_time=ts["end_time"],
+                            center=center,
+                            capacity=ts.get("capacity", capacity),
+                            created_by=request.user,
                         )
-                        hour = int(parts[0])
-                        minute = int(parts[1]) if len(parts) > 1 else 0
-                        if "PM" in ts["start_time"] and hour != 12:
-                            hour += 12
-                        if "AM" in ts["start_time"] and hour == 12:
-                            hour = 0
-                        start = time(hour, minute)
-                    if isinstance(end, str):
-                        parts = (
-                            end.replace("AM", "").replace("PM", "").strip().split(":")
-                        )
-                        hour = int(parts[0])
-                        minute = int(parts[1]) if len(parts) > 1 else 0
-                        if "PM" in ts["end_time"] and hour != 12:
-                            hour += 12
-                        if "AM" in ts["end_time"] and hour == 12:
-                            hour = 0
-                        end = time(hour, minute)
-
-                    slot, was_created = InspectionSlot.objects.get_or_create(
-                        date=current,
-                        start_time=start,
-                        end_time=end,
-                        center=center,
-                        defaults={
-                            "capacity": capacity,
-                            "created_by": request.user,
-                        },
                     )
-                    if was_created:
-                        created.append(slot)
             current += timedelta(days=1)
+
+        created = InspectionSlot.objects.bulk_create(
+            to_create, ignore_conflicts=True
+        )
 
         return Response(
             {
-                "created_count": len(created),
+                "created_count": len(to_create),
                 "slots": InspectionSlotSerializer(created, many=True).data,
             },
             status=status.HTTP_201_CREATED,
@@ -299,9 +413,7 @@ class StaffSlotDetailView(APIView):
                 {"detail": "Slot not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
-        has_active = slot.bookings.filter(
-            status__in=ACTIVE_BOOKING_STATUSES
-        ).exists()
+        has_active = slot.bookings.filter(status__in=ACTIVE_BOOKING_STATUSES).exists()
         if has_active:
             return Response(
                 {"detail": "Cannot deactivate a slot with active bookings."},
@@ -316,15 +428,16 @@ class StaffSlotDetailView(APIView):
 
 
 class AvailableSlotsView(APIView):
-    permission_classes = [IsOwner]
+    # Owners browse slots to book; staff also need them to book on an owner's
+    # behalf from the assistance queue.
+    permission_classes = [IsOwner | IsStaff]
 
     def get(self, request):
         now = timezone.localtime()
         slots = (
             InspectionSlot.objects.filter(is_active=True)
             .filter(
-                Q(date__gt=now.date())
-                | Q(date=now.date(), start_time__gt=now.time())
+                Q(date__gt=now.date()) | Q(date=now.date(), start_time__gt=now.time())
             )
             .select_related("center")
             .annotate(
@@ -339,13 +452,33 @@ class AvailableSlotsView(APIView):
 
         center_filter = request.query_params.get("center")
         if center_filter:
-            slots = slots.filter(center_id=center_filter)
+            center_uuid = _valid_uuid_or_none(center_filter)
+            if center_uuid is None:
+                return Response(
+                    {"detail": "Invalid center id."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            slots = slots.filter(center_id=center_uuid)
 
-        date_filter = request.query_params.get("date")
-        if date_filter:
-            slots = slots.filter(date=date_filter)
+        # Exact-day, or a bounded [date_from, date_to] window so callers load one
+        # visible calendar month at a time instead of every future slot.
+        for param, lookup in (
+            ("date", "date"),
+            ("date_from", "date__gte"),
+            ("date_to", "date__lte"),
+        ):
+            raw = request.query_params.get(param)
+            if not raw:
+                continue
+            parsed = _valid_date_or_none(raw)
+            if parsed is None:
+                return Response(
+                    {"detail": f"Invalid {param}."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            slots = slots.filter(**{lookup: parsed})
 
-        # Add spots_remaining as annotation
+        # spots_remaining is derived per row from the booking-count annotation.
         for slot in slots:
             slot.spots_remaining = slot.capacity - slot.bookings_count
 
@@ -362,109 +495,63 @@ class OwnerBookingCreateView(APIView):
     def post(self, request):
         serializer = BookingCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
-        car_id = serializer.validated_data["car_id"]
-        slot_id = serializer.validated_data["slot_id"]
+        # ID-on-file gate — an owner with no ID document on record can't book.
+        # This is what lets us avoid asking for the owner's ID at every booking.
+        profile = getattr(request.user, "owner_profile", None)
+        if not profile or not profile.id_type or not profile.id_document:
+            return Response(
+                {
+                    "detail": (
+                        "Complete your ID verification in your profile "
+                        "before booking."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         with transaction.atomic():
             try:
-                car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
+                car = Car.objects.select_for_update().get(
+                    id=data["car_id"], owner=request.user
+                )
             except Car.DoesNotExist:
                 return Response(
                     {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
                 )
-
-            if car.status not in BOOKABLE_CAR_STATUSES:
-                return Response(
-                    {
-                        "detail": f"Cannot book inspection — car status is '{car.get_status_display()}'."
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
             try:
-                slot = InspectionSlot.objects.select_related(
-                    "center"
-                ).select_for_update(of=("self",)).get(id=slot_id, is_active=True)
+                slot = (
+                    InspectionSlot.objects.select_related("center")
+                    .select_for_update(of=("self",))
+                    .get(id=data["slot_id"], is_active=True)
+                )
             except InspectionSlot.DoesNotExist:
                 return Response(
                     {"detail": "Slot not found or inactive."},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            if _slot_has_started(slot):
-                return Response(
-                    {"detail": "Cannot book a slot that has already started."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            # Check capacity
-            current_bookings = InspectionBooking.objects.filter(
-                slot=slot, status__in=ACTIVE_BOOKING_STATUSES
-            ).count()
-            if current_bookings >= slot.capacity:
-                return Response(
-                    {"detail": "This slot is full. Please pick another."},
-                    status=status.HTTP_409_CONFLICT,
-                )
-
-            # Rebooking after a cancel/no-show counts as a reschedule so the
-            # per-center cap can't be bypassed by cancelling and rebooking.
-            # A COMPLETED last booking means the previous inspection cycle
-            # finished — a fresh cycle starts at zero.
-            last_booking = (
-                InspectionBooking.objects.filter(car=car)
-                .order_by("-created_at")
-                .first()
-            )
-            reschedule_count = 0
-            if last_booking and last_booking.status in (
-                BookingStatus.CANCELLED,
-                BookingStatus.NO_SHOW,
-            ):
-                reschedule_count = last_booking.reschedule_count + 1
-                if reschedule_count > slot.center.max_reschedules:
-                    return Response(
-                        {
-                            "detail": (
-                                "Maximum rebookings "
-                                f"({slot.center.max_reschedules}) reached. "
-                                "Contact staff to rebook."
-                            )
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-            try:
-                booking = InspectionBooking.objects.create(
-                    car=car,
-                    slot=slot,
-                    booked_by=request.user,
-                    reschedule_count=reschedule_count,
-                )
-            except IntegrityError:
-                return Response(
-                    {"detail": "This car already has an active inspection booking."},
-                    status=status.HTTP_409_CONFLICT,
-                )
-
-            extra = []
-            if not car.tracking_id:
-                car.tracking_id = generate_tracking_id(slot.center)
-                extra.append("tracking_id")
-            record_status_change(
-                car,
-                CarStatus.INSPECTION_PENDING,
+            booking, error = create_booking_core(
+                car=car,
+                slot=slot,
+                booked_by=request.user,
+                attendee=data,
                 actor=request.user,
                 actor_role=ActorRole.OWNER,
-                extra_update_fields=extra,
+                request=request,
             )
+            if error:
+                return error
 
         schedule_notification(
             notify_inspection_booked,
             lambda bid=booking.id: booking_detail_queryset().get(id=bid),
         )
-
+        schedule_notification(
+            send_booking_confirmation,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
         detail = booking_detail_queryset().get(id=booking.id)
         return Response(
             InspectionBookingSerializer(detail).data,
@@ -502,8 +589,10 @@ class OwnerBookingCancelView(APIView):
     def post(self, request, booking_id):
         with transaction.atomic():
             try:
-                booking = InspectionBooking.objects.select_for_update().get(
-                    id=booking_id, booked_by=request.user
+                booking = (
+                    InspectionBooking.objects.select_related("slot")
+                    .select_for_update(of=("self",))
+                    .get(id=booking_id, booked_by=request.user)
                 )
             except InspectionBooking.DoesNotExist:
                 return Response(
@@ -514,6 +603,12 @@ class OwnerBookingCancelView(APIView):
             if booking.status != BookingStatus.PENDING:
                 return Response(
                     {"detail": "Only pending bookings can be cancelled."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if booking.slot.date <= timezone.localdate():
+                return Response(
+                    {"detail": DAY_OF_LOCK_MESSAGE},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -535,6 +630,7 @@ class OwnerBookingCancelView(APIView):
                 actor=request.user,
                 actor_role=ActorRole.OWNER,
                 note="Inspection booking cancelled.",
+                request=request,
             )
 
         return Response({"detail": "Booking cancelled."})
@@ -567,6 +663,12 @@ class OwnerBookingRescheduleView(APIView):
             if booking.status not in (BookingStatus.PENDING, BookingStatus.NO_SHOW):
                 return Response(
                     {"detail": "This booking cannot be rescheduled."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if booking.slot.date <= timezone.localdate():
+                return Response(
+                    {"detail": DAY_OF_LOCK_MESSAGE},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -639,6 +741,7 @@ class OwnerBookingRescheduleView(APIView):
                     actor=request.user,
                     actor_role=ActorRole.OWNER,
                     note="Inspection rescheduled.",
+                    request=request,
                 )
 
         schedule_notification(
@@ -739,6 +842,7 @@ class StaffInspectionStartView(APIView):
                 CarStatus.INSPECTION_IN_PROGRESS,
                 actor=request.user,
                 actor_role=ActorRole.STAFF,
+                request=request,
             )
 
         schedule_notification(
@@ -778,7 +882,11 @@ class StaffInspectionSubmitView(APIView):
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def post(self, request, booking_id):
-        payload = request.data.dict() if hasattr(request.data, "dict") else request.data.copy()
+        payload = (
+            request.data.dict()
+            if hasattr(request.data, "dict")
+            else request.data.copy()
+        )
         features = payload.get("features")
         if isinstance(features, str):
             try:
@@ -828,7 +936,9 @@ class StaffInspectionSubmitView(APIView):
                 )
 
             document_serializer = None
-            requires_documents = bool(car.sale_price) and inspection_result != InspectionResult.FAILED
+            requires_documents = (
+                bool(car.sale_price) and inspection_result != InspectionResult.FAILED
+            )
             has_document_payload = any(
                 payload.get(field)
                 for field in (
@@ -860,7 +970,9 @@ class StaffInspectionSubmitView(APIView):
                     document_serializer.save(inspection=inspection)
                 except IntegrityError:
                     return Response(
-                        {"detail": "Documents were already uploaded for this inspection."},
+                        {
+                            "detail": "Documents were already uploaded for this inspection."
+                        },
                         status=status.HTTP_409_CONFLICT,
                     )
 
@@ -879,6 +991,7 @@ class StaffInspectionSubmitView(APIView):
                 actor_role=ActorRole.STAFF,
                 note=inspection.staff_notes,
                 extra_update_fields=extra,
+                request=request,
             )
 
         schedule_notification(
@@ -1012,6 +1125,7 @@ class StaffClearanceResolveView(APIView):
                 actor_role=ActorRole.STAFF,
                 note=note,
                 extra_update_fields=extra,
+                request=request,
             )
 
         schedule_notification(
@@ -1072,6 +1186,7 @@ class OwnerClearanceResponseView(APIView):
                 actor=request.user,
                 actor_role=ActorRole.OWNER,
                 note=message,
+                request=request,
             )
 
         schedule_notification(
@@ -1121,6 +1236,7 @@ class StaffBookingNoShowView(APIView):
                 actor=request.user,
                 actor_role=ActorRole.STAFF,
                 note="Missed inspection appointment.",
+                request=request,
             )
 
         schedule_notification(
@@ -1251,3 +1367,185 @@ class PublicCentersView(APIView):
                 qs = qs.filter(**{f"{param}__iexact": value})
 
         return Response(InspectionCenterSerializer(qs, many=True).data)
+
+
+class OwnerAssistanceCreateView(APIView):
+    permission_classes = [IsOwner]
+
+    def get(self, request):
+        """The owner's own assistance requests — lets the UI show an already-sent
+        state instead of allowing a duplicate."""
+        qs = (
+            AssistanceRequest.objects.filter(owner=request.user)
+            .select_related("car")
+            .order_by("-created_at")
+        )
+        car = request.query_params.get("car")
+        if car:
+            car_uuid = _valid_uuid_or_none(car)
+            if car_uuid is None:
+                return Response(
+                    {"detail": "Invalid car id."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            qs = qs.filter(car_id=car_uuid)
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return Response(AssistanceRequestSerializer(qs, many=True).data)
+
+    def post(self, request):
+        serializer = AssistanceRequestCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        car = None
+        if data.get("car_id"):
+            car = Car.objects.filter(id=data["car_id"], owner=request.user).first()
+            if car is None:
+                return Response(
+                    {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
+                )
+
+        # Dedup — one open request per owner+car, so repeated taps don't pile up.
+        if AssistanceRequest.objects.filter(
+            owner=request.user, car=car, status=AssistanceStatus.OPEN
+        ).exists():
+            return Response(
+                {
+                    "detail": "You already have an open assistance request for this vehicle."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        assistance = AssistanceRequest.objects.create(
+            owner=request.user,
+            car=car,
+            country=data.get("country", ""),
+            state=data.get("state", ""),
+            message=data.get("message", ""),
+        )
+        schedule_notification(
+            notify_assistance_requested,
+            lambda aid=assistance.id: AssistanceRequest.objects.select_related(
+                "owner", "car"
+            ).get(id=aid),
+        )
+        # Confirmation email to the owner.
+        schedule_notification(
+            send_assistance_received,
+            lambda aid=assistance.id: AssistanceRequest.objects.select_related(
+                "owner"
+            ).get(id=aid),
+        )
+        return Response(
+            AssistanceRequestSerializer(assistance).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class StaffAssistanceListView(APIView):
+    permission_classes = [IsStaff]
+
+    def get(self, request):
+        qs = AssistanceRequest.objects.select_related("owner", "car").all()
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = AssistanceRequestSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+
+class StaffAssistanceHandleView(APIView):
+    permission_classes = [IsStaff]
+
+    def post(self, request, request_id):
+        try:
+            assistance = AssistanceRequest.objects.get(id=request_id)
+        except AssistanceRequest.DoesNotExist:
+            return Response(
+                {"detail": "Request not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+        if assistance.status == AssistanceStatus.HANDLED:
+            return Response(
+                {"detail": "This request is already handled."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        assistance.status = AssistanceStatus.HANDLED
+        assistance.handled_by = request.user
+        assistance.handled_at = timezone.now()
+        assistance.save(update_fields=["status", "handled_by", "handled_at"])
+        return Response(AssistanceRequestSerializer(assistance).data)
+
+
+class StaffBookForOwnerView(APIView):
+    permission_classes = [IsStaff]
+
+    def post(self, request):
+        serializer = BookingCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        with transaction.atomic():
+            try:
+                car = (
+                    Car.objects.select_for_update()
+                    .select_related("owner")
+                    .get(id=data["car_id"])
+                )
+            except Car.DoesNotExist:
+                return Response(
+                    {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
+                )
+            try:
+                slot = (
+                    InspectionSlot.objects.select_related("center")
+                    .select_for_update(of=("self",))
+                    .get(id=data["slot_id"], is_active=True)
+                )
+            except InspectionSlot.DoesNotExist:
+                return Response(
+                    {"detail": "Slot not found or inactive."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # Staff verified identity out of band, so the ID-on-file gate is
+            # intentionally skipped. booked_by is the owner; the history actor is
+            # the staff member, so the audit shows staff placed the booking.
+            booking, error = create_booking_core(
+                car=car,
+                slot=slot,
+                booked_by=car.owner,
+                attendee=data,
+                actor=request.user,
+                actor_role=ActorRole.STAFF,
+                request=request,
+            )
+            if error:
+                return error
+
+            # Close any open assistance request for this owner+car.
+            AssistanceRequest.objects.filter(
+                owner=car.owner, car=car, status=AssistanceStatus.OPEN
+            ).update(
+                status=AssistanceStatus.HANDLED,
+                handled_by=request.user,
+                handled_at=timezone.now(),
+            )
+
+        schedule_notification(
+            notify_inspection_booked,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
+        # Staff booked on the owner's behalf → the "we booked it for you" email.
+        schedule_notification(
+            send_assistance_booked,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
+        detail = booking_detail_queryset().get(id=booking.id)
+        return Response(
+            InspectionBookingSerializer(detail).data,
+            status=status.HTTP_201_CREATED,
+        )

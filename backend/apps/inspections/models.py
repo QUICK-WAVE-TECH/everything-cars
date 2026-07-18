@@ -3,7 +3,7 @@ import uuid
 from django.db import models
 
 from apps.listings.models import Car
-from apps.users.models import User
+from apps.users.models import User, IDType
 from django_countries.fields import CountryField
 
 
@@ -86,9 +86,29 @@ class BookingStatus(models.TextChoices):
     CANCELLED = "cancelled", "Cancelled"
 
 
+class AssistanceStatus(models.TextChoices):
+    OPEN = "open", "Open"
+    HANDLED = "handled", "Handled"
+
+
 ACTIVE_BOOKING_STATUSES = [BookingStatus.PENDING, BookingStatus.APPROVED]
 
+# Bookings that actually took the slot — used for the staff calendar's display
+# count so a completed/no-show inspection still reads as "booked" (it happened),
+# matching the day-activity view. Only cancelled/rejected free the slot.
+OCCUPIED_BOOKING_STATUSES = [
+    BookingStatus.PENDING,
+    BookingStatus.APPROVED,
+    BookingStatus.COMPLETED,
+    BookingStatus.NO_SHOW,
+]
+
 MAX_RESCHEDULES = 2
+
+
+class AttendeeType(models.TextChoices):
+    SELF = "self", "Owner attends"
+    REPRESENTATIVE = "representative", "Representative attends"
 
 
 class InspectionBooking(models.Model):
@@ -109,6 +129,18 @@ class InspectionBooking(models.Model):
         db_index=True,
     )
     reschedule_count = models.PositiveSmallIntegerField(default=0)
+    # Attendee declaration — who is physically showing up for the inspection.
+    attendee_type = models.CharField(
+        max_length=20, choices=AttendeeType.choices, default=AttendeeType.SELF
+    )
+    rep_name = models.CharField(max_length=200, blank=True, default="")
+    rep_id_type = models.CharField(
+        max_length=20, choices=IDType.choices, blank=True, default=""
+    )
+    rep_id_number = models.CharField(max_length=50, blank=True, default="")
+    # Proof of authorization consent — null unless a representative is declared.
+    # A timestamp (not a bool) records both that consent was given and when.
+    consent_accepted_at = models.DateTimeField(null=True, blank=True)
     staff_note = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -161,6 +193,14 @@ class InspectionResult(models.TextChoices):
     FAILED = "failed", "Failed"
 
 
+class PresentedAttendee(models.TextChoices):
+    """Who the inspector confirmed presented — only the owner or the declared
+    representative are permitted to attend."""
+
+    OWNER = "owner", "Owner"
+    REPRESENTATIVE = "representative", "Declared representative"
+
+
 class PhysicalInspection(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     booking = models.OneToOneField(
@@ -188,6 +228,19 @@ class PhysicalInspection(models.Model):
     has_accident_history = models.BooleanField(default=False)
     result = models.CharField(max_length=20, choices=InspectionResult.choices)
     staff_notes = models.TextField(blank=True, default="")
+    # Day-of identity capture — who actually presented, and the ID they showed.
+    # Staff-only: never serialized to owner/public responses.
+    presented_attendee = models.CharField(
+        max_length=20, choices=PresentedAttendee.choices, blank=True, default=""
+    )
+    presented_id_type = models.CharField(
+        max_length=20, choices=IDType.choices, blank=True, default=""
+    )
+    presented_id_number = models.CharField(max_length=50, blank=True, default="")
+    presented_id_document = models.ImageField(
+        upload_to="identity-docs/presented/%Y/%m/", blank=True, null=True
+    )
+
     inspected_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -257,6 +310,13 @@ class CarStatusHistory(models.Model):
     )
     actor_role = models.CharField(max_length=20, choices=ActorRole.choices)
     note = models.TextField(blank=True, default="")
+    actor_name = models.CharField(max_length=255, blank=True, default="")
+    actor_email = models.CharField(max_length=254, blank=True, default="")
+    actor_phone = models.CharField(max_length=20, blank=True, default="")
+    # Request forensics — who acted, from where. Empty for system transitions
+    # (auto-publish, etc.) since those have no HTTP request behind them.
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -270,3 +330,46 @@ class CarStatusHistory(models.Model):
 
     def __str__(self):
         return f"{self.car} - {self.from_status} -> {self.to_status}"
+
+
+class AssistanceRequest(models.Model):
+    """
+    An owner in a state with no inspection center asks staff to help book.
+    Backs the 'no centers near you' flow and the staff work queue
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="assistance_requests"
+    )
+    car = models.ForeignKey(
+        Car,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="assistance_requests",
+    )
+    country = models.CharField(max_length=100, blank=True, default="")
+    state = models.CharField(max_length=250, blank=True, default="")
+    message = models.TextField(blank=True, default="")
+    status = models.CharField(
+        max_length=10,
+        choices=AssistanceStatus.choices,
+        default=AssistanceStatus.OPEN,
+        db_index=True,
+    )
+    handled_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="handled_assistance",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    handled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Assistance {self.owner} ({self.status})"

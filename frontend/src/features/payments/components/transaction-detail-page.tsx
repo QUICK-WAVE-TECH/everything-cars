@@ -475,7 +475,7 @@ export function TransactionDetailPage({ backHref }: { backHref: string }) {
         )}
 
         {/* Two-column grid */}
-        <div className="txn-grid grid items-start gap-7" style={{ gridTemplateColumns: "minmax(0,1.7fr) minmax(300px,1fr)" }}>
+        <div className="txn-grid grid grid-cols-1 items-start gap-7 lg:grid-cols-[minmax(0,1.7fr)_minmax(300px,1fr)]">
           {/* Left — accordions */}
           <div className="flex flex-col gap-6">
             <Section icon="file" title="Transaction Details" subtitle="Reference, vehicle and rental terms">
@@ -512,7 +512,7 @@ export function TransactionDetailPage({ backHref }: { backHref: string }) {
           </div>
 
           {/* Right — sticky summary */}
-          <aside className="flex flex-col gap-6" style={{ position: "sticky", top: 108 }}>
+          <aside className="flex flex-col gap-6 lg:sticky lg:top-[108px]">
             <div className="overflow-hidden rounded-2xl border border-(--brc-border) bg-white shadow-[var(--brc-shadow-xs)]">
               {/* Car image */}
               <div className="flex flex-col items-center gap-3.5 border-b border-(--brc-border) bg-(--brc-bg-subtle) px-6 pb-5 pt-7">

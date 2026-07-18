@@ -4,7 +4,7 @@ import { useMemo, useState, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { XIcon, CheckIcon, SearchIcon, Loader2Icon } from "lucide-react";
+import { ArrowRightIcon, ClipboardCheckIcon, XIcon, CheckIcon, SearchIcon, Loader2Icon } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,6 +20,7 @@ import {
 } from "@/features/listings/api/admin-api";
 import type { CarListItem } from "@/features/listings/api/types";
 import { CarStatusTimeline } from "@/features/listings/components/car-status-timeline";
+import { InspectionRecordPanel } from "@/features/inspections/components/inspection-record-panel";
 import {
   useStaffBookings,
   useStartInspection,
@@ -137,7 +138,7 @@ function TrendPill({ tone = "neutral", children }: { tone?: "up" | "warn" | "neu
   };
   const c = colors[tone];
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold [font-family:var(--brc-font-ui)]" style={{ background: c.bg, color: c.fg }}>
+    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold [font-family:var(--brc-font-ui)]" style={{ background: c.bg, color: c.fg }}>
       {children}
     </span>
   );
@@ -148,7 +149,7 @@ function KpiCard({ icon, label, value, accent, sub, share }: {
   icon: IconName; label: string; value: number; accent: string; sub: React.ReactNode; share: number;
 }) {
   return (
-    <div className="group/kpi relative isolate flex min-w-[200px] flex-1 overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-[1px] shadow-[var(--brc-shadow-xs)] transition-all duration-300 ease-out hover:-translate-y-1 hover:border-transparent hover:shadow-[0_18px_38px_rgba(0,0,139,0.12)]">
+    <div className="group/kpi relative isolate flex min-w-0 overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-[1px] shadow-[var(--brc-shadow-xs)] transition-all duration-300 ease-out hover:-translate-y-1 hover:border-transparent hover:shadow-[0_18px_38px_rgba(0,0,139,0.12)]">
       <span
         className="pointer-events-none absolute inset-x-0 top-0 h-px opacity-0 transition-opacity duration-300 group-hover/kpi:opacity-100"
         style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }}
@@ -157,18 +158,18 @@ function KpiCard({ icon, label, value, accent, sub, share }: {
         className="pointer-events-none absolute -right-12 -top-16 size-36 rounded-full opacity-0 blur-2xl transition-opacity duration-300 group-hover/kpi:opacity-20"
         style={{ background: accent }}
       />
-      <div className="relative z-10 flex w-full flex-col gap-[18px] rounded-[calc(1rem-1px)] bg-white p-5">
-        <div className="flex items-center justify-between gap-2">
+      <div className="relative z-10 flex w-full flex-col gap-4 rounded-[calc(1rem-1px)] bg-white p-4 sm:gap-[18px] sm:p-5">
+        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span
-            className="flex size-11 items-center justify-center rounded-xl border transition-transform duration-300 ease-out group-hover/kpi:scale-110 group-hover/kpi:-rotate-3"
+            className="flex size-9 items-center justify-center rounded-xl border transition-transform duration-300 ease-out group-hover/kpi:scale-110 group-hover/kpi:-rotate-3 sm:size-11"
             style={{ background: `color-mix(in srgb, ${accent} 13%, #fff)`, borderColor: `color-mix(in srgb, ${accent} 22%, transparent)` }}
           >
             <Icon name={icon} size={21} stroke={accent} />
           </span>
-          {sub}
+          <span className="max-w-full">{sub}</span>
         </div>
         <div className="flex flex-col gap-1">
-          <span className="text-[40px] font-extrabold leading-none tracking-tight text-(--brc-text) [font-family:var(--brc-font-display)]">{value}</span>
+          <span className="text-[30px] font-extrabold leading-none tracking-tight text-(--brc-text) [font-family:var(--brc-font-display)] sm:text-[40px]">{value}</span>
           <span className="text-xs font-semibold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{label}</span>
         </div>
         <div className="h-[5px] overflow-hidden rounded-full bg-(--brc-bg-muted)">
@@ -189,7 +190,7 @@ const CHECKLIST = [
 
 // ── Inspection Booking Card ──
 function InspectionBookingCard({ carId, trackingId, phase }: { carId: string; trackingId: string | null; phase: "pending" | "in_progress" }) {
-  const { data: bookingsData, isLoading } = useStaffBookings({ status: "pending", car: carId });
+  const { data: bookingsData, isLoading } = useStaffBookings({ car: carId });
   const bookingResults = bookingsData?.results;
 
   const booking = useMemo(() => {
@@ -300,10 +301,7 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
 
   // Fetch the relevant booking directly instead of depending on the first page
   // of the admin booking list.
-  const { data: bookingsData } = useStaffBookings({
-    status: "pending",
-    car: carId ?? undefined,
-  });
+  const { data: bookingsData } = useStaffBookings({ car: carId ?? undefined });
   const drawerBookingResults = bookingsData?.results;
   const booking = useMemo(() => {
     if (!drawerBookingResults || !carId) return null;
@@ -515,9 +513,9 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
 
               {/* Price cards */}
               {prices.length > 0 && (
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   {prices.map((p) => (
-                    <div key={p.label} className="flex flex-1 flex-col gap-1 rounded-xl bg-(--brc-primary-tint) p-4">
+                    <div key={p.label} className="flex min-w-[140px] flex-1 flex-col gap-1 rounded-xl bg-(--brc-primary-tint) p-4">
                       <span className="text-xs font-semibold text-(--brc-primary) [font-family:var(--brc-font-ui)]">{p.label}</span>
                       <span className="text-[22px] font-extrabold text-(--brc-primary) [font-family:var(--brc-font-display)]">
                         {p.value}<span className="text-[13px] font-semibold">{p.unit ?? ""}</span>
@@ -635,6 +633,11 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
                 />
               </section>
 
+              {/* Inspector-uploaded files (presented ID + documents) */}
+              <InspectionRecordPanel
+                bookingId={clearanceBooking?.id ?? booking?.id ?? null}
+              />
+
               {/* Needs clearance note */}
               {isNeedsClearance && (
                 <section className="flex flex-col gap-3">
@@ -737,11 +740,19 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
               ) : isInspectionInProgress ? (
                 <div className="flex flex-col gap-2">
                   <button type="button" disabled={!booking} onClick={handleContinueInspection}
-                    className="group relative flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-xl border border-(--brc-primary)/15 bg-(--brc-primary) px-4 text-sm font-black text-white shadow-[0_14px_30px_rgba(0,0,139,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) hover:shadow-[0_18px_38px_rgba(0,0,139,0.26)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 [font-family:var(--brc-font-ui)]">
-                    <span className="relative z-10 whitespace-nowrap">Continue Inspection</span>
-                    <span className="relative z-10 flex size-7 items-center justify-center rounded-lg bg-white/14 transition-transform duration-200 group-hover:translate-x-0.5">
-                      <Icon name="chevright" size={15} stroke="currentColor" />
+                    className="group flex min-h-[58px] w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border border-(--brc-primary)/20 bg-(--brc-primary) px-4 text-left text-white shadow-[0_16px_34px_rgba(0,0,139,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-primary-hover) hover:shadow-[0_22px_42px_rgba(0,0,139,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-primary) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-(--brc-bg-muted) disabled:text-(--brc-text-muted) disabled:shadow-none disabled:hover:translate-y-0 [font-family:var(--brc-font-ui)]">
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/16 group-disabled:bg-white">
+                        <ClipboardCheckIcon size={19} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-black">Continue inspection</span>
+                        <span className="mt-0.5 block truncate text-xs font-semibold text-white/75 group-disabled:text-(--brc-text-muted)">
+                          Resume the physical inspection form
+                        </span>
+                      </span>
                     </span>
+                    <ArrowRightIcon size={18} className="shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" />
                   </button>
                   {!booking && (
                     <span className="text-center text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
@@ -915,7 +926,7 @@ export default function AdminApprovalsPage() {
 
       <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-[var(--brc-space-10,40px)]">
         {/* KPI Cards */}
-        <div className="flex flex-wrap gap-[18px]">
+        <div className="grid grid-cols-2 gap-3 sm:gap-[18px] lg:grid-cols-4">
           <KpiCard icon="clock" label="Pending Review" value={counts.draft} accent="#C8870B" share={counts.draft / Math.max(1, totalCars)}
             sub={<TrendPill tone={counts.draft > 0 ? "warn" : "up"}>{counts.draft > 0 ? `${counts.draft} awaiting` : "all clear"}</TrendPill>} />
           <KpiCard icon="clock" label="Inspection Pipeline" value={counts.inspection_pending + counts.inspection_in_progress} accent="#4338ca" share={(counts.inspection_pending + counts.inspection_in_progress) / Math.max(1, totalCars)}
@@ -941,17 +952,17 @@ export default function AdminApprovalsPage() {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 overflow-x-auto border-b border-(--brc-border)">
+          <div className="ec-tabscroll -mx-1 flex gap-1 overflow-x-auto border-b border-(--brc-border) px-1 pb-px">
             {TABS.map((t) => {
               const active = t.key === tab;
               return (
                 <button key={t.key} type="button" onClick={() => { setTab(t.key); setPage(1); }}
-                  className={cn("relative flex cursor-pointer items-center gap-2 whitespace-nowrap border-none bg-transparent px-3.5 pb-3 pt-2.5 text-sm transition-colors [font-family:var(--brc-font-ui)]", active ? "font-bold text-(--brc-primary)" : "font-medium text-(--brc-text-muted) hover:text-(--brc-text)")}>
+                  className={cn("relative flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap border-none bg-transparent px-3.5 pb-3 pt-2.5 text-sm transition-colors [font-family:var(--brc-font-ui)]", active ? "font-bold text-(--brc-primary)" : "font-medium text-(--brc-text-muted) hover:text-(--brc-text)")}>
                   {t.label}
-                  <span className={cn("inline-flex h-[18px] items-center rounded-full px-[7px] text-[11px] font-bold", active ? "bg-(--brc-primary-tint) text-(--brc-primary)" : "bg-(--brc-bg-muted) text-(--brc-text-muted)")}>
+                  <span className={cn("inline-flex h-[18px] shrink-0 items-center rounded-full px-[7px] text-[11px] font-bold tabular-nums", active ? "bg-(--brc-primary-tint) text-(--brc-primary)" : "bg-(--brc-bg-muted) text-(--brc-text-muted)")}>
                     {counts[t.key]}
                   </span>
-                  {active && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded bg-(--brc-primary)" />}
+                  {active && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded bg-(--brc-primary)" />}
                 </button>
               );
             })}

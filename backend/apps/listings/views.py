@@ -73,8 +73,13 @@ from apps.inspections.models import (
     ActorRole,
     BookingStatus,
     InspectionBooking,
+    PhysicalInspection,
+    InspectionResult,
 )
-from apps.inspections.serializers import CarStatusHistorySerializer
+from apps.inspections.serializers import (
+    CarStatusHistorySerializer,
+    StaffCarStatusHistorySerializer,
+)
 from apps.inspections.services import record_status_change
 
 
@@ -92,11 +97,21 @@ MAX_CAR_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
 # Editable: pre-approval states, the clearance loop, and failed inspections
 # (owner fixes the issues and resubmits for review). inspection_no_show
 # rebooks without editing.
+# Owners may only edit listing *content* (text/spec fields) when staff explicitly
+# requested changes. needs_clearance is answered with a message (not an edit); a
+# rejected inspection is fixed on the physical car and resubmitted. None of those
+# reopen the listing for editing.
 EDITABLE_CAR_STATUSES = [
+    CarStatus.NEEDS_CHANGES,
+]
+
+# Photo uploads are also allowed in DRAFT: creating a listing IS submitting it,
+# and photos are uploaded to the freshly-created draft as part of that flow.
+# (Text details are captured atomically at create time, so DRAFT text stays
+# locked — only the images arrive afterward.)
+IMAGE_EDITABLE_CAR_STATUSES = [
     CarStatus.DRAFT,
     CarStatus.NEEDS_CHANGES,
-    CarStatus.NEEDS_CLEARANCE,
-    CarStatus.INSPECTION_REJECTED,
 ]
 REQUEST_APPROVAL_BLOCKING_STATUSES = [
     RequestStatus.APPROVED,
@@ -304,6 +319,9 @@ class MyCarListCreateView(APIView):
             Car.objects.filter(owner=request.user)
             .select_related("owner__owner_profile")
             .prefetch_related("images")
+            # Annotate availability so the serializer doesn't run per-car request
+            # queries (N+1) computing each card's status.
+            .annotate(_is_sold=sold_annotation(), **availability_annotations())
         )
         # exclude archived unless explicitly requested for
         status_filter = request.query_params.get("status")
@@ -430,6 +448,7 @@ class MyCarDetailView(APIView):
                 CarStatus.ARCHIVED,
                 actor=request.user,
                 actor_role=ActorRole.OWNER,
+                request=request,
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -444,7 +463,7 @@ class CarImageUploadView(APIView):
         try:
             with transaction.atomic():
                 car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
-                if car.status not in EDITABLE_CAR_STATUSES:
+                if car.status not in IMAGE_EDITABLE_CAR_STATUSES:
                     return Response(
                         {"detail": "Car images cannot be uploaded in this status."},
                         status=status.HTTP_403_FORBIDDEN,
@@ -568,6 +587,16 @@ class PublicCarListView(APIView):
             .prefetch_related("images")
             .annotate(**availability_annotations())
         )
+        # Prefetch each car's passed inspection so the serializer's is_verified /
+        # verified overlay reads it without a per-car query (N+1).
+        passed_prefetch = Prefetch(
+            "physical_inspections",
+            queryset=PhysicalInspection.objects.filter(
+                result=InspectionResult.PASSED
+            ).order_by("-inspected_at"),
+            to_attr="_passed_inspections",
+        )
+        cars = cars.prefetch_related(passed_prefetch)
 
         # Basic filters
         listing_type = request.query_params.get("listing_type")
@@ -653,14 +682,21 @@ class PublicCarDetailView(APIView):
             ).only("id", "start_date", "duration_days", "status"),
             to_attr="_booked_requests",
         )
+        passed_prefetch = Prefetch(
+            "physical_inspections",
+            queryset=PhysicalInspection.objects.filter(
+                result=InspectionResult.PASSED
+            ).order_by("-inspected_at"),
+            to_attr="_passed_inspections",
+        )
 
         try:
             car = (
                 Car.objects.select_related("owner__owner_profile")
-                .prefetch_related("images", "features", booked_prefetch)
-                .annotate(
-                    _is_sold=sold_annotation(), **availability_annotations()
+                .prefetch_related(
+                    "images", "features", booked_prefetch, passed_prefetch
                 )
+                .annotate(_is_sold=sold_annotation(), **availability_annotations())
                 .filter(Q(status=CarStatus.PUBLISHED) | Q(_is_sold=True))
                 .get(
                     id=car_id,
@@ -671,7 +707,9 @@ class PublicCarDetailView(APIView):
             return Response(
                 {"detail": "Car does not exist"}, status=status.HTTP_404_NOT_FOUND
             )
-        return Response(CarDetailSerializer(car, context={"request": request}).data)
+        return Response(
+            CarDetailSerializer(car, context={"request": request, "public": True}).data
+        )
 
 
 class MyCarHistoryView(APIView):
@@ -747,6 +785,7 @@ class MyCarStatusView(APIView):
                 actor=request.user,
                 actor_role=ActorRole.OWNER,
                 extra_update_fields=extra,
+                request=request,
             )
             if new_status == CarStatus.DRAFT:
                 # needs_changes → draft is a resubmission — tell staff
@@ -1071,8 +1110,12 @@ class AdminCarListView(APIView):
     permission_classes = [IsStaff]
 
     def get(self, request):
-        cars = Car.objects.select_related("owner__owner_profile").prefetch_related(
-            "images"
+        cars = (
+            Car.objects.select_related("owner__owner_profile")
+            .prefetch_related("images")
+            # Annotate availability so the serializer doesn't run per-car request
+            # queries (N+1) computing each card's status.
+            .annotate(_is_sold=sold_annotation(), **availability_annotations())
         )
 
         status_filter = request.query_params.get("status")
@@ -1203,6 +1246,7 @@ class AdminCarStatusView(APIView):
                 actor_role=ActorRole.STAFF,
                 note=note,
                 extra_update_fields=extra,
+                request=request,
             )
             notification_map = {
                 CarStatus.SUSPENDED: notify_listing_suspended,
@@ -1528,8 +1572,8 @@ class AdminCarHistoryView(APIView):
             return Response(
                 {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
             )
-        history = car.status_history.all()
-        return Response(CarStatusHistorySerializer(history, many=True).data)
+        history = car.status_history.select_related("actor").all()
+        return Response(StaffCarStatusHistorySerializer(history, many=True).data)
 
 
 class AdminCarStatusCountsView(APIView):
@@ -1568,6 +1612,7 @@ class AdminApproveListingView(APIView):
                 CarStatus.LISTING_APPROVED,
                 actor=request.user,
                 actor_role=ActorRole.STAFF,
+                request=request,
             )
 
         schedule_notification(

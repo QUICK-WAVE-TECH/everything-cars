@@ -204,8 +204,49 @@ export function TransactionsTable() {
         />
       </div>
 
-      {/* Table */}
-      <div style={{ overflowX: "auto" }}>
+      {/* Mobile card list — the table scrolls awkwardly on phones */}
+      <div className="flex flex-col gap-2.5 md:hidden">
+        {rows.length === 0 ? (
+          <div className="rounded-xl border border-(--brc-border) py-10 text-center text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+            No transactions match your filters.
+          </div>
+        ) : (
+          rows.map((t) => {
+            const detailPath = getDetailPath(pathname, t.id);
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => router.push(detailPath)}
+                className="flex w-full flex-col gap-2 rounded-xl border border-(--brc-border) bg-white p-3.5 text-left transition-colors hover:bg-[rgba(0,0,139,0.035)] [font-family:var(--brc-font-ui)]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <span className="min-w-0 text-sm font-semibold text-(--brc-text)">
+                    {capitalize(t.transaction_type)} — {t.car_detail}
+                  </span>
+                  <span
+                    className="shrink-0 text-sm font-bold"
+                    style={{ color: t.transaction_type === "refund" ? "var(--brc-success)" : "var(--brc-text)" }}
+                  >
+                    {formatAmount(t.amount, t.currency)}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-(--brc-text-secondary)">
+                  <span>{formatDate(t.created_at)}</span>
+                  <span aria-hidden>·</span>
+                  <span>{capitalize(t.payment_method)}</span>
+                  <span className="ml-auto">
+                    <TxnStatusBadge status={t.status} />
+                  </span>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      {/* Table (desktop) */}
+      <div className="hidden md:block" style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 820 }}>
           <thead>
             <tr>

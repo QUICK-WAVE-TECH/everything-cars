@@ -14,6 +14,7 @@ import Link from "next/link";
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
 import { useMe } from "@/features/auth/api";
+import { PromoBanner } from "@/shared/components";
 import { useCustomerRequests } from "@/features/requests/api";
 import { useTransactions } from "@/features/payments/api";
 import { usePublicCars } from "@/features/listings/api";
@@ -847,32 +848,22 @@ export default function CustomerDashboard() {
                 <h1 className="m-0 max-w-2xl text-[clamp(2rem,6vw,3.4rem)] font-black leading-[1.04] text-(--brc-text) [font-family:var(--brc-font-display)]">
                   {greetingText}
                 </h1>
-                <p className="mt-4 max-w-xl text-base leading-7 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                  {heroSubtitle}
-                </p>
               </div>
-              <div className="grid gap-3 sm:flex sm:flex-wrap">
+              <p className="max-w-xl text-base leading-7 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                {heroSubtitle}
+              </p>
+            </div>
+
+            <div className="relative z-10 flex flex-col justify-between gap-6">
+              <div className="brc-dashboard-badge-pop self-start rounded-2xl border border-(--brc-border) bg-(--brc-bg-subtle) px-4 py-3 text-sm font-bold text-(--brc-text-secondary) shadow-[var(--brc-shadow-xs)] [font-family:var(--brc-font-ui)] lg:self-end">
+                Fast approvals
+              </div>
+              <div className="grid gap-3 sm:flex sm:flex-wrap lg:justify-end lg:self-end">
                 <DashboardButton href="/services">Browse Cars</DashboardButton>
                 <DashboardButton href="/customer/requests" variant="soft">
                   View Requests
                 </DashboardButton>
               </div>
-            </div>
-
-            <div className="relative hidden min-h-[220px] items-end justify-center lg:flex">
-              <div className="brc-dashboard-car-shadow absolute inset-x-8 bottom-7 h-8 rounded-full bg-[rgba(0,0,139,0.12)] blur-xl" />
-              <div className="brc-dashboard-badge-pop absolute right-0 top-0 rounded-2xl border border-(--brc-border) bg-(--brc-bg-subtle) px-4 py-3 text-sm font-bold text-(--brc-text-secondary) shadow-[var(--brc-shadow-xs)] [font-family:var(--brc-font-ui)]">
-                Fast approvals
-              </div>
-              <Image
-                src="/car-lexus.png"
-                alt="Lexus car"
-                width={360}
-                height={230}
-                priority
-                className="brc-dashboard-hero-car relative z-10 object-contain"
-                style={{ width: "100%", maxWidth: 360, height: "auto" }}
-              />
             </div>
           </div>
         </section>
@@ -974,6 +965,17 @@ export default function CustomerDashboard() {
               </section>
             )}
             <LoyaltySnapshot />
+            <PromoBanner
+              tag="Featured"
+              title="The Weekend Drop"
+              subtitle="Premium rides, ready to roll. Limited runs only."
+              ctaLabel="Browse Cars"
+              href="/customer/listings"
+              image="/customer-banner.jpg"
+              imagePosition="50% 36%"
+              tone="primary"
+              className="flex-1"
+            />
           </aside>
         </div>
       </div>

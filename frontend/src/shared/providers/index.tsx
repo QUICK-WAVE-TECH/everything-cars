@@ -3,6 +3,7 @@
 import { QueryProvider } from "./query-provider";
 import { AuthProvider } from "./auth-provider";
 import { WebSocketProvider } from "./websocket-provider";
+import { FormSubmitOverlay } from "@/shared/components";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -10,6 +11,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <AuthProvider>
         <WebSocketProvider>{children}</WebSocketProvider>
       </AuthProvider>
+      <FormSubmitOverlay />
     </QueryProvider>
   );
 }

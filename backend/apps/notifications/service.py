@@ -1,35 +1,18 @@
 import logging
 import time
 
+from django.conf import settings
+
 from .models import Notification, NotificationType
+from .email_service import send_email
 from apps.users.models import User
 
 logger = logging.getLogger("notifications")
 
 
-def _create_notification(
-    recipient,
-    notification_type,
-    title,
-    message="",
-    data=None,
-):
-    """Create a notification and push via WebSocket if available."""
-    t0 = time.time()
-    notif = Notification.objects.create(
-        recipient=recipient,
-        notification_type=notification_type,
-        title=title,
-        message=message,
-        data=data or {},
-    )
-    db_ms = (time.time() - t0) * 1000
-    logger.info(
-        "[NOTIF] Created %s for %s — '%s' (DB: %.0fms)",
-        notification_type, recipient.email, title, db_ms,
-    )
-    _push_ws(notif)
-    return notif
+def _fe(path=""):
+    """Absolute frontend URL for email CTA buttons."""
+    return f"{settings.FRONTEND_URL.rstrip('/')}{path}"
 
 
 def _push_ws(notif):
@@ -61,12 +44,42 @@ def _push_ws(notif):
         )
         ws_ms = (time.time() - t0) * 1000
         logger.info(
-            "[WS] Pushed to %s (Redis: %.0fms)", group, ws_ms,
+            "[WS] Pushed to %s (Redis: %.0fms)",
+            group,
+            ws_ms,
         )
     except ImportError:
         logger.warning("[WS] Channels not installed — skipping push")
     except Exception as e:
         logger.error("[WS] Push failed: %s", e)
+
+
+def _create_notification(
+    recipient,
+    notification_type,
+    title,
+    message="",
+    data=None,
+):
+    """Create a notification and push via WebSocket if available."""
+    t0 = time.time()
+    notif = Notification.objects.create(
+        recipient=recipient,
+        notification_type=notification_type,
+        title=title,
+        message=message,
+        data=data or {},
+    )
+    db_ms = (time.time() - t0) * 1000
+    logger.info(
+        "[NOTIF] Created %s for %s — '%s' (DB: %.0fms)",
+        notification_type,
+        recipient.email,
+        title,
+        db_ms,
+    )
+    _push_ws(notif)
+    return notif
 
 
 # ── Request notifications ──
@@ -99,6 +112,15 @@ def notify_request_approved(request_obj):
             "request_id": str(request_obj.id),
             "car_id": str(request_obj.car_id),
             "car_title": request_obj.car.title,
+        },
+    )
+    send_email(
+        recipient=request_obj.customer.email,
+        subject="Your request was approved",
+        template_key="request_approved",
+        context={
+            "car_title": request_obj.car.title,
+            "action_url": _fe(f"/customer/requests/{request_obj.id}"),
         },
     )
 
@@ -169,6 +191,17 @@ def notify_payment_confirmed(request_obj):
                 "car_title": request_obj.car.title,
             },
         )
+
+    send_email(
+        recipient=request_obj.customer.email,
+        subject="Payment confirmed",
+        template_key="payment_confirmed",
+        context={
+            "car_title": request_obj.car.title,
+            "amount": f"{request_obj.currency} {request_obj.price_offered}",
+            "action_url": _fe(f"/customer/requests/{request_obj.id}"),
+        },
+    )
 
 
 # ── Rental lifecycle notifications ──
@@ -244,12 +277,18 @@ def notify_listing_submitted(car, resubmitted=False):
     """All staff get notified when a listing enters the review queue —
     either a brand-new listing or one resubmitted after changes."""
     staff_users = User.objects.filter(is_staff=True, is_active=True)
-    title = "Listing resubmitted for review" if resubmitted else "New listing awaiting review"
+    title = (
+        "Listing resubmitted for review"
+        if resubmitted
+        else "New listing awaiting review"
+    )
     message = (
         f"The owner of {car.title} has made the requested changes — ready for re-review."
         if resubmitted
         else f"A new listing '{car.title}' is awaiting review."
     )
+    owner_name = car.owner.get_full_name() or car.owner.email
+    review_url = _fe("/admin/approvals")
     for staff in staff_users:
         _create_notification(
             recipient=staff,
@@ -257,6 +296,16 @@ def notify_listing_submitted(car, resubmitted=False):
             title=title,
             message=message,
             data={"car_id": str(car.id), "car_title": car.title},
+        )
+        send_email(
+            recipient=staff.email,
+            subject=title,
+            template_key="staff_new_listing",
+            context={
+                "car_title": car.title,
+                "owner_name": owner_name,
+                "review_url": review_url,
+            },
         )
 
 
@@ -272,6 +321,16 @@ def notify_changes_requested(car):
         ),
         data={"car_id": str(car.id), "car_title": car.title},
     )
+    send_email(
+        recipient=car.owner.email,
+        subject="Action needed: changes to your listing",
+        template_key="changes_requested",
+        context={
+            "car_title": car.title,
+            "admin_note": car.admin_note or "",
+            "action_url": _fe(f"/owner/my-cars/{car.id}"),
+        },
+    )
 
 
 def notify_listing_approved(car):
@@ -285,6 +344,15 @@ def notify_listing_approved(car):
             "you can now book an inspection."
         ),
         data={"car_id": str(car.id), "car_title": car.title},
+    )
+    send_email(
+        recipient=car.owner.email,
+        subject="Your listing is approved — book an inspection",
+        template_key="listing_approved",
+        context={
+            "car_title": car.title,
+            "action_url": _fe(f"/owner/my-cars/{car.id}"),
+        },
     )
 
 
@@ -341,20 +409,30 @@ def notify_needs_clearance(booking):
             "staff_note": booking.staff_note,
         },
     )
+    send_email(
+        recipient=booking.booked_by.email,
+        subject="Your inspection needs further clearance",
+        template_key="inspection_needs_clearance",
+        context={
+            "car_title": booking.car.title,
+            "clearance_note": booking.staff_note or "",
+            "action_url": _fe(f"/owner/my-cars/{booking.car_id}"),
+        },
+    )
 
 
 def notify_clearance_response(booking, response_message=""):
     """All staff get notified when an owner responds to a clearance request."""
     staff_users = User.objects.filter(is_staff=True, is_active=True)
-    detail = f': "{response_message}"' if response_message else " — ready for re-review."
+    detail = (
+        f': "{response_message}"' if response_message else " — ready for re-review."
+    )
     for staff in staff_users:
         _create_notification(
             recipient=staff,
             notification_type=NotificationType.CLEARANCE_RESPONSE,
             title="Clearance response received",
-            message=(
-                f"The owner of {booking.car.title} responded{detail}"
-            ),
+            message=(f"The owner of {booking.car.title} responded{detail}"),
             data={
                 "booking_id": str(booking.id),
                 "car_id": str(booking.car_id),
@@ -376,6 +454,16 @@ def notify_inspection_passed(booking):
             "car_title": booking.car.title,
         },
     )
+    send_email(
+        recipient=booking.booked_by.email,
+        subject="Passed! Your car is now live",
+        template_key="inspection_passed",
+        context={
+            "first_name": booking.booked_by.first_name,
+            "car_title": booking.car.title,
+            "action_url": _fe(f"/cars/{booking.car_id}"),
+        },
+    )
 
 
 def notify_inspection_failed(booking):
@@ -390,6 +478,16 @@ def notify_inspection_failed(booking):
             "car_id": str(booking.car_id),
             "car_title": booking.car.title,
             "staff_note": booking.staff_note,
+        },
+    )
+    send_email(
+        recipient=booking.booked_by.email,
+        subject="Inspection outcome for your car",
+        template_key="inspection_failed",
+        context={
+            "car_title": booking.car.title,
+            "reason": booking.staff_note or "",
+            "action_url": _fe(f"/owner/my-cars/{booking.car_id}"),
         },
     )
 
@@ -427,3 +525,68 @@ def notify_inspection_rescheduled(booking):
                 "owner_name": f"{booking.booked_by.first_name} {booking.booked_by.last_name}",
             },
         )
+
+    # Updated-appointment email to the owner.
+    send_email(
+        recipient=booking.booked_by.email,
+        subject="Your inspection has been rescheduled",
+        template_key="inspection_rescheduled",
+        context={
+            "car_title": booking.car.title,
+            "date": booking.slot.date.strftime("%a, %d %b %Y"),
+            "time": booking.slot.start_time.strftime("%I:%M %p").lstrip("0"),
+            "center": booking.slot.center.company_name,
+        },
+    )
+
+
+def notify_assistance_requested(assistance):
+    """All staff get notified when an owner requests booking assistance"""
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    car_title = assistance.car.title if assistance.car_id else "A vechile"
+    for staff in staff_users:
+        _create_notification(
+            recipient=staff,
+            notification_type=NotificationType.ASSISTANCE_REQUESTED,
+            title="Booking request received",
+            message=(
+                f"{assistance.owner.get_full_name()} needs help booking an "
+                f"inspection for {car_title} in {assistance.state or 'their area'}."
+            ),
+            data={
+                "assistance_id": str(assistance.id),
+                "owner_id": str(assistance.owner_id),
+                "state": assistance.state,
+            },
+        )
+        send_email(
+            recipient=staff.email,
+            subject="Owner needs booking assistance",
+            template_key="staff_assistance_request",
+            context={
+                "owner_name": assistance.owner.get_full_name(),
+                "state": assistance.state or "—",
+                # Empty → the template hides the whole Message block.
+                "message": assistance.message or "",
+            },
+        )
+
+
+def notify_owner_verified(user):
+    """Owner is notified (and emailed) when staff verifies their account."""
+    _create_notification(
+        recipient=user,
+        notification_type=NotificationType.SYSTEM,
+        title="Your account is verified",
+        message="Your account has been verified — you can now list cars.",
+        data={},
+    )
+    send_email(
+        recipient=user.email,
+        subject="You're verified — start listing",
+        template_key="owner_verified",
+        context={
+            "first_name": user.first_name,
+            "action_url": _fe("/owner/my-cars/new"),
+        },
+    )

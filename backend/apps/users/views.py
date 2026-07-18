@@ -9,8 +9,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.pagination import StandardPagination
+from common.permissions import IsStaff
 from .models import PasswordResetToken, User, CustomerProfile, OwnerProfile, AccessCode
 from .serializers import (
+    AdminOwnerSerializer,
     ChangePasswordSerializer,
     CustomerProfileSerializer,
     CustomerProfileWriteSerializer,
@@ -31,6 +34,8 @@ from .services import (
 )
 
 logger = logging.getLogger(__name__)
+
+LOCKED_OWNER_IDENTITY_FIELDS = {"id_type", "national_id", "id_document"}
 
 
 class SignUpView(APIView):
@@ -75,6 +80,8 @@ class SignUpView(APIView):
                     bank_account=data["bank_account"],
                     bank_name=data["bank_name"],
                     document=data.get("document"),
+                    id_type=data.get("id_type", ""),
+                    id_document=data.get("id_document"),
                 )
             transaction.on_commit(
                 lambda: generate_and_send_code(
@@ -272,6 +279,17 @@ class MeView(APIView):
 
     def patch(self, request):
         user = self._get_user(request)
+        if user.role == "owner" and hasattr(user, "owner_profile"):
+            locked_fields = LOCKED_OWNER_IDENTITY_FIELDS.intersection(request.data)
+            if locked_fields:
+                return Response(
+                    {
+                        field: "Means of identity cannot be edited from profile."
+                        for field in sorted(locked_fields)
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         serializer = UserProfileSerializer(user, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -421,4 +439,56 @@ class ChangePasswordView(APIView):
         return Response(
             {"message": "Password changed successfully"},
             status=status.HTTP_200_OK,
+        )
+
+
+class AdminOwnerListView(APIView):
+    """Staff review queue for owner KYC verification."""
+
+    permission_classes = [IsStaff]
+
+    def get(self, request):
+        qs = OwnerProfile.objects.select_related("user").order_by(
+            "is_verified", "-created_at"
+        )
+        verified = request.query_params.get("verified")
+        if verified is not None:
+            qs = qs.filter(is_verified=verified.lower() == "true")
+
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = AdminOwnerSerializer(
+            page, many=True, context={"request": request}
+        )
+        return paginator.get_paginated_response(serializer.data)
+
+
+class AdminOwnerVerifyView(APIView):
+    """Staff mark an owner verified (or revoke verification)."""
+
+    permission_classes = [IsStaff]
+
+    def post(self, request, user_id):
+        from apps.notifications.service import notify_owner_verified
+
+        try:
+            profile = OwnerProfile.objects.select_related("user").get(user_id=user_id)
+        except OwnerProfile.DoesNotExist:
+            return Response(
+                {"detail": "Owner not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        verify = request.data.get("verify", True)
+        was_verified = profile.is_verified
+        profile.is_verified = bool(verify)
+        profile.save(update_fields=["is_verified"])
+
+        # Notify + email only on a fresh verification (not on re-saves or revokes).
+        if profile.is_verified and not was_verified:
+            transaction.on_commit(
+                lambda: notify_owner_verified(profile.user), robust=True
+            )
+
+        return Response(
+            AdminOwnerSerializer(profile, context={"request": request}).data
         )

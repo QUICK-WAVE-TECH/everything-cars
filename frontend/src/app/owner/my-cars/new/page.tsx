@@ -15,6 +15,14 @@ import { Icon } from "@/features/auth/components/icon";
 import { CountrySelect, StateSelect, CityCombobox } from "@/features/auth/components";
 import { COUNTRIES } from "@/features/auth/data/countries";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useCreateCar, useUploadCarImages } from "@/features/listings/api";
 import type { CarImageFiles, CarImageType } from "@/features/listings/api/types";
@@ -241,6 +249,8 @@ export default function ListCarPage() {
   const uploadImages = useUploadCarImages();
   const [files, setFiles] = useState<CarImageFiles>({});
   const [done, setDone] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingValues, setPendingValues] = useState<CreateCarInput | null>(null);
   const submitInFlightRef = useRef(false);
 
   const form = useForm<CreateCarFormValues, unknown, CreateCarInput>({
@@ -333,15 +343,31 @@ export default function ListCarPage() {
   }
 
   function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
-    if (submitInFlightRef.current) {
-      event.preventDefault();
-      return;
-    }
-
-    submitInFlightRef.current = true;
-    void form.handleSubmit(handleSubmit, () => {
-      submitInFlightRef.current = false;
+    event.preventDefault();
+    // Validate the form, then open a confirmation modal instead of submitting
+    // straight away — the owner reviews everything, because after submission the
+    // listing locks until staff requests changes.
+    void form.handleSubmit((values) => {
+      const missingImages = REQUIRED_IMAGE_TYPES.filter((type) => !files[type]);
+      if (missingImages.length > 0) {
+        toast.error("Please add front, back, left side, and right side photos.");
+        return;
+      }
+      const oversized = findOversizedCarImage(files);
+      if (oversized) {
+        toast.error(`${oversized.name} is over 5 MB — please use a smaller photo.`);
+        return;
+      }
+      setPendingValues(values);
+      setConfirmOpen(true);
     })(event);
+  }
+
+  async function handleConfirmedSubmit() {
+    if (!pendingValues || submitInFlightRef.current) return;
+    submitInFlightRef.current = true;
+    setConfirmOpen(false);
+    await handleSubmit(pendingValues);
   }
 
   function handleReset() {
@@ -512,6 +538,60 @@ export default function ListCarPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="max-w-lg rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="[font-family:var(--brc-font-display)]">
+              Confirm your listing
+            </DialogTitle>
+            <DialogDescription className="[font-family:var(--brc-font-ui)]">
+              Review the details below. After you submit, the listing locks for
+              review — you won&apos;t be able to edit it unless our team requests
+              changes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <dl className="max-h-[50vh] divide-y divide-(--brc-border) overflow-y-auto rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle) px-4 text-sm [font-family:var(--brc-font-ui)]">
+            {[
+              { label: "Title", value: w.title },
+              { label: "Vehicle", value: [w.brand, w.model, w.year].filter(Boolean).join(" ") },
+              { label: "Listing type", value: w.listing_type },
+              w.sale_price ? { label: "Sale price", value: `${w.currency} ${w.sale_price}` } : null,
+              w.rent_price_per_day ? { label: "Rent / day", value: `${w.currency} ${w.rent_price_per_day}` } : null,
+              { label: "Location", value: [w.city, w.state].filter(Boolean).join(", ") },
+              w.mileage ? { label: "Mileage", value: w.mileage } : null,
+              { label: "Photos", value: `${Object.values(files).filter(Boolean).length} uploaded` },
+            ]
+              .filter((row): row is { label: string; value: string } => !!row && !!row.value)
+              .map((row) => (
+                <div key={row.label} className="flex items-start justify-between gap-4 py-2.5">
+                  <dt className="text-(--brc-text-muted)">{row.label}</dt>
+                  <dd className="text-right font-bold text-(--brc-text)">{row.value}</dd>
+                </div>
+              ))}
+          </dl>
+
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setConfirmOpen(false)}
+              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-border) bg-white px-4 text-sm font-bold text-(--brc-text) transition hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmedSubmit}
+              disabled={isSubmitting}
+              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-primary) px-5 text-sm font-black text-(--brc-text-on-primary) transition hover:bg-(--brc-primary-hover) disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
+            >
+              {isSubmitting && <Loader2Icon size={16} className="animate-spin" />}
+              {isSubmitting ? "Listing..." : "Confirm & submit"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
