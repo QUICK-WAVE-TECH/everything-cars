@@ -319,6 +319,9 @@ class MyCarListCreateView(APIView):
             Car.objects.filter(owner=request.user)
             .select_related("owner__owner_profile")
             .prefetch_related("images")
+            # Annotate availability so the serializer doesn't run per-car request
+            # queries (N+1) computing each card's status.
+            .annotate(_is_sold=sold_annotation(), **availability_annotations())
         )
         # exclude archived unless explicitly requested for
         status_filter = request.query_params.get("status")
@@ -1102,8 +1105,12 @@ class AdminCarListView(APIView):
     permission_classes = [IsStaff]
 
     def get(self, request):
-        cars = Car.objects.select_related("owner__owner_profile").prefetch_related(
-            "images"
+        cars = (
+            Car.objects.select_related("owner__owner_profile")
+            .prefetch_related("images")
+            # Annotate availability so the serializer doesn't run per-car request
+            # queries (N+1) computing each card's status.
+            .annotate(_is_sold=sold_annotation(), **availability_annotations())
         )
 
         status_filter = request.query_params.get("status")

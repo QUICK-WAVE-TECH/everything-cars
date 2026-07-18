@@ -25,6 +25,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import {
+  availabilityWindow,
   useAdminCenters,
   useAssistanceRequests,
   useAvailableSlots,
@@ -212,7 +213,13 @@ function BookForOwnerDialog({
     () => allCenters.filter((c) => !stateFilter || c.state === stateFilter),
     [allCenters, stateFilter],
   );
-  const { data: slots, isLoading: slotsLoading } = useAvailableSlots(centerId || undefined);
+  // Bound the read to a rolling window instead of every future slot.
+  const slotWindow = useMemo(() => availabilityWindow(), []);
+  const { data: slots, isLoading: slotsLoading } = useAvailableSlots(
+    centerId || undefined,
+    undefined,
+    slotWindow,
+  );
   const openSlots = useMemo(
     () => (slots ?? []).filter((s) => s.spots_remaining > 0),
     [slots],
@@ -609,7 +616,18 @@ export function AssistanceQueue() {
     }
   }
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <section className="mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-[var(--brc-space-10,40px)]">
+        <div className="flex items-center gap-2.5 rounded-2xl border border-(--brc-border) bg-white px-5 py-4 shadow-[var(--brc-shadow-xs)] [font-family:var(--brc-font-ui)]">
+          <Loader2Icon size={16} className="animate-spin text-(--brc-primary)" />
+          <span className="text-[13px] font-semibold text-(--brc-text-muted)">
+            Checking booking assistance requests…
+          </span>
+        </div>
+      </section>
+    );
+  }
   if (requests.length === 0) return null;
 
   return (

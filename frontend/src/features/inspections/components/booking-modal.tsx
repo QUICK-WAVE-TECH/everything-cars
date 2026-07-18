@@ -33,6 +33,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import {
+  availabilityWindow,
   useAvailableSlots,
   useCentersByCity,
   useCreateAssistanceRequest,
@@ -407,8 +408,12 @@ export function BookingModal({
   });
 
   const dateStr = selectedDate ? toDateString(selectedDate) : undefined;
+  // Bound the read to a rolling window instead of every future slot.
+  const slotWindow = useMemo(() => availabilityWindow(), []);
   const { data: allCenterSlots, isLoading: isLoadingAllSlots } = useAvailableSlots(
     selectedCenter?.id,
+    undefined,
+    slotWindow,
   );
   const { data: daySlots, isLoading: isLoadingDaySlots } = useAvailableSlots(
     selectedCenter?.id,

@@ -121,6 +121,68 @@ class StaffSlotManagementTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertGreater(res.data["created_count"], 0)
 
+    def test_create_slots_skips_existing_and_counts_accurately(self):
+        # Re-running the same batch must not duplicate slots (unique constraint)
+        # and created_count must reflect only newly-created rows.
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        payload = {
+            "date_from": tomorrow.isoformat(),
+            "date_to": tomorrow.isoformat(),
+            "days": [tomorrow.weekday()],
+            "time_slots": [{"start_time": "09:00", "end_time": "10:00"}],
+            "capacity": 1,
+            "center": str(self.center.id),
+        }
+        first = self.client.post("/api/v1/inspections/slots/", payload, format="json")
+        self.assertEqual(first.data["created_count"], 1)
+        second = self.client.post("/api/v1/inspections/slots/", payload, format="json")
+        self.assertEqual(second.data["created_count"], 0)
+        self.assertEqual(
+            InspectionSlot.objects.filter(
+                center=self.center, date=tomorrow, start_time=time(9, 0)
+            ).count(),
+            1,
+        )
+
+    def test_create_slots_rejects_range_over_90_days(self):
+        start = timezone.localdate() + timedelta(days=1)
+        end = start + timedelta(days=90)  # 91 days inclusive
+        res = self.client.post(
+            "/api/v1/inspections/slots/",
+            {
+                "date_from": start.isoformat(),
+                "date_to": end.isoformat(),
+                "days": [0, 1, 2, 3, 4, 5, 6],
+                "time_slots": [{"start_time": "09:00", "end_time": "10:00"}],
+                "capacity": 1,
+                "center": str(self.center.id),
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("date_to", res.data)
+
+    def test_create_slots_rejects_too_many_time_rows(self):
+        tomorrow = timezone.localdate() + timedelta(days=1)
+        rows = [
+            {"start_time": f"{6 + i:02d}:00", "end_time": f"{6 + i:02d}:30"}
+            for i in range(21)  # 21 rows > cap of 20
+        ]
+        res = self.client.post(
+            "/api/v1/inspections/slots/",
+            {
+                "date_from": tomorrow.isoformat(),
+                "date_to": tomorrow.isoformat(),
+                "days": [tomorrow.weekday()],
+                "time_slots": rows,
+                "capacity": 1,
+                "center": str(self.center.id),
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("time_slots", res.data)
+
     def test_create_slots_rejects_past_start_date(self):
         yesterday = timezone.localdate() - timedelta(days=1)
         res = self.client.post(
@@ -547,6 +609,30 @@ class OwnerBookingTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         slot_ids = [s["id"] for s in res.data]
         self.assertNotIn(str(self.slot.id), slot_ids)
+
+    def test_available_slots_rejects_malformed_center(self):
+        res = self.client.get(
+            "/api/v1/inspections/available-slots/?center=not-a-uuid"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_available_slots_rejects_malformed_date(self):
+        res = self.client.get(
+            "/api/v1/inspections/available-slots/?date=13/07/2026"
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_available_slots_date_range_filter(self):
+        iso = self.slot.date.isoformat()
+        in_range = self.client.get(
+            f"/api/v1/inspections/available-slots/?date_from={iso}&date_to={iso}"
+        )
+        self.assertIn(str(self.slot.id), [s["id"] for s in in_range.data])
+        after = (self.slot.date + timedelta(days=1)).isoformat()
+        out_of_range = self.client.get(
+            f"/api/v1/inspections/available-slots/?date_from={after}"
+        )
+        self.assertNotIn(str(self.slot.id), [s["id"] for s in out_of_range.data])
 
 
 def inspection_form_payload(**overrides):

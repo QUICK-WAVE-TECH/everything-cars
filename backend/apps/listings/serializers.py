@@ -112,8 +112,6 @@ class CarListSerializer(serializers.ModelSerializer):
             "owner",
             "primary_image",
             "availability_status",
-            "created_at",
-            "availability_status",
             "is_verified",
             "created_at",
         ]

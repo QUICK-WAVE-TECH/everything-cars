@@ -94,8 +94,13 @@ class InspectionSlotCreateSerializer(serializers.Serializer):
     time_slots = serializers.ListField(
         child=serializers.DictField(),
         min_length=1,
+        max_length=20,
     )
     capacity = serializers.IntegerField(min_value=1, default=1)
+
+    # Bound a single batch so one request can't schedule an unbounded number of
+    # slots (both a safety guard and a query-count cap).
+    MAX_RANGE_DAYS = 90
     center = serializers.PrimaryKeyRelatedField(
         queryset=InspectionCenter.objects.filter(is_active=True)
     )
@@ -136,6 +141,14 @@ class InspectionSlotCreateSerializer(serializers.Serializer):
         if data["date_from"] < timezone.localdate():
             raise serializers.ValidationError(
                 {"date_from": "Start date cannot be in the past."}
+            )
+        if (data["date_to"] - data["date_from"]).days + 1 > self.MAX_RANGE_DAYS:
+            raise serializers.ValidationError(
+                {
+                    "date_to": (
+                        f"Date range cannot exceed {self.MAX_RANGE_DAYS} days."
+                    )
+                }
             )
         normalized_slots = []
         for slot in data["time_slots"]:

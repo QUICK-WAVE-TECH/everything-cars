@@ -18,6 +18,25 @@ import type {
 import { listingKeys } from "@/features/listings/api/listings-api";
 import { adminListingKeys } from "@/features/listings/api/admin-api";
 
+/**
+ * Bounds an available-slots read to a rolling forward window so the payload
+ * can't grow without limit as more slots accumulate. Slot batches are capped at
+ * 90 days server-side, so 180 days covers all realistic upcoming availability.
+ */
+export function availabilityWindow(daysAhead = 180): {
+  date_from: string;
+  date_to: string;
+} {
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate(),
+    ).padStart(2, "0")}`;
+  const from = new Date();
+  const to = new Date();
+  to.setDate(to.getDate() + daysAhead);
+  return { date_from: iso(from), date_to: iso(to) };
+}
+
 function buildQuery(params?: Record<string, string | number | boolean | undefined>) {
   const query = new URLSearchParams();
   Object.entries(params ?? {}).forEach(([key, value]) => {
@@ -32,8 +51,19 @@ export const inspectionKeys = {
   slots: ["inspections", "slots"] as const,
   slotsList: (params?: Record<string, string | number | undefined>) =>
     ["inspections", "slots", params ?? {}] as const,
-  availableSlots: (centerId?: string, date?: string) =>
-    ["inspections", "available-slots", centerId ?? "all", date ?? "all"] as const,
+  availableSlots: (
+    centerId?: string,
+    date?: string,
+    range?: { date_from?: string; date_to?: string },
+  ) =>
+    [
+      "inspections",
+      "available-slots",
+      centerId ?? "all",
+      date ?? "all",
+      range?.date_from ?? "all",
+      range?.date_to ?? "all",
+    ] as const,
   locations: ["inspections", "locations"] as const,
   publicCenters: (params?: Record<string, string | number | undefined>) =>
     ["inspections", "public-centers", params ?? {}] as const,
@@ -178,10 +208,19 @@ export function useDeactivateSlot() {
 
 // ── Owner Available Slots ──
 
-export function useAvailableSlots(centerId?: string, date?: string) {
-  const query = buildQuery({ center: centerId, date });
+export function useAvailableSlots(
+  centerId?: string,
+  date?: string,
+  range?: { date_from?: string; date_to?: string },
+) {
+  const query = buildQuery({
+    center: centerId,
+    date,
+    date_from: range?.date_from,
+    date_to: range?.date_to,
+  });
   return useQuery({
-    queryKey: inspectionKeys.availableSlots(centerId, date),
+    queryKey: inspectionKeys.availableSlots(centerId, date, range),
     queryFn: () =>
       apiClient.get<AvailableSlot[]>(
         `/inspections/available-slots/${query ? `?${query}` : ""}`,

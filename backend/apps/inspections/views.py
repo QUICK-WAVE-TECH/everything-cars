@@ -1,5 +1,5 @@
 import json
-from datetime import timedelta, time
+from datetime import timedelta
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
@@ -76,6 +76,16 @@ def _valid_uuid_or_none(value):
     try:
         return uuid_module.UUID(value)
     except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def _valid_date_or_none(value):
+    """Query-param dates are user input — a malformed date must 400, not 500."""
+    from datetime import date as date_cls
+
+    try:
+        return date_cls.fromisoformat(value)
+    except (ValueError, TypeError):
         return None
 
 
@@ -264,54 +274,44 @@ class StaffSlotListCreateView(APIView):
         capacity = data["capacity"]
         center = data["center"]
 
-        created = []
+        # The serializer normalizes time_slots into `time` objects, so build the
+        # rows and insert them in one query. Skip combinations that already
+        # exist (the unique constraint) so we can report an accurate count, and
+        # let ignore_conflicts absorb any race with a concurrent create.
+        existing = set(
+            InspectionSlot.objects.filter(
+                center=center, date__range=(date_from, date_to)
+            ).values_list("date", "start_time", "end_time")
+        )
+        to_create = []
+        seen = set()  # de-dupe identical rows within a single payload
         current = date_from
         while current <= date_to:
             if current.weekday() in days:
                 for ts in time_slots:
-                    start = ts["start_time"]
-                    end = ts["end_time"]
-                    # Parse time strings if needed
-                    if isinstance(start, str):
-                        parts = (
-                            start.replace("AM", "").replace("PM", "").strip().split(":")
+                    key = (current, ts["start_time"], ts["end_time"])
+                    if key in existing or key in seen:
+                        continue
+                    seen.add(key)
+                    to_create.append(
+                        InspectionSlot(
+                            date=current,
+                            start_time=ts["start_time"],
+                            end_time=ts["end_time"],
+                            center=center,
+                            capacity=ts.get("capacity", capacity),
+                            created_by=request.user,
                         )
-                        hour = int(parts[0])
-                        minute = int(parts[1]) if len(parts) > 1 else 0
-                        if "PM" in ts["start_time"] and hour != 12:
-                            hour += 12
-                        if "AM" in ts["start_time"] and hour == 12:
-                            hour = 0
-                        start = time(hour, minute)
-                    if isinstance(end, str):
-                        parts = (
-                            end.replace("AM", "").replace("PM", "").strip().split(":")
-                        )
-                        hour = int(parts[0])
-                        minute = int(parts[1]) if len(parts) > 1 else 0
-                        if "PM" in ts["end_time"] and hour != 12:
-                            hour += 12
-                        if "AM" in ts["end_time"] and hour == 12:
-                            hour = 0
-                        end = time(hour, minute)
-
-                    slot, was_created = InspectionSlot.objects.get_or_create(
-                        date=current,
-                        start_time=start,
-                        end_time=end,
-                        center=center,
-                        defaults={
-                            "capacity": ts.get("capacity", capacity),
-                            "created_by": request.user,
-                        },
                     )
-                    if was_created:
-                        created.append(slot)
             current += timedelta(days=1)
+
+        created = InspectionSlot.objects.bulk_create(
+            to_create, ignore_conflicts=True
+        )
 
         return Response(
             {
-                "created_count": len(created),
+                "created_count": len(to_create),
                 "slots": InspectionSlotSerializer(created, many=True).data,
             },
             status=status.HTTP_201_CREATED,
@@ -452,13 +452,33 @@ class AvailableSlotsView(APIView):
 
         center_filter = request.query_params.get("center")
         if center_filter:
-            slots = slots.filter(center_id=center_filter)
+            center_uuid = _valid_uuid_or_none(center_filter)
+            if center_uuid is None:
+                return Response(
+                    {"detail": "Invalid center id."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            slots = slots.filter(center_id=center_uuid)
 
-        date_filter = request.query_params.get("date")
-        if date_filter:
-            slots = slots.filter(date=date_filter)
+        # Exact-day, or a bounded [date_from, date_to] window so callers load one
+        # visible calendar month at a time instead of every future slot.
+        for param, lookup in (
+            ("date", "date"),
+            ("date_from", "date__gte"),
+            ("date_to", "date__lte"),
+        ):
+            raw = request.query_params.get(param)
+            if not raw:
+                continue
+            parsed = _valid_date_or_none(raw)
+            if parsed is None:
+                return Response(
+                    {"detail": f"Invalid {param}."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            slots = slots.filter(**{lookup: parsed})
 
-        # Add spots_remaining as annotation
+        # spots_remaining is derived per row from the booking-count annotation.
         for slot in slots:
             slot.spots_remaining = slot.capacity - slot.bookings_count
 
