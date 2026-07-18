@@ -119,6 +119,7 @@ def booking_detail_queryset():
         "slot__created_by",
         "booked_by",
         "inspection",
+        "inspection__inspector",
         "inspection__documents",
     ).prefetch_related("car__images", "car__features")
 

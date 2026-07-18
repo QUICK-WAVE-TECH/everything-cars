@@ -82,7 +82,11 @@ export function InspectionRecordPanel({ bookingId }: { bookingId: string | null 
         </div>
 
         <span className="text-[11px] text-(--brc-text-muted)">
-          Inspected by {insp.inspector_name || "staff"} · staff-only
+          Inspected by{" "}
+          <span className="font-semibold text-(--brc-text-secondary)">
+            {insp.inspector_name || insp.inspector_email || "staff"}
+          </span>{" "}
+          · staff-only
         </span>
       </div>
     </section>

@@ -396,6 +396,9 @@ class StaffInspectionReadSerializer(serializers.ModelSerializer):
 
     documents = InspectionDocumentSerializer(read_only=True)
     inspector_name = serializers.SerializerMethodField()
+    inspector_email = serializers.EmailField(
+        source="inspector.email", read_only=True, default=""
+    )
 
     class Meta:
         model = PhysicalInspection
@@ -419,6 +422,7 @@ class StaffInspectionReadSerializer(serializers.ModelSerializer):
             "presented_id_document",
             "inspected_at",
             "inspector_name",
+            "inspector_email",
             "documents",
         ]
 

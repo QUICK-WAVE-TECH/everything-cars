@@ -84,6 +84,7 @@ export type StaffInspectionRecord = {
   presented_id_document: string | null;
   inspected_at: string;
   inspector_name: string;
+  inspector_email: string;
   documents: {
     id: string;
     car_documents: string | null;
