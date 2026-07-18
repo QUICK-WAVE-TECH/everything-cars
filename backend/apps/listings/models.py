@@ -99,14 +99,19 @@ class Car(models.Model):
         max_length=10,
         choices=ListingType.choices,
     )
+    # Prices are conditionally required by listing_type (validated in the API
+    # serializer). blank=True keeps a rent-only car (sale_price=None) editable
+    # in the Django admin, which otherwise treats the field as required.
     rent_price_per_day = models.DecimalField(
         max_digits=14,
         null=True,
+        blank=True,
         decimal_places=2,
     )
     sale_price = models.DecimalField(
         max_digits=14,
         null=True,
+        blank=True,
         decimal_places=2,
     )
     currency = models.CharField(
