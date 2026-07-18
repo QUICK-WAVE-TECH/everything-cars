@@ -206,6 +206,8 @@ class InspectionBookingSerializer(serializers.ModelSerializer):
             "status",
             "reschedule_count",
             "staff_note",
+            "attendee_type",
+            "rep_name",
             "created_at",
             "updated_at",
         ]
@@ -221,6 +223,8 @@ class InspectionBookingDetailSerializer(InspectionBookingSerializer):
     car = CarDetailSerializer(read_only=True)
 
     class Meta(InspectionBookingSerializer.Meta):
+        # Staff-only detail — rep_id_type/number are exposed here (never on the
+        # owner-facing list serializer).
         fields = [
             "id",
             "car",
@@ -229,6 +233,10 @@ class InspectionBookingDetailSerializer(InspectionBookingSerializer):
             "status",
             "reschedule_count",
             "staff_note",
+            "attendee_type",
+            "rep_name",
+            "rep_id_type",
+            "rep_id_number",
             "created_at",
             "updated_at",
         ]
