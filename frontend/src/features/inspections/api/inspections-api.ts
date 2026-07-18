@@ -20,11 +20,11 @@ import { listingKeys } from "@/features/listings/api/listings-api";
 import { adminListingKeys } from "@/features/listings/api/admin-api";
 
 /**
- * Bounds an available-slots read to a rolling forward window so the payload
- * can't grow without limit as more slots accumulate. Slot batches are capped at
- * 90 days server-side, so 180 days covers all realistic upcoming availability.
+ * Bounds an availability read to a rolling forward window so the payload can't
+ * grow without limit as more slots accumulate. Slot batches are capped at 300
+ * days server-side, so a year covers all creatable upcoming availability.
  */
-export function availabilityWindow(daysAhead = 180): {
+export function availabilityWindow(daysAhead = 365): {
   date_from: string;
   date_to: string;
 } {

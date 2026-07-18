@@ -33,6 +33,11 @@ function toIsoDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+// Mirror the server-side batch caps so the form can't offer a submit the API
+// will reject (300-day range, 20 time rows).
+const MAX_RANGE_DAYS = 300;
+const MAX_TIME_ROWS = 20;
+
 const ALL_DAYS = [
   { label: "Mon", value: 0 },
   { label: "Tue", value: 1 },
@@ -126,6 +131,17 @@ export function CreateSlotsModal({
     [dateFrom, dateTo, selectedDays, timeSlots],
   );
 
+  // Latest allowed end date for the chosen start (MAX_RANGE_DAYS inclusive).
+  const maxDateTo = useMemo(() => {
+    if (!dateFrom) return undefined;
+    const d = new Date(dateFrom + "T00:00:00");
+    if (isNaN(d.getTime())) return undefined;
+    d.setDate(d.getDate() + MAX_RANGE_DAYS - 1);
+    return toIsoDate(d);
+  }, [dateFrom]);
+  // ISO strings compare lexicographically, so string > works for dates.
+  const rangeTooLong = !!(dateFrom && dateTo && maxDateTo && dateTo > maxDateTo);
+
   function toggleDay(value: number) {
     setSelectedDays((prev) =>
       prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value],
@@ -151,7 +167,17 @@ export function CreateSlotsModal({
 
   function handleDateFromChange(value: string) {
     setDateFrom(value);
-    if (dateTo && value && dateTo < value) setDateTo(value);
+    if (dateTo && value) {
+      if (dateTo < value) {
+        setDateTo(value);
+      } else {
+        // Keep the range within the cap when the start moves.
+        const d = new Date(value + "T00:00:00");
+        d.setDate(d.getDate() + MAX_RANGE_DAYS - 1);
+        const cap = toIsoDate(d);
+        if (dateTo > cap) setDateTo(cap);
+      }
+    }
   }
 
   function resetForm() {
@@ -184,13 +210,16 @@ export function CreateSlotsModal({
       resetForm();
       onClose();
     } catch (error) {
+      // Fixed id so a rapid double-submit shows one toast, not a stack.
       toast.error(
         error instanceof ApiError ? error.message : "Failed to create slots. Please try again.",
+        { id: "create-slots-error" },
       );
     }
   }
 
-  const disabled = createSlots.isPending || previewCount === 0 || !centerId;
+  const disabled =
+    createSlots.isPending || previewCount === 0 || !centerId || rangeTooLong;
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -251,9 +280,13 @@ export function CreateSlotsModal({
                 required
                 value={dateTo}
                 min={dateFrom || todayIso}
+                max={maxDateTo}
                 onChange={(e) => setDateTo(e.target.value)}
                 className={fieldClass}
               />
+              <p className="mt-1 text-[11px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                Up to {MAX_RANGE_DAYS} days per batch.
+              </p>
             </div>
           </div>
 
@@ -289,7 +322,13 @@ export function CreateSlotsModal({
               <button
                 type="button"
                 onClick={addTimeSlot}
-                className="flex h-8 cursor-pointer items-center gap-1 rounded-lg border border-(--brc-border) bg-white px-2.5 text-xs font-bold text-(--brc-primary) transition-colors hover:bg-(--brc-primary-tint) [font-family:var(--brc-font-ui)]"
+                disabled={timeSlots.length >= MAX_TIME_ROWS}
+                title={
+                  timeSlots.length >= MAX_TIME_ROWS
+                    ? `Up to ${MAX_TIME_ROWS} time rows per batch`
+                    : undefined
+                }
+                className="flex h-8 cursor-pointer items-center gap-1 rounded-lg border border-(--brc-border) bg-white px-2.5 text-xs font-bold text-(--brc-primary) transition-colors hover:bg-(--brc-primary-tint) disabled:cursor-not-allowed disabled:opacity-40 [font-family:var(--brc-font-ui)]"
               >
                 <PlusIcon size={12} /> Add row
               </button>
@@ -387,8 +426,13 @@ export function CreateSlotsModal({
             </div>
           </div>
 
-          {/* Preview */}
-          {previewCount > 0 && (
+          {/* Preview / range warning */}
+          {rangeTooLong ? (
+            <div className="rounded-xl border border-[#ffd970] bg-(--brc-warning-bg,#fff3cd) px-4 py-3 text-[13px] font-bold text-[#9a7400] [font-family:var(--brc-font-ui)]">
+              Date range cannot exceed {MAX_RANGE_DAYS} days — shorten the range
+              or create a second batch.
+            </div>
+          ) : previewCount > 0 ? (
             <div className="flex items-center gap-2.5 rounded-xl border border-[#c5d5ff] bg-(--brc-primary-tint) px-4 py-3">
               <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-(--brc-primary) text-[11px] font-bold text-white">
                 {previewCount}
@@ -397,7 +441,7 @@ export function CreateSlotsModal({
                 {previewCount} slot{previewCount !== 1 ? "s" : ""} will be created
               </span>
             </div>
-          )}
+          ) : null}
         </form>
 
         {/* Footer */}

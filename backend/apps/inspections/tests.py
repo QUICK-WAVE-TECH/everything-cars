@@ -177,9 +177,9 @@ class StaffSlotManagementTest(APITestCase):
             1,
         )
 
-    def test_create_slots_rejects_range_over_90_days(self):
+    def test_create_slots_rejects_range_over_cap(self):
         start = timezone.localdate() + timedelta(days=1)
-        end = start + timedelta(days=90)  # 91 days inclusive
+        end = start + timedelta(days=300)  # 301 days inclusive > 300-day cap
         res = self.client.post(
             "/api/v1/inspections/slots/",
             {
@@ -691,7 +691,7 @@ class OwnerBookingTest(APITestCase):
 
     def test_available_slots_rejects_oversized_range(self):
         start = timezone.localdate()
-        end = start + timedelta(days=181)  # exceeds the 180-day cap
+        end = start + timedelta(days=366)  # exceeds the 365-day window
         res = self.client.get(
             "/api/v1/inspections/available-slots/"
             f"?date_from={start.isoformat()}&date_to={end.isoformat()}"
@@ -699,9 +699,9 @@ class OwnerBookingTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_available_slots_default_window_excludes_far_future(self):
-        # A bare call is bounded to the default look-ahead; a slot 200 days out
+        # A bare call is bounded to the default look-ahead; a slot 400 days out
         # is excluded, while the near slot from setUp is still returned.
-        far = create_slot(self.staff, center=self.center, days_ahead=200)
+        far = create_slot(self.staff, center=self.center, days_ahead=400)
         res = self.client.get(
             f"/api/v1/inspections/available-slots/?center={self.center.id}"
         )

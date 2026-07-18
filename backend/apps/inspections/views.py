@@ -505,8 +505,9 @@ class AvailableSlotsSummaryView(APIView):
 
 # Cap how far ahead a single availability read may reach, and the default
 # look-ahead when no upper bound is supplied, so a caller can't pull every
-# future slot.
-AVAILABLE_WINDOW_DAYS = 180
+# future slot. Must exceed the slot-batch range cap (300 days) so every
+# creatable slot is reachable from the booking calendar.
+AVAILABLE_WINDOW_DAYS = 365
 
 
 def _open_available_slots(request):
