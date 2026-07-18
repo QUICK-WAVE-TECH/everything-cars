@@ -540,6 +540,28 @@ class OwnerBookingTest(APITestCase):
         # Admin approval survives cancellation — car returns to bookable state
         self.assertEqual(self.car.status, CarStatus.LISTING_APPROVED)
 
+    def test_cancel_notifies_staff(self):
+        from apps.notifications.models import Notification
+
+        booking = InspectionBooking.objects.create(
+            car=self.car,
+            slot=self.slot,
+            booked_by=self.owner,
+            status=BookingStatus.PENDING,
+        )
+        self.car.status = CarStatus.INSPECTION_PENDING
+        self.car.save(update_fields=["status"])
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                f"/api/v1/inspections/bookings/{booking.id}/cancel/"
+            )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.staff, notification_type="inspection_cancelled"
+            ).exists()
+        )
+
     def test_reschedule_booking(self):
         self.client.post(
             "/api/v1/inspections/bookings/",

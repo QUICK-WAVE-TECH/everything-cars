@@ -37,6 +37,7 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
   inspection_failed: "file",
   inspection_no_show: "clock",
   inspection_rescheduled: "clock",
+  inspection_cancelled: "clock",
   payment_submitted: "banknote",
   payment_confirmed: "banknote",
   rental_active: "car",
@@ -79,6 +80,9 @@ function resolveHref(notification: NotificationItem, role: ViewerRole): string {
     case "clearance_response":
     case "listing_submitted":
       return `/admin/approvals`;
+
+    case "inspection_cancelled":
+      return `/admin/inspections`;
 
     case "system":
     default:

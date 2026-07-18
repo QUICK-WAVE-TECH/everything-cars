@@ -24,6 +24,7 @@ from apps.notifications.service import (
     notify_inspection_failed,
     notify_inspection_no_show,
     notify_inspection_rescheduled,
+    notify_inspection_cancelled,
     notify_assistance_requested,
 )
 from apps.notifications.email_service import (
@@ -699,6 +700,12 @@ class OwnerBookingCancelView(APIView):
                 note="Inspection booking cancelled.",
                 request=request,
             )
+
+        # Notify staff so their queue and slot calendar free the slot live.
+        schedule_notification(
+            notify_inspection_cancelled,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
 
         return Response({"detail": "Booking cancelled."})
 

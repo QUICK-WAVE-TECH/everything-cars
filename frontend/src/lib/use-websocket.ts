@@ -94,6 +94,13 @@ const NOTIFICATION_QUERY_DEPS: Partial<Record<NotificationType, string[][]>> = {
     ["inspections", "available-slots"],
     ["cars", "admin"],
   ],
+  // Owner cancellation frees the slot and returns the car to bookable.
+  inspection_cancelled: [
+    ["inspections", "admin-bookings"],
+    ["inspections", "slots"],
+    ["inspections", "available-slots"],
+    ["cars", "admin"],
+  ],
 };
 
 const PING_INTERVAL_MS = 25_000;
