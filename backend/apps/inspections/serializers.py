@@ -101,7 +101,7 @@ class InspectionSlotCreateSerializer(serializers.Serializer):
 
     # Bound a single batch so one request can't schedule an unbounded number of
     # slots (both a safety guard and a query-count cap).
-    MAX_RANGE_DAYS = 90
+    MAX_RANGE_DAYS = 300
     center = serializers.PrimaryKeyRelatedField(
         queryset=InspectionCenter.objects.filter(is_active=True)
     )
