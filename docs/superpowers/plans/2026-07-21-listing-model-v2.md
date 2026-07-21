@@ -58,7 +58,13 @@ class ListingType(models.TextChoices):
     vin = models.CharField(max_length=17, null=True, blank=True, unique=True)
     plate_number = models.CharField(max_length=12, null=True, blank=True, unique=True)
     is_negotiable = models.BooleanField(null=True, blank=True)
+    min_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    max_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
 ```
+
+`min_price`/`max_price` are the owner's private acceptable range — added now so the Car
+model migrates once. The offer/bidding workflow that consumes them is Spec D; in Spec A
+they only get storage + listing-form validation (Task 3) + privacy (Task 4).
 
 - [ ] **Step 4: Generate schema migration**
 
@@ -194,11 +200,27 @@ def validate(self, data):
     elif lt == ListingType.BUY:
         if sale is None:
             raise serializers.ValidationError({"sale_price": "Required for a buy listing."})
-        if "is_negotiable" not in data and (self.instance is None or self.instance.is_negotiable is None):
+        if neg is None and "is_negotiable" not in data:
             raise serializers.ValidationError({"is_negotiable": "Choose negotiable or non-negotiable."})
         data["rent_price_per_day"] = None
+        mn = data.get("min_price", getattr(self.instance, "min_price", None))
+        mx = data.get("max_price", getattr(self.instance, "max_price", None))
+        if neg:
+            if mn is None or mx is None:
+                raise serializers.ValidationError(
+                    {"min_price": "Set a private minimum and maximum for a negotiable listing."})
+            if mn > mx:
+                raise serializers.ValidationError(
+                    {"min_price": "Minimum cannot be greater than maximum."})
+        else:
+            data["min_price"] = None
+            data["max_price"] = None
     return data
 ```
+
+Add `is_negotiable`, `min_price`, `max_price` to `CarCreateSerializer.Meta.fields`. Extend the
+test class with: `test_negotiable_buy_requires_min_max_400`, `test_min_greater_than_max_400`,
+`test_non_negotiable_buy_clears_min_max`.
 
 `listing_type="both"` now fails DRF ChoiceField validation automatically (400) — the test asserts it.
 
@@ -228,12 +250,14 @@ class VinPlatePrivacyTest(APITestCase):
 def to_representation(self, instance):
     data = super().to_representation(instance)
     if self.context.get("public"):
-        data.pop("vin", None)
-        data.pop("plate_number", None)
+        for key in ("vin", "plate_number", "min_price", "max_price"):
+            data.pop(key, None)
     return data
 ```
 
-Do NOT add them to `CarListSerializer` (shared by public list) — the list-omission test passes for free.
+Add `"min_price"` and `"max_price"` to `CarDetailSerializer.Meta.fields` alongside `vin`/`plate_number`.
+Do NOT add any of them to `CarListSerializer` (shared by public list) — the list-omission test passes for free.
+Extend the privacy test to assert public payloads also omit `min_price`/`max_price`, and owner/admin payloads include them.
 
 - [ ] **Step 4: Run pass. Step 5: commit** `feat(listings): expose vin/plate to owner+staff, never in public payloads`
 

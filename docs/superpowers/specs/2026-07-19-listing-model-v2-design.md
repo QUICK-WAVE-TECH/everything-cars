@@ -11,23 +11,24 @@ A car is listed for **Rent OR Buy — never both**. Every listing carries a **VI
 ## 1. Schema & migration
 
 - `ListingType`: remove `BOTH`. Choices become `rent` / `buy`.
-- **Migration deletes all existing `listing_type="both"` cars** (9 dev-data rows; normal FK cascades remove their images, features, requests, reviews, and inspection bookings). No notifications — this is dev data by explicit decision.
+- **Migration deletes all existing** `listing_type="both"` **cars** (9 dev-data rows; normal FK cascades remove their images, features, requests, reviews, and inspection bookings). No notifications — this is dev data by explicit decision.
 - New `Car` fields:
   - `vin`: `CharField(max_length=17, null=True, blank=True, unique=True)` — nullable only so legacy rows don't collide; **required at serializer level for all new/edited listings**. Stored normalized (uppercase).
   - `plate_number`: `CharField(max_length=12, null=True, blank=True, unique=True)` — same nullable-for-legacy, required-going-forward rule. Stored normalized (uppercase, spaces/hyphens stripped).
   - `is_negotiable`: `BooleanField(null=True, blank=True)` — **NULL for rent listings**; required true/false for buy listings. UI toggle defaults to "Negotiable".
+  - `min_price` / `max_price`: `DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)` — the owner's **private** acceptable range. Required (with `min_price <= max_price`, both `<= sale_price` sanity not enforced beyond ordering) only when `listing_type="buy"` AND `is_negotiable=True`; forced NULL otherwise. These columns are added now (with `is_negotiable`) so the Car model migrates once, but the offer/bidding workflow that consumes them is **Spec D** (out of scope here). Their sole use in Spec A is storage + listing-form validation + privacy.
 - Pricing becomes strict XOR, enforced in the serializer:
   - `rent` → `rent_price_per_day` required, `sale_price` cleared to NULL.
   - `buy` → `sale_price` required, `rent_price_per_day` cleared to NULL.
 
-Postgres unique constraints permit multiple NULLs, so legacy cars without VIN/plate coexist; any *new* duplicate is rejected.
+Postgres unique constraints permit multiple NULLs, so legacy cars without VIN/plate coexist; any _new_ duplicate is rejected.
 
 ## 2. Validation & privacy
 
 - VIN: must match `^[A-HJ-NPR-Z0-9]{17}$` after uppercasing (17 chars, letters I/O/Q invalid per ISO 3779).
 - Plate: after normalization (uppercase, strip spaces and hyphens), 5–12 alphanumeric characters.
 - Duplicate VIN or plate → generic error **"This vehicle is already registered on the platform."** Never reveal which listing/owner holds the duplicate. (A duplicate against a suspended vehicle is precisely the signal Spec E's enforcement consumes.)
-- **Serializer exposure:** `vin` and `plate_number` appear in owner-facing detail (`my-cars`) and staff serializers (admin list/detail, approvals). They appear in **no public serializer** (`CarListSerializer` public context, public `CarDetailSerializer`). A test asserts the public payloads never contain either value.
+- **Serializer exposure:** `vin`, `plate_number`, `min_price`, and `max_price` appear in owner-facing detail (`my-cars`) and staff serializers (admin list/detail, approvals). They appear in **no public serializer** (`CarListSerializer` public context, public `CarDetailSerializer`). A test asserts the public payloads never contain any of these values — the private range must never leak, or the "your offer is below range" message becomes reverse-engineerable.
 
 ## 3. Requests & reviews
 
