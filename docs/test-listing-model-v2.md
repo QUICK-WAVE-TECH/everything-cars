@@ -77,6 +77,28 @@ Spec: `docs/superpowers/specs/2026-07-19-listing-model-v2-design.md`
 - [ ] Owner detail shows a "Vehicle identity" card (VIN + plate) and, for negotiable buys, a "Private pricing" card
 - [ ] Edit lockdown still holds: those fields are read-only unless the car is `needs_changes`
 
+## UI primitives (shipped alongside this spec)
+
+These are not Spec A requirements, but they landed on the same branch and touch
+the same screens.
+
+- [ ] **Rent/Buy control** is a radio group, not tabs: arrow keys move between Rent and Buy, the choice is announced as a radio, and it submits with the form
+- [ ] **Destructive actions use AlertDialog** (not a native `confirm`, not a toast): deleting a review, cancelling a booking, archiving a listing, deactivating a centre, deactivating a slot
+  - [ ] Each dialog names its action ("Delete", "Archive", "Deactivate") rather than "OK", and shows a spinner while the request is in flight
+  - [ ] Archiving a listing now asks first — it previously fired straight from the button with no confirmation
+  - [ ] Slot deactivation is a dialog, not the old two-click "Confirm?" arming button (which reset on mouse-leave and stranded keyboard users)
+- [ ] **Photo slots use the Attachment component**: empty slots show a dashed border, a filled slot shows the thumbnail, and an oversized file marks the slot as errored instead of only firing a toast
+  - [ ] Drag-and-drop still works, and the whole tile is still clickable/keyboard-reachable
+- [ ] **Profile** shows initials via Avatar, and the ID document as an Attachment ("On file" vs "Not uploaded") — check owner and customer profiles
+- [ ] **Sign-in shows only the button spinner** — no full-screen preloader overlay
+  - [ ] Other forms (e.g. creating a listing) still show the global overlay
+
+## Config
+
+- [ ] Uploaded photos render with no `next/image` "hostname is not configured" error
+- [ ] The image allowlist follows `NEXT_PUBLIC_API_URL`: point it at a LAN IP or deploy host and photos still load without editing `next.config.ts`
+- [ ] Restarting the dev server is required after changing `next.config.ts` (image config is read at boot), and it must be started from `frontend/`
+
 ## Regression
 
 - [ ] Editing an unrelated field (e.g. colour) on an existing buy car does NOT demand `is_negotiable`
