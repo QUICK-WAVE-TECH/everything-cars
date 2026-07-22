@@ -240,10 +240,21 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "available_from",
             "features",
             "is_verified",
+            "vin",
+            "plate_number",
+            "min_price",
+            "max_price",
             "verified_report",
             "availability_status",
         ]
         read_only_fields = ["id"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if self.context.get("public"):
+            for key in ("vin", "plate_number", "min_price", "max_price"):
+                data.pop(key, None)
+        return data
 
     def get_primary_image(self, obj):
         return CarListSerializer(context=self.context).get_primary_image(obj)

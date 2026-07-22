@@ -1060,3 +1060,48 @@ class XorPricingTest(APITestCase):
             self._post(listing_type="both", rent_price_per_day="20000.00").status_code,
             400,
         )
+
+
+class VinPlatePrivacyTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("priv-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(
+            self.owner,
+            vin="1HGCM82633A004352",
+            plate_number="ABC123DE",
+            is_negotiable=True,
+            min_price="4000000.00",
+            max_price="5500000.00",
+        )
+
+    PRIVATE = ("vin", "plate_number", "min_price", "max_price")
+
+    def test_public_detail_omits_private_fields(self):
+        res = self.client.get(f"/api/v1/listings/cars/{self.car.id}")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        for key in self.PRIVATE:
+            self.assertNotIn(key, res.data)
+
+    def test_owner_detail_includes_private_fields(self):
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.get(f"/api/v1/listings/my-cars/{self.car.id}")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["vin"], "1HGCM82633A004352")
+        self.assertEqual(res.data["plate_number"], "ABC123DE")
+        self.assertIn("min_price", res.data)
+
+    def test_admin_detail_includes_private_fields(self):
+        staff = create_user("priv-staff@test.com", "owner", is_staff=True)
+        self.client.force_authenticate(user=staff)
+        res = self.client.get(f"/api/v1/listings/admin/cars/{self.car.id}")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("vin", res.data)
+        self.assertIn("min_price", res.data)
+
+    def test_public_list_omits_private_fields(self):
+        res = self.client.get("/api/v1/listings/cars")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        for row in res.data["results"]:
+            for key in self.PRIVATE:
+                self.assertNotIn(key, row)
