@@ -705,16 +705,15 @@ class RequestCreateSerializer(serializers.ModelSerializer):
             )
 
         request_type = data.get("request_type")
-        if car and request_type and car.listing_type != ListingType.BOTH:
-            if request_type != car.listing_type:
-                raise serializers.ValidationError(
-                    {
-                        "request_type": (
-                            "This listing only accepts "
-                            f"{car.get_listing_type_display().lower()} requests."
-                        )
-                    }
-                )
+        if car and request_type and request_type != car.listing_type:
+            raise serializers.ValidationError(
+                {
+                    "request_type": (
+                        "This listing only accepts "
+                        f"{car.get_listing_type_display().lower()} requests."
+                    )
+                }
+            )
 
         if request_type == ListingType.RENT:
             duration_days = data.get("duration_days")

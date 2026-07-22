@@ -1105,3 +1105,42 @@ class VinPlatePrivacyTest(APITestCase):
         for row in res.data["results"]:
             for key in self.PRIVATE:
                 self.assertNotIn(key, row)
+
+
+class RequestTypeMatchTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("rtm-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.buy_car = create_car(
+            self.owner,
+            listing_type=ListingType.BUY,
+            sale_price="5000000.00",
+            is_negotiable=False,
+        )
+        self.rent_car = create_car(
+            self.owner,
+            listing_type=ListingType.RENT,
+            sale_price=None,
+            rent_price_per_day="20000.00",
+        )
+        self.customer = create_user("rtm-customer@test.com", "customer")
+        create_customer_profile(self.customer)
+        self.client.force_authenticate(user=self.customer)
+
+    def _post(self, car, rtype, price):
+        return self.client.post(
+            "/api/v1/listings/requests",
+            {"car": str(car.id), "request_type": rtype, "price_offered": price},
+            format="json",
+        )
+
+    def test_rent_request_on_buy_car_400(self):
+        self.assertEqual(self._post(self.buy_car, "rent", "20000.00").status_code, 400)
+
+    def test_buy_request_on_rent_car_400(self):
+        self.assertEqual(
+            self._post(self.rent_car, "buy", "5000000.00").status_code, 400
+        )
+
+    def test_matching_buy_request_ok(self):
+        self.assertEqual(self._post(self.buy_car, "buy", "5000000.00").status_code, 201)
