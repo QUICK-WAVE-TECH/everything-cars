@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { confirmToast } from "@/lib/confirm-toast";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useCarReviews, useCreateReview } from "../api";
 import type { ReviewItem } from "../api";
 import { StarRating } from "./star-rating";
@@ -268,28 +268,23 @@ export function WriteReviewSection({ carId, requestId }: WriteReviewSectionProps
   const { data: reviewsData, isLoading } = useCarReviews(carId);
   const deleteReview = useDeleteReview();
   const [isEditing, setIsEditing] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   // Find if the current user already has a review linked to this request
   const myReview = reviewsData?.results.find(
     (r) => r.request === requestId && r.reviewer.id === me?.id,
   ) ?? null;
 
-  function handleDelete() {
+  async function handleConfirmDelete() {
     if (!myReview) return;
-    const reviewId = myReview.id;
-    confirmToast({
-      message: "Delete your review?",
-      description: "This can't be undone.",
-      actionLabel: "Delete",
-      onConfirm: async () => {
-        try {
-          await deleteReview.mutateAsync(reviewId);
-          toast.success("Review deleted");
-        } catch {
-          toast.error("Failed to delete review");
-        }
-      },
-    });
+    try {
+      await deleteReview.mutateAsync(myReview.id);
+      toast.success("Review deleted");
+    } catch {
+      toast.error("Failed to delete review");
+    } finally {
+      setConfirmDeleteOpen(false);
+    }
   }
 
   return (
@@ -322,7 +317,7 @@ export function WriteReviewSection({ carId, requestId }: WriteReviewSectionProps
           <ExistingReview
             review={myReview}
             onEditRequest={() => setIsEditing(true)}
-            onDelete={handleDelete}
+            onDelete={() => setConfirmDeleteOpen(true)}
             isDeleting={deleteReview.isPending}
           />
         ) : (
@@ -334,6 +329,17 @@ export function WriteReviewSection({ carId, requestId }: WriteReviewSectionProps
           />
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Delete your review?"
+        description="Your rating and comment will be removed. This can't be undone."
+        confirmLabel="Delete"
+        destructive
+        isPending={deleteReview.isPending}
+        onConfirm={handleConfirmDelete}
+      />
     </section>
   );
 }

@@ -48,15 +48,9 @@ import {
   type CreateCarFormValues,
   type CreateCarInput,
 } from "@/features/listings/schemas";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ApiError } from "@/lib/api-client";
 import { BookingModal } from "@/features/inspections/components/booking-modal";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   useCancelBooking,
   useClearanceResponse,
@@ -481,6 +475,7 @@ export default function CarDetailPage() {
   const [bookingOpen, setBookingOpen] = useState(false);
   const [reschedulingPending, setReschedulingPending] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false);
   const [clearanceMessage, setClearanceMessage] = useState("");
 
   // Most recent pending/completed booking for this car — used to send a
@@ -636,6 +631,7 @@ export default function CarDetailPage() {
       toast.error(
         error instanceof ApiError ? error.message : "Failed to archive listing",
       );
+      setConfirmArchiveOpen(false);
     }
   }
 
@@ -856,7 +852,7 @@ export default function CarDetailPage() {
                 {!["archived", "inspection_pending", "inspection_in_progress"].includes(car.status) && (
                   <button
                     type="button"
-                    onClick={handleArchive}
+                    onClick={() => setConfirmArchiveOpen(true)}
                     disabled={deleteCar.isPending}
                     className="group inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-(--brc-danger)/30 bg-white px-4 text-sm font-extrabold text-(--brc-danger) shadow-[0_12px_28px_rgba(220,38,38,0.10)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-(--brc-danger-bg) hover:shadow-[0_16px_34px_rgba(220,38,38,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--brc-danger) focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
                   >
@@ -1355,47 +1351,32 @@ export default function CarDetailPage() {
         )}
       </div>
     </div>
-      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-        <DialogContent className="max-w-[440px] rounded-2xl border border-(--brc-border) bg-white p-6">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-black text-(--brc-text) [font-family:var(--brc-font-display)]">
-              Cancel this booking?
-            </DialogTitle>
-          </DialogHeader>
-          {pendingBooking && (
-            <p className="m-0 text-sm leading-6 text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
-              Your appointment at{" "}
-              <span className="font-bold text-(--brc-text)">
-                {pendingBooking.slot.center.company_name}
-              </span>{" "}
-              will be released and the listing returns to &ldquo;Approved — ready
-              to book&rdquo;. Rebooking later counts toward the center&rsquo;s
-              reschedule limit.
-            </p>
-          )}
-          <DialogFooter className="mt-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setCancelDialogOpen(false)}
-              disabled={cancelBooking.isPending}
-              className="inline-flex h-11 cursor-pointer items-center justify-center rounded-lg border border-(--brc-border) bg-white px-4 text-sm font-bold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) disabled:opacity-60 [font-family:var(--brc-font-ui)]"
-            >
-              Keep Booking
-            </button>
-            <button
-              type="button"
-              onClick={handleCancelBooking}
-              disabled={cancelBooking.isPending}
-              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-danger) px-4 text-sm font-bold text-white transition-all hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 [font-family:var(--brc-font-ui)]"
-            >
-              {cancelBooking.isPending ? (
-                <Loader2Icon size={15} className="animate-spin" />
-              ) : null}
-              Yes, Cancel Booking
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={cancelDialogOpen}
+        onOpenChange={setCancelDialogOpen}
+        title="Cancel this booking?"
+        description={
+          pendingBooking
+            ? `Your appointment at ${pendingBooking.slot.center.company_name} will be released and the listing returns to "Approved — ready to book". Rebooking later counts toward the center's reschedule limit.`
+            : undefined
+        }
+        confirmLabel="Yes, cancel booking"
+        cancelLabel="Keep booking"
+        destructive
+        isPending={cancelBooking.isPending}
+        onConfirm={handleCancelBooking}
+      />
+
+      <ConfirmDialog
+        open={confirmArchiveOpen}
+        onOpenChange={setConfirmArchiveOpen}
+        title="Archive this listing?"
+        description="It will be removed from the marketplace and can no longer receive requests. You can still see it in your listings."
+        confirmLabel="Archive"
+        destructive
+        isPending={deleteCar.isPending}
+        onConfirm={handleArchive}
+      />
 
       <BookingModal
         carId={car.id}
