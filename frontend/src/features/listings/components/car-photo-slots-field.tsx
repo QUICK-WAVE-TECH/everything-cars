@@ -11,6 +11,16 @@ import {
   UploadIcon,
   XIcon,
 } from "lucide-react";
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentMedia,
+  AttachmentTitle,
+  AttachmentTrigger,
+} from "@/components/ui/attachment";
 import { cn } from "@/lib/utils";
 import type {
   CarImage,
@@ -78,6 +88,7 @@ function SlotTile({
 }) {
   const id = useId();
   const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   // Derive the preview URL instead of mirroring it into state; the effect
   // only handles revocation when the file changes or the component unmounts.
   const previewUrl = useMemo(
@@ -97,23 +108,49 @@ function SlotTile({
     const nextFile = files?.[0];
     if (!nextFile) return;
     if (nextFile.size > MAX_CAR_IMAGE_SIZE_BYTES) {
-      toast.error(
-        `${nextFile.name} is ${fileSizeMb(nextFile).toFixed(1)} MB — photos must be 5 MB or smaller.`,
-      );
+      const message = `${fileSizeMb(nextFile).toFixed(1)} MB — must be 5 MB or smaller`;
+      setError(message);
+      toast.error(`${nextFile.name} is ${message}.`);
       return;
     }
+    setError(null);
     onPick(nextFile);
   }
 
+  // Attachment carries the visual state machine (dashed when idle, destructive
+  // when rejected, solid once filled); the drop handlers and the file input
+  // stay ours — Attachment is presentational and ships no picker.
+  const state = error ? "error" : hasImage ? "done" : "idle";
+
   return (
-    <div
+    <Attachment
+      state={state}
+      orientation="vertical"
       className={cn(
-        "group relative flex min-h-[230px] min-w-0 flex-col overflow-hidden rounded-lg border bg-white",
-        dragging ? "border-(--brc-primary)" : "border-(--brc-border)",
-        disabled && "opacity-60",
+        "min-h-[230px] w-full min-w-0 gap-0 overflow-hidden p-0",
+        dragging && "border-(--brc-primary) bg-(--brc-primary-tint)",
+        disabled && "pointer-events-none opacity-60",
       )}
+      onDragEnter={(event) => {
+        event.preventDefault();
+        if (!disabled) setDragging(true);
+      }}
+      onDragOver={(event) => {
+        event.preventDefault();
+        if (!disabled) setDragging(true);
+      }}
+      onDragLeave={(event) => {
+        event.preventDefault();
+        setDragging(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDragging(false);
+        if (!disabled) pick(event.dataTransfer.files);
+      }}
     >
-      <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-(--brc-border) px-3">
+      {/* Header: slot name + whether it's required */}
+      <div className="flex h-11 w-full shrink-0 items-center justify-between gap-2 border-b border-(--brc-border) px-3">
         <div className="flex min-w-0 items-center gap-2">
           <span
             className={cn(
@@ -125,9 +162,9 @@ function SlotTile({
           >
             {hasImage ? <CheckCircle2Icon size={14} /> : <CameraIcon size={14} />}
           </span>
-          <span className="truncate text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+          <AttachmentTitle className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
             {slot.label}
-          </span>
+          </AttachmentTitle>
         </div>
         <span
           className={cn(
@@ -141,30 +178,11 @@ function SlotTile({
         </span>
       </div>
 
-      <label
-        htmlFor={id}
-        className={cn(
-          "relative flex min-h-0 flex-1 cursor-pointer flex-col items-center justify-center bg-(--brc-bg-subtle)",
-          dragging && "bg-(--brc-primary-tint)",
-          disabled && "cursor-not-allowed",
-        )}
-        onDragEnter={(event) => {
-          event.preventDefault();
-          if (!disabled) setDragging(true);
-        }}
-        onDragOver={(event) => {
-          event.preventDefault();
-          if (!disabled) setDragging(true);
-        }}
-        onDragLeave={(event) => {
-          event.preventDefault();
-          setDragging(false);
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragging(false);
-          if (!disabled) pick(event.dataTransfer.files);
-        }}
+      {/* Preview / drop target. The trigger renders as the file input's label so
+          the whole area stays clickable and keyboard-reachable. */}
+      <AttachmentMedia
+        variant="image"
+        className="relative w-full min-h-0 flex-1 rounded-none bg-(--brc-bg-subtle)"
       >
         <input
           id={id}
@@ -173,6 +191,10 @@ function SlotTile({
           className="sr-only"
           disabled={disabled}
           onChange={(event) => pick(event.target.files)}
+        />
+        <AttachmentTrigger
+          render={<label htmlFor={id} aria-label={`Add ${slot.label} photo`} />}
+          className={cn("cursor-pointer", disabled && "cursor-not-allowed")}
         />
 
         {displayUrl ? (
@@ -196,29 +218,38 @@ function SlotTile({
         )}
 
         {displayUrl && (
-          <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[11px] font-bold text-white [font-family:var(--brc-font-ui)]">
+          <span className="absolute bottom-2 right-2 z-20 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-1 text-[11px] font-bold text-white [font-family:var(--brc-font-ui)]">
             {file ? <RotateCcwIcon size={12} /> : <ImageIcon size={12} />}
             {file ? "Replace" : "Current"}
           </span>
         )}
-      </label>
+      </AttachmentMedia>
 
-      <div className="flex h-[54px] shrink-0 items-center justify-between gap-2 border-t border-(--brc-border) px-3">
-        <span className="min-w-0 truncate text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-          {file ? fileLabel(file) : existingImage ? "Saved photo" : "JPG, PNG, WEBP, HEIC"}
-        </span>
+      {/* Footer: file name / hint, plus the clear action */}
+      <AttachmentContent className="flex h-[54px] w-full shrink-0 items-center justify-between gap-2 border-t border-(--brc-border) px-3">
+        <AttachmentDescription className="mt-0 min-w-0 truncate text-xs [font-family:var(--brc-font-ui)]">
+          {error
+            ? error
+            : file
+              ? fileLabel(file)
+              : existingImage
+                ? "Saved photo"
+                : "JPG, PNG, WEBP, HEIC"}
+        </AttachmentDescription>
         {file && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-(--brc-border) bg-white text-(--brc-text-muted) transition-colors hover:border-(--brc-danger) hover:text-(--brc-danger)"
-            aria-label={`Clear ${slot.label}`}
-          >
-            <XIcon size={15} />
-          </button>
+          <AttachmentActions>
+            <AttachmentAction
+              type="button"
+              onClick={onClear}
+              aria-label={`Clear ${slot.label}`}
+              className="size-8 rounded-full border border-(--brc-border) bg-white text-(--brc-text-muted) hover:border-(--brc-danger) hover:text-(--brc-danger)"
+            >
+              <XIcon size={15} />
+            </AttachmentAction>
+          </AttachmentActions>
         )}
-      </div>
-    </div>
+      </AttachmentContent>
+    </Attachment>
   );
 }
 
