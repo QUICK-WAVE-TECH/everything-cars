@@ -8,7 +8,6 @@ from apps.users.models import User
 class ListingType(models.TextChoices):
     RENT = "rent", "Rent"
     BUY = "buy", "Buy"
-    BOTH = "both", "Both"
 
 
 class BodyType(models.TextChoices):
@@ -113,6 +112,21 @@ class Car(models.Model):
         null=True,
         blank=True,
         decimal_places=2,
+    )
+    vin = models.CharField(max_length=17, blank=True, null=True, unique=True)
+    plate_number = models.CharField(
+        max_length=12, blank=True, null=True, unique=True
+    )  # ✓
+
+    is_negotiable = models.BooleanField(
+        null=True,
+        blank=True,
+    )
+    min_price = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True
+    )
+    max_price = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True
     )
     currency = models.CharField(
         max_length=3,

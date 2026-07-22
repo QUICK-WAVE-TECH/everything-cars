@@ -600,10 +600,7 @@ class PublicCarListView(APIView):
 
         # Basic filters
         listing_type = request.query_params.get("listing_type")
-        if listing_type in (ListingType.RENT, ListingType.BUY):
-            # "both" listings serve either mode
-            cars = cars.filter(listing_type__in=[listing_type, ListingType.BOTH])
-        elif listing_type:
+        if listing_type:
             cars = cars.filter(listing_type=listing_type)
 
         state = request.query_params.get("state")

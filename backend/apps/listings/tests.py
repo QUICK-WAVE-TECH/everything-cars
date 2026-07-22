@@ -20,6 +20,7 @@ from apps.listings.models import (
     RequestStatus,
 )
 from apps.users.models import CustomerProfile, OwnerProfile, User
+from apps.listings.migration_helpers import delete_both_cars
 
 
 def create_user(email, role, **extra):
@@ -568,29 +569,21 @@ class PublicListingTypeFilterTest(APITestCase):
             rent_price_per_day="20000.00",
         )
         create_car(owner, title="Buy Only", listing_type=ListingType.BUY)
-        create_car(
-            owner,
-            title="Both Ways",
-            listing_type=ListingType.BOTH,
-            rent_price_per_day="30000.00",
-        )
 
     def _titles(self, res):
         return {c["title"] for c in res.data["results"]}
 
-    def test_rent_mode_includes_both(self):
+    def test_rent_mode_returns_only_rent(self):
         res = self.client.get("/api/v1/listings/cars?listing_type=rent")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         titles = self._titles(res)
         self.assertIn("Rent Only", titles)
-        self.assertIn("Both Ways", titles)
         self.assertNotIn("Buy Only", titles)
 
-    def test_buy_mode_includes_both(self):
+    def test_buy_mode_returns_only_buy(self):
         res = self.client.get("/api/v1/listings/cars?listing_type=buy")
         titles = self._titles(res)
         self.assertIn("Buy Only", titles)
-        self.assertIn("Both Ways", titles)
         self.assertNotIn("Rent Only", titles)
 
 
@@ -814,7 +807,9 @@ class VerifiedOverlayTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         # Description stays the owner's; inspector notes live in the report.
         self.assertEqual(res.data["description"], "Owner description")
-        self.assertEqual(res.data["verified_report"]["notes"], "Inspector verified notes")
+        self.assertEqual(
+            res.data["verified_report"]["notes"], "Inspector verified notes"
+        )
         self.assertEqual(res.data["mileage"], 99999)
         self.assertEqual(res.data["fuel_type"], "diesel")
         self.assertTrue(res.data["is_verified"])
@@ -856,3 +851,32 @@ class ListingSubmittedEmailTest(APITestCase):
         html = mail.outbox[0].alternatives[0][0]
         self.assertIn("Ada Bello", html)
         self.assertIn(car.title, html)
+
+
+class DeleteBothCarsMigrationTest(APITestCase):
+    def test_both_cars_deleted_rent_and_buy_kept(self):
+        owner = create_user("both-owner@x.com", "owner")
+        both = Car.objects.create(
+            owner=owner,
+            title="Both Car",
+            listing_type="both",
+            rent_price_per_day=10,
+            sale_price=20,
+            brand="Toyota",
+            model="Camry",
+            year=2020,
+            state="Lagos",
+        )
+        rent = Car.objects.create(
+            owner=owner,
+            title="Rent Car",
+            listing_type="rent",
+            rent_price_per_day=10,
+            brand="Toyota",
+            model="Camry",
+            year=2020,
+            state="Lagos",
+        )
+        delete_both_cars(Car)
+        self.assertFalse(Car.objects.filter(id=both.id).exists())
+        self.assertTrue(Car.objects.filter(id=rent.id).exists())
