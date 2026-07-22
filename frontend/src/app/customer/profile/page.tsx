@@ -24,6 +24,7 @@ import { COUNTRIES } from "@/features/auth/data/countries";
 import { ApiError } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 type ProfileInput = z.infer<typeof profileUpdateSchema>;
 type PasswordInput = z.infer<typeof changePasswordSchema>;
@@ -197,9 +198,11 @@ export default function ProfilePage() {
           <CardContent className="flex flex-col gap-7 p-0">
             {/* Identity row */}
             <div className="flex items-start gap-4 sm:items-center sm:gap-[18px]">
-              <span className="flex size-16 shrink-0 items-center justify-center rounded-full bg-(--brc-primary-tint) text-2xl font-extrabold text-(--brc-primary) [font-family:var(--brc-font-display)] sm:size-[88px] sm:text-[30px]">
-                {initials(`${user.first_name} ${user.last_name}`)}
-              </span>
+              <Avatar className="size-16 after:hidden sm:size-[88px]">
+                <AvatarFallback className="rounded-full bg-(--brc-primary-tint) text-2xl font-extrabold text-(--brc-primary) [font-family:var(--brc-font-display)] sm:text-[30px]">
+                  {initials(`${user.first_name} ${user.last_name}`)}
+                </AvatarFallback>
+              </Avatar>
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <span className="truncate text-lg font-bold text-(--brc-text) [font-family:var(--brc-font-ui)] sm:text-[22px]">
                   {user.first_name} {user.last_name}

@@ -4,6 +4,24 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useIsMutating } from "@tanstack/react-query";
 
+declare module "@tanstack/react-query" {
+  /**
+   * Types the `meta` object every mutation may carry. React Query derives
+   * MutationMeta from this Register interface, so new meta keys belong here —
+   * which also means a typo is a type error, not a silently ignored flag.
+   */
+  interface Register {
+    mutationMeta: {
+      /**
+       * Suppress the global <FormSubmitOverlay> for this mutation. Use it when
+       * the trigger already shows progress inline (a spinner in the submit
+       * button), so a fast action isn't buried under a full-screen takeover.
+       */
+      skipGlobalOverlay?: boolean;
+    };
+  }
+}
+
 /**
  * Preloader — the brand logo on white, softly dissolving left-to-right.
  *
@@ -71,9 +89,16 @@ export function Preloader() {
 /**
  * Full-screen preloader shown while any form submission is pending.
  * Driven globally by react-query's mutation count — no per-form wiring needed.
+ *
+ * A mutation can opt out by declaring `meta: { skipGlobalOverlay: true }`. Use
+ * that when the trigger already shows its own progress (a spinner inside the
+ * submit button, say) — stacking a full-screen takeover on top of an inline
+ * spinner just makes a fast action feel slow.
  */
 export function FormSubmitOverlay() {
-  const mutating = useIsMutating();
+  const mutating = useIsMutating({
+    predicate: (mutation) => mutation.meta?.skipGlobalOverlay !== true,
+  });
   const [phase, setPhase] = useState<"hidden" | "shown" | "leaving">("hidden");
   const shownAt = useRef(0);
   useScrollLock(phase !== "hidden");

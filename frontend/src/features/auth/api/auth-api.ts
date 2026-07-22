@@ -147,6 +147,9 @@ export function useSignIn() {
   return useMutation({
     mutationFn: (data: SignInData) =>
       apiClient.post<AuthResponse>("/auth/sign-in", data),
+    // The Continue button shows its own spinner; a full-screen takeover on top
+    // of that makes signing in feel slower than it is.
+    meta: { skipGlobalOverlay: true },
   });
 }
 

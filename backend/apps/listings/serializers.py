@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-
+import re
 from rest_framework import serializers
 from django.utils import timezone
 
@@ -101,6 +101,9 @@ class CarListSerializer(serializers.ModelSerializer):
             "listing_type",
             "rent_price_per_day",
             "sale_price",
+            # Public on purpose: drives the "Negotiable" badge on cards and
+            # public detail. The min/max range behind it stays private.
+            "is_negotiable",
             "currency",
             "brand",
             "model",
@@ -211,6 +214,7 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "listing_type",
             "rent_price_per_day",
             "sale_price",
+            "is_negotiable",
             "currency",
             "brand",
             "model",
@@ -240,10 +244,21 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "available_from",
             "features",
             "is_verified",
+            "vin",
+            "plate_number",
+            "min_price",
+            "max_price",
             "verified_report",
             "availability_status",
         ]
         read_only_fields = ["id"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if self.context.get("public"):
+            for key in ("vin", "plate_number", "min_price", "max_price"):
+                data.pop(key, None)
+        return data
 
     def get_primary_image(self, obj):
         return CarListSerializer(context=self.context).get_primary_image(obj)
@@ -403,6 +418,39 @@ class CarCreateSerializer(serializers.ModelSerializer):
     features = ListingFeatureSerializer(many=True, required=False)
     MIN_MODEL_YEAR = 1900
     MAX_SEATS = 60
+    VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
+
+    def validate_vin(self, value):
+        if value in (None, ""):
+            raise serializers.ValidationError("VIN is required.")
+        v = value.strip().upper()
+        if not self.VIN_RE.match(v):
+            raise serializers.ValidationError("Enter a valid 17-character VIN.")
+        qs = Car.objects.filter(vin=v)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "This vehicle is already registered on the platform."
+            )
+        return v
+
+    def validate_plate_number(self, value):
+        if value in (None, ""):
+            raise serializers.ValidationError("Plate number is required.")
+        p = re.sub(r"[\s-]", "", value).upper()
+        if not (5 <= len(p) <= 12 and p.isalnum()):
+            raise serializers.ValidationError(
+                "Enter a valid plate number (5–12 letters/numbers)."
+            )
+        qs = Car.objects.filter(plate_number=p)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "This vehicle is already registered on the platform."
+            )
+        return p
 
     class Meta:
         model = Car
@@ -421,34 +469,63 @@ class CarCreateSerializer(serializers.ModelSerializer):
             "fuel_type",
             "seats",
             "mileage",
+            "vin",
+            "plate_number",
+            "is_negotiable",
+            "min_price",
+            "max_price",
             "country",
             "state",
             "city",
             "description",
             "features",
         ]
+        extra_kwargs = {"vin": {"validators": []}, "plate_number": {"validators": []}}
 
     def validate(self, data):
-        listing_type = data.get("listing_type")
-        rent_price = data.get("rent_price_per_day")
-        sale_price = data.get("sale_price")
+        lt = data.get("listing_type", getattr(self.instance, "listing_type", None))
+        rent = data.get(
+            "rent_price_per_day", getattr(self.instance, "rent_price_per_day", None)
+        )
+        sale = data.get("sale_price", getattr(self.instance, "sale_price", None))
+        neg = data.get("is_negotiable", getattr(self.instance, "is_negotiable", None))
 
-        if self.instance is not None:
-            if "listing_type" not in data:
-                listing_type = self.instance.listing_type
-            if "rent_price_per_day" not in data:
-                rent_price = self.instance.rent_price_per_day
-            if "sale_price" not in data:
-                sale_price = self.instance.sale_price
+        if lt == ListingType.RENT:
+            if rent is None:
+                raise serializers.ValidationError(
+                    "Rent price per day is required for rental listings."
+                )
+            data["sale_price"] = None
+            data["is_negotiable"] = None
+            data["min_price"] = None
+            data["max_price"] = None
+        elif lt == ListingType.BUY:
+            if sale is None:
+                raise serializers.ValidationError(
+                    {"sale_price": "Required for a buy listing."}
+                )
+            if self.instance is None and neg is None:
+                raise serializers.ValidationError(
+                    {"is_negotiable": "Choose negotiable or non-negotiable."}
+                )
 
-        if listing_type in ("rent", "both") and rent_price is None:
-            raise serializers.ValidationError(
-                {"rent_price_per_day": "Required for rent or both listing type."}
-            )
-        if listing_type in ("buy", "both") and sale_price is None:
-            raise serializers.ValidationError(
-                {"sale_price": "Required for buy or both listing type."}
-            )
+            data["rent_price_per_day"] = None
+            mn = data.get("min_price", getattr(self.instance, "min_price", None))
+            mx = data.get("max_price", getattr(self.instance, "max_price", None))
+            if neg:
+                if mn is None or mx is None:
+                    raise serializers.ValidationError(
+                        {
+                            "min_price": "Set a private minimum and maximum for a negotiable listing."
+                        }
+                    )
+                if mn > mx:
+                    raise serializers.ValidationError(
+                        {"min_price": "Minimum cannot be greater than maximum."}
+                    )
+            else:
+                data["min_price"] = None
+                data["max_price"] = None
         return data
 
     def validate_year(self, value):
@@ -632,16 +709,15 @@ class RequestCreateSerializer(serializers.ModelSerializer):
             )
 
         request_type = data.get("request_type")
-        if car and request_type and car.listing_type != ListingType.BOTH:
-            if request_type != car.listing_type:
-                raise serializers.ValidationError(
-                    {
-                        "request_type": (
-                            "This listing only accepts "
-                            f"{car.get_listing_type_display().lower()} requests."
-                        )
-                    }
-                )
+        if car and request_type and request_type != car.listing_type:
+            raise serializers.ValidationError(
+                {
+                    "request_type": (
+                        "This listing only accepts "
+                        f"{car.get_listing_type_display().lower()} requests."
+                    )
+                }
+            )
 
         if request_type == ListingType.RENT:
             duration_days = data.get("duration_days")

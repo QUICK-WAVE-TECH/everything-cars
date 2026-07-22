@@ -3,6 +3,7 @@ from rest_framework.test import APITestCase
 
 from apps.listings.models import Car, CarStatus, ListingType, Request, RequestStatus
 from apps.reviews.models import Review
+from apps.reviews.migration_helpers import delete_non_rent_reviews
 from apps.users.models import CustomerProfile, OwnerProfile, User
 
 
@@ -112,7 +113,9 @@ class ReviewApiTests(APITestCase):
 
         self.assertEqual(customer_response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(owner_response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Review.objects.filter(request=self.completed_request).count(), 2)
+        self.assertEqual(
+            Review.objects.filter(request=self.completed_request).count(), 2
+        )
 
     def test_uninvolved_user_cannot_review_request(self):
         self.client.force_authenticate(user=self.other_customer)
@@ -153,3 +156,110 @@ class ReviewApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(Review.objects.count(), 0)
+
+
+class RentOnlyReviewTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("ro-owner@test.com", User.Role.OWNER)
+        create_owner_profile(self.owner)
+        self.customer = create_user("ro-customer@test.com", User.Role.CUSTOMER)
+        create_customer_profile(self.customer)
+        self.buy_car = Car.objects.create(
+            owner=self.owner,
+            title="Buy Car",
+            listing_type=ListingType.BUY,
+            sale_price="5000000.00",
+            is_negotiable=False,
+            brand="Toyota",
+            model="Camry",
+            year=2021,
+            state="Lagos",
+            city="Ikeja",
+            status=CarStatus.PUBLISHED,
+        )
+        self.buy_request = Request.objects.create(
+            car=self.buy_car,
+            customer=self.customer,
+            request_type=ListingType.BUY,
+            price_offered="5000000.00",
+            status=RequestStatus.COMPLETED,
+        )
+
+    def _url(self, car):
+        return f"/api/v1/listings/cars/{car.id}/reviews"
+
+    def test_buy_car_reviews_get_returns_empty(self):
+        res = self.client.get(self._url(self.buy_car))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["results"], [])
+        self.assertEqual(res.data["review_count"], 0)
+
+    def test_review_post_on_buy_car_400(self):
+        self.client.force_authenticate(user=self.customer)
+        res = self.client.post(
+            self._url(self.buy_car),
+            {
+                "request": str(self.buy_request.id),
+                "rating": 5,
+                "comment": "Nice car.",
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("rental listings", str(res.data))
+
+    def test_review_post_on_rent_car_ok(self):
+        rent_car = create_car(self.owner)  # helper builds a rent car
+        req = Request.objects.create(
+            car=rent_car,
+            customer=self.customer,
+            request_type=ListingType.RENT,
+            price_offered="40000.00",
+            duration_days=3,
+            status=RequestStatus.COMPLETED,
+        )
+        self.client.force_authenticate(user=self.customer)
+        res = self.client.post(
+            self._url(rent_car),
+            {
+                "request": str(req.id),
+                "rating": 5,
+                "comment": "Great.",
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+
+class DeleteNonRentReviewsMigrationTest(APITestCase):
+    """Pins the data-migration behaviour: reviews only survive on rent cars."""
+
+    def test_non_rent_reviews_deleted_rent_kept(self):
+        owner = create_user("purge-owner@test.com", User.Role.OWNER)
+        create_owner_profile(owner)
+        customer = create_user("purge-customer@test.com", User.Role.CUSTOMER)
+        create_customer_profile(customer)
+
+        rent_car = create_car(owner)
+        buy_car = Car.objects.create(
+            owner=owner, title="Buy Car", listing_type=ListingType.BUY,
+            sale_price="5000000.00", brand="Toyota", model="Land Cruiser",
+            year=2023, state="Lagos", city="Ikeja", status=CarStatus.PUBLISHED,
+        )
+
+        def make_review(car, request_type, **extra):
+            req = Request.objects.create(
+                car=car, customer=customer, request_type=request_type,
+                price_offered="40000.00", status=RequestStatus.COMPLETED, **extra,
+            )
+            return Review.objects.create(
+                car=car, request=req, reviewer=customer, rating=4, comment="ok",
+            )
+
+        rent_review = make_review(rent_car, ListingType.RENT, duration_days=3)
+        buy_review = make_review(buy_car, ListingType.BUY)
+
+        delete_non_rent_reviews(Review)
+
+        self.assertTrue(Review.objects.filter(id=rent_review.id).exists())
+        self.assertFalse(Review.objects.filter(id=buy_review.id).exists())

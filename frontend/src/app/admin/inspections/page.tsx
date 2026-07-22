@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import {
@@ -89,22 +90,16 @@ function slotColor(slot: InspectionSlot): { bg: string; border: string; text: st
 function SlotChip({ slot }: { slot: InspectionSlot }) {
   const { bg, border, text } = slotColor(slot);
   const deactivateSlot = useDeactivateSlot();
-  // Two-click confirm: first click arms, second deactivates.
-  const [arming, setArming] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  async function handleDeactivate(e: React.MouseEvent) {
-    e.stopPropagation();
-    if (!arming) {
-      setArming(true);
-      return;
-    }
+  async function handleDeactivate() {
     try {
       await deactivateSlot.mutateAsync(slot.id);
       toast.success("Slot deactivated");
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Failed to deactivate slot");
     } finally {
-      setArming(false);
+      setConfirmOpen(false);
     }
   }
 
@@ -126,27 +121,31 @@ function SlotChip({ slot }: { slot: InspectionSlot }) {
       )}
       <button
         type="button"
-        onClick={handleDeactivate}
-        onMouseLeave={() => setArming(false)}
-        onBlur={() => setArming(false)}
+        onClick={(e) => { e.stopPropagation(); setConfirmOpen(true); }}
         disabled={deactivateSlot.isPending}
-        aria-label={arming ? "Click again to confirm deactivation" : "Deactivate slot"}
-        title={arming ? "Click again to confirm" : "Deactivate slot"}
+        aria-label="Deactivate slot"
+        title="Deactivate slot"
         className={cn(
-          "absolute right-1.5 top-1.5 flex h-5 cursor-pointer items-center justify-center rounded-full border shadow-sm transition-all duration-150 [font-family:var(--brc-font-ui)] disabled:cursor-not-allowed disabled:opacity-60",
-          arming
-            ? "px-1.5 border-(--brc-danger) bg-(--brc-danger) text-[9px] font-black text-white"
-            : "w-5 border-(--brc-border) bg-white text-(--brc-text-muted) hover:border-(--brc-danger) hover:text-(--brc-danger)",
+          "absolute right-1.5 top-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-(--brc-border) bg-white text-(--brc-text-muted) shadow-sm transition-all duration-150 hover:border-(--brc-danger) hover:text-(--brc-danger) [font-family:var(--brc-font-ui)] disabled:cursor-not-allowed disabled:opacity-60",
         )}
       >
         {deactivateSlot.isPending ? (
           <Loader2Icon size={10} className="animate-spin" />
-        ) : arming ? (
-          "Confirm?"
         ) : (
           <XIcon size={11} />
         )}
       </button>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Deactivate this slot?"
+        description={`${formatTime(slot.start_time)} – ${formatTime(slot.end_time)} will stop accepting new bookings. Slots with active bookings can't be deactivated.`}
+        confirmLabel="Deactivate"
+        destructive
+        isPending={deactivateSlot.isPending}
+        onConfirm={handleDeactivate}
+      />
     </div>
   );
 }

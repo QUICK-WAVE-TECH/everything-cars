@@ -5,7 +5,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { LockIcon, PencilIcon, XIcon, Loader2Icon } from "lucide-react";
+import { LockIcon, PencilIcon, XIcon, Loader2Icon, FileTextIcon } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
 import {
@@ -25,6 +25,14 @@ import { COUNTRIES } from "@/features/auth/data/countries";
 import { ApiError } from "@/lib/api-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Attachment,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentMedia,
+  AttachmentTitle,
+} from "@/components/ui/attachment";
 
 type ProfileInput = z.infer<typeof ownerProfileUpdateSchema>;
 type PasswordInput = z.infer<typeof changePasswordSchema>;
@@ -43,6 +51,35 @@ function isoToName(iso: string): string {
 }
 
 type Field = { label: string; value: string; icon: IconName; locked?: boolean };
+
+function IdDocumentField({ idType, hasDocument }: { idType?: string; hasDocument: boolean }) {
+  const label = idTypeLabel(idType);
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <span className="flex items-center justify-between gap-2 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+        <span className="flex min-w-0 items-center gap-2">
+          <Icon name="idcard" size={16} stroke="var(--brc-text-secondary)" />
+          <span className="truncate">ID Document</span>
+        </span>
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-(--brc-bg-subtle) px-2 py-0.5 text-[11px] font-semibold text-(--brc-text-muted)">
+          <LockIcon size={12} />
+          Locked
+        </span>
+      </span>
+      <Attachment state={hasDocument ? "done" : "idle"} className="w-full max-w-full">
+        <AttachmentMedia variant="icon">
+          <FileTextIcon aria-hidden="true" />
+        </AttachmentMedia>
+        <AttachmentContent>
+          <AttachmentTitle>{hasDocument ? label || "ID document" : "ID document"}</AttachmentTitle>
+          <AttachmentDescription>
+            {hasDocument ? "On file" : "Not uploaded"}
+          </AttachmentDescription>
+        </AttachmentContent>
+      </Attachment>
+    </div>
+  );
+}
 
 function ReadonlyField({ field }: { field: Field }) {
   return (
@@ -201,12 +238,6 @@ export default function OwnerProfilePage() {
       icon: "idcard",
       locked: true,
     },
-    {
-      label: "ID Document",
-      value: profile?.id_document ? "Uploaded" : "Not uploaded",
-      icon: "idcard",
-      locked: true,
-    },
     { label: "Location", value: profile?.location || "—", icon: "pin" },
     { label: "RC Number", value: profile?.rc_number || "—", icon: "idcard" },
     { label: "Address", value: profile?.address || "—", icon: "pin" },
@@ -240,9 +271,11 @@ export default function OwnerProfilePage() {
             {/* Identity header */}
             <div className="flex flex-col gap-4">
               <div className="flex items-start gap-4 sm:items-center sm:gap-[18px]">
-                <span className="flex size-16 shrink-0 items-center justify-center rounded-full bg-(--brc-primary-tint) text-2xl font-extrabold text-(--brc-primary) [font-family:var(--brc-font-display)] sm:size-[88px] sm:text-[30px]">
-                  {initials(`${user.first_name} ${user.last_name}`)}
-                </span>
+                <Avatar className="size-16 after:hidden sm:size-[88px]">
+                  <AvatarFallback className="rounded-full bg-(--brc-primary-tint) text-2xl font-extrabold text-(--brc-primary) [font-family:var(--brc-font-display)] sm:text-[30px]">
+                    {initials(`${user.first_name} ${user.last_name}`)}
+                  </AvatarFallback>
+                </Avatar>
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                   <span className="truncate text-lg font-bold text-(--brc-text) [font-family:var(--brc-font-ui)] sm:text-[22px]">
                     {user.first_name} {user.last_name}
@@ -310,6 +343,10 @@ export default function OwnerProfilePage() {
                 {fields.map((f) => (
                   <ReadonlyField key={f.label} field={f} />
                 ))}
+                <IdDocumentField
+                  idType={profile?.id_type}
+                  hasDocument={!!profile?.id_document}
+                />
               </div>
             ) : (
               <Form {...form}>
@@ -425,13 +462,9 @@ export default function OwnerProfilePage() {
                             locked: true,
                           }}
                         />
-                        <ReadonlyField
-                          field={{
-                            label: "ID Document",
-                            value: profile?.id_document ? "Uploaded" : "Not uploaded",
-                            icon: "idcard",
-                            locked: true,
-                          }}
+                        <IdDocumentField
+                          idType={profile?.id_type}
+                          hasDocument={!!profile?.id_document}
                         />
                       </div>
                     </div>

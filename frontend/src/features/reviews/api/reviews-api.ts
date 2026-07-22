@@ -3,11 +3,16 @@ import { apiClient } from "@/lib/api-client";
 import { requestKeys } from "@/features/requests/api/requests-api";
 import type { ReviewsResponse, CreateReviewInput, UpdateReviewInput } from "./types";
 
-export function useCarReviews(carId: string) {
+/**
+ * Reviews exist only on rent listings — the API returns an empty list for a
+ * buy car. Pass `enabled: false` on buy listings to skip the pointless round
+ * trip rather than fetching a guaranteed-empty response.
+ */
+export function useCarReviews(carId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["reviews", carId],
     queryFn: () => apiClient.get<ReviewsResponse>(`/listings/cars/${carId}/reviews`),
-    enabled: !!carId,
+    enabled: !!carId && (options?.enabled ?? true),
   });
 }
 

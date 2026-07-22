@@ -11,11 +11,11 @@ export function ServicesSection() {
   const cars = useMemo(() => data?.results ?? [], [data?.results]);
 
   const rentCars = useMemo(
-    () => cars.filter((c) => (c.listing_type === "rent" || c.listing_type === "both") && c.availability_status !== "sold").slice(0, 8),
+    () => cars.filter((c) => c.listing_type === "rent" && c.availability_status !== "sold").slice(0, 8),
     [cars],
   );
   const buyCars = useMemo(
-    () => cars.filter((c) => (c.listing_type === "buy" || c.listing_type === "both") && c.availability_status !== "sold").slice(0, 8),
+    () => cars.filter((c) => c.listing_type === "buy" && c.availability_status !== "sold").slice(0, 8),
     [cars],
   );
   const recentlySold = useMemo(

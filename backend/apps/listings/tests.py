@@ -20,6 +20,7 @@ from apps.listings.models import (
     RequestStatus,
 )
 from apps.users.models import CustomerProfile, OwnerProfile, User
+from apps.listings.migration_helpers import delete_both_cars
 
 
 def create_user(email, role, **extra):
@@ -568,29 +569,21 @@ class PublicListingTypeFilterTest(APITestCase):
             rent_price_per_day="20000.00",
         )
         create_car(owner, title="Buy Only", listing_type=ListingType.BUY)
-        create_car(
-            owner,
-            title="Both Ways",
-            listing_type=ListingType.BOTH,
-            rent_price_per_day="30000.00",
-        )
 
     def _titles(self, res):
         return {c["title"] for c in res.data["results"]}
 
-    def test_rent_mode_includes_both(self):
+    def test_rent_mode_returns_only_rent(self):
         res = self.client.get("/api/v1/listings/cars?listing_type=rent")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         titles = self._titles(res)
         self.assertIn("Rent Only", titles)
-        self.assertIn("Both Ways", titles)
         self.assertNotIn("Buy Only", titles)
 
-    def test_buy_mode_includes_both(self):
+    def test_buy_mode_returns_only_buy(self):
         res = self.client.get("/api/v1/listings/cars?listing_type=buy")
         titles = self._titles(res)
         self.assertIn("Buy Only", titles)
-        self.assertIn("Both Ways", titles)
         self.assertNotIn("Rent Only", titles)
 
 
@@ -814,7 +807,9 @@ class VerifiedOverlayTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         # Description stays the owner's; inspector notes live in the report.
         self.assertEqual(res.data["description"], "Owner description")
-        self.assertEqual(res.data["verified_report"]["notes"], "Inspector verified notes")
+        self.assertEqual(
+            res.data["verified_report"]["notes"], "Inspector verified notes"
+        )
         self.assertEqual(res.data["mileage"], 99999)
         self.assertEqual(res.data["fuel_type"], "diesel")
         self.assertTrue(res.data["is_verified"])
@@ -856,3 +851,305 @@ class ListingSubmittedEmailTest(APITestCase):
         html = mail.outbox[0].alternatives[0][0]
         self.assertIn("Ada Bello", html)
         self.assertIn(car.title, html)
+
+
+class DeleteBothCarsMigrationTest(APITestCase):
+    def test_both_cars_deleted_rent_and_buy_kept(self):
+        owner = create_user("both-owner@x.com", "owner")
+        both = Car.objects.create(
+            owner=owner,
+            title="Both Car",
+            listing_type="both",
+            rent_price_per_day=10,
+            sale_price=20,
+            brand="Toyota",
+            model="Camry",
+            year=2020,
+            state="Lagos",
+        )
+        rent = Car.objects.create(
+            owner=owner,
+            title="Rent Car",
+            listing_type="rent",
+            rent_price_per_day=10,
+            brand="Toyota",
+            model="Camry",
+            year=2020,
+            state="Lagos",
+        )
+        delete_both_cars(Car)
+        self.assertFalse(Car.objects.filter(id=both.id).exists())
+        self.assertTrue(Car.objects.filter(id=rent.id).exists())
+
+
+class VinPlateValidationTest(APITestCase):
+
+    def setUp(self):
+        self.owner = create_user("owner-vin@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.client.force_authenticate(user=self.owner)
+
+    def _payload(self, **over):
+        data = {
+            "title": "Test Car",
+            "listing_type": "rent",
+            "rent_price_per_day": "20000.00",
+            "brand": "Toyota",
+            "model": "Corolla",
+            "year": 2021,
+            "state": "Lagos",
+            "city": "Ikeja",
+            "vin": "1HGCM82633A004352",  # 17 chars, no I/O/Q
+            "plate_number": "ABC123DE",
+        }
+        data.update(over)
+        return data
+
+    def _post(self, **over):
+        data = self.client.post(
+            "/api/v1/listings/my-cars",
+            self._payload(**over),
+            format="json",
+        )
+        return data
+
+    def test_vin_normalized_uppercase(self):
+        res = self._post(vin="1hgcm82633a004352")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        car = Car.objects.get(id=res.data["id"])
+        self.assertEqual(car.vin, "1HGCM82633A004352")
+
+    def test_vin_bad_length_400(self):
+        res = self._post(vin="1HGCM82633A00435")  # 16 chars
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_vin_illegal_letter_400(self):
+        res = self._post(vin="1HGCM82633A0O4352")  # contains O
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_plate_normalized_strip(self):
+        res = self._post(plate_number="abc 123")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        car = Car.objects.get(id=res.data["id"])
+        self.assertEqual(car.plate_number, "ABC123")
+
+    def test_plate_too_short_400(self):
+        res = self._post(plate_number="AB12")  # 4 chars
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_duplicate_vin_generic_message(self):
+        other = create_user("other-vin@test.com", "owner")
+        create_car(
+            other,
+            vin="1HGCM82633A004352",
+            listing_type=ListingType.RENT,
+            sale_price=None,
+            rent_price_per_day="10000.00",
+        )
+        res = self._post(vin="1HGCM82633A004352")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already registered on the platform", str(res.data))
+        self.assertNotIn("other-vin@test.com", str(res.data))
+
+
+class XorPricingTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("xor-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.client.force_authenticate(user=self.owner)
+
+    def _post(self, **over):
+        data = {
+            "title": "Test Car",
+            "brand": "Toyota",
+            "model": "Corolla",
+            "year": 2021,
+            "state": "Lagos",
+            "city": "Ikeja",
+            "vin": "1HGCM82633A004352",
+            "plate_number": "ABC123DE",
+        }
+        data.update(over)
+        return self.client.post("/api/v1/listings/my-cars", data, format="json")
+
+    def test_rent_requires_rent_price_clears_sale(self):
+        res = self._post(
+            listing_type="rent", rent_price_per_day="20000.00", sale_price="5000000.00"
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(Car.objects.get(id=res.data["id"]).sale_price)
+
+    def test_rent_without_rent_price_400(self):
+        self.assertEqual(self._post(listing_type="rent").status_code, 400)
+
+    def test_buy_requires_sale_price_clears_rent(self):
+        res = self._post(
+            listing_type="buy",
+            sale_price="5000000.00",
+            rent_price_per_day="20000.00",
+            is_negotiable=False,
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(Car.objects.get(id=res.data["id"]).rent_price_per_day)
+
+    def test_buy_without_sale_price_400(self):
+        self.assertEqual(
+            self._post(listing_type="buy", is_negotiable=False).status_code, 400
+        )
+
+    def test_buy_requires_is_negotiable(self):
+        self.assertEqual(
+            self._post(listing_type="buy", sale_price="5000000.00").status_code, 400
+        )
+
+    def test_negotiable_buy_requires_min_max_400(self):
+        self.assertEqual(
+            self._post(
+                listing_type="buy", sale_price="5000000.00", is_negotiable=True
+            ).status_code,
+            400,
+        )
+
+    def test_min_greater_than_max_400(self):
+        self.assertEqual(
+            self._post(
+                listing_type="buy",
+                sale_price="5000000.00",
+                is_negotiable=True,
+                min_price="6000000.00",
+                max_price="5000000.00",
+            ).status_code,
+            400,
+        )
+
+    def test_negotiable_buy_stores_range(self):
+        res = self._post(
+            listing_type="buy",
+            sale_price="5000000.00",
+            is_negotiable=True,
+            min_price="4000000.00",
+            max_price="5500000.00",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            str(Car.objects.get(id=res.data["id"]).min_price), "4000000.00"
+        )
+
+    def test_non_negotiable_buy_clears_min_max(self):
+        res = self._post(
+            listing_type="buy",
+            sale_price="5000000.00",
+            is_negotiable=False,
+            min_price="4000000.00",
+            max_price="5500000.00",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        car = Car.objects.get(id=res.data["id"])
+        self.assertIsNone(car.min_price)
+        self.assertIsNone(car.max_price)
+
+    def test_rent_forces_is_negotiable_null(self):
+        res = self._post(
+            listing_type="rent", rent_price_per_day="20000.00", is_negotiable=True
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(Car.objects.get(id=res.data["id"]).is_negotiable)
+
+    def test_listing_type_both_rejected(self):
+        self.assertEqual(
+            self._post(listing_type="both", rent_price_per_day="20000.00").status_code,
+            400,
+        )
+
+
+class VinPlatePrivacyTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("priv-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(
+            self.owner,
+            vin="1HGCM82633A004352",
+            plate_number="ABC123DE",
+            is_negotiable=True,
+            min_price="4000000.00",
+            max_price="5500000.00",
+        )
+
+    PRIVATE = ("vin", "plate_number", "min_price", "max_price")
+
+    def test_public_detail_omits_private_fields(self):
+        res = self.client.get(f"/api/v1/listings/cars/{self.car.id}")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        for key in self.PRIVATE:
+            self.assertNotIn(key, res.data)
+
+    def test_owner_detail_includes_private_fields(self):
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.get(f"/api/v1/listings/my-cars/{self.car.id}")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["vin"], "1HGCM82633A004352")
+        self.assertEqual(res.data["plate_number"], "ABC123DE")
+        self.assertIn("min_price", res.data)
+
+    def test_admin_detail_includes_private_fields(self):
+        staff = create_user("priv-staff@test.com", "owner", is_staff=True)
+        self.client.force_authenticate(user=staff)
+        res = self.client.get(f"/api/v1/listings/admin/cars/{self.car.id}")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("vin", res.data)
+        self.assertIn("min_price", res.data)
+
+    def test_is_negotiable_is_public(self):
+        """The badge flag is public; only the range behind it is private."""
+        detail = self.client.get(f"/api/v1/listings/cars/{self.car.id}")
+        self.assertTrue(detail.data["is_negotiable"])
+        listing = self.client.get("/api/v1/listings/cars")
+        row = next(r for r in listing.data["results"] if r["id"] == str(self.car.id))
+        self.assertTrue(row["is_negotiable"])
+        self.assertNotIn("min_price", row)
+
+    def test_public_list_omits_private_fields(self):
+        res = self.client.get("/api/v1/listings/cars")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        for row in res.data["results"]:
+            for key in self.PRIVATE:
+                self.assertNotIn(key, row)
+
+
+class RequestTypeMatchTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("rtm-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.buy_car = create_car(
+            self.owner,
+            listing_type=ListingType.BUY,
+            sale_price="5000000.00",
+            is_negotiable=False,
+        )
+        self.rent_car = create_car(
+            self.owner,
+            listing_type=ListingType.RENT,
+            sale_price=None,
+            rent_price_per_day="20000.00",
+        )
+        self.customer = create_user("rtm-customer@test.com", "customer")
+        create_customer_profile(self.customer)
+        self.client.force_authenticate(user=self.customer)
+
+    def _post(self, car, rtype, price):
+        return self.client.post(
+            "/api/v1/listings/requests",
+            {"car": str(car.id), "request_type": rtype, "price_offered": price},
+            format="json",
+        )
+
+    def test_rent_request_on_buy_car_400(self):
+        self.assertEqual(self._post(self.buy_car, "rent", "20000.00").status_code, 400)
+
+    def test_buy_request_on_rent_car_400(self):
+        self.assertEqual(
+            self._post(self.rent_car, "buy", "5000000.00").status_code, 400
+        )
+
+    def test_matching_buy_request_ok(self):
+        self.assertEqual(self._post(self.buy_car, "buy", "5000000.00").status_code, 201)

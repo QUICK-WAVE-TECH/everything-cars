@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api-client";
 import {
@@ -388,44 +389,20 @@ function ConfirmToggleDialog({
   }
 
   return (
-    <Dialog open={!!center} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent
-        showCloseButton={false}
-        className="w-[calc(100vw-2rem)] gap-0 overflow-hidden rounded-3xl border border-(--brc-border) bg-white p-0 shadow-[0_28px_70px_rgba(18,18,18,0.22)] sm:max-w-[420px]"
-      >
-        <div className="p-6">
-          <h3 className="m-0 text-base font-black text-(--brc-text) [font-family:var(--brc-font-ui)]">
-            {willDeactivate ? "Deactivate center?" : "Reactivate center?"}
-          </h3>
-          <p className="mt-2.5 text-sm leading-6 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-            {willDeactivate
-              ? `${center?.company_name} will no longer be selectable when creating new inspection slots. Existing slots are unaffected.`
-              : `${center?.company_name} will become available again when creating new inspection slots.`}
-          </p>
-        </div>
-        <div className="flex justify-end gap-2.5 border-t border-(--brc-border) px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-11 cursor-pointer rounded-xl border border-(--brc-border) bg-white px-5 text-sm font-bold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={updateCenter.isPending}
-            onClick={handleConfirm}
-            className={cn(
-              "flex h-11 cursor-pointer items-center gap-2 rounded-xl border-none px-5 text-sm font-bold text-white transition-all hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]",
-              willDeactivate ? "bg-(--brc-danger)" : "bg-(--brc-success)",
-            )}
-          >
-            {updateCenter.isPending && <Loader2Icon size={14} className="animate-spin" />}
-            {willDeactivate ? "Deactivate" : "Reactivate"}
-          </button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      open={!!center}
+      onOpenChange={(next: boolean) => { if (!next) onClose(); }}
+      title={willDeactivate ? "Deactivate center?" : "Reactivate center?"}
+      description={
+        willDeactivate
+          ? `${center?.company_name} will no longer be selectable when creating new inspection slots. Existing slots are unaffected.`
+          : `${center?.company_name} will become available again when creating new inspection slots.`
+      }
+      confirmLabel={willDeactivate ? "Deactivate" : "Reactivate"}
+      destructive={willDeactivate}
+      isPending={updateCenter.isPending}
+      onConfirm={handleConfirm}
+    />
   );
 }
 

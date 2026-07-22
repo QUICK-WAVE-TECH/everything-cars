@@ -7,6 +7,7 @@ import { Icon } from "@/features/auth/components/icon";
 import { Chip } from "./chip";
 import { AvailabilityBadge } from "@/features/listings/components/availability-badge";
 import { VerifiedBadge } from "@/features/listings/components/verified-report";
+import { NegotiableBadge } from "@/features/listings/components/negotiable-badge";
 import type { CarListItem } from "@/features/listings/api/types";
 
 function currencySymbol(code: string) {
@@ -174,13 +175,23 @@ export function ApiCarCard({ car, displayMode }: ApiCarCardProps) {
       >
         <span
           style={{
-            fontFamily: "var(--brc-font-display)",
-            fontWeight: 700,
-            fontSize: "clamp(16px, 4vw, 20px)",
-            color: "var(--brc-text)",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
           }}
         >
-          {fmtPrice(car, displayMode)}
+          <span
+            style={{
+              fontFamily: "var(--brc-font-display)",
+              fontWeight: 700,
+              fontSize: "clamp(16px, 4vw, 20px)",
+              color: "var(--brc-text)",
+            }}
+          >
+            {fmtPrice(car, displayMode)}
+          </span>
+          {car.listing_type === "buy" && <NegotiableBadge isNegotiable={car.is_negotiable} size="sm" />}
         </span>
         <span
           style={{

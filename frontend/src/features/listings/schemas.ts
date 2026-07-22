@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+import {
+  normalizePlate,
+  normalizeVin,
+  validatePlate,
+  validateVin,
+} from "@/features/listings/lib/vehicle-identity";
+
 const currentYear = new Date().getFullYear();
 
 const decimalString = (msg: string) =>
@@ -10,11 +17,21 @@ const digitsOnly = (msg: string) =>
 
 const createCarBase = z.object({
   title: z.string().trim().min(2, "Title is required"),
-  listing_type: z.enum(["rent", "buy", "both"], {
+  // A car is listed for rent XOR buy — never both.
+  listing_type: z.enum(["rent", "buy"], {
     message: "Select listing type",
   }),
   rent_price_per_day: decimalString("Price must be a valid number (e.g. 35000 or 35000.50)"),
   sale_price: decimalString("Price must be a valid number (e.g. 24000000 or 24000000.00)"),
+  // Buy listings only. When negotiable, the owner sets a private min/max range
+  // that customers never see.
+  is_negotiable: z.boolean().optional(),
+  min_price: decimalString("Enter a valid amount"),
+  max_price: decimalString("Enter a valid amount"),
+  // Normalized here; the format/length rules are asserted in the superRefine
+  // below so the message can name the exact problem.
+  vin: z.string().trim().transform(normalizeVin),
+  plate_number: z.string().trim().transform(normalizePlate),
   currency: z.string().default("NGN"),
   brand: z.string().trim().min(1, "Brand is required"),
   model: z.string().trim().min(1, "Model is required"),
@@ -52,24 +69,50 @@ const createCarBase = z.object({
 });
 
 export const createCarSchema = createCarBase.superRefine((data, ctx) => {
-  if (
-    (data.listing_type === "rent" || data.listing_type === "both") &&
-    !data.rent_price_per_day
-  ) {
-    ctx.addIssue({
-      code: "custom",
-      message: "Rental price is required for this listing type",
-      path: ["rent_price_per_day"],
-    });
+  const vinError = validateVin(data.vin);
+  if (vinError) {
+    ctx.addIssue({ code: "custom", message: vinError, path: ["vin"] });
   }
-  if (
-    (data.listing_type === "buy" || data.listing_type === "both") &&
-    !data.sale_price
-  ) {
+  const plateError = validatePlate(data.plate_number);
+  if (plateError) {
+    ctx.addIssue({ code: "custom", message: plateError, path: ["plate_number"] });
+  }
+
+  if (data.listing_type === "rent") {
+    if (!data.rent_price_per_day) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Rental price is required for this listing type",
+        path: ["rent_price_per_day"],
+      });
+    }
+    return;
+  }
+
+  // Buy listing
+  if (!data.sale_price) {
     ctx.addIssue({
       code: "custom",
       message: "Sale price is required for this listing type",
       path: ["sale_price"],
+    });
+  }
+  if (data.is_negotiable !== true) return;
+
+  // Negotiable buy listings must declare a private, ordered range.
+  if (!data.min_price || !data.max_price) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Enter both a minimum and a maximum",
+      path: ["min_price"],
+    });
+    return;
+  }
+  if (Number(data.min_price) > Number(data.max_price)) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Minimum must be less than or equal to maximum",
+      path: ["min_price"],
     });
   }
 });

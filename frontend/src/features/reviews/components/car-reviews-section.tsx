@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelativeDate } from "@/shared/utils/format";
 import { useMe } from "@/features/auth/api";
@@ -295,13 +297,17 @@ export function CarReviewsSection({ carId }: { carId: string }) {
   const deleteReview = useDeleteReview();
   const [editingReview, setEditingReview] = useState<ReviewItem | null>(null);
 
-  async function handleDelete(id: string) {
-    if (!window.confirm("Delete this review?")) return;
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  async function handleConfirmDelete() {
+    if (!pendingDeleteId) return;
     try {
-      await deleteReview.mutateAsync(id);
+      await deleteReview.mutateAsync(pendingDeleteId);
       toast.success("Review deleted");
     } catch {
       toast.error("Failed to delete review");
+    } finally {
+      setPendingDeleteId(null);
     }
   }
 
@@ -359,7 +365,7 @@ export function CarReviewsSection({ carId }: { carId: string }) {
                   review={review}
                   isOwnReview={!!me && me.id === review.reviewer.id}
                   onEdit={(r) => setEditingReview(r)}
-                  onDelete={handleDelete}
+                  onDelete={setPendingDeleteId}
                   isDeleting={deleteReview.isPending}
                 />
               )}
@@ -367,6 +373,17 @@ export function CarReviewsSection({ carId }: { carId: string }) {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(next: boolean) => { if (!next) setPendingDeleteId(null); }}
+        title="Delete this review?"
+        description="Your rating and comment will be removed. This can't be undone."
+        confirmLabel="Delete"
+        destructive
+        isPending={deleteReview.isPending}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }

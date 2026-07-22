@@ -40,12 +40,18 @@ export type BookedPeriod = {
   status: string;
 };
 
+export type ListingType = "rent" | "buy";
+
 export type CarListItem = {
   id: string;
   title: string;
-  listing_type: "rent" | "buy" | "both";
+  /** A car is listed for rent XOR buy — never both. */
+  listing_type: ListingType;
   rent_price_per_day: string | null;
   sale_price: string | null;
+  /** Buy listings only (null on rent). Public — drives the "Negotiable" badge.
+   * The owner's private min/max range behind it is never public. */
+  is_negotiable: boolean | null;
   currency: string;
   brand: string;
   model: string;
@@ -97,4 +103,10 @@ export type CarDetail = CarListItem & {
   booked_periods: BookedPeriod[];
   available_from: string | null;
   verified_report: VerifiedReport | null;
+  /** Owner- and staff-only. Absent from every public payload, so these are
+   * optional: never assume they exist on a publicly-fetched car. */
+  vin?: string | null;
+  plate_number?: string | null;
+  min_price?: string | null;
+  max_price?: string | null;
 };
