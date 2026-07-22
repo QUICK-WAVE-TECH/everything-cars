@@ -880,3 +880,73 @@ class DeleteBothCarsMigrationTest(APITestCase):
         delete_both_cars(Car)
         self.assertFalse(Car.objects.filter(id=both.id).exists())
         self.assertTrue(Car.objects.filter(id=rent.id).exists())
+
+
+class VinPlateValidationTest(APITestCase):
+
+    def setUp(self):
+        self.owner = create_user("owner-vin@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.client.force_authenticate(user=self.owner)
+
+    def _payload(self, **over):
+        data = {
+            "title": "Test Car",
+            "listing_type": "rent",
+            "rent_price_per_day": "20000.00",
+            "brand": "Toyota",
+            "model": "Corolla",
+            "year": 2021,
+            "state": "Lagos",
+            "city": "Ikeja",
+            "vin": "1HGCM82633A004352",  # 17 chars, no I/O/Q
+            "plate_number": "ABC123DE",
+        }
+        data.update(over)
+        return data
+
+    def _post(self, **over):
+        data = self.client.post(
+            "/api/v1/listings/my-cars",
+            self._payload(**over),
+            format="json",
+        )
+        return data
+
+    def test_vin_normalized_uppercase(self):
+        res = self._post(vin="1hgcm82633a004352")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        car = Car.objects.get(id=res.data["id"])
+        self.assertEqual(car.vin, "1HGCM82633A004352")
+
+    def test_vin_bad_length_400(self):
+        res = self._post(vin="1HGCM82633A00435")  # 16 chars
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_vin_illegal_letter_400(self):
+        res = self._post(vin="1HGCM82633A0O4352")  # contains O
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_plate_normalized_strip(self):
+        res = self._post(plate_number="abc 123")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        car = Car.objects.get(id=res.data["id"])
+        self.assertEqual(car.plate_number, "ABC123")
+
+    def test_plate_too_short_400(self):
+        res = self._post(plate_number="AB12")  # 4 chars
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_duplicate_vin_generic_message(self):
+        other = create_user("other-vin@test.com", "owner")
+        create_car(
+            other,
+            vin="1HGCM82633A004352",
+            listing_type=ListingType.RENT,
+            sale_price=None,
+            rent_price_per_day="10000.00",
+        )
+        res = self._post(vin="1HGCM82633A004352")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already registered on the platform", str(res.data))
+        self.assertNotIn("other-vin@test.com", str(res.data))

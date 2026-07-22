@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-
+import re
 from rest_framework import serializers
 from django.utils import timezone
 
@@ -403,6 +403,39 @@ class CarCreateSerializer(serializers.ModelSerializer):
     features = ListingFeatureSerializer(many=True, required=False)
     MIN_MODEL_YEAR = 1900
     MAX_SEATS = 60
+    VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
+
+    def validate_vin(self, value):
+        if value in (None, ""):
+            raise serializers.ValidationError("VIN is required.")
+        v = value.strip().upper()
+        if not self.VIN_RE.match(v):
+            raise serializers.ValidationError("Enter a valid 17-character VIN.")
+        qs = Car.objects.filter(vin=v)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "This vehicle is already registered on the platform."
+            )
+        return v
+
+    def validate_plate_number(self, value):
+        if value in (None, ""):
+            raise serializers.ValidationError("Plate number is required.")
+        p = re.sub(r"[\s-]", "", value).upper()
+        if not (5 <= len(p) <= 12 and p.isalnum()):
+            raise serializers.ValidationError(
+                "Enter a valid plate number (5–12 letters/numbers)."
+            )
+        qs = Car.objects.filter(plate_number=p)
+        if self.instance:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise serializers.ValidationError(
+                "This vehicle is already registered on the platform."
+            )
+        return p
 
     class Meta:
         model = Car
@@ -421,12 +454,15 @@ class CarCreateSerializer(serializers.ModelSerializer):
             "fuel_type",
             "seats",
             "mileage",
+            "vin",
+            "plate_number",
             "country",
             "state",
             "city",
             "description",
             "features",
         ]
+        extra_kwargs = {"vin": {"validators": []}, "plate_number": {"validators": []}}
 
     def validate(self, data):
         listing_type = data.get("listing_type")
