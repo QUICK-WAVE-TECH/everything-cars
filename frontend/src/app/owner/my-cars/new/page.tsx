@@ -30,6 +30,9 @@ import {
   CarPhotoSlotsField,
   findOversizedCarImage,
 } from "@/features/listings/components/car-photo-slots-field";
+import { ListingTypeToggle } from "@/features/listings/components/listing-type-toggle";
+import { NegotiableField } from "@/features/listings/components/negotiable-field";
+import { VehicleIdentityFields } from "@/features/listings/components/vehicle-identity-fields";
 import { useRouter } from "next/navigation";
 import {
   createCarSchema,
@@ -78,6 +81,22 @@ function TextField({ label, placeholder, value, onChange, prefix, className, inp
 
 function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
+}
+
+/**
+ * Pull a VIN/plate message out of a DRF field-error body
+ * (`{"vin": ["This vehicle is already registered on the platform."]}`).
+ * Returns null when the failure was about something else.
+ */
+function extractVehicleFieldError(error: ApiError): string | null {
+  const data = error.data;
+  if (!data || typeof data !== "object") return null;
+  for (const field of ["vin", "plate_number"] as const) {
+    const value = (data as Record<string, unknown>)[field];
+    if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+    if (typeof value === "string") return value;
+  }
+  return null;
 }
 
 function SelectField({ label, placeholder, value, options, onPick, className }: {
@@ -250,6 +269,7 @@ export default function ListCarPage() {
   const [files, setFiles] = useState<CarImageFiles>({});
   const [done, setDone] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [vehicleServerError, setVehicleServerError] = useState<string | null>(null);
   const [pendingValues, setPendingValues] = useState<CreateCarInput | null>(null);
   const submitInFlightRef = useRef(false);
 
@@ -257,9 +277,14 @@ export default function ListCarPage() {
     resolver: zodResolver(createCarSchema),
     defaultValues: {
       title: "",
-      listing_type: undefined,
+      listing_type: "rent",
       rent_price_per_day: "",
       sale_price: "",
+      is_negotiable: true,
+      min_price: "",
+      max_price: "",
+      vin: "",
+      plate_number: "",
       currency: "NGN",
       brand: "",
       model: "",
@@ -282,9 +307,14 @@ export default function ListCarPage() {
   const listingType = w.listing_type;
   const countryName = COUNTRIES.find((c) => c.iso === (w.country ?? "").toLowerCase())?.name ?? "";
   const isBuy = listingType === "buy";
-  // Show both price fields when no type selected yet, otherwise show based on type
-  const showRentPrice = !listingType || listingType === "rent" || listingType === "both";
-  const showSalePrice = !listingType || isBuy || listingType === "both";
+  // Pricing is strictly exclusive: a car is listed to rent OR to buy.
+  const showRentPrice = !isBuy;
+  const showSalePrice = isBuy;
+  const isNegotiable = isBuy && w.is_negotiable === true;
+  const rangeError =
+    form.formState.errors.min_price?.message ??
+    form.formState.errors.max_price?.message ??
+    null;
 
   async function handleSubmit(values: CreateCarInput) {
     try {
@@ -311,6 +341,21 @@ export default function ListCarPage() {
       if (!values.rent_price_per_day) delete payload.rent_price_per_day;
       if (!values.sale_price) delete payload.sale_price;
 
+      // Mirror the server's XOR rules so we never send a field it would reject
+      // or silently null out.
+      if (values.listing_type === "rent") {
+        delete payload.sale_price;
+        delete payload.is_negotiable;
+        delete payload.min_price;
+        delete payload.max_price;
+      } else {
+        delete payload.rent_price_per_day;
+        if (!values.is_negotiable) {
+          delete payload.min_price;
+          delete payload.max_price;
+        }
+      }
+
       const car = await createCar.mutateAsync(payload);
 
       try {
@@ -333,7 +378,14 @@ export default function ListCarPage() {
       toast.success("Car listed successfully");
     } catch (error) {
       if (error instanceof ApiError) {
-        toast.error(error.message);
+        // A duplicate VIN/plate comes back on those fields with a deliberately
+        // generic message — surface it beside the inputs, not just as a toast.
+        const fieldMessage = extractVehicleFieldError(error);
+        if (fieldMessage) {
+          setVehicleServerError(fieldMessage);
+          setConfirmOpen(false);
+        }
+        toast.error(fieldMessage ?? error.message);
       } else {
         toast.error("Something went wrong. Please try again.");
       }
@@ -452,7 +504,15 @@ export default function ListCarPage() {
             <form onSubmit={handleFormSubmit} className="flex flex-col gap-6 sm:gap-8">
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
                 <TextField label="Car Title" placeholder="Enter car title" value={w.title ?? ""} onChange={(v) => form.setValue("title", v.replace(/\b\w/g, (c) => c.toUpperCase()))} />
-                <SelectField label="Listing Type" placeholder="Select listing type" value={w.listing_type ?? ""} options={["rent", "buy", "both"]} onPick={(v) => form.setValue("listing_type", v as "rent" | "buy" | "both")} />
+                <div className="flex min-w-0 flex-col gap-2 sm:col-span-2 lg:col-span-1">
+                  <span className="text-sm text-(--brc-text) [font-family:var(--brc-font-ui)] sm:text-base">
+                    Listing Type
+                  </span>
+                  <ListingTypeToggle
+                    value={listingType ?? "rent"}
+                    onChange={(next) => form.setValue("listing_type", next)}
+                  />
+                </div>
 
                 {showRentPrice && (
                   <TextField label="Rental Price per Day" placeholder="e.g. 35000.00" value={w.rent_price_per_day ?? ""} onChange={(v) => form.setValue("rent_price_per_day", v)} prefix="₦" inputMode="decimal" filter="decimal" />
@@ -460,6 +520,32 @@ export default function ListCarPage() {
                 {showSalePrice && (
                   <TextField label="Sale Price" placeholder="e.g. 24000000.00" value={w.sale_price ?? ""} onChange={(v) => form.setValue("sale_price", v)} prefix="₦" inputMode="decimal" filter="decimal" />
                 )}
+
+                {isBuy && (
+                  <NegotiableField
+                    isNegotiable={w.is_negotiable === true}
+                    onToggle={(next) => form.setValue("is_negotiable", next)}
+                    minPrice={w.min_price ?? ""}
+                    maxPrice={w.max_price ?? ""}
+                    onMinPriceChange={(v) => form.setValue("min_price", v)}
+                    onMaxPriceChange={(v) => form.setValue("max_price", v)}
+                    error={isNegotiable ? rangeError : null}
+                  />
+                )}
+
+                <VehicleIdentityFields
+                  vin={w.vin ?? ""}
+                  plate={w.plate_number ?? ""}
+                  onVinChange={(v) => {
+                    setVehicleServerError(null);
+                    form.setValue("vin", v);
+                  }}
+                  onPlateChange={(v) => {
+                    setVehicleServerError(null);
+                    form.setValue("plate_number", v);
+                  }}
+                  serverError={vehicleServerError}
+                />
 
                 <TextField label="Brand" placeholder="Enter brand name" value={w.brand ?? ""} onChange={(v) => form.setValue("brand", v)} />
                 <TextField label="Model" placeholder="Enter model" value={w.model ?? ""} onChange={(v) => form.setValue("model", v)} />
@@ -557,8 +643,14 @@ export default function ListCarPage() {
               { label: "Title", value: w.title },
               { label: "Vehicle", value: [w.brand, w.model, w.year].filter(Boolean).join(" ") },
               { label: "Listing type", value: w.listing_type },
-              w.sale_price ? { label: "Sale price", value: `${w.currency} ${w.sale_price}` } : null,
-              w.rent_price_per_day ? { label: "Rent / day", value: `${w.currency} ${w.rent_price_per_day}` } : null,
+              isBuy && w.sale_price ? { label: "Sale price", value: `${w.currency} ${w.sale_price}` } : null,
+              !isBuy && w.rent_price_per_day ? { label: "Rent / day", value: `${w.currency} ${w.rent_price_per_day}` } : null,
+              isBuy ? { label: "Pricing", value: w.is_negotiable ? "Negotiable" : "Non-negotiable" } : null,
+              isNegotiable && w.min_price && w.max_price
+                ? { label: "Private range", value: `${w.currency} ${w.min_price} – ${w.max_price}` }
+                : null,
+              { label: "VIN", value: w.vin },
+              { label: "Plate", value: w.plate_number },
               { label: "Location", value: [w.city, w.state].filter(Boolean).join(", ") },
               w.mileage ? { label: "Mileage", value: w.mileage } : null,
               { label: "Photos", value: `${Object.values(files).filter(Boolean).length} uploaded` },

@@ -41,6 +41,8 @@ import type { CarDetail } from "@/features/listings/api";
 import type { CarImageFiles } from "@/features/listings/api/types";
 import { CarPhotoSlotsField } from "@/features/listings/components/car-photo-slots-field";
 import { CarStatusTimeline } from "@/features/listings/components/car-status-timeline";
+import { VehicleIdentityCard } from "@/features/listings/components/vehicle-identity-card";
+import { PrivatePricingCard } from "@/features/listings/components/private-pricing-card";
 import {
   createCarSchema,
   type CreateCarFormValues,
@@ -434,6 +436,11 @@ function populateForm(car: CarDetail): CreateCarFormValues {
     listing_type: car.listing_type,
     rent_price_per_day: car.rent_price_per_day ?? "",
     sale_price: car.sale_price ?? "",
+    is_negotiable: car.is_negotiable ?? false,
+    min_price: car.min_price ?? "",
+    max_price: car.max_price ?? "",
+    vin: car.vin ?? "",
+    plate_number: car.plate_number ?? "",
     currency: car.currency || "NGN",
     brand: car.brand,
     model: car.model,
@@ -528,10 +535,8 @@ export default function CarDetailPage() {
 
   const w = useWatch({ control: form.control });
   const listingType = w.listing_type;
-  const showRentPrice =
-    !listingType || listingType === "rent" || listingType === "both";
-  const showSalePrice =
-    !listingType || listingType === "buy" || listingType === "both";
+  const showRentPrice = !listingType || listingType === "rent";
+  const showSalePrice = !listingType || listingType === "buy";
   const countryName =
     COUNTRIES.find((c) => c.iso === (w.country ?? "").toLowerCase())?.name ??
     "";
@@ -1038,15 +1043,13 @@ export default function CarDetailPage() {
                     value={car.listing_type}
                   />
                   <ReadonlyDetail label="Currency" value={car.currency} />
-                  {(car.listing_type === "rent" ||
-                    car.listing_type === "both") && (
+                  {car.listing_type === "rent" && (
                     <ReadonlyDetail
                       label="Rent Price / Day"
                       value={formatPrice(car.rent_price_per_day, car.currency)}
                     />
                   )}
-                  {(car.listing_type === "buy" ||
-                    car.listing_type === "both") && (
+                  {car.listing_type === "buy" && (
                     <ReadonlyDetail
                       label="Sale Price"
                       value={formatPrice(car.sale_price, car.currency)}
@@ -1142,12 +1145,9 @@ export default function CarDetailPage() {
                     label="Listing Type"
                     placeholder="Select listing type"
                     value={w.listing_type ?? ""}
-                    options={["rent", "buy", "both"]}
+                    options={["rent", "buy"]}
                     onPick={(v) =>
-                      form.setValue(
-                        "listing_type",
-                        v as "rent" | "buy" | "both",
-                      )
+                      form.setValue("listing_type", v as "rent" | "buy")
                     }
                   />
                   <SelectField
@@ -1341,6 +1341,18 @@ export default function CarDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Owner-only: VIN/plate + private negotiation range — never shown publicly */}
+        {!editing && (
+          <>
+            <VehicleIdentityCard vin={car.vin} plateNumber={car.plate_number} />
+            <PrivatePricingCard
+              minPrice={car.min_price}
+              maxPrice={car.max_price}
+              currency={car.currency}
+            />
+          </>
+        )}
       </div>
     </div>
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>

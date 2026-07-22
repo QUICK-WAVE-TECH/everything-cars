@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePublicCarDetail } from "@/features/listings/api";
 import { VerifiedReport, VerifiedBadge } from "@/features/listings/components/verified-report";
+import { NegotiableBadge } from "@/features/listings/components/negotiable-badge";
 import { useCarReviews } from "@/features/reviews/api";
 import { StarRating } from "@/features/reviews/components/star-rating";
 import { useAuthStore } from "@/features/auth/store";
@@ -68,7 +69,10 @@ function formatDate(dateStr: string): string {
 
 export function CarDetailPage({ carId }: { carId: string }) {
   const { data: car, isLoading } = usePublicCarDetail(carId);
-  const { data: reviewsData } = useCarReviews(carId);
+  // Skip the request entirely on buy listings — reviews are rent-only.
+  const { data: reviewsData } = useCarReviews(carId, {
+    enabled: car ? car.listing_type === "rent" : false,
+  });
   const [activeImage, setActiveImage] = useState(0);
   const carouselRef = useRef<HTMLDivElement>(null);
 
@@ -82,9 +86,7 @@ export function CarDetailPage({ carId }: { carId: string }) {
 
   const createRequest = useCreateRequest();
 
-  const canRent = car ? car.listing_type === "rent" || car.listing_type === "both" : false;
-  const canBuy = car ? car.listing_type === "buy" || car.listing_type === "both" : false;
-  const [mode, setMode] = useState<"rent" | "buy">("rent");
+  const isBuyListing = car?.listing_type === "buy";
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [reqPrice, setReqPrice] = useState("");
   const [reqDays, setReqDays] = useState("");
@@ -113,8 +115,8 @@ export function CarDetailPage({ carId }: { carId: string }) {
   const isSold = car?.availability_status === "sold";
   const isReserved = car?.availability_status === "reserved";
 
-  // Once car loads, set mode to what's available
-  const effectiveMode = mode === "rent" && !canRent ? "buy" : mode === "buy" && !canBuy ? "rent" : mode;
+  // A car is listed for rent XOR buy, so the listing type IS the mode.
+  const effectiveMode: "rent" | "buy" = isBuyListing ? "buy" : "rent";
 
   if (isLoading || !car) {
     return (
@@ -185,16 +187,9 @@ export function CarDetailPage({ carId }: { carId: string }) {
           </ol>
         </nav>
 
-        {canRent && canBuy && (
-          <div role="group" aria-label="View mode" style={{ display: "inline-flex", background: "var(--brc-bg-muted)", borderRadius: "var(--brc-radius-pill)", padding: 4, gap: 4 }}>
-            {(["rent", "buy"] as const).map((m) => (
-              <button key={m} onClick={() => setMode(m)} aria-pressed={effectiveMode === m}
-                style={{ height: 36, padding: "0 20px", borderRadius: "var(--brc-radius-pill)", border: "none", cursor: "pointer", fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14, background: effectiveMode === m ? "var(--brc-primary)" : "transparent", color: effectiveMode === m ? "#fff" : "var(--brc-text-secondary)", transition: "background 180ms ease, color 180ms ease" }}>
-                {m === "rent" ? "Rent" : "Buy"}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* The rent/buy mode switcher lived here for "both" listings. A car is
+            now listed for rent XOR buy, so the mode is fully determined by
+            listing_type and there is nothing to switch between. */}
       </div>
 
       {/* Two-column: Gallery + Info */}
@@ -254,26 +249,29 @@ export function CarDetailPage({ carId }: { carId: string }) {
             <span>Year: <strong style={{ color: "var(--brc-text)" }}>{car.year}</strong></span>
           </div>
 
-          {/* Rating */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-            <StarRating rating={avgRating ?? 0} size={18} />
-            {avgRating ? (
-              <>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--brc-text)" }}>{avgRating}</span>
-                <span style={{ fontSize: 13, color: "var(--brc-text-muted)" }}>({reviewCount} {reviewCount === 1 ? "review" : "reviews"})</span>
-              </>
-            ) : (
-              <span style={{ fontSize: 13, color: "var(--brc-text-muted)" }}>No reviews yet</span>
-            )}
-          </div>
+          {/* Rating — rent listings only; reviews don't exist for buy cars */}
+          {!isBuyListing && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+              <StarRating rating={avgRating ?? 0} size={18} />
+              {avgRating ? (
+                <>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "var(--brc-text)" }}>{avgRating}</span>
+                  <span style={{ fontSize: 13, color: "var(--brc-text-muted)" }}>({reviewCount} {reviewCount === 1 ? "review" : "reviews"})</span>
+                </>
+              ) : (
+                <span style={{ fontSize: 13, color: "var(--brc-text-muted)" }}>No reviews yet</span>
+              )}
+            </div>
+          )}
 
           {/* Price */}
-          <p style={{ fontFamily: "var(--brc-font-display)", fontSize: "clamp(26px, 4vw, 34px)", fontWeight: 800, color: "var(--brc-text)", margin: "0 0 12px" }}>
+          <p style={{ fontFamily: "var(--brc-font-display)", fontSize: "clamp(26px, 4vw, 34px)", fontWeight: 800, color: "var(--brc-text)", margin: "0 0 12px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             {effectiveMode === "rent" && car.rent_price_per_day
               ? `${fmtMoney(car.rent_price_per_day, car.currency)}/day`
               : car.sale_price
                 ? fmtMoney(car.sale_price, car.currency)
                 : "—"}
+            {effectiveMode === "buy" && <NegotiableBadge isNegotiable={car.is_negotiable} />}
           </p>
 
           {/* Availability badge */}
@@ -476,11 +474,11 @@ export function CarDetailPage({ carId }: { carId: string }) {
         </section>
       </div>
 
-      {/* Description / Reviews Tabs */}
+      {/* Description / Reviews Tabs — reviews are rent-only */}
       <section aria-label="Car details and reviews" style={{ marginBottom: 64 }}>
         <Tabs defaultValue="description">
           <TabsList variant="line" style={{ width: "100%", borderBottom: "2px solid var(--brc-border)", borderRadius: 0, paddingBottom: 0, height: "auto", marginBottom: 32, gap: 0, maxWidth: "100%", overflowX: "auto" }}>
-            {(["description", "reviews"] as const).map((tab) => (
+            {(isBuyListing ? (["description"] as const) : (["description", "reviews"] as const)).map((tab) => (
               <TabsTrigger key={tab} value={tab} className="car-detail-tab-trigger" style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 15, padding: "10px 24px", textTransform: "capitalize", borderRadius: 0, flex: "none" }}>
                 {tab === "description" ? "Description" : `Reviews (${reviewCount})`}
               </TabsTrigger>
@@ -578,13 +576,15 @@ export function CarDetailPage({ carId }: { carId: string }) {
             </div>
           </TabsContent>
 
-          {/* Reviews tab */}
-          <TabsContent value="reviews">
-            <h2 style={{ fontFamily: "var(--brc-font-display)", fontSize: 22, fontWeight: 800, color: "var(--brc-text)", margin: "0 0 24px" }}>
-              Customer Reviews
-            </h2>
-            <CarReviewsSection carId={carId} />
-          </TabsContent>
+          {/* Reviews tab — rent-only; the tab trigger above is hidden for buy listings */}
+          {!isBuyListing && (
+            <TabsContent value="reviews">
+              <h2 style={{ fontFamily: "var(--brc-font-display)", fontSize: 22, fontWeight: 800, color: "var(--brc-text)", margin: "0 0 24px" }}>
+                Customer Reviews
+              </h2>
+              <CarReviewsSection carId={carId} />
+            </TabsContent>
+          )}
         </Tabs>
       </section>
 

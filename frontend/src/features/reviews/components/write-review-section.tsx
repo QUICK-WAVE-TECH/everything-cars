@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+
+import { confirmToast } from "@/lib/confirm-toast";
 import { useCarReviews, useCreateReview } from "../api";
 import type { ReviewItem } from "../api";
 import { StarRating } from "./star-rating";
@@ -272,15 +274,22 @@ export function WriteReviewSection({ carId, requestId }: WriteReviewSectionProps
     (r) => r.request === requestId && r.reviewer.id === me?.id,
   ) ?? null;
 
-  async function handleDelete() {
+  function handleDelete() {
     if (!myReview) return;
-    if (!window.confirm("Are you sure you want to delete your review?")) return;
-    try {
-      await deleteReview.mutateAsync(myReview.id);
-      toast.success("Review deleted");
-    } catch {
-      toast.error("Failed to delete review");
-    }
+    const reviewId = myReview.id;
+    confirmToast({
+      message: "Delete your review?",
+      description: "This can't be undone.",
+      actionLabel: "Delete",
+      onConfirm: async () => {
+        try {
+          await deleteReview.mutateAsync(reviewId);
+          toast.success("Review deleted");
+        } catch {
+          toast.error("Failed to delete review");
+        }
+      },
+    });
   }
 
   return (

@@ -59,12 +59,6 @@ function formatPrice(item: CarListItem): string {
   if (item.listing_type === "buy" && item.sale_price) {
     return `${symbol}${Number(item.sale_price).toLocaleString("en-NG")}`;
   }
-  if (item.listing_type === "both") {
-    const parts: string[] = [];
-    if (item.rent_price_per_day) parts.push(`${symbol}${Number(item.rent_price_per_day).toLocaleString("en-NG")}/day`);
-    if (item.sale_price) parts.push(`${symbol}${Number(item.sale_price).toLocaleString("en-NG")}`);
-    return parts.join(" · ") || "—";
-  }
   return "—";
 }
 

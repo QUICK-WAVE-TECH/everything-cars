@@ -20,6 +20,8 @@ import {
 } from "@/features/listings/api/admin-api";
 import type { CarListItem } from "@/features/listings/api/types";
 import { CarStatusTimeline } from "@/features/listings/components/car-status-timeline";
+import { VehicleIdentityCard } from "@/features/listings/components/vehicle-identity-card";
+import { PrivatePricingCard } from "@/features/listings/components/private-pricing-card";
 import { InspectionRecordPanel } from "@/features/inspections/components/inspection-record-panel";
 import {
   useStaffBookings,
@@ -543,6 +545,14 @@ function ReviewDrawer({ carId, open, onClose, onAction, isActing }: {
                   ))}
                 </div>
               </section>
+
+              {/* Staff-only: VIN/plate + private negotiation range — never public */}
+              <VehicleIdentityCard vin={car.vin} plateNumber={car.plate_number} />
+              <PrivatePricingCard
+                minPrice={car.min_price}
+                maxPrice={car.max_price}
+                currency={car.currency}
+              />
 
               {/* Owner */}
               <section className="flex flex-col gap-3">

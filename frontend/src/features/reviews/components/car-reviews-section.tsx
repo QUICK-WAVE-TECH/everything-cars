@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+
+import { confirmToast } from "@/lib/confirm-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelativeDate } from "@/shared/utils/format";
 import { useMe } from "@/features/auth/api";
@@ -295,14 +297,20 @@ export function CarReviewsSection({ carId }: { carId: string }) {
   const deleteReview = useDeleteReview();
   const [editingReview, setEditingReview] = useState<ReviewItem | null>(null);
 
-  async function handleDelete(id: string) {
-    if (!window.confirm("Delete this review?")) return;
-    try {
-      await deleteReview.mutateAsync(id);
-      toast.success("Review deleted");
-    } catch {
-      toast.error("Failed to delete review");
-    }
+  function handleDelete(id: string) {
+    confirmToast({
+      message: "Delete this review?",
+      description: "This can't be undone.",
+      actionLabel: "Delete",
+      onConfirm: async () => {
+        try {
+          await deleteReview.mutateAsync(id);
+          toast.success("Review deleted");
+        } catch {
+          toast.error("Failed to delete review");
+        }
+      },
+    });
   }
 
   if (isLoading) {
