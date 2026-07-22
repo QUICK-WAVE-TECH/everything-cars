@@ -63,6 +63,9 @@ Spec: `docs/superpowers/specs/2026-07-19-listing-model-v2-design.md`
 - [ ] Completed **rent** request → customer can leave a review (201)
 - [ ] Completed **buy** request → review POST → 400 "Reviews are only available on rental listings."
 - [ ] Buy car reviews GET → 200 with an empty list and `review_count: 0`
+- [ ] Migration `reviews.0003` deleted every pre-existing review on a non-rent car; rent reviews untouched
+- [ ] A completed **buy** request page shows no review section and no "Write a Review" CTA (owner and customer views)
+- [ ] The buy car's detail page CTA reads "View Your Request", never "Write a Review"
 - [ ] Public buy listing renders **no** reviews section, no write-review CTA, no star rating
 - [ ] Public rent listing keeps reviews exactly as before
 

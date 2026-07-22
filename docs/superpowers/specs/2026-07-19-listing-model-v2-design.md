@@ -34,7 +34,8 @@ Postgres unique constraints permit multiple NULLs, so legacy cars without VIN/pl
 
 - **Request/listing type match:** creating a rent request requires `car.listing_type == "rent"`; a buy request requires `"buy"`. (Today a `both` car accepted either; with `both` gone the check becomes a strict equality guard → 400 on mismatch.)
 - **Review creation:** only for a completed **rent** request. A completed buy request can no longer open a review → 400 "Reviews are only available on rental listings."
-- **Review display:** the reviews GET for a buy car returns an empty list (200). Existing review rows are retained in the DB, display-gated only.
+- **Review display:** the reviews GET for a buy car returns an empty list (200).
+- **Existing rows are deleted, not hidden.** (Revised during implementation — the original plan was to retain and display-gate them.) A data migration removes every review attached to a non-rent listing. Hiding was rejected because a hidden row still counts in aggregates, exports and any direct `Review` query, so "reviews are rent-only" would have been true of the UI but not of the data.
 - **Frontend:** buy listings hide the reviews section, review CTA, and star/rating badges on cards. Rent listings unchanged.
 
 ## 4. Frontend

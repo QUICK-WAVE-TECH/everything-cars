@@ -3,6 +3,7 @@ from rest_framework.test import APITestCase
 
 from apps.listings.models import Car, CarStatus, ListingType, Request, RequestStatus
 from apps.reviews.models import Review
+from apps.reviews.migration_helpers import delete_non_rent_reviews
 from apps.users.models import CustomerProfile, OwnerProfile, User
 
 
@@ -228,3 +229,37 @@ class RentOnlyReviewTest(APITestCase):
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+
+class DeleteNonRentReviewsMigrationTest(APITestCase):
+    """Pins the data-migration behaviour: reviews only survive on rent cars."""
+
+    def test_non_rent_reviews_deleted_rent_kept(self):
+        owner = create_user("purge-owner@test.com", User.Role.OWNER)
+        create_owner_profile(owner)
+        customer = create_user("purge-customer@test.com", User.Role.CUSTOMER)
+        create_customer_profile(customer)
+
+        rent_car = create_car(owner)
+        buy_car = Car.objects.create(
+            owner=owner, title="Buy Car", listing_type=ListingType.BUY,
+            sale_price="5000000.00", brand="Toyota", model="Land Cruiser",
+            year=2023, state="Lagos", city="Ikeja", status=CarStatus.PUBLISHED,
+        )
+
+        def make_review(car, request_type, **extra):
+            req = Request.objects.create(
+                car=car, customer=customer, request_type=request_type,
+                price_offered="40000.00", status=RequestStatus.COMPLETED, **extra,
+            )
+            return Review.objects.create(
+                car=car, request=req, reviewer=customer, rating=4, comment="ok",
+            )
+
+        rent_review = make_review(rent_car, ListingType.RENT, duration_days=3)
+        buy_review = make_review(buy_car, ListingType.BUY)
+
+        delete_non_rent_reviews(Review)
+
+        self.assertTrue(Review.objects.filter(id=rent_review.id).exists())
+        self.assertFalse(Review.objects.filter(id=buy_review.id).exists())
