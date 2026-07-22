@@ -101,6 +101,9 @@ class CarListSerializer(serializers.ModelSerializer):
             "listing_type",
             "rent_price_per_day",
             "sale_price",
+            # Public on purpose: drives the "Negotiable" badge on cards and
+            # public detail. The min/max range behind it stays private.
+            "is_negotiable",
             "currency",
             "brand",
             "model",
@@ -211,6 +214,7 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "listing_type",
             "rent_price_per_day",
             "sale_price",
+            "is_negotiable",
             "currency",
             "brand",
             "model",

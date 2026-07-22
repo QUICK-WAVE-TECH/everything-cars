@@ -1099,6 +1099,15 @@ class VinPlatePrivacyTest(APITestCase):
         self.assertIn("vin", res.data)
         self.assertIn("min_price", res.data)
 
+    def test_is_negotiable_is_public(self):
+        """The badge flag is public; only the range behind it is private."""
+        detail = self.client.get(f"/api/v1/listings/cars/{self.car.id}")
+        self.assertTrue(detail.data["is_negotiable"])
+        listing = self.client.get("/api/v1/listings/cars")
+        row = next(r for r in listing.data["results"] if r["id"] == str(self.car.id))
+        self.assertTrue(row["is_negotiable"])
+        self.assertNotIn("min_price", row)
+
     def test_public_list_omits_private_fields(self):
         res = self.client.get("/api/v1/listings/cars")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
