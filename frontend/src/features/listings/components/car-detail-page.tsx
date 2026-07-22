@@ -345,7 +345,9 @@ export function CarDetailPage({ carId }: { carId: string }) {
               href={`/customer/requests/${myRequestForCar.id}`}
               style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 52, width: "100%", borderRadius: "var(--brc-radius-sm)", background: myRequestForCar.status === "completed" ? "var(--brc-success)" : "var(--brc-primary)", color: "#fff", fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 15, textDecoration: "none" }}
             >
-              {myRequestForCar.status === "completed" ? "Write a Review" : `View Your Request (${myRequestForCar.status.replace("_", " ")})`}
+              {myRequestForCar.status === "completed" && !isBuyListing
+                ? "Write a Review"
+                : `View Your Request (${myRequestForCar.status.replace("_", " ")})`}
               <Icon name="arrow" size={17} stroke="#fff" />
             </Link>
           ) : !isAuthenticated ? (

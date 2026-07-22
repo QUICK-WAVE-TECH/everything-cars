@@ -241,8 +241,9 @@ export default function OwnerRequestDetailPage() {
             </section>
           )}
 
-          {/* Write / view review — only for completed requests */}
-          {request.status === "completed" && (
+          {/* Write / view review — completed RENTALS only. Reviews don't exist
+              for purchases, and the API rejects a review on a buy request. */}
+          {request.status === "completed" && request.request_type === "rent" && (
             <WriteReviewSection carId={car.id} requestId={requestId} />
           )}
 
