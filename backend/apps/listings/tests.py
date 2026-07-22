@@ -950,3 +950,113 @@ class VinPlateValidationTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("already registered on the platform", str(res.data))
         self.assertNotIn("other-vin@test.com", str(res.data))
+
+
+class XorPricingTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("xor-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.client.force_authenticate(user=self.owner)
+
+    def _post(self, **over):
+        data = {
+            "title": "Test Car",
+            "brand": "Toyota",
+            "model": "Corolla",
+            "year": 2021,
+            "state": "Lagos",
+            "city": "Ikeja",
+            "vin": "1HGCM82633A004352",
+            "plate_number": "ABC123DE",
+        }
+        data.update(over)
+        return self.client.post("/api/v1/listings/my-cars", data, format="json")
+
+    def test_rent_requires_rent_price_clears_sale(self):
+        res = self._post(
+            listing_type="rent", rent_price_per_day="20000.00", sale_price="5000000.00"
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(Car.objects.get(id=res.data["id"]).sale_price)
+
+    def test_rent_without_rent_price_400(self):
+        self.assertEqual(self._post(listing_type="rent").status_code, 400)
+
+    def test_buy_requires_sale_price_clears_rent(self):
+        res = self._post(
+            listing_type="buy",
+            sale_price="5000000.00",
+            rent_price_per_day="20000.00",
+            is_negotiable=False,
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(Car.objects.get(id=res.data["id"]).rent_price_per_day)
+
+    def test_buy_without_sale_price_400(self):
+        self.assertEqual(
+            self._post(listing_type="buy", is_negotiable=False).status_code, 400
+        )
+
+    def test_buy_requires_is_negotiable(self):
+        self.assertEqual(
+            self._post(listing_type="buy", sale_price="5000000.00").status_code, 400
+        )
+
+    def test_negotiable_buy_requires_min_max_400(self):
+        self.assertEqual(
+            self._post(
+                listing_type="buy", sale_price="5000000.00", is_negotiable=True
+            ).status_code,
+            400,
+        )
+
+    def test_min_greater_than_max_400(self):
+        self.assertEqual(
+            self._post(
+                listing_type="buy",
+                sale_price="5000000.00",
+                is_negotiable=True,
+                min_price="6000000.00",
+                max_price="5000000.00",
+            ).status_code,
+            400,
+        )
+
+    def test_negotiable_buy_stores_range(self):
+        res = self._post(
+            listing_type="buy",
+            sale_price="5000000.00",
+            is_negotiable=True,
+            min_price="4000000.00",
+            max_price="5500000.00",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            str(Car.objects.get(id=res.data["id"]).min_price), "4000000.00"
+        )
+
+    def test_non_negotiable_buy_clears_min_max(self):
+        res = self._post(
+            listing_type="buy",
+            sale_price="5000000.00",
+            is_negotiable=False,
+            min_price="4000000.00",
+            max_price="5500000.00",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        car = Car.objects.get(id=res.data["id"])
+        self.assertIsNone(car.min_price)
+        self.assertIsNone(car.max_price)
+
+    def test_rent_forces_is_negotiable_null(self):
+        res = self._post(
+            listing_type="rent", rent_price_per_day="20000.00", is_negotiable=True
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(Car.objects.get(id=res.data["id"]).is_negotiable)
+
+    def test_listing_type_both_rejected(self):
+        self.assertEqual(
+            self._post(listing_type="both", rent_price_per_day="20000.00").status_code,
+            400,
+        )

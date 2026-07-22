@@ -456,6 +456,9 @@ class CarCreateSerializer(serializers.ModelSerializer):
             "mileage",
             "vin",
             "plate_number",
+            "is_negotiable",
+            "min_price",
+            "max_price",
             "country",
             "state",
             "city",
@@ -465,26 +468,49 @@ class CarCreateSerializer(serializers.ModelSerializer):
         extra_kwargs = {"vin": {"validators": []}, "plate_number": {"validators": []}}
 
     def validate(self, data):
-        listing_type = data.get("listing_type")
-        rent_price = data.get("rent_price_per_day")
-        sale_price = data.get("sale_price")
+        lt = data.get("listing_type", getattr(self.instance, "listing_type", None))
+        rent = data.get(
+            "rent_price_per_day", getattr(self.instance, "rent_price_per_day", None)
+        )
+        sale = data.get("sale_price", getattr(self.instance, "sale_price", None))
+        neg = data.get("is_negotiable", getattr(self.instance, "is_negotiable", None))
 
-        if self.instance is not None:
-            if "listing_type" not in data:
-                listing_type = self.instance.listing_type
-            if "rent_price_per_day" not in data:
-                rent_price = self.instance.rent_price_per_day
-            if "sale_price" not in data:
-                sale_price = self.instance.sale_price
+        if lt == ListingType.RENT:
+            if rent is None:
+                raise serializers.ValidationError(
+                    "Rent price per day is required for rental listings."
+                )
+            data["sale_price"] = None
+            data["is_negotiable"] = None
+            data["min_price"] = None
+            data["max_price"] = None
+        elif lt == ListingType.BUY:
+            if sale is None:
+                raise serializers.ValidationError(
+                    {"sale_price": "Required for a buy listing."}
+                )
+            if self.instance is None and neg is None:
+                raise serializers.ValidationError(
+                    {"is_negotiable": "Choose negotiable or non-negotiable."}
+                )
 
-        if listing_type in ("rent", "both") and rent_price is None:
-            raise serializers.ValidationError(
-                {"rent_price_per_day": "Required for rent or both listing type."}
-            )
-        if listing_type in ("buy", "both") and sale_price is None:
-            raise serializers.ValidationError(
-                {"sale_price": "Required for buy or both listing type."}
-            )
+            data["rent_price_per_day"] = None
+            mn = data.get("min_price", getattr(self.instance, "min_price", None))
+            mx = data.get("max_price", getattr(self.instance, "max_price", None))
+            if neg:
+                if mn is None or mx is None:
+                    raise serializers.ValidationError(
+                        {
+                            "min_price": "Set a private minimum and maximum for a negotiable listing."
+                        }
+                    )
+                if mn > mx:
+                    raise serializers.ValidationError(
+                        {"min_price": "Minimum cannot be greater than maximum."}
+                    )
+            else:
+                data["min_price"] = None
+                data["max_price"] = None
         return data
 
     def validate_year(self, value):
