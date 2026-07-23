@@ -265,7 +265,7 @@ export function CarDetailPage({ carId }: { carId: string }) {
           )}
 
           {/* Price */}
-          <p style={{ fontFamily: "var(--brc-font-display)", fontSize: "clamp(26px, 4vw, 34px)", fontWeight: 800, color: "var(--brc-text)", margin: "0 0 12px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <p style={{ fontFamily: "var(--brc-font-ui)", fontSize: "clamp(24px, 4vw, 30px)", fontWeight: 700, color: "var(--brc-text)", margin: "0 0 12px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             {effectiveMode === "rent" && car.rent_price_per_day
               ? `${fmtMoney(car.rent_price_per_day, car.currency)}/day`
               : car.sale_price

@@ -27,7 +27,7 @@ export function NegotiableBadge({
     <Badge
       variant="outline"
       className={cn(
-        "animate-in fade-in zoom-in-95 border-amber-500/30 bg-amber-50 text-amber-700 duration-500 dark:bg-amber-950/40 dark:text-amber-400",
+        "animate-in fade-in zoom-in-95 rounded-full border-(--brc-accent)/30 bg-(--brc-accent-bg) text-(--brc-accent) duration-500",
         size === "sm" ? "h-5 text-[11px]" : "h-6 text-xs",
         className,
       )}

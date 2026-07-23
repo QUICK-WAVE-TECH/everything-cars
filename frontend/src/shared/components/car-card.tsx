@@ -183,9 +183,9 @@ export function ApiCarCard({ car, displayMode }: ApiCarCardProps) {
         >
           <span
             style={{
-              fontFamily: "var(--brc-font-display)",
+              fontFamily: "var(--brc-font-ui)",
               fontWeight: 700,
-              fontSize: "clamp(16px, 4vw, 20px)",
+              fontSize: "clamp(18px, 4vw, 22px)",
               color: "var(--brc-text)",
             }}
           >

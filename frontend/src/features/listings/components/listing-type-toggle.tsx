@@ -1,14 +1,14 @@
 "use client";
 
 import { Radio } from "@base-ui/react/radio";
-import { CarFrontIcon, TagIcon } from "lucide-react";
+import { KeyRoundIcon, TagIcon } from "lucide-react";
 
 import { RadioGroup } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 import type { ListingType } from "@/features/listings/api/types";
 
 const OPTIONS: { value: ListingType; label: string; icon: typeof TagIcon }[] = [
-  { value: "rent", label: "Rent", icon: CarFrontIcon },
+  { value: "rent", label: "Rent", icon: KeyRoundIcon },
   { value: "buy", label: "Buy", icon: TagIcon },
 ];
 
@@ -52,8 +52,11 @@ export function ListingTypeToggle({
           users get an instant swap instead of a slide. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-lg bg-background shadow-sm motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out"
-        style={{ transform: `translateX(${activeIndex * 100}%)` }}
+        className="pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-lg bg-(--brc-primary) motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out"
+        style={{
+          transform: `translateX(${activeIndex * 100}%)`,
+          boxShadow: "0 2px 6px color-mix(in srgb, var(--brc-primary) 28%, transparent)",
+        }}
       />
       {OPTIONS.map((option) => {
         const Icon = option.icon;
@@ -62,8 +65,8 @@ export function ListingTypeToggle({
             key={option.value}
             value={option.value}
             className={cn(
-              "relative z-10 flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-transparent text-sm font-medium transition-colors outline-none",
-              "text-muted-foreground hover:text-foreground data-checked:text-foreground",
+              "relative z-10 flex h-10.5 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-transparent text-sm font-bold transition-colors outline-none",
+              "text-(--brc-text-secondary) hover:text-(--brc-text) data-checked:text-(--brc-text-on-primary)",
               "focus-visible:ring-[3px] focus-visible:ring-ring/50",
               disabled && "cursor-not-allowed",
             )}

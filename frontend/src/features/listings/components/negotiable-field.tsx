@@ -1,6 +1,6 @@
 "use client";
 
-import { LockIcon } from "lucide-react";
+import { AlertCircleIcon, EyeOffIcon, LockIcon } from "lucide-react";
 
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -106,11 +106,17 @@ export function NegotiableField({
         aria-hidden={!isNegotiable}
       >
         <div className="min-h-0 overflow-hidden">
-          <div className="flex flex-col gap-3 border-t border-(--brc-border) pt-4">
-            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-(--brc-primary-tint) px-2.5 py-1 text-xs font-medium text-(--brc-primary)">
-              <LockIcon className="size-3" aria-hidden="true" />
-              Private — only you and our team can see this
-            </span>
+          <div className="flex flex-col gap-3.5 rounded-2xl border border-(--brc-primary-tint) bg-(--brc-primary-tint) p-4.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="inline-flex items-center gap-2 text-sm font-bold text-(--brc-text)">
+                <LockIcon className="size-4.5 text-(--brc-primary)" aria-hidden="true" />
+                Acceptable price range
+              </span>
+              <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-(--brc-primary) bg-(--brc-bg) px-3 py-1 text-xs font-semibold text-(--brc-primary)">
+                <EyeOffIcon className="size-3" aria-hidden="true" />
+                Private — only you and our team can see this
+              </span>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <MoneyInput
                 label="Minimum you'll accept"
@@ -128,7 +134,11 @@ export function NegotiableField({
               />
             </div>
             {error ? (
-              <span className="text-xs text-(--brc-danger)" role="alert">
+              <span
+                className="inline-flex items-center gap-1.5 text-xs text-(--brc-danger)"
+                role="alert"
+              >
+                <AlertCircleIcon className="size-3.5 shrink-0" aria-hidden="true" />
                 {error}
               </span>
             ) : null}
