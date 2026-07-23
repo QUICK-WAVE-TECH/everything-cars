@@ -18,6 +18,7 @@ import { useMe } from "@/features/auth/api";
 import { useCustomerRequests, useCreateRequest } from "@/features/requests/api";
 import { toast } from "sonner";
 import { AvailabilityBadge } from "./availability-badge";
+import { MakeOfferDialog } from "@/features/offers/components/make-offer-dialog";
 
 const ACTIVE_REQUEST_STATUSES = [
   "pending",
@@ -87,7 +88,9 @@ export function CarDetailPage({ carId }: { carId: string }) {
   const createRequest = useCreateRequest();
 
   const isBuyListing = car?.listing_type === "buy";
+  const isNegotiableBuy = isBuyListing && !!car?.is_negotiable;
   const [showRequestForm, setShowRequestForm] = useState(false);
+  const [offerDialogOpen, setOfferDialogOpen] = useState(false);
   const [reqPrice, setReqPrice] = useState("");
   const [reqDays, setReqDays] = useState("");
   const [reqStartDate, setReqStartDate] = useState("");
@@ -358,6 +361,29 @@ export function CarDetailPage({ carId }: { carId: string }) {
               {effectiveMode === "rent" ? "Request to Rent" : "Request to Buy"}
               <Icon name="arrow" size={17} stroke="#fff" />
             </Link>
+          ) : isNegotiableBuy ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setOfferDialogOpen(true)}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 52, width: "100%", borderRadius: "var(--brc-radius-sm)", background: "var(--brc-primary)", color: "#fff", fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 15, border: "none", cursor: "pointer" }}
+              >
+                Make an Offer
+                <Icon name="arrow" size={17} stroke="#fff" />
+              </button>
+              <p style={{ fontSize: 13, color: "var(--brc-text-muted)", margin: "10px 0 0", textAlign: "center" }}>
+                The seller is open to offers on this vehicle.
+              </p>
+              <MakeOfferDialog
+                carId={car.id}
+                carTitle={car.title}
+                salePrice={car.sale_price ?? "0"}
+                currency={car.currency}
+                primaryImage={sortedImages[0]?.image ?? null}
+                open={offerDialogOpen}
+                onOpenChange={setOfferDialogOpen}
+              />
+            </>
           ) : !showRequestForm ? (
             <button
               type="button"
