@@ -37,6 +37,16 @@ class NotificationType(models.TextChoices):
     RENTAL_ACTIVE = "rental_active", "Rental is active"
     RENTAL_COMPLETED = "rental_completed", "Rental completed"
     REQUESTS_AUTO_REJECTED = "requests_auto_rejected", "Requests auto-rejected"
+
+    OFFER_SUBMITTED = "offer_submitted", "Offer submitted"
+    OFFER_RECEIVED = "offer_received", "New offer received"
+    OFFER_COUNTERED = "offer_countered", "Counter-offer received"
+    OFFER_ACCEPTED = "offer_accepted", "Offer accepted"
+    OFFER_REJECTED = "offer_rejected", "Offer declined"
+    COUNTER_ACCEPTED = "counter_accepted", "Counter-offer accepted"
+    COUNTER_REJECTED = "counter_rejected", "Counter-offer declined"
+    OFFER_EXPIRED = "offer_expired", "Offer expired"
+    CAR_NO_LONGER_AVAILABLE = "car_no_longer_available", "Vehicle no longer available"
     SYSTEM = "system", "System announcement"
 
 

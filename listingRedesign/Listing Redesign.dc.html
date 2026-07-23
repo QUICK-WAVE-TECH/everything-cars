@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/components/fig-tokens.css">
+  <link rel="stylesheet" href="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/components/fig-typography.css">
+  <link rel="stylesheet" href="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+  <script src="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/_ds_bundle.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--surface-muted); }
+    a { color: var(--brand-navy); text-decoration: none; }
+    a:hover { color: var(--brand-navy-deep); }
+    input::placeholder { color: var(--ink-400); }
+    @keyframes fieldSwap { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes badgeSheen { from { transform: translateX(-130%); } to { transform: translateX(260%); } }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    @keyframes modalIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+    @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; font-family: var(--font-body); color: var(--ink-900);">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 32px; background: var(--white); border-bottom: 1px solid var(--line-200); position: sticky; top: 0; z-index: 20;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <img src="assets/logo.png" alt="Buy &amp; Rent Cars" style="height: 34px; width: auto; display: block;" />
+      <span style="font-size: 12px; color: var(--ink-500); border-left: 1px solid var(--line-200); padding-left: 14px; letter-spacing: .04em; text-transform: uppercase;">Rent / Buy redesign</span>
+    </div>
+    <nav style="display: flex; gap: 4px; background: var(--surface-muted); border: 1px solid var(--line-200); border-radius: 100px; padding: 4px;">
+      <button type="button" onClick="{{ goForm }}" style="border: none; cursor: pointer; font-family: var(--font-body); font-weight: 700; font-size: 13px; padding: 8px 16px; border-radius: 100px; background: {{ tabFormBg }}; color: {{ tabFormColor }}; transition: background .15s, color .15s;">Listing form</button>
+      <button type="button" onClick="{{ goPublic }}" style="border: none; cursor: pointer; font-family: var(--font-body); font-weight: 700; font-size: 13px; padding: 8px 16px; border-radius: 100px; background: {{ tabPublicBg }}; color: {{ tabPublicColor }}; transition: background .15s, color .15s;">Public detail</button>
+      <button type="button" onClick="{{ goCard }}" style="border: none; cursor: pointer; font-family: var(--font-body); font-weight: 700; font-size: 13px; padding: 8px 16px; border-radius: 100px; background: {{ tabCardBg }}; color: {{ tabCardColor }}; transition: background .15s, color .15s;">Car card</button>
+    </nav>
+  </header>
+
+  <!-- ============ SURFACE 1: LISTING FORM ============ -->
+  <sc-if value="{{ isForm }}" hint-placeholder-val="{{ true }}">
+  <main style="max-width: 720px; margin: 0 auto; padding: 32px 24px 96px;">
+
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; border: 1px dashed var(--ink-300); border-radius: 12px; padding: 12px 14px; margin-bottom: 24px; background: var(--white);">
+      <span style="font-family: var(--font-label); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-500);">Prototype controls</span>
+      <div style="display: flex; gap: 4px; background: var(--surface-muted); border-radius: 8px; padding: 3px;">
+        <button type="button" onClick="{{ setNeedsChanges }}" style="border: none; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 6px; background: {{ modeEditBg }}; color: {{ modeEditColor }};">needs_changes</button>
+        <button type="button" onClick="{{ setLocked }}" style="border: none; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 6px; background: {{ modeLockBg }}; color: {{ modeLockColor }};">locked</button>
+      </div>
+      <button type="button" onClick="{{ toggleSim }}" style="display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-200); cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 8px; background: {{ simBg }}; color: {{ simColor }};"><i class="ph ph-copy-simple" style="font-size: 14px;"></i>Simulate duplicate VIN</button>
+      <div style="flex: 1;"></div>
+      <button type="button" onClick="{{ clearForm }}" style="border: none; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 8px; background: transparent; color: var(--ink-700);">Clear</button>
+      <button type="button" onClick="{{ prefill }}" style="border: none; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 8px; background: transparent; color: var(--brand-navy);">Prefill example</button>
+    </div>
+
+    <h1 style="font-family: var(--font-display); font-weight: 800; font-size: 32px; line-height: 1.2; margin: 0 0 6px;">List your car</h1>
+    <p style="font-size: 15px; color: var(--ink-700); margin: 0 0 28px;">Tell buyers and renters about your vehicle. Fields marked <span style="color: var(--danger);">*</span> are required.</p>
+
+    <sc-if value="{{ locked }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; align-items: flex-start; gap: 10px; background: var(--warning-bg); border: 1px solid var(--warning); border-radius: 12px; padding: 14px 16px; margin-bottom: 24px;">
+        <i class="ph-fill ph-lock-key" style="font-size: 18px; color: var(--warning-ink); margin-top: 1px;"></i>
+        <div>
+          <div style="font-weight: 700; font-size: 14px; color: var(--warning-ink);">This listing is locked</div>
+          <div style="font-size: 13px; color: var(--ink-700); margin-top: 2px;">Details can only be edited after an admin requests changes (status: needs_changes).</div>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="display: flex; flex-direction: column; gap: 28px; background: var(--white); border: 1px solid var(--line-200); border-radius: 24px; padding: 28px; opacity: {{ formOpacity }};">
+
+      <!-- Listing type segmented control -->
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <span style="font-size: 14px; font-weight: 600; color: var(--ink-700);">Listing type <span style="color: var(--danger);">*</span></span>
+        <div role="radiogroup" aria-label="Listing type" style="position: relative; display: flex; background: var(--surface-muted); border: 1px solid var(--line-200); border-radius: 12px; padding: 4px; width: 340px; max-width: 100%;">
+          <div aria-hidden="true" style="position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 8px; background: var(--brand-navy); box-shadow: 0 2px 6px rgba(0,0,139,.28); transition: transform .28s cubic-bezier(.4,0,.2,1); transform: {{ pillTransform }};"></div>
+          <button type="button" role="radio" aria-checked="{{ isRent }}" onClick="{{ selectRent }}" disabled="{{ locked }}" style="position: relative; z-index: 1; flex: 1; height: 42px; border: none; background: transparent; cursor: pointer; font-family: var(--font-body); font-weight: 700; font-size: 14px; color: {{ rentColor }}; display: inline-flex; align-items: center; justify-content: center; gap: 7px; transition: color .2s;"><i class="ph-bold ph-key" style="font-size: 16px;"></i>Rent</button>
+          <button type="button" role="radio" aria-checked="{{ isBuy }}" onClick="{{ selectBuy }}" disabled="{{ locked }}" style="position: relative; z-index: 1; flex: 1; height: 42px; border: none; background: transparent; cursor: pointer; font-family: var(--font-body); font-weight: 700; font-size: 14px; color: {{ buyColor }}; display: inline-flex; align-items: center; justify-content: center; gap: 7px; transition: color .2s;"><i class="ph-bold ph-tag" style="font-size: 16px;"></i>Buy</button>
+        </div>
+        <span style="font-size: 12px; color: var(--ink-500);">{{ typeHint }}</span>
+      </div>
+
+      <!-- Vehicle basics -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <label style="display: flex; flex-direction: column; gap: 8px;">
+          <span style="font-size: 14px; font-weight: 600; color: var(--ink-700);">Make</span>
+          <span style="display: flex; align-items: center; height: 48px; padding: 0 16px; background: var(--white); border: 1px solid var(--line-200); border-radius: 8px;"><input value="{{ make }}" onChange="{{ onMake }}" disabled="{{ locked }}" style="flex: 1; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: 14px; color: var(--ink-900); min-width: 0;" /></span>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 8px;">
+          <span style="font-size: 14px; font-weight: 600; color: var(--ink-700);">Model</span>
+          <span style="display: flex; align-items: center; height: 48px; padding: 0 16px; background: var(--white); border: 1px solid var(--line-200); border-radius: 8px;"><input value="{{ model }}" onChange="{{ onModel }}" disabled="{{ locked }}" style="flex: 1; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: 14px; color: var(--ink-900); min-width: 0;" /></span>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 8px;">
+          <span style="font-size: 14px; font-weight: 600; color: var(--ink-700);">Year</span>
+          <span style="display: flex; align-items: center; height: 48px; padding: 0 16px; background: var(--white); border: 1px solid var(--line-200); border-radius: 8px;"><input value="{{ year }}" onChange="{{ onYear }}" disabled="{{ locked }}" inputmode="numeric" style="flex: 1; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: 14px; color: var(--ink-900); min-width: 0;" /></span>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 8px;">
+          <span style="font-size: 14px; font-weight: 600; color: var(--ink-700);">Location</span>
+          <span style="display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px; background: var(--white); border: 1px solid var(--line-200); border-radius: 8px;"><i class="ph ph-map-pin" style="font-size: 18px; color: var(--ink-500);"></i><input value="{{ location }}" onChange="{{ onLocation }}" disabled="{{ locked }}" style="flex: 1; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: 14px; color: var(--ink-900); min-width: 0;" /></span>
+        </label>
+      </div>
+
+      <!-- Conditional price -->
+      <div>
+        <sc-if value="{{ isRent }}" hint-placeholder-val="{{ false }}">
+          <label style="display: flex; flex-direction: column; gap: 8px; animation: fieldSwap .3s ease;">
+            <span style="font-size: 14px; font-weight: 600; color: var(--ink-700);">Rent price per day <span style="color: var(--danger);">*</span></span>
+            <span style="display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px; background: var(--white); border: 1px solid {{ priceBorder }}; border-radius: 8px;">
+              <span style="font-weight: 700; font-size: 15px; color: var(--ink-700);">₦</span>
+              <input value="{{ rentPriceFmt }}" onChange="{{ onRentPrice }}" onBlur="{{ touchPrice }}" disabled="{{ locked }}" inputmode="numeric" placeholder="0" style="flex: 1; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: 14px; color: var(--ink-900); min-width: 0;" />
+              <span style="font-size: 13px; color: var(--ink-500);">/day</span>
+            </span>
+            <span style="font-size: 12px; color: {{ priceHintColor }};">{{ priceMessage }}</span>
+          </label>
+        </sc-if>
+        <sc-if value="{{ isBuy }}" hint-placeholder-val="{{ true }}">
+          <label style="display: flex; flex-direction: column; gap: 8px; animation: fieldSwap .3s ease;">
+            <span style="font-size: 14px; font-weight: 600; color: var(--ink-700);">Sale price <span style="color: var(--danger);">*</span></span>
+            <span style="display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px; background: var(--white); border: 1px solid {{ priceBorder }}; border-radius: 8px;">
+              <span style="font-weight: 700; font-size: 15px; color: var(--ink-700);">₦</span>
+              <input value="{{ salePriceFmt }}" onChange="{{ onSalePrice }}" onBlur="{{ touchPrice }}" disabled="{{ locked }}" inputmode="numeric" placeholder="0" style="flex: 1; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: 14px; color: var(--ink-900); min-width: 0;" />
+            </span>
+            <span style="font-size: 12px; color: {{ priceHintColor }};">{{ priceMessage }}</span>
+          </label>
+        </sc-if>
+      </div>
+
+      <!-- Negotiable (Buy only) -->
+      <sc-if value="{{ isBuy }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 0;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid var(--line-200); border-radius: 16px; background: var(--surface-muted);">
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 14px; font-weight: 700; color: var(--ink-900);">{{ negLabel }}</span>
+              <span style="font-size: 13px; color: var(--ink-700);">{{ negDesc }}</span>
+            </div>
+            <button type="button" role="switch" aria-checked="{{ isNegotiable }}" aria-label="Negotiable" onClick="{{ toggleNeg }}" disabled="{{ locked }}" style="flex-shrink: 0; width: 52px; height: 30px; border-radius: 100px; border: none; cursor: pointer; background: {{ negSwitchBg }}; position: relative; transition: background .2s;">
+              <span aria-hidden="true" style="position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 100px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s cubic-bezier(.4,0,.2,1); transform: {{ negKnob }};"></span>
+            </button>
+          </div>
+
+          <div style="display: grid; grid-template-rows: {{ negRows }}; opacity: {{ negOpacity }}; transition: grid-template-rows .3s ease, opacity .3s ease, margin-top .3s ease; margin-top: {{ negMargin }};">
+            <div style="overflow: hidden; min-height: 0;">
+              <div style="border: 1px solid var(--brand-navy-soft); background: var(--brand-navy-soft); border-radius: 16px; padding: 18px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="ph-fill ph-lock-key" style="font-size: 18px; color: var(--brand-navy);"></i>
+                    <span style="font-size: 14px; font-weight: 700; color: var(--ink-900);">Acceptable price range</span>
+                  </div>
+                  <span style="display: inline-flex; align-items: center; gap: 5px; background: var(--white); border: 1px solid var(--brand-navy); color: var(--brand-navy); border-radius: 100px; padding: 4px 12px; font-family: var(--font-label); font-size: 11px; font-weight: 600;"><i class="ph-fill ph-eye-slash" style="font-size: 12px;"></i>Private — only you and our team can see this</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                  <label style="display: flex; flex-direction: column; gap: 8px;">
+                    <span style="font-size: 13px; font-weight: 600; color: var(--ink-700);">Minimum <span style="color: var(--danger);">*</span></span>
+                    <span style="display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 14px; background: var(--white); border: 1px solid {{ rangeBorder }}; border-radius: 8px;"><span style="font-weight: 700; font-size: 14px; color: var(--ink-700);">₦</span><input value="{{ minPriceFmt }}" onChange="{{ onMinPrice }}" onBlur="{{ touchRange }}" disabled="{{ locked }}" inputmode="numeric" placeholder="0" style="flex: 1; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: 14px; color: var(--ink-900); min-width: 0;" /></span>
+                  </label>
+                  <label style="display: flex; flex-direction: column; gap: 8px;">
+                    <span style="font-size: 13px; font-weight: 600; color: var(--ink-700);">Maximum <span style="color: var(--danger);">*</span></span>
+                    <span style="display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 14px; background: var(--white); border: 1px solid {{ rangeBorder }}; border-radius: 8px;"><span style="font-weight: 700; font-size: 14px; color: var(--ink-700);">₦</span><input value="{{ maxPriceFmt }}" onChange="{{ onMaxPrice }}" onBlur="{{ touchRange }}" disabled="{{ locked }}" inputmode="numeric" placeholder="0" style="flex: 1; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: 14px; color: var(--ink-900); min-width: 0;" /></span>
+                  </label>
+                </div>
+                <sc-if value="{{ rangeError }}" hint-placeholder-val="{{ false }}">
+                  <div style="display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; color: var(--danger-2);"><i class="ph-fill ph-warning-circle" style="font-size: 14px;"></i>{{ rangeError }}</div>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- Vehicle identity: VIN + Plate -->
+      <div style="display: flex; flex-direction: column; gap: 16px; padding-top: 4px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i class="ph-fill ph-shield-check" style="font-size: 18px; color: var(--brand-navy);"></i>
+          <span style="font-size: 15px; font-weight: 700;">Vehicle identity</span>
+          <span style="font-size: 12px; color: var(--ink-500);">Required · kept private from the public</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <label style="display: flex; flex-direction: column; gap: 8px;">
+            <span style="display: flex; justify-content: space-between; align-items: center;"><span style="font-size: 14px; font-weight: 600; color: var(--ink-700);">VIN <span style="color: var(--danger);">*</span></span><span style="font-size: 12px; color: var(--ink-500); font-variant-numeric: tabular-nums;">{{ vinCount }}</span></span>
+            <span style="display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px; background: var(--white); border: 1px solid {{ vinBorder }}; border-radius: 8px;">
+              <i class="ph ph-identification-card" style="font-size: 18px; color: var(--ink-500);"></i>
+              <input value="{{ vin }}" onChange="{{ onVin }}" onBlur="{{ touchVin }}" disabled="{{ locked }}" placeholder="1HGCM82633A004352" spellcheck="false" aria-invalid="{{ vinInvalid }}" style="flex: 1; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: 14px; letter-spacing: .08em; color: var(--ink-900); min-width: 0; text-transform: uppercase;" />
+              <sc-if value="{{ vinOk }}" hint-placeholder-val="{{ false }}"><i class="ph-fill ph-check-circle" style="font-size: 18px; color: var(--success);"></i></sc-if>
+            </span>
+            <span style="font-size: 12px; color: {{ vinHintColor }};">{{ vinMessage }}</span>
+          </label>
+          <label style="display: flex; flex-direction: column; gap: 8px;">
+            <span style="display: flex; justify-content: space-between; align-items: center;"><span style="font-size: 14px; font-weight: 600; color: var(--ink-700);">Plate number <span style="color: var(--danger);">*</span></span><span style="font-size: 12px; color: var(--ink-500); font-variant-numeric: tabular-nums;">{{ plateCount }}</span></span>
+            <span style="display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 16px; background: var(--white); border: 1px solid {{ plateBorder }}; border-radius: 8px;">
+              <i class="ph ph-identification-badge" style="font-size: 18px; color: var(--ink-500);"></i>
+              <input value="{{ plate }}" onChange="{{ onPlate }}" onBlur="{{ touchPlate }}" disabled="{{ locked }}" placeholder="LND419KJA" spellcheck="false" aria-invalid="{{ plateInvalid }}" style="flex: 1; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: 14px; letter-spacing: .08em; color: var(--ink-900); min-width: 0; text-transform: uppercase;" />
+              <sc-if value="{{ plateOk }}" hint-placeholder-val="{{ false }}"><i class="ph-fill ph-check-circle" style="font-size: 18px; color: var(--success);"></i></sc-if>
+            </span>
+            <span style="font-size: 12px; color: {{ plateHintColor }};">{{ plateMessage }}</span>
+          </label>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 12px; padding-top: 4px;">
+        <button type="button" onClick="{{ openConfirm }}" disabled="{{ locked }}" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 22px; border-radius: 8px; border: 1px solid var(--brand-navy); background: {{ submitBg }}; color: {{ submitColor }}; font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: {{ submitCursor }}; transition: background .15s;">Review &amp; publish<i class="ph-bold ph-arrow-right" style="font-size: 16px;"></i></button>
+      </div>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- ============ SURFACE 2: PUBLIC DETAIL ============ -->
+  <sc-if value="{{ isPublic }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 860px; margin: 0 auto; padding: 28px 24px 96px;">
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 22px; flex-wrap: wrap;">
+      <span style="font-size: 12px; color: var(--ink-500); margin-right: 4px;">Preview listing:</span>
+      <button type="button" onClick="{{ exSetBuyNeg }}" style="border: 1px solid {{ exNegBorder }}; background: {{ exNegBg }}; color: {{ exNegColor }}; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: 100px;">Buy · Negotiable</button>
+      <button type="button" onClick="{{ exSetBuyFixed }}" style="border: 1px solid {{ exFixedBorder }}; background: {{ exFixedBg }}; color: {{ exFixedColor }}; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: 100px;">Buy · Fixed</button>
+      <button type="button" onClick="{{ exSetRent }}" style="border: 1px solid {{ exRentBorder }}; background: {{ exRentBg }}; color: {{ exRentColor }}; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: 100px;">Rent</button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.1fr 1fr; gap: 32px; align-items: start;">
+      <div style="background: var(--surface-muted); border: 1px solid var(--line-200); border-radius: 24px; height: 360px; position: relative; overflow: hidden;">
+        <img src="assets/car-lexus.png" alt="{{ exTitle }}" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 40px 28px;" />
+        <span style="position: absolute; left: 16px; top: 16px; background: var(--white); border: 1px solid var(--line-200); border-radius: 100px; padding: 5px 12px; font-size: 12px; font-weight: 600; color: var(--ink-700);">{{ exBodyChip }}</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 18px;">
+        <div>
+          <h1 style="font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1.15; margin: 0 0 8px;">{{ exTitle }}</h1>
+          <div style="display: flex; align-items: center; gap: 5px; color: var(--ink-700); font-size: 14px;"><i class="ph ph-map-pin" style="font-size: 16px;"></i>{{ exLoc }}</div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <span style="font-size: 30px; font-weight: 700; line-height: 1.2; color: var(--ink-900);">{{ exPriceMain }}<span style="font-size: 16px; font-weight: 400; color: var(--ink-700);">{{ exPriceSuffix }}</span></span>
+          <sc-if value="{{ exShowBadge }}" hint-placeholder-val="{{ false }}">
+            <span style="position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 5px; background: var(--peach-bg); color: var(--brand-orange-2); border: 1px solid rgba(255,149,0,.4); border-radius: 100px; padding: 5px 13px; font-family: var(--font-label); font-size: 12px; font-weight: 600;">
+              <i class="ph-fill ph-handshake" style="font-size: 14px; color: var(--brand-orange);"></i>Negotiable
+              <span aria-hidden="true" style="position: absolute; top: 0; left: 0; height: 100%; width: 45%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent); animation: badgeSheen 1.25s ease .2s 1;"></span>
+            </span>
+          </sc-if>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div style="border: 1px solid var(--line-200); border-radius: 12px; padding: 12px 14px;"><div style="font-size: 11px; color: var(--ink-500); text-transform: uppercase; letter-spacing: .04em;">Body type</div><div style="font-size: 14px; font-weight: 600; margin-top: 2px;">{{ exBodyChip }}</div></div>
+          <div style="border: 1px solid var(--line-200); border-radius: 12px; padding: 12px 14px;"><div style="font-size: 11px; color: var(--ink-500); text-transform: uppercase; letter-spacing: .04em;">Transmission</div><div style="font-size: 14px; font-weight: 600; margin-top: 2px;">Automatic</div></div>
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+          <button type="button" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; border-radius: 8px; border: none; background: var(--surface-dark); color: var(--white); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: pointer;">{{ exCta }}<i class="ph-bold ph-arrow-right" style="font-size: 16px;"></i></button>
+          <button type="button" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 18px; border-radius: 8px; border: 1px solid var(--line-200); background: transparent; color: var(--brand-navy); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: pointer;"><i class="ph ph-chat-circle" style="font-size: 16px;"></i>Message</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reviews (rent only) -->
+    <sc-if value="{{ exShowReviews }}" hint-placeholder-val="{{ false }}">
+      <section style="margin-top: 44px; border-top: 1px solid var(--line-200); padding-top: 32px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <span style="font-family: var(--font-display); font-weight: 800; font-size: 40px; line-height: 1;">{{ exRating }}</span>
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <x-import component-from-global-scope="BuyRentCarsDesignSystem_a58654.StarRating" value="{{ exRatingNum }}" size="18" hint-size="100px,20px"></x-import>
+              <span style="font-size: 13px; color: var(--ink-700);">{{ exReviewCountLabel }}</span>
+            </div>
+          </div>
+          <button type="button" style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 8px; border: 1px solid var(--brand-navy); background: transparent; color: var(--brand-navy); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: pointer;"><i class="ph ph-pencil-simple-line" style="font-size: 16px;"></i>Write a review</button>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <sc-for list="{{ reviewList }}" as="rev" hint-placeholder-count="2">
+            <div style="border: 1px solid var(--line-200); border-radius: 16px; padding: 16px 18px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="width: 34px; height: 34px; border-radius: 100px; background: var(--brand-navy-soft); color: var(--brand-navy); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">{{ rev.initials }}</span>
+                  <span style="font-weight: 700; font-size: 14px;">{{ rev.name }}</span>
+                </div>
+                <span style="font-size: 12px; color: var(--ink-500);">{{ rev.date }}</span>
+              </div>
+              <x-import component-from-global-scope="BuyRentCarsDesignSystem_a58654.StarRating" value="{{ rev.rating }}" size="14" hint-size="90px,18px"></x-import>
+              <p style="margin: 8px 0 0; font-size: 14px; color: var(--ink-700); line-height: 1.5;">{{ rev.text }}</p>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{ exBuyNoReviews }}" hint-placeholder-val="{{ true }}">
+      <div style="margin-top: 40px; border: 1px dashed var(--line-200); border-radius: 16px; padding: 16px 18px; display: flex; align-items: center; gap: 10px; color: var(--ink-500); font-size: 13px;">
+        <i class="ph ph-info" style="font-size: 18px;"></i>Reviews are for rentals only — no review UI renders on a car for sale. No VIN, plate, or private price range is present anywhere on this public page.
+      </div>
+    </sc-if>
+  </main>
+  </sc-if>
+
+  <!-- ============ SURFACE 3: CAR CARD ============ -->
+  <sc-if value="{{ isCard }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 1200px; margin: 0 auto; padding: 40px 24px 96px;">
+    <h1 style="font-family: var(--font-display); font-weight: 800; font-size: 26px; margin: 0 0 6px;">Marketplace card — Rent vs Buy</h1>
+    <p style="font-size: 14px; color: var(--ink-700); margin: 0 0 32px;">Buy cards drop the star rating (reviews are rent-only) and show the Negotiable badge when applicable. Rent cards are unchanged.</p>
+    <div style="display: flex; gap: 32px; flex-wrap: wrap;">
+      <sc-for list="{{ cards }}" as="c" hint-placeholder-count="3">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="width: 340px; max-width: 100%; display: flex; flex-direction: column; gap: 20px; background: var(--white); border: 1px solid var(--line-200); border-radius: 16px; padding: 16px;">
+            <div style="position: relative; height: 240px; border-radius: 12px; overflow: hidden; background: var(--surface-muted);">
+              <img src="assets/car-lexus.png" alt="{{ c.title }}" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 36px 20px;" />
+              <sc-if value="{{ c.showStars }}" hint-placeholder-val="{{ false }}">
+                <div style="position: absolute; left: 12px; top: 12px; background: var(--white); border-radius: 100px; padding: 3px 8px 3px 4px; display: flex; align-items: center; gap: 4px;">
+                  <x-import component-from-global-scope="BuyRentCarsDesignSystem_a58654.StarRating" value="{{ c.rating }}" size="14" hint-size="90px,18px"></x-import>
+                  <span style="font-size: 12px; font-weight: 600; color: var(--ink-700);">{{ c.ratingLabel }}</span>
+                </div>
+              </sc-if>
+              <sc-if value="{{ c.showBadge }}" hint-placeholder-val="{{ false }}">
+                <span style="position: absolute; left: 12px; top: 12px; overflow: hidden; display: inline-flex; align-items: center; gap: 5px; background: var(--peach-bg); color: var(--brand-orange-2); border: 1px solid rgba(255,149,0,.4); border-radius: 100px; padding: 4px 11px; font-family: var(--font-label); font-size: 11px; font-weight: 600;">
+                  <i class="ph-fill ph-handshake" style="font-size: 12px; color: var(--brand-orange);"></i>Negotiable
+                  <span aria-hidden="true" style="position: absolute; top: 0; left: 0; height: 100%; width: 45%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.75), transparent); animation: badgeSheen 1.25s ease .3s 1;"></span>
+                </span>
+              </sc-if>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; flex-direction: column; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line-200);">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                  <span style="font-size: 15px; color: var(--ink-900);">{{ c.title }}</span>
+                  <span style="font-size: 12px; color: var(--ink-700); background: var(--surface-muted); border-radius: 8px; padding: 4px 10px; white-space: nowrap;">{{ c.body }}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px; color: var(--ink-700); font-size: 12px;"><i class="ph ph-map-pin" style="font-size: 15px;"></i>{{ c.loc }}</div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                <span style="font-size: 22px; font-weight: 700; line-height: 1.2; color: var(--ink-900);">{{ c.priceMain }}<span style="font-size: 14px; font-weight: 400;">{{ c.suffix }}</span></span>
+                <button type="button" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 42px; padding: 0 16px; border-radius: 8px; border: none; background: var(--surface-dark); color: var(--white); font-family: var(--font-body); font-weight: 700; font-size: 13px; cursor: pointer;">{{ c.cta }}<i class="ph-bold ph-arrow-right" style="font-size: 15px;"></i></button>
+              </div>
+            </div>
+          </div>
+          <span style="font-size: 12px; color: var(--ink-500); text-align: center;">{{ c.caption }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- Confirmation modal -->
+  <sc-if value="{{ showConfirm }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeConfirm }}" style="position: fixed; inset: 0; background: rgba(18,18,18,.5); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 24px; animation: overlayIn .2s ease;">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Confirm listing" style="width: 460px; max-width: 100%; background: var(--white); border-radius: 24px; padding: 26px; animation: modalIn .25s cubic-bezier(.4,0,.2,1);">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <i class="ph-fill ph-clipboard-text" style="font-size: 22px; color: var(--brand-navy);"></i>
+          <h2 style="font-family: var(--font-display); font-weight: 800; font-size: 22px; margin: 0;">Confirm your listing</h2>
+        </div>
+        <p style="font-size: 13px; color: var(--ink-700); margin: 0 0 18px;">Please review the details below before submitting for approval.</p>
+        <div style="display: flex; flex-direction: column; gap: 0; border: 1px solid var(--line-200); border-radius: 16px; overflow: hidden;">
+          <div style="display: flex; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--line-200);"><span style="font-size: 13px; color: var(--ink-500);">Vehicle</span><span style="font-size: 13px; font-weight: 600; text-align: right;">{{ cVehicle }}</span></div>
+          <div style="display: flex; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--line-200);"><span style="font-size: 13px; color: var(--ink-500);">Listing type</span><span style="font-size: 13px; font-weight: 600; text-align: right;">{{ cType }}</span></div>
+          <div style="display: flex; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--line-200);"><span style="font-size: 13px; color: var(--ink-500);">{{ cPriceLabel }}</span><span style="font-size: 13px; font-weight: 600; text-align: right;">{{ cPrice }}</span></div>
+          <sc-if value="{{ cShowNeg }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--line-200);"><span style="font-size: 13px; color: var(--ink-500);">Pricing</span><span style="font-size: 13px; font-weight: 600; text-align: right;">{{ cNeg }}</span></div>
+          </sc-if>
+          <sc-if value="{{ cShowRange }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--line-200); background: var(--brand-navy-soft);"><span style="font-size: 13px; color: var(--brand-navy); display: inline-flex; align-items: center; gap: 5px;"><i class="ph-fill ph-lock-key" style="font-size: 13px;"></i>Private range</span><span style="font-size: 13px; font-weight: 600; text-align: right; color: var(--brand-navy);">{{ cRange }}</span></div>
+          </sc-if>
+          <div style="display: flex; justify-content: space-between; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--line-200);"><span style="font-size: 13px; color: var(--ink-500);">VIN</span><span style="font-size: 13px; font-weight: 600; text-align: right; letter-spacing: .05em;">{{ cVin }}</span></div>
+          <div style="display: flex; justify-content: space-between; gap: 16px; padding: 12px 16px;"><span style="font-size: 13px; color: var(--ink-500);">Plate</span><span style="font-size: 13px; font-weight: 600; text-align: right; letter-spacing: .05em;">{{ cPlate }}</span></div>
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 20px;">
+          <button type="button" onClick="{{ closeConfirm }}" style="flex: 1; height: 46px; border-radius: 8px; border: 1px solid var(--line-200); background: transparent; color: var(--ink-900); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: pointer;">Back to edit</button>
+          <button type="button" onClick="{{ submit }}" style="flex: 1; height: 46px; border-radius: 8px; border: none; background: var(--brand-navy); color: var(--surface-muted); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: pointer;">Submit for approval</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- Toast -->
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; right: 24px; bottom: 24px; z-index: 60; display: flex; align-items: flex-start; gap: 10px; max-width: 380px; background: var(--white); border: 1px solid {{ toastBorder }}; border-left: 4px solid {{ toastAccent }}; border-radius: 12px; padding: 14px 16px; box-shadow: 0 8px 28px rgba(0,0,0,.14); animation: toastIn .3s cubic-bezier(.4,0,.2,1);">
+      <i class="{{ toastIcon }}" style="font-size: 20px; color: {{ toastAccent }}; margin-top: 1px;"></i>
+      <div style="flex: 1;">
+        <div style="font-size: 14px; font-weight: 700; color: var(--ink-900);">{{ toastTitle }}</div>
+        <div style="font-size: 13px; color: var(--ink-700); margin-top: 2px;">{{ toastMsg }}</div>
+      </div>
+      <button type="button" onClick="{{ closeToast }}" style="border: none; background: transparent; cursor: pointer; color: var(--ink-500); padding: 0; line-height: 1;"><i class="ph ph-x" style="font-size: 16px;"></i></button>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: &quot;100%&quot;, &quot;height&quot;: 900}}">
+class Component extends DCLogic {
+  state = {
+    surface: 'form',
+    make: 'Toyota', model: 'Camry XSE', year: '2021', location: 'Lagos, Lekki',
+    listingType: 'buy',
+    rentPrice: '', salePrice: '18500000',
+    vin: '1HGCM82633A004352', plate: 'LND419KJA',
+    isNegotiable: true, minPrice: '16000000', maxPrice: '18500000',
+    touched: {}, editable: true, simDuplicate: false, vinTaken: false,
+    showConfirm: false, toast: null, example: 'buyNeg',
+  };
+
+  set(patch) { this.setState({ ...patch, vinTaken: false }); }
+
+  fmt(d) { return String(d || '').replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  money(d) { return d ? '₦' + this.fmt(d) : '—'; }
+  onMoney(k) { return (e) => this.set({ [k]: e.target.value.replace(/[^\d]/g, '').slice(0, 12) }); }
+
+  vinErr() {
+    const v = this.state.vin;
+    if (!v) return 'VIN is required';
+    if (v.length !== 17) return `VIN must be exactly 17 characters (${v.length}/17)`;
+    if (/[IOQ]/.test(v)) return 'VIN cannot contain the letters I, O or Q';
+    if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(v)) return 'VIN contains an invalid character';
+    return null;
+  }
+  plateErr() {
+    const p = this.state.plate;
+    if (!p) return 'Plate number is required';
+    if (p.length < 5 || p.length > 12) return `Plate must be 5–12 characters (${p.length})`;
+    return null;
+  }
+  priceErr() {
+    return this.state.listingType === 'rent'
+      ? (this.state.rentPrice ? null : 'Rent price per day is required')
+      : (this.state.salePrice ? null : 'Sale price is required');
+  }
+  rangeErr() {
+    if (this.state.listingType !== 'buy' || !this.state.isNegotiable) return null;
+    if (!this.state.minPrice || !this.state.maxPrice) return 'Enter both a minimum and a maximum';
+    if (+this.state.minPrice > +this.state.maxPrice) return 'Minimum must be less than or equal to maximum';
+    return null;
+  }
+  isValid() { return !this.vinErr() && !this.plateErr() && !this.priceErr() && !this.rangeErr(); }
+
+  openConfirm() {
+    this.setState({ touched: { vin: 1, plate: 1, price: 1, range: 1 } });
+    if (this.isValid()) this.setState({ showConfirm: true });
+    else { this.fireToast('error', 'Please fix the highlighted fields', 'Some required details are missing or invalid.'); }
+  }
+  submit() {
+    if (this.state.simDuplicate) {
+      this.setState({ showConfirm: false, vinTaken: true, touched: { ...this.state.touched, vin: 1 } });
+      this.fireToast('error', 'Could not publish', 'This vehicle is already registered on the platform.');
+    } else {
+      this.setState({ showConfirm: false });
+      this.fireToast('success', 'Submitted for approval', 'Your listing is now awaiting admin review.');
+    }
+  }
+  fireToast(type, title, msg) {
+    this.setState({ toast: { type, title, msg } });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({ toast: null }), 6000);
+  }
+  clearForm() {
+    this.setState({ listingType: 'buy', rentPrice: '', salePrice: '', vin: '', plate: '', isNegotiable: true, minPrice: '', maxPrice: '', touched: {}, vinTaken: false });
+  }
+  prefill() {
+    this.setState({ listingType: 'buy', salePrice: '18500000', rentPrice: '', vin: '1HGCM82633A004352', plate: 'LND419KJA', isNegotiable: true, minPrice: '16000000', maxPrice: '18500000', make: 'Toyota', model: 'Camry XSE', year: '2021', location: 'Lagos, Lekki', touched: {}, vinTaken: false });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const locked = !s.editable;
+    const isBuy = s.listingType === 'buy';
+    const isRent = s.listingType === 'rent';
+
+    const active = (v) => s.surface === v;
+    const tabBg = (v) => active(v) ? 'var(--brand-navy)' : 'transparent';
+    const tabColor = (v) => active(v) ? 'var(--white)' : 'var(--ink-700)';
+
+    // validation display
+    const vinE = s.vinTaken ? 'This vehicle is already registered on the platform.' : (s.touched.vin ? this.vinErr() : null);
+    const plateE = s.touched.plate ? this.plateErr() : null;
+    const priceE = s.touched.price ? this.priceErr() : null;
+    const rangeE = s.touched.range ? this.rangeErr() : null;
+    const vinOk = !this.vinErr() && !s.vinTaken;
+    const plateOk = !this.plateErr();
+
+    // examples
+    const EX = {
+      buyNeg:   { title: '2021 Toyota Camry XSE', body: 'Sedan', loc: 'Lagos, Lekki', type: 'buy', price: '18,500,000', neg: true },
+      buyFixed: { title: '2019 Mercedes-Benz GLE 350', body: 'SUV', loc: 'Abuja', type: 'buy', price: '42,000,000', neg: false },
+      rent:     { title: '2022 Lexus NX 300h', body: 'SUV', loc: 'Lagos, Ikeja', type: 'rent', price: '45,000', neg: false, rating: 4.6, reviews: 23 },
+    };
+    const ex = EX[s.example];
+    const exBuy = ex.type === 'buy';
+
+    const cards = [
+      { title: '2021 Toyota Camry XSE', body: 'Sedan', loc: 'Lagos, Lekki', priceMain: '₦18,500,000', suffix: '', cta: 'Buy Now', showStars: false, showBadge: true, rating: 0, ratingLabel: '', caption: 'Buy · Negotiable → badge shown, no stars' },
+      { title: '2019 Mercedes GLE 350', body: 'SUV', loc: 'Abuja', priceMain: '₦42,000,000', suffix: '', cta: 'Buy Now', showStars: false, showBadge: false, rating: 0, ratingLabel: '', caption: 'Buy · Fixed → no badge, no stars' },
+      { title: '2022 Lexus NX 300h', body: 'SUV', loc: 'Lagos, Ikeja', priceMain: '₦45,000', suffix: '/day', cta: 'Rent Now', showStars: true, showBadge: false, rating: 4.6, ratingLabel: '4.6', caption: 'Rent → stars kept, unchanged' },
+    ];
+
+    const reviewList = [
+      { name: 'Adaeze M.', initials: 'AM', rating: 5, date: '2 weeks ago', text: 'Smooth rental — the car was spotless and exactly as pictured. Pickup in Ikeja was quick.' },
+      { name: 'Tunde B.', initials: 'TB', rating: 4, date: '1 month ago', text: 'Great condition and fair pricing. Owner was responsive throughout. Would rent again.' },
+    ];
+
+    // confirm summary
+    const cPrice = isBuy ? this.money(s.salePrice) : this.money(s.rentPrice) + (s.rentPrice ? '/day' : '');
+
+    return {
+      // tabs
+      goForm: () => this.setState({ surface: 'form' }), goPublic: () => this.setState({ surface: 'public' }), goCard: () => this.setState({ surface: 'card' }),
+      isForm: active('form'), isPublic: active('public'), isCard: active('card'),
+      tabFormBg: tabBg('form'), tabFormColor: tabColor('form'),
+      tabPublicBg: tabBg('public'), tabPublicColor: tabColor('public'),
+      tabCardBg: tabBg('card'), tabCardColor: tabColor('card'),
+
+      // prototype controls
+      editable: s.editable, locked,
+      setNeedsChanges: () => this.setState({ editable: true }), setLocked: () => this.setState({ editable: false }),
+      modeEditBg: s.editable ? 'var(--white)' : 'transparent', modeEditColor: s.editable ? 'var(--brand-navy)' : 'var(--ink-500)',
+      modeLockBg: !s.editable ? 'var(--white)' : 'transparent', modeLockColor: !s.editable ? 'var(--brand-navy)' : 'var(--ink-500)',
+      simDuplicate: s.simDuplicate, toggleSim: () => this.setState({ simDuplicate: !s.simDuplicate, vinTaken: false }),
+      simBg: s.simDuplicate ? 'var(--warning-bg)' : 'var(--white)', simColor: s.simDuplicate ? 'var(--warning-ink)' : 'var(--ink-700)',
+      clearForm: () => this.clearForm(), prefill: () => this.prefill(),
+      formOpacity: locked ? 0.72 : 1,
+
+      // basics
+      make: s.make, model: s.model, year: s.year, location: s.location,
+      onMake: (e) => this.set({ make: e.target.value }), onModel: (e) => this.set({ model: e.target.value }),
+      onYear: (e) => this.set({ year: e.target.value.replace(/[^\d]/g, '').slice(0, 4) }), onLocation: (e) => this.set({ location: e.target.value }),
+
+      // segmented
+      isRent, isBuy,
+      selectRent: () => this.set({ listingType: 'rent' }), selectBuy: () => this.set({ listingType: 'buy' }),
+      pillTransform: isBuy ? 'translateX(100%)' : 'translateX(0)',
+      rentColor: isRent ? 'var(--white)' : 'var(--ink-700)', buyColor: isBuy ? 'var(--white)' : 'var(--ink-700)',
+      typeHint: isRent ? 'Renters pay a daily rate. Reviews stay on rentals.' : 'Buyers see a sale price. You can allow price negotiation below.',
+
+      // price
+      rentPriceFmt: this.fmt(s.rentPrice), salePriceFmt: this.fmt(s.salePrice),
+      onRentPrice: this.onMoney('rentPrice'), onSalePrice: this.onMoney('salePrice'),
+      touchPrice: () => this.setState({ touched: { ...s.touched, price: 1 } }),
+      priceBorder: priceE ? 'var(--danger)' : 'var(--line-200)',
+      priceMessage: priceE || (isRent ? 'Amount charged per day.' : 'The asking price shown to buyers.'),
+      priceHintColor: priceE ? 'var(--danger-2)' : 'var(--ink-500)',
+
+      // negotiable
+      isNegotiable: s.isNegotiable, toggleNeg: () => this.set({ isNegotiable: !s.isNegotiable }),
+      negLabel: s.isNegotiable ? 'Negotiable' : 'Non-negotiable',
+      negDesc: s.isNegotiable ? 'Buyers can make an offer within your private range.' : 'The sale price is fixed. Buyers cannot make offers.',
+      negSwitchBg: s.isNegotiable ? 'var(--brand-navy)' : 'var(--ink-300)',
+      negKnob: s.isNegotiable ? 'translateX(22px)' : 'translateX(0)',
+      negRows: s.isNegotiable ? '1fr' : '0fr', negOpacity: s.isNegotiable ? 1 : 0, negMargin: s.isNegotiable ? '14px' : '0px',
+      minPriceFmt: this.fmt(s.minPrice), maxPriceFmt: this.fmt(s.maxPrice),
+      onMinPrice: this.onMoney('minPrice'), onMaxPrice: this.onMoney('maxPrice'),
+      touchRange: () => this.setState({ touched: { ...s.touched, range: 1 } }),
+      rangeBorder: rangeE ? 'var(--danger)' : 'var(--line-200)', rangeError: rangeE,
+
+      // vin
+      vin: s.vin, onVin: (e) => this.set({ vin: e.target.value.toUpperCase().replace(/[\s-]/g, '').slice(0, 17) }),
+      touchVin: () => this.setState({ touched: { ...s.touched, vin: 1 } }),
+      vinCount: `${s.vin.length}/17`, vinInvalid: !!vinE,
+      vinBorder: vinE ? 'var(--danger)' : (vinOk && s.vin ? 'var(--success)' : 'var(--line-200)'),
+      vinMessage: vinE || 'Auto-uppercased. 17 characters, no I, O or Q.',
+      vinHintColor: vinE ? 'var(--danger-2)' : 'var(--ink-500)',
+      vinOk: vinOk && s.vin.length === 17,
+
+      // plate
+      plate: s.plate, onPlate: (e) => this.set({ plate: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12) }),
+      touchPlate: () => this.setState({ touched: { ...s.touched, plate: 1 } }),
+      plateCount: `${s.plate.length}/12`, plateInvalid: !!plateE,
+      plateBorder: plateE ? 'var(--danger)' : (plateOk && s.plate ? 'var(--success)' : 'var(--line-200)'),
+      plateMessage: plateE || 'Letters & numbers only. Spaces and hyphens are removed.',
+      plateHintColor: plateE ? 'var(--danger-2)' : 'var(--ink-500)',
+      plateOk: plateOk && !!s.plate,
+
+      // submit
+      openConfirm: () => this.openConfirm(),
+      submitBg: locked ? 'var(--brand-navy-tint)' : 'var(--brand-navy)',
+      submitColor: locked ? 'var(--ink-500)' : 'var(--surface-muted)',
+      submitCursor: locked ? 'not-allowed' : 'pointer',
+
+      // confirm modal
+      showConfirm: s.showConfirm, closeConfirm: () => this.setState({ showConfirm: false }), stop: (e) => e.stopPropagation(),
+      submit: () => this.submit(),
+      cVehicle: `${s.year} ${s.make} ${s.model}`,
+      cType: isBuy ? 'Buy' : 'Rent',
+      cPriceLabel: isBuy ? 'Sale price' : 'Rent per day',
+      cPrice,
+      cShowNeg: isBuy, cNeg: s.isNegotiable ? 'Negotiable' : 'Non-negotiable',
+      cShowRange: isBuy && s.isNegotiable, cRange: this.money(s.minPrice) + ' – ' + this.money(s.maxPrice),
+      cVin: s.vin || '—', cPlate: s.plate || '—',
+
+      // toast
+      toast: s.toast, closeToast: () => this.setState({ toast: null }),
+      toastTitle: s.toast && s.toast.title, toastMsg: s.toast && s.toast.msg,
+      toastAccent: s.toast && s.toast.type === 'success' ? 'var(--success)' : 'var(--danger)',
+      toastBorder: s.toast && s.toast.type === 'success' ? 'var(--success-bg)' : 'rgb(253,235,235)',
+      toastIcon: s.toast && s.toast.type === 'success' ? 'ph-fill ph-check-circle' : 'ph-fill ph-warning-circle',
+
+      // public detail
+      example: s.example,
+      exSetBuyNeg: () => this.setState({ example: 'buyNeg' }), exSetBuyFixed: () => this.setState({ example: 'buyFixed' }), exSetRent: () => this.setState({ example: 'rent' }),
+      exNegBg: s.example === 'buyNeg' ? 'var(--brand-navy)' : 'var(--white)', exNegColor: s.example === 'buyNeg' ? 'var(--white)' : 'var(--ink-700)', exNegBorder: s.example === 'buyNeg' ? 'var(--brand-navy)' : 'var(--line-200)',
+      exFixedBg: s.example === 'buyFixed' ? 'var(--brand-navy)' : 'var(--white)', exFixedColor: s.example === 'buyFixed' ? 'var(--white)' : 'var(--ink-700)', exFixedBorder: s.example === 'buyFixed' ? 'var(--brand-navy)' : 'var(--line-200)',
+      exRentBg: s.example === 'rent' ? 'var(--brand-navy)' : 'var(--white)', exRentColor: s.example === 'rent' ? 'var(--white)' : 'var(--ink-700)', exRentBorder: s.example === 'rent' ? 'var(--brand-navy)' : 'var(--line-200)',
+      exTitle: ex.title, exLoc: ex.loc, exBodyChip: ex.body,
+      exPriceMain: '₦' + ex.price, exPriceSuffix: exBuy ? '' : '/day',
+      exShowBadge: exBuy && ex.neg,
+      exShowReviews: !exBuy, exBuyNoReviews: exBuy,
+      exRating: ex.rating ? String(ex.rating) : '', exRatingNum: ex.rating || 0, exReviewCountLabel: ex.reviews ? `${ex.reviews} reviews` : '',
+      exCta: exBuy ? 'Buy Now' : 'Rent Now',
+      reviewList,
+
+      // cards
+      cards,
+    };
+  }
+}
+</script>
+</body>
+</html>

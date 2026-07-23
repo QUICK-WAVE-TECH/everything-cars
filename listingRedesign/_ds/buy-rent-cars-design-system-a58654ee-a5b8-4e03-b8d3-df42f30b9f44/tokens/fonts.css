@@ -1,0 +1,9 @@
+/* Buy & Rent Cars — Webfonts
+   The source Figma uses Manrope (primary UI + body), Lexend (display),
+   Geist (small labels/badges) and Archivo (some button labels). These
+   are all Google Fonts. They are loaded from the Google Fonts CDN here
+   rather than self-hosted — see readme.md "Fonts" caveat. To ship
+   offline, download the .woff2 files into assets/fonts/ and replace
+   these @import lines with @font-face rules. */
+
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Lexend:wght@400;500;600;700;800;900&family=Archivo:wght@400;500;600;700&family=Geist:wght@400;500;600;700&display=swap');

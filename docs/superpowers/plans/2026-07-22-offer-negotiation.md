@@ -16,20 +16,20 @@
 
 ## File structure
 
-| Path | Responsibility |
-|---|---|
-| `backend/common/notifications.py` | `schedule_notification` helper (one home; currently duplicated in two apps) |
-| `backend/apps/offers/models.py` | `Offer`, `OfferStatus`, `ACTIVE_OFFER_STATUSES` |
-| `backend/apps/offers/serializers.py` | Create / respond / counter / list serializers, owner-vs-customer field split |
-| `backend/apps/offers/views.py` | Customer + owner endpoints |
-| `backend/apps/offers/services.py` | `accept_offer()` — the atomic hand-off, kept out of the view |
-| `backend/apps/offers/urls.py` | Route table |
-| `backend/apps/offers/management/commands/expire_offers.py` | Sweep + notify |
-| `backend/apps/offers/tests.py` | All backend tests |
-| `backend/apps/notifications/service.py` | 9 new `notify_offer_*` functions |
-| `frontend/src/features/offers/` | api/, components/, types |
-| `frontend/src/app/owner/offers/page.tsx` | Owner Offer Management |
-| `frontend/src/app/customer/offers/page.tsx` | Customer My Offers |
+| Path                                                       | Responsibility                                                               |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `backend/common/notifications.py`                          | `schedule_notification` helper (one home; currently duplicated in two apps)  |
+| `backend/apps/offers/models.py`                            | `Offer`, `OfferStatus`, `ACTIVE_OFFER_STATUSES`                              |
+| `backend/apps/offers/serializers.py`                       | Create / respond / counter / list serializers, owner-vs-customer field split |
+| `backend/apps/offers/views.py`                             | Customer + owner endpoints                                                   |
+| `backend/apps/offers/services.py`                          | `accept_offer()` — the atomic hand-off, kept out of the view                 |
+| `backend/apps/offers/urls.py`                              | Route table                                                                  |
+| `backend/apps/offers/management/commands/expire_offers.py` | Sweep + notify                                                               |
+| `backend/apps/offers/tests.py`                             | All backend tests                                                            |
+| `backend/apps/notifications/service.py`                    | 9 new `notify_offer_*` functions                                             |
+| `frontend/src/features/offers/`                            | api/, components/, types                                                     |
+| `frontend/src/app/owner/offers/page.tsx`                   | Owner Offer Management                                                       |
+| `frontend/src/app/customer/offers/page.tsx`                | Customer My Offers                                                           |
 
 ---
 
@@ -37,14 +37,15 @@
 
 **Files:** Create `backend/apps/offers/{__init__,models,apps}.py`, migration; Modify `config/settings/base.py` (INSTALLED_APPS)
 
-- [ ] **Step 1: Create the app**
+- [x] **Step 1: Create the app**
 
 ```bash
 cd backend && uv run python manage.py startapp offers apps/offers
 ```
+
 Then set `name = "apps.offers"` in `apps/offers/apps.py`, and add `"apps.offers"` to `INSTALLED_APPS` in `config/settings/base.py`.
 
-- [ ] **Step 2: Write the failing test** in `apps/offers/tests.py`
+- [x] **Step 2: Write the failing test** in `apps/offers/tests.py`
 
 ```python
 from datetime import timedelta
@@ -110,12 +111,12 @@ class OfferModelTest(APITestCase):
         )
 ```
 
-- [ ] **Step 3: Run it, expect failure**
+- [x] **Step 3: Run it, expect failure**
 
 Run: `cd backend && uv run python manage.py test apps.offers -v2`
 Expected: FAIL — `apps.offers.models` has no `Offer`.
 
-- [ ] **Step 4: Write the model** in `apps/offers/models.py`
+- [x] **Step 4: Write the model** in `apps/offers/models.py`
 
 ```python
 import uuid
@@ -215,6 +216,7 @@ cd backend && uv run python manage.py makemigrations offers && \
   uv run python manage.py migrate offers && \
   uv run python manage.py test apps.offers -v2
 ```
+
 Expected: 4 tests PASS.
 
 - [ ] **Step 6: Commit**
@@ -230,7 +232,7 @@ git commit -m "feat(offers): add Offer model with one-active-offer constraint"
 
 **Files:** Create `apps/offers/serializers.py`, `apps/offers/views.py`, `apps/offers/urls.py`; Modify `config/urls.py`; Test: `apps/offers/tests.py`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 class PlaceOfferTest(APITestCase):
@@ -309,11 +311,11 @@ class PlaceOfferTest(APITestCase):
         self.assertEqual(self._post().status_code, 400)
 ```
 
-- [ ] **Step 2: Run, expect 404s** (no route yet)
+- [x] **Step 2: Run, expect 404s** (no route yet)
 
 Run: `cd backend && uv run python manage.py test apps.offers.tests.PlaceOfferTest -v2`
 
-- [ ] **Step 3: Write the serializer** in `apps/offers/serializers.py`
+- [x] **Step 3: Write the serializer** in `apps/offers/serializers.py`
 
 ```python
 from django.utils import timezone
@@ -461,7 +463,7 @@ class CarOfferCreateView(APIView):
         )
 ```
 
-- [ ] **Step 6: Wire the routes.** `apps/offers/urls.py`:
+- [x] **Step 6: Wire the routes.** `apps/offers/urls.py`:
 
 ```python
 from django.urls import path
@@ -472,12 +474,14 @@ urlpatterns = [
     path("cars/<uuid:car_id>/offers", CarOfferCreateView.as_view(), name="car-offers"),
 ]
 ```
+
 And in `config/urls.py`, beside the other includes:
+
 ```python
     path("api/v1/offers/", include("apps.offers.urls")),
 ```
 
-- [ ] **Step 7: Run — all PlaceOfferTest tests pass. Then commit**
+- [x] **Step 7: Run — all PlaceOfferTest tests pass. Then commit**
 
 ```bash
 git add backend/apps/offers backend/config/urls.py
@@ -490,7 +494,7 @@ git commit -m "feat(offers): place an offer with floor, eligibility and caps"
 
 **Files:** Modify `apps/offers/serializers.py`, `views.py`, `urls.py`; Test: `tests.py`
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 ```python
 class OwnerRespondTest(APITestCase):
@@ -628,7 +632,7 @@ class OfferRespondView(APIView):
         return Response(OfferSerializer(offer, context={"request": request}).data)
 ```
 
-- [ ] **Step 5: Add `owner_respond` to `apps/offers/services.py`**
+- [ ] **Step 5: Add** `owner_respond` **to** `apps/offers/services.py`
 
 ```python
 from django.core.exceptions import ValidationError
@@ -664,7 +668,7 @@ def owner_respond(offer, action, data):
     return accept_offer(offer)
 ```
 
-**Both `accept_offer` and `customer_respond` must exist now as stubs**, or this module fails to import. Task 4 and Task 5 replace them:
+**Both** `accept_offer` **and** `customer_respond` **must exist now as stubs**, or this module fails to import. Task 4 and Task 5 replace them:
 
 ```python
 def accept_offer(offer):
@@ -680,6 +684,7 @@ def customer_respond(offer, action):
 ```python
     path("offers/<uuid:offer_id>/respond", OfferRespondView.as_view(), name="offer-respond"),
 ```
+
 ```bash
 git commit -am "feat(offers): owner can decline or send one counter-offer"
 ```
@@ -753,9 +758,9 @@ class AcceptOfferTest(APITestCase):
         self.assertEqual(self._accept(self.rival_offer).status_code, 400)
 ```
 
-- [ ] **Step 2: Run, expect failure.**
+- [x] **Step 2: Run, expect failure.**
 
-- [ ] **Step 3: Implement `accept_offer`**
+- [x] **Step 3: Implement** `accept_offer`
 
 ```python
 from django.db import transaction
@@ -1016,6 +1021,7 @@ git commit -am "feat(offers): lazy expiry guard plus expire_offers command"
     OFFER_EXPIRED = "offer_expired", "Offer expired"
     CAR_NO_LONGER_AVAILABLE = "car_no_longer_available", "Vehicle no longer available"
 ```
+
 Then `uv run python manage.py makemigrations notifications`.
 
 - [ ] **Step 2: Failing test**
@@ -1037,11 +1043,12 @@ class OfferNotificationTest(APITestCase):
         self.assertTrue(Notification.objects.filter(
             recipient=customer, notification_type="offer_submitted").exists())
 ```
+
 Write the equivalent for counter, accept, decline, counter-accepted, counter-declined, superseded and expired.
 
-- [ ] **Step 3: Add `notify_offer_*` functions** to `apps/notifications/service.py`, each following the existing `notify_request_approved` shape — `_create_notification(...)` then `send_email(...)` for the customer-facing ones. Wire `car_no_longer_available` to the **existing** `car_sold.html` template. Keep decline copy neutral.
+- [ ] **Step 3: Add** `notify_offer_`\* **functions** to `apps/notifications/service.py`, each following the existing `notify_request_approved` shape — `_create_notification(...)` then `send_email(...)` for the customer-facing ones. Wire `car_no_longer_available` to the **existing** `car_sold.html` template. Keep decline copy neutral.
 
-- [ ] **Step 4: Create `backend/common/notifications.py`**
+- [ ] **Step 4: Create** `backend/common/notifications.py`
 
 ```python
 from django.db import transaction
@@ -1051,6 +1058,7 @@ def schedule_notification(notify_func, get_payload):
     """Fire a notification only once the surrounding transaction commits."""
     transaction.on_commit(lambda: notify_func(get_payload()), robust=True)
 ```
+
 Use it from `apps/offers/views.py`. (`apps/listings/views.py` and `apps/inspections/views.py` each hold an identical private copy; leave them be for now, but this is the shared home for future callers.)
 
 - [ ] **Step 5: Call the notifications** from the create/respond/withdraw views and `accept_offer`, all via `schedule_notification`. Run green, commit.
@@ -1164,6 +1172,7 @@ class OfferListTest(APITestCase):
 - [ ] **Step 2: Implement** `MyOfferListView` and `OwnerOfferListView` using `StandardPagination`, `select_related("car", "customer", "resulting_request")` and `prefetch_related("car__images")`.
 
 Owner-facing buyer block:
+
 ```python
 class OfferBuyerSerializer(serializers.Serializer):
     """Name always; contact details only once a deal exists."""
@@ -1192,7 +1201,7 @@ git commit -m "feat(offers): customer and owner offer list endpoints"
 
 ---
 
-### Task 10: Frontend — types and API hooks *(Claude implements)*
+### Task 10: Frontend — types and API hooks _(Claude implements)_
 
 **Files:** Create `frontend/src/features/offers/api/{types.ts,offers-api.ts,index.ts}`
 
@@ -1203,7 +1212,7 @@ git commit -m "feat(offers): customer and owner offer list endpoints"
 
 ---
 
-### Task 11: Frontend — Make Offer dialog *(Claude implements)*
+### Task 11: Frontend — Make Offer dialog _(Claude implements)_
 
 **Files:** Create `features/offers/components/make-offer-dialog.tsx`; Modify `features/listings/components/car-detail-page.tsx`
 
@@ -1214,7 +1223,7 @@ git commit -m "feat(offers): customer and owner offer list endpoints"
 
 ---
 
-### Task 12: Frontend — `/customer/offers` *(Claude implements)*
+### Task 12: Frontend — `/customer/offers` _(Claude implements)_
 
 - [ ] Active/Closed segmented control; offer cards with countdown; countered offers expanded as the hero state with the offer-vs-counter comparison and Accept/Decline; withdraw as a quiet ghost link while pending; closed cards recessed with an explanatory chip.
 - [ ] Accept routes through `ConfirmDialog` stating it reserves the vehicle.
@@ -1222,7 +1231,7 @@ git commit -m "feat(offers): customer and owner offer list endpoints"
 
 ---
 
-### Task 13: Frontend — `/owner/offers` *(Claude implements)*
+### Task 13: Frontend — `/owner/offers` _(Claude implements)_
 
 - [ ] Stat strip, sticky filter bar (car / status / sort), offers **grouped by car**, "Best offer" flag on each car's highest live bid, per-minute countdown.
 - [ ] Right-side respond `Sheet`: buyer block, the private range card (**the only place it renders**), Accept / Counter / Decline, counter amount revealed by accordion with the one-counter warning.
@@ -1231,7 +1240,7 @@ git commit -m "feat(offers): customer and owner offer list endpoints"
 
 ---
 
-### Task 14: Frontend — remaining surfaces *(Claude implements)*
+### Task 14: Frontend — remaining surfaces _(Claude implements)_
 
 - [ ] Owner car detail: per-car offers section with count and link.
 - [ ] Owner dashboard: pending-offers stat and recent-offers widget.

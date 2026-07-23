@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/components/fig-tokens.css">
+  <link rel="stylesheet" href="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/components/fig-typography.css">
+  <link rel="stylesheet" href="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+  <script src="_ds/buy-rent-cars-design-system-a58654ee-a5b8-4e03-b8d3-df42f30b9f44/_ds_bundle.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--surface-muted); }
+    a { color: var(--brand-navy); text-decoration: none; }
+    a:hover { color: var(--brand-navy-deep); }
+    input::placeholder, textarea::placeholder { color: var(--ink-400); }
+    @keyframes rowIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    @keyframes pulseBg { 0% { background: var(--brand-navy-soft); } 100% { background: var(--white); } }
+    @keyframes sheenX { from { transform: translateX(-130%); } to { transform: translateX(260%); } }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    @keyframes dialogIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+    @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes sheetIn { from { transform: translateX(100%); } to { transform: none; } }
+    @keyframes crossIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes skShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  </style>
+</helmet>
+
+<div style="min-height: 100vh; font-family: var(--font-body); color: var(--ink-900);">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 28px; background: var(--white); border-bottom: 1px solid var(--line-200); position: sticky; top: 0; z-index: 30; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <img src="assets/logo.png" alt="Buy &amp; Rent Cars" style="height: 32px; width: auto; display: block;" />
+      <span style="font-size: 12px; color: var(--ink-500); border-left: 1px solid var(--line-200); padding-left: 14px; letter-spacing: .04em; text-transform: uppercase;">Offers &amp; negotiation</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <label style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-500); font-weight: 700;">Surface</span>
+        <span style="position: relative; display: inline-flex;">
+          <select value="{{ surfaceSel }}" onChange="{{ onSurface }}" aria-label="Choose surface" style="appearance: none; -webkit-appearance: none; height: 38px; padding: 0 34px 0 14px; border: 1px solid var(--line-200); border-radius: 100px; background: var(--white); font-family: var(--font-body); font-size: 13px; font-weight: 700; color: var(--brand-navy); cursor: pointer;">
+            <optgroup label="Public"><option value="publicCar">Car detail · Make an Offer</option></optgroup>
+            <optgroup label="Owner"><option value="ownerDash">Dashboard</option><option value="owner">Offers hub</option><option value="ownerCar">My car · offers</option></optgroup>
+            <optgroup label="Customer"><option value="customer">My offers</option><option value="makeoffer">Make Offer dialog</option><option value="custReq">Request detail</option></optgroup>
+            <optgroup label="Shared"><option value="notifications">Notifications</option></optgroup>
+          </select>
+          <i class="ph ph-caret-down" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 13px; color: var(--brand-navy); pointer-events: none;"></i>
+        </span>
+      </label>
+      <sc-if value="{{ showViewportToggle }}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; gap: 3px; background: var(--surface-muted); border: 1px solid var(--line-200); border-radius: 8px; padding: 3px;">
+          <button type="button" onClick="{{ setDesktop }}" aria-label="Desktop view" style="border: none; cursor: pointer; padding: 6px 10px; border-radius: 6px; background: {{ vpDeskBg }}; color: {{ vpDeskColor }}; display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-body); font-size: 12px; font-weight: 600;"><i class="ph ph-monitor" style="font-size: 15px;"></i>Desktop</button>
+          <button type="button" onClick="{{ setMobile }}" aria-label="Mobile view" style="border: none; cursor: pointer; padding: 6px 10px; border-radius: 6px; background: {{ vpMobBg }}; color: {{ vpMobColor }}; display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-body); font-size: 12px; font-weight: 600;"><i class="ph ph-device-mobile" style="font-size: 15px;"></i>Mobile</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{ showLoadingToggle }}" hint-placeholder-val="{{ false }}">
+        <button type="button" onClick="{{ toggleLoading }}" style="height: 38px; padding: 0 14px; border-radius: 100px; border: 1px solid {{ loadingBorder }}; background: {{ loadingBg }}; color: {{ loadingColor }}; font-family: var(--font-body); font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;"><i class="ph ph-spinner-gap" style="font-size: 15px;"></i>Loading</button>
+      </sc-if>
+      <button type="button" onClick="{{ toggleNotif }}" aria-label="Notifications" style="position: relative; width: 40px; height: 40px; border-radius: 100px; border: 1px solid var(--line-200); background: var(--white); color: var(--ink-700); cursor: pointer; display: inline-flex; align-items: center; justify-content: center;"><i class="ph ph-bell" style="font-size: 18px;"></i><sc-if value="{{ notifUnread }}" hint-placeholder-val="{{ true }}"><span style="position: absolute; top: 7px; right: 8px; width: 8px; height: 8px; border-radius: 100px; background: var(--danger); border: 2px solid var(--white);"></span></sc-if></button>
+    </div>
+  </header>
+
+  <!-- ============ OWNER · DESKTOP ============ -->
+  <sc-if value="{{ ownerDesktop }}" hint-placeholder-val="{{ true }}">
+  <main style="max-width: 1240px; margin: 0 auto; padding: 28px 28px 96px;">
+
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 22px;">
+      <div>
+        <h1 style="font-family: var(--font-display); font-weight: 800; font-size: 32px; line-height: 1.1; margin: 0 0 6px;">Offers</h1>
+        <p style="font-size: 15px; color: var(--ink-700); margin: 0;">{{ subtitle }}</p>
+      </div>
+      <button type="button" onClick="{{ simIncoming }}" style="display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 8px; border: 1px dashed var(--ink-300); background: var(--white); color: var(--ink-700); font-family: var(--font-body); font-size: 12px; font-weight: 600; cursor: pointer;"><i class="ph ph-broadcast" style="font-size: 15px;"></i>Simulate incoming offer</button>
+    </div>
+
+    <!-- Stat strip -->
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
+      <sc-for list="{{ statCards }}" as="st" hint-placeholder-count="4">
+        <div style="background: var(--white); border: 1px solid {{ st.color }}; border-radius: 16px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 13px; font-weight: 600; color: var(--ink-700);">{{ st.label }}</span>
+            <span style="width: 30px; height: 30px; border-radius: 8px; background: {{ st.bg }}; color: {{ st.color }}; display: inline-flex; align-items: center; justify-content: center;"><i class="{{ st.icon }}" style="font-size: 16px;"></i></span>
+          </div>
+          <div style="font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1; color: var(--ink-900); font-variant-numeric: tabular-nums;">{{ st.value }}</div>
+          <span style="font-size: 12px; color: var(--ink-500);">{{ st.sub }}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- Filter bar -->
+    <div style="position: sticky; top: 62px; z-index: 20; background: var(--surface-muted); padding: 12px 0; margin-bottom: 4px;">
+      <div style="display: flex; align-items: center; gap: 12px; background: var(--white); border: 1px solid var(--line-200); border-radius: 12px; padding: 12px 14px; flex-wrap: wrap;">
+        <div style="position: relative;">
+          <select value="{{ filterCar }}" onChange="{{ onFilterCar }}" aria-label="Filter by car" style="appearance: none; -webkit-appearance: none; height: 40px; padding: 0 34px 0 14px; border: 1px solid var(--line-200); border-radius: 8px; background: var(--white); font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--ink-900); cursor: pointer;">
+            <option value="all">All cars</option>
+            <option value="A">2021 Toyota Camry XSE</option>
+            <option value="B">2019 Mercedes-Benz GLE 350</option>
+            <option value="C">2022 Lexus RX 350 F-Sport</option>
+          </select>
+          <i class="ph ph-caret-down" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; color: var(--ink-500); pointer-events: none;"></i>
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; flex: 1;">
+          <sc-for list="{{ statusChips }}" as="ch" hint-placeholder-count="7">
+            <button type="button" onClick="{{ ch.onToggle }}" style="border: 1px solid {{ ch.border }}; background: {{ ch.bg }}; color: {{ ch.color }}; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 8px 12px; border-radius: 100px; transition: background .15s, color .15s;">{{ ch.label }}</button>
+          </sc-for>
+        </div>
+        <div style="position: relative;">
+          <select value="{{ sortValue }}" onChange="{{ onSort }}" aria-label="Sort offers" style="appearance: none; -webkit-appearance: none; height: 40px; padding: 0 34px 0 14px; border: 1px solid var(--line-200); border-radius: 8px; background: var(--white); font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--ink-900); cursor: pointer;">
+            <option value="newest">Newest</option>
+            <option value="highest">Highest amount</option>
+            <option value="expiring">Expiring soonest</option>
+          </select>
+          <i class="ph ph-caret-down" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; color: var(--ink-500); pointer-events: none;"></i>
+        </div>
+      </div>
+      <sc-if value="{{ hasFilters }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
+          <sc-for list="{{ activePills }}" as="p" hint-placeholder-count="2">
+            <span style="display: inline-flex; align-items: center; gap: 6px; background: var(--brand-navy-soft); color: var(--brand-navy); border-radius: 100px; padding: 5px 8px 5px 12px; font-size: 12px; font-weight: 600;">{{ p.label }}<button type="button" onClick="{{ p.onRemove }}" aria-label="Remove filter" style="border: none; background: transparent; cursor: pointer; color: var(--brand-navy); padding: 0; display: inline-flex; line-height: 1;"><i class="ph-bold ph-x" style="font-size: 12px;"></i></button></span>
+          </sc-for>
+          <button type="button" onClick="{{ clearAll }}" style="border: none; background: transparent; cursor: pointer; color: var(--ink-700); font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 5px 8px;">Clear all</button>
+        </div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ showPill }}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; justify-content: center; margin: 12px 0;">
+        <button type="button" onClick="{{ dismissPill }}" style="display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px; border-radius: 100px; border: none; background: var(--brand-navy); color: var(--white); font-family: var(--font-body); font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,139,.25);"><i class="ph-bold ph-arrow-clockwise" style="font-size: 15px;"></i>New offers — refresh</button>
+      </div>
+    </sc-if>
+
+    <!-- Grouped offer list -->
+    <sc-if value="{{ ownerEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="border: 1px dashed var(--line-200); border-radius: 16px; padding: 56px 24px; text-align: center; background: var(--white);">
+        <span style="width: 52px; height: 52px; border-radius: 100px; background: var(--surface-muted); color: var(--ink-500); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 14px;"><i class="ph ph-tray" style="font-size: 26px;"></i></span>
+        <div style="font-weight: 700; font-size: 16px; margin-bottom: 4px;">No offers match these filters</div>
+        <div style="font-size: 14px; color: var(--ink-700);">Offers appear here when buyers bid on your negotiable listings.</div>
+      </div>
+    </sc-if>
+
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+      <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+        <div style="background: var(--white); border: 1px solid var(--line-200); border-radius: 16px; overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--line-200); background: var(--surface-muted);">
+            <img src="assets/car-lexus.png" alt="{{ g.title }}" style="width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: var(--white); border: 1px solid var(--line-200);" />
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ g.title }}</div>
+              <div style="font-size: 13px; color: var(--ink-700); font-variant-numeric: tabular-nums;">Asking {{ g.askingFmt }}</div>
+            </div>
+            <span style="flex-shrink: 0; background: var(--brand-navy-soft); color: var(--brand-navy); border-radius: 100px; padding: 5px 12px; font-size: 12px; font-weight: 700;">{{ g.countLabel }}</span>
+          </div>
+          <div style="display: flex; flex-direction: column;">
+            <sc-for list="{{ g.offers }}" as="o" hint-placeholder-count="2">
+              <div style="display: grid; grid-template-columns: 1.4fr 1.3fr auto; align-items: center; gap: 20px; padding: 18px; border-top: 1px solid var(--line-200); animation: {{ o.rowAnim }};">
+                <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+                  <span style="flex-shrink: 0; width: 40px; height: 40px; border-radius: 100px; background: var(--brand-navy-soft); color: var(--brand-navy); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;">{{ o.initials }}</span>
+                  <div style="min-width: 0;">
+                    <div style="font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ o.name }}</div>
+                    <div style="font-size: 12px; color: var(--ink-500);">{{ o.ago }}</div>
+                  </div>
+                </div>
+                <div style="min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <span style="font-size: 20px; font-weight: 700; color: var(--ink-900); font-variant-numeric: tabular-nums;">{{ o.amountFmt }}</span>
+                    <sc-if value="{{ o.best }}" hint-placeholder-val="{{ false }}">
+                      <span style="position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 4px; background: var(--brand-orange); color: var(--white); border-radius: 100px; padding: 3px 10px; font-family: var(--font-label); font-size: 11px; font-weight: 700;"><i class="ph-fill ph-seal-check" style="font-size: 12px;"></i>Best offer<span aria-hidden="true" style="position: absolute; top: 0; left: 0; height: 100%; width: 45%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.65), transparent); animation: sheenX 1.3s ease .3s 1;"></span></span>
+                    </sc-if>
+                  </div>
+                  <div style="font-size: 12px; color: {{ o.deltaColor }}; margin-top: 3px;">{{ o.deltaText }}</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 16px; justify-self: end;">
+                  <span aria-live="polite" style="font-size: 13px; font-weight: 600; color: {{ o.cdColor }}; font-variant-numeric: tabular-nums; white-space: nowrap;">{{ o.cdText }}</span>
+                  <sc-if value="{{ o.awaiting }}" hint-placeholder-val="{{ false }}">
+                    <span title="The buyer is reviewing your counter — the ball is in their court." style="display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line-200); background: var(--surface-muted); color: var(--ink-500); font-family: var(--font-body); font-weight: 700; font-size: 13px; cursor: default;"><i class="ph ph-hourglass-medium" style="font-size: 15px;"></i>Awaiting buyer</span>
+                  </sc-if>
+                  <sc-if value="{{ o.canRespond }}" hint-placeholder-val="{{ true }}">
+                    <button type="button" onClick="{{ o.onRespond }}" style="display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 18px; border-radius: 8px; border: none; background: var(--brand-navy); color: var(--white); font-family: var(--font-body); font-weight: 700; font-size: 13px; cursor: pointer; transition: background .15s;"><i class="ph-bold ph-chat-teardrop-text" style="font-size: 15px;"></i>Respond</button>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- ============ OWNER · LOADING SKELETON ============ -->
+  <sc-if value="{{ ownerSkeleton }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 1240px; margin: 0 auto; padding: 28px 28px 96px;" aria-busy="true">
+    <div style="height: 38px; width: 180px; border-radius: 8px; margin-bottom: 22px; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
+      <sc-for list="{{ sk4 }}" as="i" hint-placeholder-count="4">
+        <div style="height: 110px; border-radius: 16px; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+      </sc-for>
+    </div>
+    <div style="height: 64px; border-radius: 12px; margin-bottom: 20px; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+      <sc-for list="{{ sk2 }}" as="g" hint-placeholder-count="2">
+        <div style="border: 1px solid var(--line-200); border-radius: 16px; overflow: hidden;">
+          <div style="height: 76px; background: var(--surface-muted); border-bottom: 1px solid var(--line-200);"></div>
+          <sc-for list="{{ sk3 }}" as="r" hint-placeholder-count="3">
+            <div style="display: grid; grid-template-columns: 1.4fr 1.3fr auto; gap: 20px; align-items: center; padding: 18px; border-top: 1px solid var(--line-200);">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="flex-shrink: 0; width: 40px; height: 40px; border-radius: 100px; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+                <div style="flex: 1;">
+                  <div style="height: 14px; width: 60%; border-radius: 6px; margin-bottom: 8px; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+                  <div style="height: 11px; width: 40%; border-radius: 6px; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+                </div>
+              </div>
+              <div>
+                <div style="height: 20px; width: 55%; border-radius: 6px; margin-bottom: 8px; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+                <div style="height: 11px; width: 35%; border-radius: 6px; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+              </div>
+              <div style="width: 120px; height: 40px; border-radius: 8px; justify-self: end; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- ============ OWNER · MOBILE ============ -->
+  <sc-if value="{{ ownerMobile }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 400px; margin: 0 auto; padding: 20px 16px 96px;">
+    <h1 style="font-family: var(--font-display); font-weight: 800; font-size: 26px; line-height: 1.1; margin: 0 0 5px;">Offers</h1>
+    <p style="font-size: 14px; color: var(--ink-700); margin: 0 0 16px;">{{ subtitle }}</p>
+    <div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 16px;">
+      <sc-for list="{{ statCards }}" as="st" hint-placeholder-count="4">
+        <div style="flex: 0 0 auto; min-width: 130px; background: var(--white); border: 1px solid {{ st.color }}; border-radius: 12px; padding: 12px 14px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--ink-700); margin-bottom: 6px;">{{ st.label }}</div>
+          <div style="font-family: var(--font-display); font-weight: 800; font-size: 22px; line-height: 1; font-variant-numeric: tabular-nums;">{{ st.value }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <button type="button" onClick="{{ openMFilters }}" style="width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; border-radius: 8px; border: 1px solid var(--line-200); background: var(--white); color: var(--ink-900); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: pointer; margin-bottom: 16px;"><i class="ph ph-sliders-horizontal" style="font-size: 16px;"></i>Filters{{ mFilterCountLabel }}</button>
+
+    <sc-if value="{{ ownerEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="border: 1px dashed var(--line-200); border-radius: 16px; padding: 40px 20px; text-align: center; background: var(--white); font-size: 14px; color: var(--ink-700);">No offers match these filters.</div>
+    </sc-if>
+
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+        <div>
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <img src="assets/car-lexus.png" alt="{{ g.title }}" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover; background: var(--white); border: 1px solid var(--line-200);" />
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ g.title }}</div>
+              <div style="font-size: 12px; color: var(--ink-500); font-variant-numeric: tabular-nums;">Asking {{ g.askingFmt }} · {{ g.countLabel }}</div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <sc-for list="{{ g.offers }}" as="o" hint-placeholder-count="2">
+              <div style="background: var(--white); border: 1px solid var(--line-200); border-radius: 16px; padding: 16px; animation: {{ o.rowAnim }};">
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px;">
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                      <span style="font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums;">{{ o.amountFmt }}</span>
+                      <sc-if value="{{ o.best }}" hint-placeholder-val="{{ false }}">
+                        <span style="display: inline-flex; align-items: center; gap: 4px; background: var(--brand-orange); color: var(--white); border-radius: 100px; padding: 3px 9px; font-family: var(--font-label); font-size: 10px; font-weight: 700;"><i class="ph-fill ph-seal-check" style="font-size: 11px;"></i>Best</span>
+                      </sc-if>
+                    </div>
+                    <div style="font-size: 12px; color: {{ o.deltaColor }}; margin-top: 2px;">{{ o.deltaText }}</div>
+                  </div>
+                  <span aria-live="polite" style="font-size: 12px; font-weight: 600; color: {{ o.cdColor }}; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right;">{{ o.cdText }}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line-200);">
+                  <span style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 100px; background: var(--brand-navy-soft); color: var(--brand-navy); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px;">{{ o.initials }}</span>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 700; font-size: 13px;">{{ o.name }}</div>
+                    <div style="font-size: 11px; color: var(--ink-500);">{{ o.ago }}</div>
+                  </div>
+                </div>
+                <div style="margin-top: 12px;">
+                  <sc-if value="{{ o.awaiting }}" hint-placeholder-val="{{ false }}">
+                    <div style="width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 44px; border-radius: 8px; border: 1px solid var(--line-200); background: var(--surface-muted); color: var(--ink-500); font-family: var(--font-body); font-weight: 700; font-size: 13px;"><i class="ph ph-hourglass-medium" style="font-size: 15px;"></i>Awaiting buyer</div>
+                  </sc-if>
+                  <sc-if value="{{ o.canRespond }}" hint-placeholder-val="{{ true }}">
+                    <button type="button" onClick="{{ o.onRespond }}" style="width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 44px; border-radius: 8px; border: none; background: var(--brand-navy); color: var(--white); font-family: var(--font-body); font-weight: 700; font-size: 13px; cursor: pointer;"><i class="ph-bold ph-chat-teardrop-text" style="font-size: 15px;"></i>Respond</button>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- ============ CUSTOMER · MY OFFERS ============ -->
+  <sc-if value="{{ custReal }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: {{ custMaxWidth }}; margin: 0 auto; padding: {{ custPad }};">
+    <h1 style="font-family: var(--font-display); font-weight: 800; font-size: {{ custTitleSize }}; line-height: 1.1; margin: 0 0 6px;">My Offers</h1>
+    <p style="font-size: 15px; color: var(--ink-700); margin: 0 0 22px;">Track your offers and respond to counters. Offers are valid for 48 hours.</p>
+
+    <div role="radiogroup" aria-label="Offer status" style="position: relative; display: flex; background: var(--surface-muted); border: 1px solid var(--line-200); border-radius: 12px; padding: 4px; width: 280px; max-width: 100%; margin-bottom: 24px;">
+      <div aria-hidden="true" style="position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 8px; background: var(--brand-navy); box-shadow: 0 2px 6px rgba(0,0,139,.28); transition: transform .28s cubic-bezier(.4,0,.2,1); transform: {{ custPill }};"></div>
+      <button type="button" role="radio" aria-checked="{{ custActiveSel }}" onClick="{{ setActive }}" style="position: relative; z-index: 1; flex: 1; height: 40px; border: none; background: transparent; cursor: pointer; font-family: var(--font-body); font-weight: 700; font-size: 14px; color: {{ custActiveColor }}; transition: color .2s;">Active</button>
+      <button type="button" role="radio" aria-checked="{{ custClosedSel }}" onClick="{{ setClosed }}" style="position: relative; z-index: 1; flex: 1; height: 40px; border: none; background: transparent; cursor: pointer; font-family: var(--font-body); font-weight: 700; font-size: 14px; color: {{ custClosedColor }}; transition: color .2s;">Closed</button>
+    </div>
+
+    <sc-if value="{{ custEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="border: 1px dashed var(--line-200); border-radius: 16px; padding: 56px 24px; text-align: center; background: var(--white);">
+        <span style="width: 52px; height: 52px; border-radius: 100px; background: var(--surface-muted); color: var(--ink-500); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 14px;"><i class="ph ph-handshake" style="font-size: 26px;"></i></span>
+        <div style="font-weight: 700; font-size: 16px; margin-bottom: 4px;">You haven't made any offers</div>
+        <div style="font-size: 14px; color: var(--ink-700);">Browse cars and make an offer on a negotiable listing to get started.</div>
+      </div>
+    </sc-if>
+
+    <div style="display: flex; flex-direction: column; gap: 18px;">
+      <sc-for list="{{ custList }}" as="c" hint-placeholder-count="3">
+        <div style="background: var(--white); border: 1px solid var(--line-200); border-left: {{ c.leftBorder }}; border-radius: 16px; overflow: hidden; opacity: {{ c.opacity }};">
+          <div style="display: flex; gap: 18px; padding: 18px; flex-wrap: wrap;">
+            <div style="flex: 0 0 {{ c.thumbW }}; max-width: 100%; aspect-ratio: 16 / 9; background: var(--surface-muted); border: 1px solid var(--line-200); border-radius: 12px; overflow: hidden; position: relative;">
+              <img src="assets/car-lexus.png" alt="{{ c.title }}" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 14px;" />
+            </div>
+            <div style="flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                <div>
+                  <div style="font-weight: 700; font-size: 16px; margin-bottom: 4px;">{{ c.title }}</div>
+                  <span aria-live="polite" style="font-size: 13px; font-weight: 600; color: {{ c.cdColor }}; font-variant-numeric: tabular-nums;">{{ c.cdText }}</span>
+                </div>
+                <span style="flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; background: {{ c.statusBg }}; color: {{ c.statusColor }}; border-radius: 100px; padding: 5px 11px; font-family: var(--font-label); font-size: 11px; font-weight: 700; white-space: nowrap;">{{ c.statusLabel }}</span>
+              </div>
+
+              <sc-if value="{{ c.isCountered }}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                  <div style="display: flex; align-items: stretch; gap: 12px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 130px; border: 1px solid var(--line-200); border-radius: 12px; padding: 12px 14px;">
+                      <div style="font-size: 11px; color: var(--ink-500); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px;">You offered</div>
+                      <div style="font-size: 18px; font-weight: 700; color: var(--ink-700); font-variant-numeric: tabular-nums;">{{ c.yourOfferFmt }}</div>
+                    </div>
+                    <div style="flex: 1; min-width: 130px; border: 1px solid var(--warning); background: var(--warning-bg); border-radius: 12px; padding: 12px 14px;">
+                      <div style="font-size: 11px; color: var(--warning-ink); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px;">Owner countered</div>
+                      <div style="font-size: 24px; font-weight: 800; color: var(--ink-900); font-variant-numeric: tabular-nums; line-height: 1.1;">{{ c.counterFmt }}</div>
+                    </div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-500);"><i class="ph ph-info" style="font-size: 14px;"></i>This is the owner's only counter-offer.</div>
+                  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" onClick="{{ c.onAcceptCounter }}" style="flex: 1; min-width: 140px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px; border-radius: 8px; border: none; background: var(--brand-navy); color: var(--white); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: pointer;"><i class="ph-bold ph-check" style="font-size: 16px;"></i>Accept counter</button>
+                    <button type="button" onClick="{{ c.onDeclineCounter }}" style="flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px; padding: 0 20px; border-radius: 8px; border: 1px solid var(--line-200); background: transparent; color: var(--ink-900); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: pointer;">Decline</button>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ c.isPlain }}" hint-placeholder-val="{{ true }}">
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                    <div>
+                      <div style="font-size: 11px; color: var(--ink-500); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px;">Your offer</div>
+                      <div style="font-size: 22px; font-weight: 700; color: {{ c.amountColor }}; font-variant-numeric: tabular-nums;">{{ c.yourOfferFmt }}</div>
+                    </div>
+                    <sc-if value="{{ c.showWithdraw }}" hint-placeholder-val="{{ false }}">
+                      <button type="button" onClick="{{ c.onWithdraw }}" style="border: none; background: transparent; cursor: pointer; color: var(--ink-500); font-family: var(--font-body); font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; padding: 4px;">Withdraw offer</button>
+                    </sc-if>
+                  </div>
+                  <sc-if value="{{ c.explain }}" hint-placeholder-val="{{ false }}">
+                    <div style="font-size: 13px; color: var(--ink-700);">{{ c.explain }}</div>
+                  </sc-if>
+                  <sc-if value="{{ c.showBrowse }}" hint-placeholder-val="{{ false }}">
+                    <a href="{{ c.browseHref }}" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-500); width: max-content;"><i class="ph ph-magnifying-glass" style="font-size: 14px;"></i>Browse similar vehicles</a>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- ============ PUBLIC · CAR DETAIL ============ -->
+  <sc-if value="{{ isPublicCar }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 1000px; margin: 0 auto; padding: 28px 28px 96px;">
+    <div style="display: flex; gap: 6px; background: var(--white); border: 1px solid var(--line-200); border-radius: 100px; padding: 4px; width: max-content; max-width: 100%; margin-bottom: 22px;">
+      <sc-for list="{{ pcToggles }}" as="t" hint-placeholder-count="3">
+        <button type="button" onClick="{{ t.onPick }}" style="border: none; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 7px 14px; border-radius: 100px; background: {{ t.bg }}; color: {{ t.color }};">{{ t.label }}</button>
+      </sc-for>
+    </div>
+    <div style="font-size: 13px; color: var(--ink-500); margin-bottom: 16px;">Cars <span style="color: var(--ink-300);">/</span> 2021 Toyota Camry XSE</div>
+    <div style="display: grid; grid-template-columns: 1.15fr 1fr; gap: 28px; align-items: start;">
+      <div style="position: relative; background: var(--surface-muted); border: 1px solid var(--line-200); border-radius: 20px; aspect-ratio: 4 / 3; overflow: hidden;">
+        <span style="position: absolute; top: 14px; left: 14px; z-index: 1; display: inline-flex; align-items: center; gap: 5px; background: var(--white); border-radius: 100px; padding: 5px 11px; font-size: 12px; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,.08);"><i class="ph-fill ph-star" style="font-size: 13px; color: var(--brand-orange);"></i>4.9</span>
+        <img src="assets/car-lexus.png" alt="2021 Toyota Camry XSE" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 22px;" />
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 18px;">
+        <div>
+          <h1 style="font-family: var(--font-display); font-weight: 800; font-size: 28px; line-height: 1.1; margin: 0 0 6px;">2021 Toyota Camry XSE</h1>
+          <div style="display: inline-flex; align-items: center; gap: 5px; font-size: 14px; color: var(--ink-700);"><i class="ph ph-map-pin" style="font-size: 15px; color: var(--ink-500);"></i>Lagos, Nigeria</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <span style="font-family: var(--font-display); font-weight: 800; font-size: 32px; line-height: 1; font-variant-numeric: tabular-nums;">₦18,500,000</span>
+          <span style="display: inline-flex; align-items: center; gap: 6px; background: var(--brand-navy-soft); color: var(--brand-navy); border-radius: 100px; padding: 5px 12px; font-family: var(--font-label); font-size: 12px; font-weight: 700;"><i class="ph-fill ph-handshake" style="font-size: 14px;"></i>Open to offers</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <sc-for list="{{ pcSpecs }}" as="sp" hint-placeholder-count="4">
+            <div style="border: 1px solid var(--line-200); border-radius: 12px; padding: 11px 13px;">
+              <div style="font-size: 11px; color: var(--ink-500); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px;">{{ sp.k }}</div>
+              <div style="font-size: 14px; font-weight: 700;">{{ sp.v }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="margin-top: 4px;">
+          <sc-if value="{{ pcAvailable }}" hint-placeholder-val="{{ true }}">
+            <button type="button" onClick="{{ goMakeOffer }}" style="width: 100%; height: 52px; border-radius: 8px; border: none; background: var(--brand-navy); color: var(--white); font-family: var(--font-body); font-weight: 700; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 9px; transition: background .15s;"><i class="ph-bold ph-handshake" style="font-size: 17px;"></i>Make an Offer</button>
+            <p style="font-size: 13px; color: var(--ink-500); margin: 10px 0 0; text-align: center;">The seller is open to offers on this vehicle.</p>
+          </sc-if>
+          <sc-if value="{{ pcLive }}" hint-placeholder-val="{{ false }}">
+            <button type="button" onClick="{{ goCustomer }}" style="width: 100%; height: 52px; border-radius: 8px; border: 1px solid var(--brand-navy); background: var(--white); color: var(--brand-navy); font-family: var(--font-body); font-weight: 700; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;"><span style="display: inline-flex; align-items: center; gap: 8px;"><i class="ph-bold ph-arrow-right" style="font-size: 16px;"></i>View your offer — ₦16,500,000</span><span style="font-weight: 600; font-size: 13px; color: {{ pcLiveCdColor }}; font-variant-numeric: tabular-nums;">{{ pcLiveCd }}</span></button>
+          </sc-if>
+          <sc-if value="{{ pcLimit }}" hint-placeholder-val="{{ false }}">
+            <button type="button" disabled style="width: 100%; height: 52px; border-radius: 8px; border: none; background: rgb(230,241,250); color: rgb(151,152,154); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: not-allowed;">You've reached the offer limit for this vehicle.</button>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- ============ OWNER · CAR DETAIL ============ -->
+  <sc-if value="{{ isOwnerCar }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 880px; margin: 0 auto; padding: 28px 28px 96px;">
+    <div style="display: flex; gap: 6px; background: var(--white); border: 1px solid var(--line-200); border-radius: 100px; padding: 4px; width: max-content; margin-bottom: 22px;">
+      <sc-for list="{{ ocToggles }}" as="t" hint-placeholder-count="2">
+        <button type="button" onClick="{{ t.onPick }}" style="border: none; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 7px 14px; border-radius: 100px; background: {{ t.bg }}; color: {{ t.color }};">{{ t.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display: flex; align-items: center; gap: 16px; background: var(--white); border: 1px solid var(--line-200); border-radius: 16px; padding: 16px 18px; margin-bottom: 20px;">
+      <img src="assets/car-lexus.png" alt="2021 Toyota Camry XSE" style="width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: var(--surface-muted); border: 1px solid var(--line-200);" />
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-weight: 700; font-size: 18px;">2021 Toyota Camry XSE</div>
+        <div style="font-size: 13px; color: var(--ink-700); font-variant-numeric: tabular-nums;">Asking ₦18,500,000 · Lagos, Nigeria</div>
+      </div>
+      <span style="flex-shrink: 0; background: var(--brand-navy-soft); color: var(--brand-navy); border-radius: 100px; padding: 5px 12px; font-family: var(--font-label); font-size: 11px; font-weight: 700;">Listed</span>
+    </div>
+    <div style="background: var(--white); border: 1px solid var(--line-200); border-radius: 16px; padding: 18px; margin-bottom: 20px;">
+      <div style="font-size: 13px; font-weight: 700; color: var(--ink-900); margin-bottom: 16px;">Listing status</div>
+      <div style="display: flex; align-items: center; gap: 0;">
+        <sc-for list="{{ ocTimeline }}" as="ts" hint-placeholder-count="3">
+          <div style="display: flex; align-items: center; flex: {{ ts.flex }};">
+            <span style="flex-shrink: 0; width: 26px; height: 26px; border-radius: 100px; background: {{ ts.dotBg }}; color: {{ ts.dotColor }}; display: inline-flex; align-items: center; justify-content: center;"><i class="{{ ts.icon }}" style="font-size: 14px;"></i></span>
+            <span style="font-size: 12px; font-weight: 600; color: {{ ts.labelColor }}; margin-left: 8px; white-space: nowrap;">{{ ts.label }}</span>
+            <sc-if value="{{ ts.line }}" hint-placeholder-val="{{ false }}"><span style="flex: 1; height: 2px; background: var(--line-200); margin: 0 10px;"></span></sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="border: 1px solid var(--brand-navy-soft); background: var(--brand-navy-soft); border-radius: 16px; padding: 16px 18px; margin-bottom: 20px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px;">
+        <span style="display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--ink-900);"><i class="ph-fill ph-lock-key" style="font-size: 16px; color: var(--brand-navy);"></i>Your acceptable range</span>
+        <span style="display: inline-flex; align-items: center; gap: 5px; background: var(--white); border: 1px solid var(--brand-navy); color: var(--brand-navy); border-radius: 100px; padding: 3px 10px; font-family: var(--font-label); font-size: 10px; font-weight: 600;"><i class="ph-fill ph-eye-slash" style="font-size: 11px;"></i>Only visible to you</span>
+      </div>
+      <div style="font-size: 20px; font-weight: 800; color: var(--brand-navy); font-variant-numeric: tabular-nums;">{{ ocMinFmt }} – {{ ocMaxFmt }}</div>
+    </div>
+    <div style="background: var(--white); border: 1px solid var(--line-200); border-radius: 16px; overflow: hidden;">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--line-200);">
+        <span style="font-weight: 700; font-size: 15px;">Offers</span>
+        <sc-if value="{{ ocHasOffers }}" hint-placeholder-val="{{ true }}"><span style="background: var(--brand-navy-soft); color: var(--brand-navy); border-radius: 100px; padding: 3px 10px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;">{{ ocCount }} live</span></sc-if>
+        <sc-if value="{{ ocHasOffers }}" hint-placeholder-val="{{ true }}"><a href="#" onClick="{{ ocViewAll }}" style="margin-left: auto; font-size: 13px; font-weight: 700;">{{ ocViewAllLabel }}</a></sc-if>
+      </div>
+      <sc-if value="{{ ocEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="padding: 40px 24px; text-align: center;">
+          <span style="width: 48px; height: 48px; border-radius: 100px; background: var(--surface-muted); color: var(--ink-500); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px;"><i class="ph ph-tray" style="font-size: 24px;"></i></span>
+          <div style="font-size: 14px; color: var(--ink-700);">No offers yet — buyers can make offers on this listing.</div>
+        </div>
+      </sc-if>
+      <sc-for list="{{ ocOffers }}" as="o" hint-placeholder-count="3">
+        <div style="display: grid; grid-template-columns: 1.3fr auto auto; gap: 16px; align-items: center; padding: 16px 18px; border-top: 1px solid var(--line-200);">
+          <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+            <span style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 100px; background: var(--brand-navy-soft); color: var(--brand-navy); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;">{{ o.initials }}</span>
+            <div style="min-width: 0;"><div style="font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ o.name }}</div><div style="font-size: 12px; color: var(--ink-500);">{{ o.ago }}</div></div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;">{{ o.amountFmt }}</div>
+            <div style="font-size: 12px; color: {{ o.deltaColor }};">{{ o.deltaText }}</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px; justify-self: end;">
+            <span aria-live="polite" style="font-size: 12px; font-weight: 600; color: {{ o.cdColor }}; font-variant-numeric: tabular-nums; white-space: nowrap;">{{ o.cdText }}</span>
+            <span style="background: {{ o.statusBg }}; color: {{ o.statusColor }}; border-radius: 100px; padding: 4px 10px; font-family: var(--font-label); font-size: 10px; font-weight: 700; white-space: nowrap;">{{ o.statusLabel }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- ============ OWNER · DASHBOARD ============ -->
+  <sc-if value="{{ isOwnerDash }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 1000px; margin: 0 auto; padding: 28px 28px 96px;">
+    <div style="display: flex; gap: 6px; background: var(--white); border: 1px solid var(--line-200); border-radius: 100px; padding: 4px; width: max-content; margin-bottom: 22px;">
+      <sc-for list="{{ odToggles }}" as="t" hint-placeholder-count="2">
+        <button type="button" onClick="{{ t.onPick }}" style="border: none; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 7px 14px; border-radius: 100px; background: {{ t.bg }}; color: {{ t.color }};">{{ t.label }}</button>
+      </sc-for>
+    </div>
+    <h1 style="font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1.1; margin: 0 0 6px;">Good afternoon, Daniel</h1>
+    <p style="font-size: 15px; color: var(--ink-700); margin: 0 0 24px;">Here's what's happening with your offers.</p>
+    <div style="width: 340px; max-width: 100%; background: var(--white); border: 1px solid var(--brand-navy); border-radius: 16px; padding: 18px 20px; cursor: pointer; display: flex; flex-direction: column; gap: 10px;" onClick="{{ goOwnerHub }}">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <span style="font-size: 13px; font-weight: 600; color: var(--ink-700);">Offers awaiting you</span>
+        <span style="width: 30px; height: 30px; border-radius: 8px; background: var(--brand-navy-soft); color: var(--brand-navy); display: inline-flex; align-items: center; justify-content: center;"><i class="ph ph-hand-coins" style="font-size: 16px;"></i></span>
+      </div>
+      <div style="font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums;">{{ odCount }}</div>
+      <span style="font-size: 12px; color: var(--ink-500);">Across {{ odVehicles }} vehicles</span>
+    </div>
+    <div style="background: var(--white); border: 1px solid var(--line-200); border-radius: 16px; overflow: hidden; margin-top: 20px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--line-200);">
+        <span style="font-weight: 700; font-size: 15px;">Recent offers</span>
+        <a href="#" onClick="{{ goOwnerHub }}" style="font-size: 13px; font-weight: 700;">View all</a>
+      </div>
+      <sc-if value="{{ dashEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="padding: 40px 24px; text-align: center; font-size: 14px; color: var(--ink-700);">No offers yet.</div>
+      </sc-if>
+      <sc-for list="{{ recentRows }}" as="r" hint-placeholder-count="5">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 13px 18px; border-top: 1px solid var(--line-200);">
+          <img src="assets/car-lexus.png" alt="{{ r.car }}" style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 6px; object-fit: cover; background: var(--surface-muted); border: 1px solid var(--line-200);" />
+          <span style="flex-shrink: 0; width: 30px; height: 30px; border-radius: 100px; background: var(--brand-navy-soft); color: var(--brand-navy); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px;">{{ r.initials }}</span>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.name }}</div>
+            <div style="font-size: 12px; color: var(--ink-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.car }}</div>
+          </div>
+          <div style="flex-shrink: 0; text-align: right;">
+            <div style="font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;">{{ r.amountFmt }}</div>
+            <div style="font-size: 11px; color: var(--ink-500);">{{ r.ago }}</div>
+          </div>
+          <span style="flex-shrink: 0; background: {{ r.statusBg }}; color: {{ r.statusColor }}; border-radius: 100px; padding: 4px 10px; font-family: var(--font-label); font-size: 10px; font-weight: 700; white-space: nowrap;">{{ r.statusLabel }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- ============ CUSTOMER · REQUEST DETAIL ============ -->
+  <sc-if value="{{ isCustReq }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 720px; margin: 0 auto; padding: 28px 28px 96px;">
+    <div style="display: flex; gap: 6px; background: var(--white); border: 1px solid var(--line-200); border-radius: 100px; padding: 4px; width: max-content; margin-bottom: 22px;">
+      <sc-for list="{{ crToggles }}" as="t" hint-placeholder-count="2">
+        <button type="button" onClick="{{ t.onPick }}" style="border: none; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 7px 14px; border-radius: 100px; background: {{ t.bg }}; color: {{ t.color }};">{{ t.label }}</button>
+      </sc-for>
+    </div>
+    <div style="font-size: 13px; color: var(--ink-500); margin-bottom: 16px;">Requests <span style="color: var(--ink-300);">/</span> #REQ-2481</div>
+    <div style="display: flex; align-items: center; gap: 16px; background: var(--white); border: 1px solid var(--line-200); border-radius: 16px; padding: 16px 18px; margin-bottom: 20px;">
+      <img src="assets/car-lexus.png" alt="2021 Toyota Camry XSE" style="width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: var(--surface-muted); border: 1px solid var(--line-200);" />
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-weight: 700; font-size: 18px;">2021 Toyota Camry XSE</div>
+        <div style="font-size: 13px; color: var(--ink-700);">Purchase request · Lagos, Nigeria</div>
+      </div>
+      <span style="flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; background: var(--success-bg); color: var(--success); border-radius: 100px; padding: 5px 12px; font-family: var(--font-label); font-size: 11px; font-weight: 700;"><i class="ph-fill ph-check-circle" style="font-size: 12px;"></i>Approved by Owner</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px; background: var(--success-bg); border: 1px solid var(--success); border-radius: 12px; padding: 14px 16px; margin-bottom: 20px;">
+      <div style="display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 700; color: var(--ink-900);"><i class="ph-fill ph-handshake" style="font-size: 18px; color: var(--success);"></i>Created from your accepted offer of ₦17,500,000 on 22 Jul</div>
+      <sc-if value="{{ crCountered }}" hint-placeholder-val="{{ true }}">
+        <div style="font-size: 13px; color: var(--ink-700); padding-left: 28px; font-variant-numeric: tabular-nums;">You offered ₦16,500,000 · seller countered ₦17,500,000.</div>
+      </sc-if>
+    </div>
+    <div style="background: var(--white); border: 1px solid var(--line-200); border-radius: 16px; padding: 18px;">
+      <div style="font-size: 13px; font-weight: 700; color: var(--ink-900); margin-bottom: 16px;">Request status</div>
+      <div style="display: flex; flex-direction: column;">
+        <sc-for list="{{ crSteps }}" as="cs" hint-placeholder-count="4">
+          <div style="display: flex; gap: 12px;">
+            <div style="display: flex; flex-direction: column; align-items: center;">
+              <span style="flex-shrink: 0; width: 26px; height: 26px; border-radius: 100px; background: {{ cs.dotBg }}; color: {{ cs.dotColor }}; display: inline-flex; align-items: center; justify-content: center;"><i class="{{ cs.icon }}" style="font-size: 14px;"></i></span>
+              <sc-if value="{{ cs.line }}" hint-placeholder-val="{{ true }}"><span style="width: 2px; flex: 1; min-height: 22px; background: var(--line-200);"></span></sc-if>
+            </div>
+            <div style="padding-bottom: {{ cs.pad }};">
+              <div style="font-size: 14px; font-weight: 700; color: {{ cs.labelColor }};">{{ cs.label }}</div>
+              <div style="font-size: 12px; color: var(--ink-500);">{{ cs.meta }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- ============ NOTIFICATIONS · PAGE ============ -->
+  <sc-if value="{{ isNotifPage }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 640px; margin: 0 auto; padding: 28px 28px 96px;">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 22px;">
+      <div>
+        <h1 style="font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1.1; margin: 0 0 4px;">Notifications</h1>
+        <p style="font-size: 14px; color: var(--ink-700); margin: 0;">{{ notifSub }}</p>
+      </div>
+      <button type="button" onClick="{{ markAllRead }}" style="border: none; background: transparent; cursor: pointer; color: var(--brand-navy); font-family: var(--font-body); font-size: 13px; font-weight: 700; padding: 4px;">Mark all as read</button>
+    </div>
+    <div style="background: var(--white); border: 1px solid var(--line-200); border-radius: 16px; overflow: hidden;">
+      <sc-for list="{{ notifRows }}" as="n" hint-placeholder-count="6">
+        <button type="button" onClick="{{ n.onOpen }}" style="width: 100%; text-align: left; display: flex; align-items: flex-start; gap: 12px; padding: 15px 18px; border: none; border-top: 1px solid var(--line-200); background: {{ n.rowBg }}; cursor: pointer; font-family: var(--font-body);">
+          <span style="flex-shrink: 0; width: 38px; height: 38px; border-radius: 100px; background: {{ n.iconBg }}; color: {{ n.iconColor }}; display: inline-flex; align-items: center; justify-content: center;"><i class="{{ n.icon }}" style="font-size: 18px;"></i></span>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 14px; color: var(--ink-900); line-height: 1.4; font-variant-numeric: tabular-nums;">{{ n.text }}</div>
+            <div style="font-size: 12px; color: var(--ink-500); margin-top: 2px;">{{ n.time }}</div>
+          </div>
+          <sc-if value="{{ n.unread }}" hint-placeholder-val="{{ false }}"><span style="flex-shrink: 0; width: 9px; height: 9px; border-radius: 100px; background: var(--brand-navy); margin-top: 6px;"></span></sc-if>
+        </button>
+      </sc-for>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- ============ CUSTOMER · LOADING SKELETON ============ -->
+  <sc-if value="{{ custSkeleton }}" hint-placeholder-val="{{ false }}">
+  <main style="max-width: 760px; margin: 0 auto; padding: 28px 28px 96px;" aria-busy="true">
+    <div style="height: 34px; width: 160px; border-radius: 8px; margin-bottom: 10px; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+    <div style="height: 16px; width: 280px; border-radius: 6px; margin-bottom: 24px; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+    <div style="display: flex; flex-direction: column; gap: 18px;">
+      <sc-for list="{{ sk3 }}" as="c" hint-placeholder-count="3">
+        <div style="border: 1px solid var(--line-200); border-radius: 16px; padding: 18px; display: flex; gap: 18px;">
+          <div style="flex: 0 0 200px; aspect-ratio: 16 / 9; border-radius: 12px; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+          <div style="flex: 1;">
+            <div style="height: 16px; width: 70%; border-radius: 6px; margin-bottom: 12px; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+            <div style="height: 13px; width: 40%; border-radius: 6px; margin-bottom: 20px; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+            <div style="height: 24px; width: 50%; border-radius: 6px; background: linear-gradient(90deg, var(--surface-muted) 25%, #fff 50%, var(--surface-muted) 75%); background-size: 200% 100%; animation: skShimmer 1.4s ease infinite;"></div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- ============ MAKE OFFER DIALOG (surface) ============ -->
+  <sc-if value="{{ isMakeOffer }}" hint-placeholder-val="{{ false }}">
+  <main style="min-height: calc(100vh - 62px); background: rgba(18,18,18,.35); display: flex; align-items: flex-start; justify-content: center; padding: 40px 20px 80px;">
+    <div style="position: fixed; top: 74px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; background: var(--white); border: 1px solid var(--line-200); border-radius: 100px; padding: 4px; z-index: 5; box-shadow: 0 4px 14px rgba(0,0,0,.08);">
+      <button type="button" onClick="{{ setMoEmpty }}" style="border: none; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 7px 13px; border-radius: 100px; background: {{ moEmptyBg }}; color: {{ moEmptyColor }};">Empty</button>
+      <button type="button" onClick="{{ setMoFilled }}" style="border: none; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 7px 13px; border-radius: 100px; background: {{ moFilledBg }}; color: {{ moFilledColor }};">Filled &amp; valid</button>
+      <button type="button" onClick="{{ setMoBelow }}" style="border: none; cursor: pointer; font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 7px 13px; border-radius: 100px; background: {{ moBelowBg }}; color: {{ moBelowColor }};">Below minimum</button>
+    </div>
+
+    <div role="dialog" aria-modal="true" aria-label="Make an offer" style="width: 460px; max-width: 100%; background: var(--white); border-radius: 20px; padding: 24px; margin-top: 44px; animation: dialogIn .25s cubic-bezier(.4,0,.2,1); box-shadow: 0 20px 50px rgba(0,0,0,.2);">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px;">
+        <h2 style="font-family: var(--font-display); font-weight: 800; font-size: 20px; margin: 0;">Make an offer</h2>
+        <button type="button" aria-label="Close" style="border: none; background: var(--surface-muted); cursor: pointer; width: 32px; height: 32px; border-radius: 100px; color: var(--ink-700); display: inline-flex; align-items: center; justify-content: center;"><i class="ph ph-x" style="font-size: 16px;"></i></button>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; background: var(--surface-muted); border: 1px solid var(--line-200); border-radius: 12px; padding: 12px; margin-bottom: 20px;">
+        <img src="assets/car-lexus.png" alt="{{ moCarTitle }}" style="width: 52px; height: 52px; border-radius: 8px; object-fit: cover; background: var(--white); border: 1px solid var(--line-200);" />
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-weight: 700; font-size: 14px;">{{ moCarTitle }}</div>
+          <div style="font-size: 13px; color: var(--ink-700); font-variant-numeric: tabular-nums;">Asking {{ moAskingFmt }}</div>
+        </div>
+      </div>
+
+      <label style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;">
+        <span style="font-size: 14px; font-weight: 600; color: var(--ink-700);">Your offer</span>
+        <span style="display: flex; align-items: center; gap: 8px; height: 62px; padding: 0 18px; background: var(--white); border: 1px solid {{ moBorder }}; border-radius: 12px;">
+          <span style="font-size: 26px; font-weight: 700; color: var(--ink-500);">₦</span>
+          <input value="{{ moAmountFmt }}" onChange="{{ onMoAmount }}" inputmode="numeric" placeholder="0" aria-invalid="{{ moError }}" style="flex: 1; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: 28px; font-weight: 700; color: var(--ink-900); min-width: 0; font-variant-numeric: tabular-nums;" />
+        </span>
+        <sc-if value="{{ moError }}" hint-placeholder-val="{{ false }}">
+          <span style="display: flex; align-items: flex-start; gap: 7px; font-size: 13px; color: var(--danger-2); line-height: 1.45; animation: crossIn .2s ease;"><i class="ph ph-info" style="font-size: 15px; margin-top: 1px;"></i>Your offer is below the acceptable range for this vehicle. Please submit a higher amount to continue.</span>
+        </sc-if>
+      </label>
+
+      <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+        <sc-for list="{{ moPicks }}" as="pk" hint-placeholder-count="3">
+          <button type="button" onClick="{{ pk.onPick }}" style="flex: 1; height: 40px; border-radius: 8px; border: 1px solid var(--line-200); background: var(--white); color: var(--brand-navy); font-family: var(--font-body); font-size: 13px; font-weight: 700; cursor: pointer; transition: background .15s;">{{ pk.label }}</button>
+        </sc-for>
+      </div>
+
+      <label style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px;">
+        <span style="display: flex; align-items: center; justify-content: space-between;"><span style="font-size: 14px; font-weight: 600; color: var(--ink-700);">Message <span style="font-weight: 400; color: var(--ink-500);">(optional)</span></span><span style="font-size: 12px; color: {{ moCountColor }}; font-variant-numeric: tabular-nums;">{{ moCount }}</span></span>
+        <textarea value="{{ moMsg }}" onChange="{{ onMoMsg }}" rows="3" placeholder="Add a note for the owner…" style="border: 1px solid var(--line-200); border-radius: 12px; padding: 12px 14px; font-family: var(--font-body); font-size: 14px; color: var(--ink-900); resize: none; outline: none;"></textarea>
+      </label>
+
+      <div style="display: flex; align-items: flex-start; gap: 8px; background: var(--surface-muted); border-radius: 10px; padding: 11px 13px; margin-bottom: 18px;">
+        <i class="ph ph-clock-countdown" style="font-size: 16px; color: var(--ink-500); margin-top: 1px;"></i>
+        <span style="font-size: 12px; color: var(--ink-700); line-height: 1.45;">Your offer is valid for 48 hours. You can make up to 3 offers on this vehicle. <span style="font-weight: 700;">{{ moRemaining }}</span></span>
+      </div>
+
+      <button type="button" onClick="{{ moSubmit }}" disabled="{{ moSubmitting }}" style="width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 9px; height: 50px; border-radius: 8px; border: none; background: var(--brand-navy); color: var(--white); font-family: var(--font-body); font-weight: 700; font-size: 15px; cursor: {{ moCursor }};">
+        <sc-if value="{{ moSubmitting }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="width: 17px; height: 17px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 100px; animation: spin .7s linear infinite;"></span>Submitting…</sc-if>
+        <sc-if value="{{ moIdle }}" hint-placeholder-val="{{ true }}"><i class="ph-bold ph-paper-plane-tilt" style="font-size: 16px;"></i>Submit offer</sc-if>
+      </button>
+    </div>
+  </main>
+  </sc-if>
+
+  <!-- ============ OWNER RESPOND SHEET ============ -->
+  <sc-if value="{{ respondOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeRespond }}" style="position: fixed; inset: 0; background: rgba(18,18,18,.4); z-index: 40; animation: overlayIn .2s ease;"></div>
+    <aside onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Respond to offer" style="position: fixed; top: 0; right: 0; bottom: 0; width: 440px; max-width: 100%; background: var(--white); z-index: 41; box-shadow: -8px 0 30px rgba(0,0,0,.14); animation: sheetIn .3s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column;">
+
+      <sc-if value="{{ respondSuccess }}" hint-placeholder-val="{{ false }}">
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; animation: crossIn .3s ease;">
+          <span style="width: 68px; height: 68px; border-radius: 100px; background: var(--success-bg); color: var(--success); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 18px;"><i class="ph-fill ph-check-circle" style="font-size: 40px;"></i></span>
+          <div style="font-family: var(--font-display); font-weight: 800; font-size: 22px; margin-bottom: 6px;">Vehicle reserved</div>
+          <div style="font-size: 14px; color: var(--ink-700); max-width: 280px;">The offer is accepted and a purchase request has been created. The other offers were declined automatically.</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ respondForm }}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 22px; border-bottom: 1px solid var(--line-200);">
+        <h2 style="font-family: var(--font-display); font-weight: 800; font-size: 20px; margin: 0;">Respond to offer</h2>
+        <button type="button" onClick="{{ closeRespond }}" aria-label="Close" style="border: none; background: var(--surface-muted); cursor: pointer; width: 32px; height: 32px; border-radius: 100px; color: var(--ink-700); display: inline-flex; align-items: center; justify-content: center;"><i class="ph ph-x" style="font-size: 16px;"></i></button>
+      </div>
+
+      <div style="flex: 1; overflow-y: auto; padding: 22px; display: flex; flex-direction: column; gap: 20px;">
+        <div style="font-size: 12px; color: var(--ink-500);">{{ activeCarTitle }} · Asking {{ activeAskingFmt }}</div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px; border: 1px solid var(--line-200); border-radius: 16px; padding: 18px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="width: 44px; height: 44px; border-radius: 100px; background: var(--brand-navy-soft); color: var(--brand-navy); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px;">{{ activeInitials }}</span>
+            <div>
+              <div style="font-weight: 700; font-size: 15px;">{{ activeName }}</div>
+              <div style="font-size: 12px; color: var(--ink-500);">{{ activeAgo }}</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;">
+            <span style="font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums;">{{ activeAmountFmt }}</span>
+            <span style="font-size: 13px; color: {{ activeDeltaColor }};">{{ activeDeltaText }}</span>
+          </div>
+          <sc-if value="{{ activeHasMsg }}" hint-placeholder-val="{{ false }}">
+            <div style="background: var(--surface-muted); border-radius: 12px; padding: 12px 14px; font-size: 13px; color: var(--ink-700); line-height: 1.5;">“{{ activeMessage }}”</div>
+          </sc-if>
+        </div>
+
+        <div style="border: 1px solid var(--brand-navy-soft); background: var(--brand-navy-soft); border-radius: 16px; padding: 16px 18px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px;">
+            <span style="display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: var(--ink-900);"><i class="ph-fill ph-lock-key" style="font-size: 16px; color: var(--brand-navy);"></i>Your acceptable range</span>
+            <span style="display: inline-flex; align-items: center; gap: 5px; background: var(--white); border: 1px solid var(--brand-navy); color: var(--brand-navy); border-radius: 100px; padding: 3px 10px; font-family: var(--font-label); font-size: 10px; font-weight: 600;"><i class="ph-fill ph-eye-slash" style="font-size: 11px;"></i>Only visible to you</span>
+          </div>
+          <div style="font-size: 20px; font-weight: 800; color: var(--brand-navy); font-variant-numeric: tabular-nums;">{{ activeMinFmt }} – {{ activeMaxFmt }}</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <button type="button" onClick="{{ askAccept }}" style="width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; border-radius: 8px; border: none; background: var(--brand-navy); color: var(--white); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: pointer;"><i class="ph-bold ph-check" style="font-size: 16px;"></i>Accept offer</button>
+
+          <button type="button" onClick="{{ toggleCounter }}" style="width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; border-radius: 8px; border: 1px solid var(--brand-navy); background: transparent; color: var(--brand-navy); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: pointer;"><i class="ph-bold ph-arrows-left-right" style="font-size: 16px;"></i>{{ counterBtnLabel }}</button>
+
+          <div style="display: grid; grid-template-rows: {{ counterRows }}; opacity: {{ counterOpacity }}; transition: grid-template-rows .3s ease, opacity .3s ease;">
+            <div style="overflow: hidden; min-height: 0;">
+              <div style="border: 1px solid var(--line-200); border-radius: 12px; padding: 16px; margin-top: 2px; display: flex; flex-direction: column; gap: 12px;">
+                <label style="display: flex; flex-direction: column; gap: 8px;">
+                  <span style="font-size: 13px; font-weight: 600; color: var(--ink-700);">Your counter-offer</span>
+                  <span style="display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 16px; background: var(--white); border: 1px solid var(--line-200); border-radius: 8px;"><span style="font-size: 18px; font-weight: 700; color: var(--ink-500);">₦</span><input value="{{ counterAmountFmt }}" onChange="{{ onCounterAmount }}" inputmode="numeric" style="flex: 1; border: none; outline: none; background: transparent; font-family: var(--font-body); font-size: 18px; font-weight: 700; color: var(--ink-900); min-width: 0; font-variant-numeric: tabular-nums;" /></span>
+                </label>
+                <div style="display: flex; align-items: flex-start; gap: 7px; font-size: 12px; color: var(--warning-ink); line-height: 1.45;"><i class="ph-fill ph-warning" style="font-size: 14px; margin-top: 1px;"></i>You get one counter-offer. If they decline, this negotiation closes.</div>
+                <button type="button" onClick="{{ sendCounter }}" style="width: 100%; height: 46px; border-radius: 8px; border: none; background: var(--brand-navy); color: var(--white); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: pointer;">Send counter-offer</button>
+              </div>
+            </div>
+          </div>
+
+          <button type="button" onClick="{{ askDecline }}" style="width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; border-radius: 8px; border: none; background: transparent; color: var(--danger-2); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: pointer;">Decline offer</button>
+        </div>
+      </div>
+      </sc-if>
+    </aside>
+  </sc-if>
+
+  <!-- ============ CONFIRM DIALOG ============ -->
+  <sc-if value="{{ confirmOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeConfirm }}" style="position: fixed; inset: 0; background: rgba(18,18,18,.5); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; animation: overlayIn .2s ease;">
+      <div onClick="{{ stop }}" role="alertdialog" aria-modal="true" aria-label="{{ confirmTitle }}" style="width: 400px; max-width: 100%; background: var(--white); border-radius: 20px; padding: 24px; animation: dialogIn .25s cubic-bezier(.4,0,.2,1);">
+        <span style="width: 46px; height: 46px; border-radius: 100px; background: {{ confirmIconBg }}; color: {{ confirmIconColor }}; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 14px;"><i class="{{ confirmIcon }}" style="font-size: 24px;"></i></span>
+        <h2 style="font-family: var(--font-display); font-weight: 800; font-size: 20px; margin: 0 0 8px;">{{ confirmTitle }}</h2>
+        <p style="font-size: 14px; color: var(--ink-700); margin: 0 0 22px; line-height: 1.5;">{{ confirmBody }}</p>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" onClick="{{ closeConfirm }}" style="flex: 1; height: 46px; border-radius: 8px; border: 1px solid var(--line-200); background: transparent; color: var(--ink-900); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: pointer;">Cancel</button>
+          <button type="button" onClick="{{ doConfirm }}" style="flex: 1; height: 46px; border-radius: 8px; border: none; background: {{ confirmCtaBg }}; color: var(--white); font-family: var(--font-body); font-weight: 700; font-size: 14px; cursor: pointer;">{{ confirmCta }}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ============ MOBILE FILTERS SHEET ============ -->
+  <sc-if value="{{ mFiltersOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeMFilters }}" style="position: fixed; inset: 0; background: rgba(18,18,18,.45); z-index: 55; display: flex; align-items: flex-end; animation: overlayIn .2s ease;">
+      <div onClick="{{ stop }}" role="dialog" aria-modal="true" aria-label="Filters" style="width: 100%; background: var(--white); border-radius: 20px 20px 0 0; padding: 20px 18px 28px; animation: dialogIn .25s cubic-bezier(.4,0,.2,1);">
+        <div style="width: 40px; height: 4px; border-radius: 100px; background: var(--line-200); margin: 0 auto 18px;"></div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;"><h2 style="font-family: var(--font-display); font-weight: 800; font-size: 18px; margin: 0;">Filters</h2><button type="button" onClick="{{ clearAll }}" style="border: none; background: transparent; cursor: pointer; color: var(--ink-700); font-size: 13px; font-weight: 600;">Clear all</button></div>
+        <div style="font-size: 13px; font-weight: 600; color: var(--ink-700); margin-bottom: 8px;">Car</div>
+        <div style="position: relative; margin-bottom: 18px;">
+          <select value="{{ filterCar }}" onChange="{{ onFilterCar }}" style="width: 100%; appearance: none; -webkit-appearance: none; height: 46px; padding: 0 34px 0 14px; border: 1px solid var(--line-200); border-radius: 8px; background: var(--white); font-family: var(--font-body); font-size: 14px; font-weight: 600; color: var(--ink-900);">
+            <option value="all">All cars</option>
+            <option value="A">2021 Toyota Camry XSE</option>
+            <option value="B">2019 Mercedes-Benz GLE 350</option>
+            <option value="C">2022 Lexus RX 350 F-Sport</option>
+          </select>
+          <i class="ph ph-caret-down" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--ink-500); pointer-events: none;"></i>
+        </div>
+        <div style="font-size: 13px; font-weight: 600; color: var(--ink-700); margin-bottom: 8px;">Status</div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px;">
+          <sc-for list="{{ statusChips }}" as="ch" hint-placeholder-count="7">
+            <button type="button" onClick="{{ ch.onToggle }}" style="border: 1px solid {{ ch.border }}; background: {{ ch.bg }}; color: {{ ch.color }}; cursor: pointer; font-family: var(--font-body); font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 100px;">{{ ch.label }}</button>
+          </sc-for>
+        </div>
+        <button type="button" onClick="{{ closeMFilters }}" style="width: 100%; height: 48px; border-radius: 8px; border: none; background: var(--brand-navy); color: var(--white); font-family: var(--font-body); font-weight: 700; font-size: 15px; cursor: pointer;">Show results</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ============ NOTIFICATIONS · DROPDOWN ============ -->
+  <sc-if value="{{ notifOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeNotif }}" style="position: fixed; inset: 0; z-index: 50;"></div>
+    <div role="dialog" aria-label="Notifications" style="position: fixed; top: 64px; right: 24px; width: 380px; max-width: calc(100vw - 32px); background: var(--white); border: 1px solid var(--line-200); border-radius: 16px; box-shadow: 0 16px 44px rgba(0,0,0,.18); z-index: 51; overflow: hidden; animation: dialogIn .2s ease;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--line-200);">
+        <span style="font-family: var(--font-display); font-weight: 800; font-size: 16px;">Notifications</span>
+        <button type="button" onClick="{{ markAllRead }}" style="border: none; background: transparent; cursor: pointer; color: var(--brand-navy); font-family: var(--font-body); font-size: 12px; font-weight: 700; padding: 2px;">Mark all read</button>
+      </div>
+      <div style="max-height: 420px; overflow-y: auto;">
+        <sc-for list="{{ notifRows }}" as="n" hint-placeholder-count="5">
+          <button type="button" onClick="{{ n.onOpen }}" style="width: 100%; text-align: left; display: flex; align-items: flex-start; gap: 11px; padding: 13px 18px; border: none; border-top: 1px solid var(--line-200); background: {{ n.rowBg }}; cursor: pointer; font-family: var(--font-body);">
+            <span style="flex-shrink: 0; width: 34px; height: 34px; border-radius: 100px; background: {{ n.iconBg }}; color: {{ n.iconColor }}; display: inline-flex; align-items: center; justify-content: center;"><i class="{{ n.icon }}" style="font-size: 16px;"></i></span>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 13px; color: var(--ink-900); line-height: 1.4; font-variant-numeric: tabular-nums;">{{ n.text }}</div>
+              <div style="font-size: 11px; color: var(--ink-500); margin-top: 2px;">{{ n.time }}</div>
+            </div>
+            <sc-if value="{{ n.unread }}" hint-placeholder-val="{{ false }}"><span style="flex-shrink: 0; width: 8px; height: 8px; border-radius: 100px; background: var(--brand-navy); margin-top: 5px;"></span></sc-if>
+          </button>
+        </sc-for>
+      </div>
+      <button type="button" onClick="{{ goNotifPage }}" style="width: 100%; padding: 13px; border: none; border-top: 1px solid var(--line-200); background: var(--white); color: var(--brand-navy); font-family: var(--font-body); font-weight: 700; font-size: 13px; cursor: pointer;">View all notifications</button>
+    </div>
+  </sc-if>
+
+  <!-- ============ TOAST ============ -->
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; right: 24px; bottom: 24px; z-index: 70; display: flex; align-items: flex-start; gap: 10px; max-width: 380px; background: var(--white); border: 1px solid var(--line-200); border-left: 4px solid {{ toastAccent }}; border-radius: 12px; padding: 14px 16px; box-shadow: 0 8px 28px rgba(0,0,0,.14); animation: toastIn .3s cubic-bezier(.4,0,.2,1);">
+      <i class="{{ toastIcon }}" style="font-size: 20px; color: {{ toastAccent }}; margin-top: 1px;"></i>
+      <div style="flex: 1;">
+        <div style="font-size: 14px; font-weight: 700; color: var(--ink-900);">{{ toastTitle }}</div>
+        <div style="font-size: 13px; color: var(--ink-700); margin-top: 2px;">{{ toastMsg }}</div>
+      </div>
+      <button type="button" onClick="{{ closeToast }}" aria-label="Dismiss" style="border: none; background: transparent; cursor: pointer; color: var(--ink-500); padding: 0; line-height: 1;"><i class="ph ph-x" style="font-size: 16px;"></i></button>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: &quot;100%&quot;, &quot;height&quot;: 940}}">
+class Component extends DCLogic {
+  base = Date.now();
+  state = {
+    surface: 'owner', viewport: 'desktop', now: Date.now(), countP: 0,
+    filterCar: 'all', filterStatuses: [], sort: 'newest',
+    incoming: false, showPill: false, mFiltersOpen: false,
+    respondId: null, counterOpen: false, counterAmount: '', respondSuccess: false,
+    confirm: null, custTab: 'active',
+    moState: 'empty', moAmount: '', moMsg: '', moSubmitting: false, moError: false,
+    pcState: 'available', ocState: 'offers', odState: 'data', crState: 'countered',
+    loading: false, notifOpen: false, notifRead: false,
+    toast: null,
+  };
+
+  componentDidMount() {
+    this._tick = setInterval(() => this.setState({ now: Date.now() }), 60000);
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) { this.setState({ countP: 1 }); return; }
+    const start = performance.now(), dur = 500;
+    const step = (t) => {
+      const x = Math.min(1, (t - start) / dur);
+      const p = 1 - (1 - x) * (1 - x);
+      this.setState({ countP: p });
+      if (x < 1) this._raf = requestAnimationFrame(step);
+    };
+    this._raf = requestAnimationFrame(step);
+  }
+  componentWillUnmount() { clearInterval(this._tick); cancelAnimationFrame(this._raf); clearTimeout(this._t); clearTimeout(this._succ); }
+
+  fmt(n) { return String(Math.round(n) || 0).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  money(n) { return '₦' + this.fmt(n); }
+  initials(name) { return name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase(); }
+
+  cars() {
+    return [
+      { id: 'A', title: '2021 Toyota Camry XSE', asking: 18500000, min: 15000000, max: 18500000, offers: [
+        { id: 'a1', name: 'Chidera Okafor', amount: 17000000, status: 'pending', ago: '2 hours ago', agoMin: 120, expMin: 2832, message: 'Hi, I can pay cash this week and handle the paperwork quickly. Would you take ₦17,000,000?' },
+        { id: 'a2', name: 'Musa Ibrahim', amount: 16000000, status: 'pending', ago: '5 hours ago', agoMin: 300, expMin: 340, message: '' },
+        { id: 'a3', name: 'Blessing Adeyemi', amount: 15500000, status: 'countered', counter: 17500000, ago: '1 day ago', agoMin: 1440, expMin: 1200, message: 'Is the price flexible? This is my max budget right now.' },
+      ]},
+      { id: 'B', title: '2019 Mercedes-Benz GLE 350', asking: 42000000, min: 38000000, max: 42000000, offers: [
+        { id: 'b1', name: 'Emeka Nwosu', amount: 40500000, status: 'pending', ago: '3 hours ago', agoMin: 180, expMin: 48, message: 'Serious buyer, inspection already done. Ready to close today.' },
+        { id: 'b2', name: 'Fatima Bello', amount: 39000000, status: 'pending', ago: '6 hours ago', agoMin: 360, expMin: 1800, message: '' },
+      ]},
+      { id: 'C', title: '2022 Lexus RX 350 F-Sport', asking: 55000000, min: 50000000, max: 55000000, offers: [
+        { id: 'c1', name: 'Daniel Achebe', amount: 55000000, status: 'pending', ago: '20 minutes ago', agoMin: 20, expMin: 2760, message: 'Full asking price. Can we finalize today?' },
+      ]},
+    ];
+  }
+  incomingOffer() { return { id: 'inc', name: 'Ngozi Eze', amount: 17500000, status: 'pending', ago: 'just now', agoMin: 0, expMin: 2820, message: '', incoming: true }; }
+
+  cd(expMin) {
+    const ms = (this.base + expMin * 60000) - this.state.now;
+    if (ms <= 0) return { text: 'Expired', color: 'var(--ink-500)' };
+    const totalMin = Math.floor(ms / 60000), h = Math.floor(totalMin / 60), m = totalMin % 60;
+    const text = h >= 1 ? `Expires in ${h}h ${m}m` : `Expires in ${m}m`;
+    const color = ms < 3600000 ? 'var(--danger-2)' : (ms < 6 * 3600000 ? 'var(--warning-ink)' : 'var(--ink-700)');
+    return { text, color };
+  }
+  delta(amount, asking) {
+    if (amount >= asking) return { text: 'at asking price', color: 'var(--success)' };
+    return { text: this.money(asking - amount) + ' below asking', color: 'var(--ink-500)' };
+  }
+
+  findOffer(id) {
+    for (const c of this.cars()) { for (const o of c.offers) { if (o.id === id) return { offer: o, car: c }; } }
+    if (id === 'inc') return { offer: this.incomingOffer(), car: this.cars()[0] };
+    return null;
+  }
+
+  fireToast(type, title, msg) {
+    this.setState({ toast: { type, title, msg } });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({ toast: null }), 5000);
+  }
+
+  toggleStatus(k) {
+    const cur = this.state.filterStatuses;
+    this.setState({ filterStatuses: cur.includes(k) ? cur.filter(x => x !== k) : [...cur, k] });
+  }
+
+  openRespond(id) { this.setState({ respondId: id, counterOpen: false, respondSuccess: false, counterAmount: '' }); }
+
+  askAccept() {
+    const a = this.findOffer(this.state.respondId); if (!a) return;
+    this.setState({ confirm: { kind: 'accept', title: `Accept ${this.money(a.offer.amount)}?`, body: 'This reserves the vehicle and automatically declines the other offers on this listing.', cta: 'Accept & reserve', destructive: false } });
+  }
+  askDecline() {
+    this.setState({ confirm: { kind: 'decline', title: 'Decline this offer?', body: 'The buyer will be notified that their offer wasn\u2019t accepted. This can\u2019t be undone.', cta: 'Decline offer', destructive: true } });
+  }
+  doConfirm() {
+    const c = this.state.confirm; if (!c) return;
+    if (c.kind === 'accept') {
+      this.setState({ confirm: null, respondSuccess: true });
+      clearTimeout(this._succ);
+      this._succ = setTimeout(() => { this.setState({ respondId: null, respondSuccess: false }); this.fireToast('success', 'Vehicle reserved', 'A purchase request has been created from this offer.'); }, 1400);
+    } else if (c.kind === 'decline') {
+      this.setState({ confirm: null, respondId: null });
+      this.fireToast('success', 'Offer declined', 'The buyer has been notified.');
+    } else if (c.kind === 'acceptCounter') {
+      this.setState({ confirm: null });
+      this.fireToast('success', 'Counter accepted', 'The vehicle is reserved for you. Check your requests to continue.');
+    }
+  }
+
+  moFloor() { return 15000000; }
+  moAsking() { return 18500000; }
+  onMoAmountVal(v) { this.setState({ moAmount: v.replace(/[^\d]/g, '').slice(0, 12), moError: false }); }
+  moDoSubmit() {
+    const amt = +this.state.moAmount;
+    if (!amt) return;
+    if (amt < this.moFloor()) { this.setState({ moError: true, moState: 'custom' }); return; }
+    this.setState({ moSubmitting: true, moError: false });
+    setTimeout(() => { this.setState({ moSubmitting: false }); this.fireToast('success', 'Offer submitted', 'The owner has 48 hours to respond. We\u2019ll notify you.'); }, 1100);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const isOwner = s.surface === 'owner', isCustomer = s.surface === 'customer', isMakeOffer = s.surface === 'makeoffer';
+    const isPublicCar = s.surface === 'publicCar', isOwnerCar = s.surface === 'ownerCar', isOwnerDash = s.surface === 'ownerDash', isCustReq = s.surface === 'custReq', isNotifPage = s.surface === 'notifications';
+    const desktop = s.viewport === 'desktop';
+    const navBg = (v) => s.surface === v ? 'var(--brand-navy)' : 'transparent';
+    const navColor = (v) => s.surface === v ? 'var(--white)' : 'var(--ink-700)';
+
+    // ---- owner data ----
+    let raw = this.cars();
+    if (s.incoming) raw = raw.map(c => c.id === 'A' ? { ...c, offers: [this.incomingOffer(), ...c.offers] } : c);
+
+    const pendingCount = raw.reduce((n, c) => n + c.offers.filter(o => o.status === 'pending').length, 0);
+    const counteredCount = raw.reduce((n, c) => n + c.offers.filter(o => o.status === 'countered').length, 0);
+    const totalLive = raw.reduce((n, c) => n + c.offers.filter(o => o.status === 'pending' || o.status === 'countered').reduce((a, o) => a + o.amount, 0), 0);
+    const accepted = 2;
+
+    const statCards = [
+      { label: 'Pending', value: String(Math.round(pendingCount * s.countP)), sub: 'Awaiting your response', color: 'var(--brand-navy)', bg: 'var(--brand-navy-soft)', icon: 'ph ph-hourglass-medium' },
+      { label: 'Countered', value: String(Math.round(counteredCount * s.countP)), sub: 'Awaiting the buyer', color: 'var(--warning-ink)', bg: 'var(--warning-bg)', icon: 'ph ph-arrows-left-right' },
+      { label: 'Accepted', value: String(Math.round(accepted * s.countP)), sub: 'This month', color: 'var(--success)', bg: 'var(--success-bg)', icon: 'ph ph-check-circle' },
+      { label: 'Live offer value', value: this.money(totalLive * s.countP), sub: 'Across live offers', color: 'var(--brand-orange-2)', bg: 'var(--peach-bg)', icon: 'ph ph-currency-ngn' },
+    ];
+
+    // filter + sort
+    const carTitle = { A: '2021 Toyota Camry XSE', B: '2019 Mercedes-Benz GLE 350', C: '2022 Lexus RX 350 F-Sport' };
+    const ALLST = [
+      { key: 'pending', label: 'Pending' }, { key: 'countered', label: 'Countered' }, { key: 'accepted', label: 'Accepted' },
+      { key: 'rejected', label: 'Rejected' }, { key: 'expired', label: 'Expired' }, { key: 'withdrawn', label: 'Withdrawn' }, { key: 'closed', label: 'Closed' },
+    ];
+    const statusChips = ALLST.map(st => {
+      const on = s.filterStatuses.includes(st.key);
+      return { key: st.key, label: st.label, onToggle: () => this.toggleStatus(st.key),
+        bg: on ? 'var(--brand-navy)' : 'var(--white)', color: on ? 'var(--white)' : 'var(--ink-700)', border: on ? 'var(--brand-navy)' : 'var(--line-200)' };
+    });
+
+    let groups = raw;
+    if (s.filterCar !== 'all') groups = groups.filter(c => c.id === s.filterCar);
+    if (s.filterStatuses.length) groups = groups.map(c => ({ ...c, offers: c.offers.filter(o => s.filterStatuses.includes(o.status)) }));
+    groups = groups.filter(c => c.offers.length);
+
+    const sortFn = {
+      newest: (a, b) => a.agoMin - b.agoMin,
+      highest: (a, b) => b.amount - a.amount,
+      expiring: (a, b) => a.expMin - b.expMin,
+    }[s.sort];
+
+    const groupsOut = groups.map(c => {
+      const live = c.offers.filter(o => o.status === 'pending' || o.status === 'countered');
+      const bestAmt = live.length ? Math.max(...live.map(o => o.amount)) : -1;
+      let bestUsed = false;
+      const offers = [...c.offers].sort(sortFn).map((o, i) => {
+        const d = this.delta(o.amount, c.asking), cd = this.cd(o.expMin);
+        const isBest = !bestUsed && o.amount === bestAmt && (o.status === 'pending' || o.status === 'countered');
+        if (isBest) bestUsed = true;
+        return {
+          id: o.id, name: o.name, initials: this.initials(o.name), ago: o.ago,
+          amountFmt: this.money(o.amount), deltaText: d.text, deltaColor: d.color,
+          cdText: cd.text, cdColor: cd.color, best: isBest,
+          awaiting: o.status === 'countered', canRespond: o.status === 'pending',
+          onRespond: () => this.openRespond(o.id),
+          rowAnim: o.incoming ? 'pulseBg 1.2s ease 1, rowIn .3s ease both' : `rowIn .3s ease ${Math.min(i, 6) * 40}ms both`,
+        };
+      });
+      return { id: c.id, title: c.title, askingFmt: this.money(c.asking), countLabel: c.offers.length + (c.offers.length === 1 ? ' offer' : ' offers'), offers };
+    });
+
+    // active filter pills
+    const activePills = [];
+    if (s.filterCar !== 'all') activePills.push({ label: carTitle[s.filterCar], onRemove: () => this.setState({ filterCar: 'all' }) });
+    s.filterStatuses.forEach(k => { const st = ALLST.find(x => x.key === k); activePills.push({ label: st.label, onRemove: () => this.toggleStatus(k) }); });
+    const hasFilters = activePills.length > 0;
+    const mFilterCount = (s.filterCar !== 'all' ? 1 : 0) + s.filterStatuses.length;
+
+    // ---- respond sheet ----
+    const active = s.respondId ? this.findOffer(s.respondId) : null;
+    let respondData = {};
+    if (active) {
+      const o = active.offer, c = active.car, d = this.delta(o.amount, c.asking);
+      respondData = {
+        activeCarTitle: c.title, activeAskingFmt: this.money(c.asking),
+        activeName: o.name, activeInitials: this.initials(o.name), activeAgo: o.ago,
+        activeAmountFmt: this.money(o.amount), activeDeltaText: d.text, activeDeltaColor: d.color,
+        activeHasMsg: !!o.message, activeMessage: o.message,
+        activeMinFmt: this.money(c.min), activeMaxFmt: this.money(c.max),
+      };
+    }
+    const counterDefault = active ? Math.round((active.offer.amount + active.car.asking) / 2) : 0;
+    const counterVal = s.counterAmount || String(counterDefault);
+
+    // ---- customer data ----
+    const active_offers = [
+      { id: 'm1', title: '2019 Mercedes-Benz GLE 350', yours: 16000000, kind: 'countered', counter: 17500000, expMin: 2400 },
+      { id: 'm2', title: '2021 Toyota Camry XSE', yours: 17000000, kind: 'pending', expMin: 2832 },
+      { id: 'm3', title: '2022 Lexus RX 350 F-Sport', yours: 52000000, kind: 'pending', expMin: 300 },
+    ];
+    const closed_offers = [
+      { id: 'm4', title: '2020 Honda Accord Sport', yours: 9000000, kind: 'expired', statusLabel: 'Expired' },
+      { id: 'm5', title: '2018 Toyota Corolla LE', yours: 6500000, kind: 'declined', statusLabel: 'Declined' },
+      { id: 'm6', title: '2021 Kia Sportage EX', yours: 22000000, kind: 'sold', statusLabel: 'Closed — vehicle sold' },
+    ];
+    const chip = (kind) => ({
+      countered: { bg: 'var(--warning-bg)', color: 'var(--warning-ink)', label: 'Countered' },
+      pending: { bg: 'var(--brand-navy-soft)', color: 'var(--brand-navy)', label: 'Pending' },
+      expired: { bg: 'var(--surface-muted)', color: 'var(--ink-500)', label: 'Expired' },
+      declined: { bg: 'rgb(253,235,235)', color: 'var(--danger-2)', label: 'Declined' },
+      sold: { bg: 'var(--surface-muted)', color: 'var(--ink-500)', label: 'Closed — vehicle sold' },
+    }[kind]);
+    const custRaw = s.custTab === 'active' ? active_offers : closed_offers;
+    const custList = custRaw.map(o => {
+      const cd = o.expMin != null ? this.cd(o.expMin) : { text: '', color: 'var(--ink-500)' };
+      const c = chip(o.kind);
+      const closed = o.kind === 'expired' || o.kind === 'declined' || o.kind === 'sold';
+      return {
+        id: o.id, title: o.title, yourOfferFmt: this.money(o.yours),
+        cdText: closed ? '' : cd.text, cdColor: cd.color,
+        statusLabel: c.label, statusBg: c.bg, statusColor: c.color,
+        isCountered: o.kind === 'countered', counterFmt: o.counter ? this.money(o.counter) : '',
+        isPlain: o.kind !== 'countered',
+        amountColor: o.kind === 'sold' ? 'var(--ink-500)' : 'var(--ink-900)',
+        explain: o.kind === 'sold' ? 'Another buyer\u2019s offer was accepted.' : '',
+        showBrowse: o.kind === 'sold', browseHref: '/cars?body_type=sedan',
+        showWithdraw: o.kind === 'pending', closed,
+        opacity: closed ? '.7' : '1',
+        leftBorder: o.kind === 'countered' ? '4px solid var(--warning)' : '1px solid var(--line-200)',
+        thumbW: desktop ? '200px' : '120px',
+        onWithdraw: () => this.fireToast('success', 'Offer withdrawn', 'Your offer has been withdrawn.'),
+        onAcceptCounter: () => this.setState({ confirm: { kind: 'acceptCounter', title: `Accept ${this.money(o.counter)}?`, body: 'This closes the negotiation and reserves the vehicle for you.', cta: 'Accept counter', destructive: false } }),
+        onDeclineCounter: () => this.fireToast('success', 'Counter declined', 'The negotiation on this vehicle is now closed.'),
+      };
+    });
+
+    // ---- make offer ----
+    const moAsking = this.moAsking();
+    const moPicks = [
+      { label: '−5%', onPick: () => this.onMoAmountVal(String(Math.round(moAsking * 0.95))) },
+      { label: '−10%', onPick: () => this.onMoAmountVal(String(Math.round(moAsking * 0.90))) },
+      { label: 'Asking price', onPick: () => this.onMoAmountVal(String(moAsking)) },
+    ];
+    const moLen = s.moMsg.length;
+
+    // ==== new surfaces ====
+    const tgl = (active, val) => ({ bg: active === val ? 'var(--brand-navy)' : 'transparent', color: active === val ? 'var(--white)' : 'var(--ink-700)' });
+    const ownerChip = (st) => ({ pending: { bg: 'var(--brand-navy-soft)', color: 'var(--brand-navy)', label: 'Pending' }, countered: { bg: 'var(--warning-bg)', color: 'var(--warning-ink)', label: 'Countered' } }[st] || { bg: 'var(--surface-muted)', color: 'var(--ink-500)', label: st });
+
+    // public car detail
+    const pcToggles = [
+      { label: 'No offer yet', onPick: () => this.setState({ pcState: 'available' }), ...tgl(s.pcState, 'available') },
+      { label: 'Live offer', onPick: () => this.setState({ pcState: 'live' }), ...tgl(s.pcState, 'live') },
+      { label: 'Limit reached', onPick: () => this.setState({ pcState: 'limit' }), ...tgl(s.pcState, 'limit') },
+    ];
+    const pcSpecs = [ { k: 'Body type', v: 'Sedan' }, { k: 'Year', v: '2021' }, { k: 'Mileage', v: '38,000 km' }, { k: 'Transmission', v: 'Automatic' } ];
+    const pcLiveCdObj = this.cd(2472);
+
+    // owner car detail
+    const ocCar = this.cars()[0];
+    const ocOffers = [...ocCar.offers].sort((a, b) => b.amount - a.amount).slice(0, 3).map(o => {
+      const d = this.delta(o.amount, ocCar.asking), cd = this.cd(o.expMin), ch = ownerChip(o.status);
+      return { initials: this.initials(o.name), name: o.name, ago: o.ago, amountFmt: this.money(o.amount), deltaText: d.text, deltaColor: d.color, cdText: cd.text, cdColor: cd.color, statusBg: ch.bg, statusColor: ch.color, statusLabel: ch.label };
+    });
+    const ocEmpty = s.ocState === 'empty';
+    const ocCount = ocCar.offers.length;
+    const ocToggles = [ { label: 'With offers', onPick: () => this.setState({ ocState: 'offers' }), ...tgl(s.ocState, 'offers') }, { label: 'No offers yet', onPick: () => this.setState({ ocState: 'empty' }), ...tgl(s.ocState, 'empty') } ];
+    const ocTimeline = [
+      { icon: 'ph-fill ph-check', label: 'Listed', dotBg: 'var(--success-bg)', dotColor: 'var(--success)', labelColor: 'var(--ink-900)', line: true, flex: '1 1 auto' },
+      { icon: 'ph-fill ph-eye', label: 'Receiving offers', dotBg: 'var(--brand-navy-soft)', dotColor: 'var(--brand-navy)', labelColor: 'var(--ink-900)', line: true, flex: '1 1 auto' },
+      { icon: 'ph ph-flag', label: 'Sold', dotBg: 'var(--surface-muted)', dotColor: 'var(--ink-400)', labelColor: 'var(--ink-500)', line: false, flex: '0 0 auto' },
+    ];
+
+    // owner dashboard
+    const odToggles = [ { label: 'With offers', onPick: () => this.setState({ odState: 'data' }), ...tgl(s.odState, 'data') }, { label: 'No offers', onPick: () => this.setState({ odState: 'empty' }), ...tgl(s.odState, 'empty') } ];
+    const dashEmpty = s.odState === 'empty';
+    const recentSrc = [
+      { name: 'Ngozi Eze', car: '2022 Lexus RX 350 F-Sport', amount: 17500000, ago: '2m ago', st: 'pending' },
+      { name: 'Chidera Okafor', car: '2021 Toyota Camry XSE', amount: 17000000, ago: '2h ago', st: 'pending' },
+      { name: 'Emeka Nwosu', car: '2019 Mercedes-Benz GLE 350', amount: 40500000, ago: '3h ago', st: 'pending' },
+      { name: 'Blessing Adeyemi', car: '2021 Toyota Camry XSE', amount: 15500000, ago: '5h ago', st: 'countered' },
+      { name: 'Musa Ibrahim', car: '2021 Toyota Camry XSE', amount: 16000000, ago: '6h ago', st: 'pending' },
+    ];
+    const recentRows = dashEmpty ? [] : recentSrc.map(r => { const ch = ownerChip(r.st); return { initials: this.initials(r.name), name: r.name, car: r.car, amountFmt: this.money(r.amount), ago: r.ago, statusBg: ch.bg, statusColor: ch.color, statusLabel: ch.label }; });
+    const odCount = dashEmpty ? '0' : '7';
+    const odVehicles = dashEmpty ? '0' : '3';
+
+    // customer request detail
+    const crToggles = [ { label: 'Accepted directly', onPick: () => this.setState({ crState: 'direct' }), ...tgl(s.crState, 'direct') }, { label: 'Accepted after counter', onPick: () => this.setState({ crState: 'countered' }), ...tgl(s.crState, 'countered') } ];
+    const crCountered = s.crState === 'countered';
+    const crSteps = [
+      { icon: 'ph-fill ph-handshake', label: 'Offer accepted', meta: '22 Jul · 10:24 AM', dotBg: 'var(--success-bg)', dotColor: 'var(--success)', labelColor: 'var(--ink-900)', line: true, pad: '22px' },
+      { icon: 'ph-fill ph-check', label: 'Request created', meta: '22 Jul · 10:24 AM', dotBg: 'var(--success-bg)', dotColor: 'var(--success)', labelColor: 'var(--ink-900)', line: true, pad: '22px' },
+      { icon: 'ph ph-credit-card', label: 'Proceed to payment', meta: 'Awaiting your payment', dotBg: 'var(--brand-navy-soft)', dotColor: 'var(--brand-navy)', labelColor: 'var(--ink-900)', line: true, pad: '22px' },
+      { icon: 'ph ph-key', label: 'Ownership transfer', meta: 'Pending', dotBg: 'var(--surface-muted)', dotColor: 'var(--ink-400)', labelColor: 'var(--ink-500)', line: false, pad: '0' },
+    ];
+
+    // notifications
+    const tintMap = { success: { bg: 'var(--success-bg)', color: 'var(--success)' }, danger: { bg: 'rgb(253,235,235)', color: 'var(--danger-2)' }, neutral: { bg: 'var(--surface-muted)', color: 'var(--ink-700)' } };
+    const notifsDef = [
+      { icon: 'ph ph-paper-plane-tilt', tint: 'neutral', text: 'Your offer of ₦17,000,000 on 2021 Toyota Camry XSE was submitted', time: '2m ago', unread: true, target: 'customer' },
+      { icon: 'ph ph-hand-coins', tint: 'neutral', text: 'New offer of ₦17,500,000 on 2022 Lexus RX 350 F-Sport', time: '18m ago', unread: true, target: 'owner' },
+      { icon: 'ph ph-arrows-left-right', tint: 'neutral', text: 'The owner countered with ₦17,500,000', time: '1h ago', unread: true, target: 'customer' },
+      { icon: 'ph-fill ph-check-circle', tint: 'success', text: 'Your offer on 2021 Toyota Camry XSE was accepted', time: '3h ago', unread: true, target: 'custReq' },
+      { icon: 'ph-fill ph-x-circle', tint: 'danger', text: 'Your offer on 2020 Honda Accord Sport was declined', time: '5h ago', unread: false, target: 'publicCar' },
+      { icon: 'ph-fill ph-check-circle', tint: 'success', text: 'Blessing Adeyemi accepted your counter-offer', time: 'Yesterday', unread: false, target: 'custReq' },
+      { icon: 'ph-fill ph-x-circle', tint: 'danger', text: 'Musa Ibrahim declined your counter-offer', time: 'Yesterday', unread: false, target: 'owner' },
+      { icon: 'ph ph-clock', tint: 'neutral', text: 'Your offer on 2018 Toyota Corolla LE expired', time: '2d ago', unread: false, target: 'publicCar' },
+      { icon: 'ph ph-car-profile', tint: 'neutral', text: '2021 Kia Sportage EX is no longer available', time: '3d ago', unread: false, target: 'publicCar' },
+    ];
+    const notifRows = notifsDef.map(n => { const t = tintMap[n.tint]; const unread = n.unread && !s.notifRead; return { icon: n.icon, text: n.text, time: n.time, unread, iconBg: t.bg, iconColor: t.color, rowBg: unread ? 'rgba(0,0,139,0.035)' : 'var(--white)', onOpen: () => this.setState({ surface: n.target, notifOpen: false }) }; });
+    const liveUnread = s.notifRead ? 0 : notifsDef.filter(n => n.unread).length;
+    const notifUnread = liveUnread > 0;
+    const notifSub = liveUnread > 0 ? `${liveUnread} unread` : 'You’re all caught up.';
+
+    // ---- confirm ----
+    const cf = s.confirm;
+
+    return {
+      // nav
+      goOwner: () => this.setState({ surface: 'owner', respondId: null, confirm: null, mFiltersOpen: false }), goCustomer: () => this.setState({ surface: 'customer', respondId: null, confirm: null, mFiltersOpen: false }), goMakeOffer: () => this.setState({ surface: 'makeoffer', respondId: null, confirm: null, mFiltersOpen: false }),
+      isOwner, isCustomer, isMakeOffer,
+      navOwnerBg: navBg('owner'), navOwnerColor: navColor('owner'),
+      navCustomerBg: navBg('customer'), navCustomerColor: navColor('customer'),
+      navMakeBg: navBg('makeoffer'), navMakeColor: navColor('makeoffer'),
+      showViewportToggle: isOwner || isCustomer,
+      setDesktop: () => this.setState({ viewport: 'desktop' }), setMobile: () => this.setState({ viewport: 'mobile' }),
+      vpDeskBg: desktop ? 'var(--white)' : 'transparent', vpDeskColor: desktop ? 'var(--brand-navy)' : 'var(--ink-500)',
+      vpMobBg: !desktop ? 'var(--white)' : 'transparent', vpMobColor: !desktop ? 'var(--brand-navy)' : 'var(--ink-500)',
+      ownerDesktop: isOwner && desktop && !s.loading, ownerMobile: isOwner && !desktop && !s.loading,
+      ownerSkeleton: isOwner && desktop && s.loading,
+
+      // owner
+      subtitle: pendingCount > 0 ? `${pendingCount} ${pendingCount === 1 ? 'offer' : 'offers'} awaiting your response.` : 'You\u2019re all caught up.',
+      statCards, groups: groupsOut, ownerEmpty: groupsOut.length === 0,
+      filterCar: s.filterCar, onFilterCar: (e) => this.setState({ filterCar: e.target.value }),
+      statusChips, sortValue: s.sort, onSort: (e) => this.setState({ sort: e.target.value }),
+      activePills, hasFilters, clearAll: () => this.setState({ filterCar: 'all', filterStatuses: [] }),
+      mFilterCountLabel: mFilterCount ? ` (${mFilterCount})` : '',
+      simIncoming: () => this.setState({ incoming: true, showPill: true }),
+      showPill: s.showPill, dismissPill: () => this.setState({ showPill: false }),
+      openMFilters: () => this.setState({ mFiltersOpen: true }), closeMFilters: () => this.setState({ mFiltersOpen: false }), mFiltersOpen: s.mFiltersOpen,
+
+      // respond sheet
+      respondOpen: !!active, closeRespond: () => this.setState({ respondId: null }), stop: (e) => e.stopPropagation(),
+      respondSuccess: s.respondSuccess, respondForm: !s.respondSuccess,
+      ...respondData,
+      toggleCounter: () => this.setState({ counterOpen: !s.counterOpen }),
+      counterBtnLabel: s.counterOpen ? 'Cancel counter' : 'Counter offer',
+      counterRows: s.counterOpen ? '1fr' : '0fr', counterOpacity: s.counterOpen ? 1 : 0,
+      counterAmountFmt: this.fmt(counterVal), onCounterAmount: (e) => this.setState({ counterAmount: e.target.value.replace(/[^\d]/g, '').slice(0, 12) }),
+      sendCounter: () => { this.setState({ respondId: null, counterOpen: false }); this.fireToast('success', 'Counter sent', 'The buyer has 48 hours to accept or decline your counter.'); },
+      askAccept: () => this.askAccept(), askDecline: () => this.askDecline(),
+
+      // confirm
+      confirmOpen: !!cf, closeConfirm: () => this.setState({ confirm: null }), doConfirm: () => this.doConfirm(),
+      confirmTitle: cf && cf.title, confirmBody: cf && cf.body, confirmCta: cf && cf.cta,
+      confirmCtaBg: cf && cf.destructive ? 'var(--danger)' : 'var(--brand-navy)',
+      confirmIcon: cf && cf.destructive ? 'ph-fill ph-warning' : 'ph-fill ph-check-circle',
+      confirmIconBg: cf && cf.destructive ? 'rgb(253,235,235)' : 'var(--success-bg)',
+      confirmIconColor: cf && cf.destructive ? 'var(--danger-2)' : 'var(--success)',
+
+      // customer
+      custTab: s.custTab, setActive: () => this.setState({ custTab: 'active' }), setClosed: () => this.setState({ custTab: 'closed' }),
+      custActiveSel: s.custTab === 'active', custClosedSel: s.custTab === 'closed',
+      custPill: s.custTab === 'active' ? 'translateX(0)' : 'translateX(100%)',
+      custActiveColor: s.custTab === 'active' ? 'var(--white)' : 'var(--ink-700)', custClosedColor: s.custTab === 'closed' ? 'var(--white)' : 'var(--ink-700)',
+      custList, custEmpty: custList.length === 0,
+      custMaxWidth: desktop ? '760px' : '400px', custPad: desktop ? '28px 28px 96px' : '20px 16px 96px', custTitleSize: desktop ? '32px' : '26px',
+
+      // make offer
+      moCarTitle: '2021 Toyota Camry XSE', moAskingFmt: this.money(moAsking),
+      moAmountFmt: this.fmt(s.moAmount), onMoAmount: (e) => this.onMoAmountVal(e.target.value),
+      moPicks, moBorder: s.moError ? 'var(--danger)' : 'var(--line-200)',
+      moError: s.moError,
+      moMsg: s.moMsg, onMoMsg: (e) => this.setState({ moMsg: e.target.value.slice(0, 400) }),
+      moCount: `${moLen}/400`, moCountColor: moLen >= 350 ? 'var(--warning-ink)' : 'var(--ink-500)',
+      moRemaining: '2 of 3 remaining.',
+      moSubmitting: s.moSubmitting, moIdle: !s.moSubmitting, moCursor: s.moSubmitting ? 'default' : 'pointer',
+      moSubmit: () => this.moDoSubmit(),
+      setMoEmpty: () => this.setState({ moState: 'empty', moAmount: '', moMsg: '', moError: false }),
+      setMoFilled: () => this.setState({ moState: 'filled', moAmount: '17000000', moMsg: 'Hi, I can complete the purchase this week and cover the transfer paperwork.', moError: false }),
+      setMoBelow: () => this.setState({ moState: 'below', moAmount: '12000000', moError: true }),
+      moEmptyBg: s.moState === 'empty' ? 'var(--brand-navy)' : 'transparent', moEmptyColor: s.moState === 'empty' ? 'var(--white)' : 'var(--ink-700)',
+      moFilledBg: s.moState === 'filled' ? 'var(--brand-navy)' : 'transparent', moFilledColor: s.moState === 'filled' ? 'var(--white)' : 'var(--ink-700)',
+      moBelowBg: s.moState === 'below' ? 'var(--brand-navy)' : 'transparent', moBelowColor: s.moState === 'below' ? 'var(--white)' : 'var(--ink-700)',
+
+      // surface picker
+      surfaceSel: s.surface, onSurface: (e) => this.setState({ surface: e.target.value, respondId: null, confirm: null, mFiltersOpen: false, notifOpen: false }),
+      isPublicCar, isOwnerCar, isOwnerDash, isCustReq, isNotifPage,
+      showLoadingToggle: (isOwner && desktop) || isCustomer,
+      toggleLoading: () => this.setState({ loading: !s.loading }),
+      loadingBg: s.loading ? 'var(--brand-navy)' : 'var(--white)', loadingColor: s.loading ? 'var(--white)' : 'var(--ink-700)', loadingBorder: s.loading ? 'var(--brand-navy)' : 'var(--line-200)',
+      custReal: isCustomer && !s.loading, custSkeleton: isCustomer && s.loading,
+      sk2: [0, 1], sk3: [0, 1, 2], sk4: [0, 1, 2, 3],
+
+      // notifications
+      notifOpen: s.notifOpen, toggleNotif: () => this.setState({ notifOpen: !s.notifOpen }), closeNotif: () => this.setState({ notifOpen: false }),
+      goNotifPage: () => this.setState({ surface: 'notifications', notifOpen: false }),
+      markAllRead: () => this.setState({ notifRead: true }), notifRows, notifUnread, notifSub,
+
+      // public car
+      pcToggles, pcSpecs, pcAvailable: s.pcState === 'available', pcLive: s.pcState === 'live', pcLimit: s.pcState === 'limit',
+      pcLiveCd: pcLiveCdObj.text, pcLiveCdColor: pcLiveCdObj.color,
+
+      // owner car
+      ocToggles, ocOffers, ocEmpty, ocHasOffers: !ocEmpty, ocCount, ocViewAllLabel: `View all ${ocCount} offers`,
+      ocMinFmt: this.money(ocCar.min), ocMaxFmt: this.money(ocCar.max), ocTimeline,
+      ocViewAll: (e) => { e.preventDefault(); this.setState({ surface: 'owner', filterCar: 'A' }); },
+
+      // owner dashboard
+      odToggles, odCount, odVehicles, recentRows, dashEmpty,
+      goOwnerHub: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ surface: 'owner' }); },
+
+      // customer request
+      crToggles, crCountered, crSteps,
+
+      // toast
+      toast: s.toast, closeToast: () => this.setState({ toast: null }),
+      toastTitle: s.toast && s.toast.title, toastMsg: s.toast && s.toast.msg,
+      toastAccent: s.toast && s.toast.type === 'success' ? 'var(--success)' : 'var(--danger)',
+      toastIcon: s.toast && s.toast.type === 'success' ? 'ph-fill ph-check-circle' : 'ph-fill ph-warning-circle',
+    };
+  }
+}
+</script>
+</body>
+</html>

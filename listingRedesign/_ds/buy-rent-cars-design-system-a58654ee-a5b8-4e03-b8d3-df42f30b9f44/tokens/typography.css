@@ -1,0 +1,42 @@
+/* Buy & Rent Cars — Typography tokens
+   Font families and the type scale observed in the source Figma.
+   Manrope is the workhorse (body + most UI). Lexend carries big
+   display headings (ExtraBold/Black). Geist appears on small badge
+   labels; Archivo on some button labels. */
+
+:root {
+  /* ---- Families ---- */
+  --font-body:    'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Lexend', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-label:   'Geist', 'Manrope', -apple-system, sans-serif;
+  --font-alt:     'Archivo', 'Manrope', -apple-system, sans-serif;
+
+  /* ---- Weights ---- */
+  --fw-regular:  400; /* @kind other */
+  --fw-medium:   500; /* @kind other */
+  --fw-semibold: 600; /* @kind other */
+  --fw-bold:     700; /* @kind other */
+  --fw-extra:    800; /* @kind other */
+  --fw-black:    900; /* @kind other */
+
+  /* ---- Type scale (px, verbatim from source) ---- */
+  --fs-display:   64px;  /* Lexend ExtraBold hero */
+  --fs-h1:        48px;  /* Lexend / Manrope ExtraBold */
+  --fs-h2:        32px;  /* Manrope Bold section headings */
+  --fs-h3:        24px;  /* Manrope Bold card price / subhead */
+  --fs-lg:        20px;
+  --fs-body:      16px;  /* Manrope Regular default */
+  --fs-sm:        14px;  /* Manrope Regular UI text, button labels */
+  --fs-xs:        12px;  /* captions, badges, meta */
+  --fs-2xs:       10px;
+
+  /* ---- Line heights (from source) ---- */
+  --lh-tight:   1.0;   /* @kind other */
+  --lh-snug:    1.2;   /* @kind other */
+  --lh-ui:      1.4;   /* @kind other */
+  --lh-body:    1.5;   /* @kind other */
+
+  /* ---- Semantic aliases ---- */
+  --text-display-font: var(--font-display);
+  --text-body-font:    var(--font-body);
+}
