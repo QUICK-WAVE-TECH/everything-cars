@@ -351,3 +351,53 @@ class CustomerRespondTest(APITestCase):
         self.assertEqual(
             Offer.objects.filter(car=self.car, customer=self.customer).count(), 1
         )
+
+
+class ExpiryTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("t6-owner@test.com", "owner")
+        self.customer = create_user("t6-cust@test.com")
+        self.car = create_negotiable_car(self.owner)
+        self.offer = Offer.objects.create(
+            car=self.car,
+            customer=self.customer,
+            amount="16500000.00",
+            currency="NGN",
+            expires_at=timezone.now() - timedelta(minutes=1),
+        )
+
+    def test_stale_pending_offer_reports_expired(self):
+        self.assertTrue(self.offer.is_expired)
+
+    def test_expired_offer_cannot_be_accepted_even_while_stored_pending(self):
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.post(
+            f"/api/v1/offers/offers/{self.offer.id}/respond",
+            {"action": "accept"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400)
+        self.offer.refresh_from_db()
+        self.assertNotEqual(self.offer.status, OfferStatus.ACCEPTED)
+
+    def test_command_flips_and_is_idempotent(self):
+        from django.core.management import call_command
+
+        call_command("expire_offers")
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status, OfferStatus.EXPIRED)
+        call_command("expire_offers")  # second run must be a no-op
+
+    def test_command_leaves_live_offers_alone(self):
+        live = Offer.objects.create(
+            car=self.car,
+            customer=create_user("t6-b@test.com"),
+            amount="16600000.00",
+            currency="NGN",
+            expires_at=timezone.now() + timedelta(hours=10),
+        )
+        from django.core.management import call_command
+
+        call_command("expire_offers")
+        live.refresh_from_db()
+        self.assertEqual(live.status, OfferStatus.PENDING)
