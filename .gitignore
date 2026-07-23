@@ -58,3 +58,12 @@ back images/
 
 # RSA JWT keys (never commit)
 *.pem
+
+# Claude Design prototypes / exports — kept locally, never pushed
+/listingRedesign/
+/_ds/
+/assets/
+/*.dc.html
+/Listing redesign prototype.zip
+/.thumbnail
+/support.js
