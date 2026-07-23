@@ -302,3 +302,52 @@ class AcceptOfferTest(APITestCase):
         self._accept()
         # rival_offer is superseded; accepting it must fail
         self.assertEqual(self._accept(self.rival_offer).status_code, 400)
+
+
+class CustomerRespondTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("t5-owner@test.com", "owner")
+        self.customer = create_user("t5-cust@test.com")
+        self.car = create_negotiable_car(self.owner)
+        self.offer = Offer.objects.create(
+            car=self.car,
+            customer=self.customer,
+            amount="16500000.00",
+            currency="NGN",
+            expires_at=timezone.now() + timedelta(hours=48),
+        )
+        self.client.force_authenticate(user=self.customer)
+
+    def _post(self, path, **payload):
+        return self.client.post(
+            f"/api/v1/offers/offers/{self.offer.id}/{path}", payload, format="json"
+        )
+
+    def _make_countered(self):
+        self.offer.status = OfferStatus.COUNTERED
+        self.offer.counter_amount = "17500000.00"
+        self.offer.save(update_fields=["status", "counter_amount"])
+
+    def test_customer_declines_counter(self):
+        self._make_countered()
+        self.assertEqual(self._post("respond", action="reject").status_code, 200)
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status, OfferStatus.REJECTED)
+
+    def test_customer_cannot_respond_before_a_counter(self):
+        self.assertEqual(self._post("respond", action="accept").status_code, 400)
+
+    def test_withdraw_while_pending(self):
+        self.assertEqual(self._post("withdraw").status_code, 200)
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status, OfferStatus.WITHDRAWN)
+
+    def test_cannot_withdraw_after_a_counter(self):
+        self._make_countered()
+        self.assertEqual(self._post("withdraw").status_code, 400)
+
+    def test_withdrawn_offer_still_counts_toward_the_cap(self):
+        self._post("withdraw")
+        self.assertEqual(
+            Offer.objects.filter(car=self.car, customer=self.customer).count(), 1
+        )

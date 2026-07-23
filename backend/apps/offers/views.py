@@ -12,7 +12,7 @@ from apps.listings.models import Car
 from .models import Offer
 from .serializers import OfferCreateSerializer, OfferSerializer
 from .serializers import OfferRespondSerializer
-from .services import customer_respond, owner_respond
+from .services import customer_respond, owner_respond, withdraw_offer
 
 
 class CarOfferCreateView(APIView):
@@ -69,4 +69,20 @@ class OfferRespondView(APIView):
                 {"detail": str(exc.message)}, status=status.HTTP_400_BAD_REQUEST
             )
 
+        return Response(OfferSerializer(offer, context={"request": request}).data)
+
+
+class OfferWithdrawView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, offer_id):
+        offer = get_object_or_404(
+            Offer.objects.select_related("car"), id=offer_id, customer=request.user
+        )
+        try:
+            offer = withdraw_offer(offer)
+        except ValidationError as exc:
+            return Response(
+                {"detail": str(exc.message)}, status=status.HTTP_400_BAD_REQUEST
+            )
         return Response(OfferSerializer(offer, context={"request": request}).data)
