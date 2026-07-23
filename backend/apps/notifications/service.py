@@ -627,6 +627,14 @@ def _offer_data(offer):
     }
 
 
+def _money(amount, currency="NGN"):
+    """₦16,500,000 — the sign for NGN, the code otherwise."""
+    if amount is None:
+        return ""
+    symbol = "₦" if currency == "NGN" else f"{currency} "
+    return f"{symbol}{amount:,.0f}"
+
+
 def notify_offer_submitted(offer):
     """Confirm to the buyer that their offer went in."""
     _create_notification(
@@ -635,6 +643,16 @@ def notify_offer_submitted(offer):
         title="Offer submitted",
         message=f"Your offer on {offer.car.title} has been submitted.",
         data=_offer_data(offer),
+    )
+    send_email(
+        recipient=offer.customer.email,
+        subject="Your offer was submitted",
+        template_key="offer_submitted",
+        context={
+            "car_title": offer.car.title,
+            "offer_amount": _money(offer.amount, offer.currency),
+            "action_url": _fe("/customer/offers"),
+        },
     )
 
 
@@ -658,6 +676,16 @@ def notify_offer_countered(offer):
         message=f"The seller sent a counter-offer on {offer.car.title}.",
         data=_offer_data(offer),
     )
+    send_email(
+        recipient=offer.customer.email,
+        subject="The seller sent a counter-offer",
+        template_key="offer_countered",
+        context={
+            "car_title": offer.car.title,
+            "counter_amount": _money(offer.counter_amount, offer.currency),
+            "action_url": _fe("/customer/offers"),
+        },
+    )
 
 
 def notify_offer_accepted(offer):
@@ -669,6 +697,21 @@ def notify_offer_accepted(offer):
         message=f"Your offer on {offer.car.title} was accepted. Proceed to payment.",
         data=_offer_data(offer),
     )
+    # Deep-link straight to the created purchase request when we have it.
+    request_id = getattr(offer, "resulting_request_id", None)
+    action_url = _fe(
+        f"/customer/requests/{request_id}" if request_id else "/customer/offers"
+    )
+    send_email(
+        recipient=offer.customer.email,
+        subject="Your offer was accepted",
+        template_key="offer_accepted",
+        context={
+            "car_title": offer.car.title,
+            "offer_amount": _money(offer.agreed_amount, offer.currency),
+            "action_url": action_url,
+        },
+    )
 
 
 def notify_offer_rejected(offer):
@@ -679,6 +722,16 @@ def notify_offer_rejected(offer):
         title="Offer declined",
         message=f"Your offer on {offer.car.title} was not accepted.",
         data=_offer_data(offer),
+    )
+    send_email(
+        recipient=offer.customer.email,
+        subject="An update on your offer",
+        template_key="offer_rejected",
+        context={
+            "car_title": offer.car.title,
+            "offer_amount": _money(offer.amount, offer.currency),
+            "action_url": _fe("/cars"),
+        },
     )
 
 
@@ -712,6 +765,16 @@ def notify_offer_expired(offer):
         title="Offer expired",
         message=f"Your offer on {offer.car.title} has expired.",
         data=_offer_data(offer),
+    )
+    send_email(
+        recipient=offer.customer.email,
+        subject="Your offer has expired",
+        template_key="offer_expired",
+        context={
+            "car_title": offer.car.title,
+            "offer_amount": _money(offer.amount, offer.currency),
+            "action_url": _fe(f"/cars/{offer.car_id}"),
+        },
     )
 
 
