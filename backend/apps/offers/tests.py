@@ -481,3 +481,27 @@ class OfferNotificationTest(APITestCase):
                 recipient=customer, notification_type="offer_submitted"
             ).exists()
         )
+
+
+class OwnerCarRangeTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("range-owner@test.com", "owner")
+        self.stranger = create_user("range-other@test.com", "owner")
+        self.car = create_negotiable_car(self.owner)
+
+    def _url(self, car=None):
+        return f"/api/v1/offers/cars/{(car or self.car).id}/range"
+
+    def test_owner_sees_their_private_range(self):
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.get(self._url())
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["min_price"], "16000000.00")
+        self.assertEqual(res.data["max_price"], "17000000.00")
+
+    def test_non_owner_gets_404(self):
+        self.client.force_authenticate(user=self.stranger)
+        self.assertEqual(self.client.get(self._url()).status_code, 404)
+
+    def test_anonymous_rejected(self):
+        self.assertIn(self.client.get(self._url()).status_code, (401, 403))

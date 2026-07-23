@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeftRightIcon, CheckCircle2Icon, CheckIcon, TriangleAlertIcon } from "lucide-react";
+import { ArrowLeftRightIcon, CheckCircle2Icon, CheckIcon, LockIcon, TriangleAlertIcon } from "lucide-react";
 
 import { ApiError } from "@/lib/api-client";
-import { useRespondToOffer, type OwnerOffer } from "@/features/offers/api";
+import { useCarRange, useRespondToOffer, type OwnerOffer } from "@/features/offers/api";
 import { agreedAmount, formatOfferAmount } from "@/features/offers/lib/offer-format";
 import { OfferStatusBadge } from "@/features/offers/components/offer-status-badge";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -56,12 +56,15 @@ type OwnerRespondSheetProps = {
 
 /**
  * Right-side sheet where the owner accepts, counters, or declines a single
- * offer. No private-range card here — the list endpoint doesn't return
- * min/max and there's no dedicated endpoint for it yet.
- * TODO: private range needs its own endpoint (Spec D1 follow-up).
+ * offer. The owner's private range is fetched lazily from a dedicated
+ * owner-only endpoint (never part of the offer list payload) and shown only here.
  */
 export function OwnerRespondSheet({ offer, open, onOpenChange }: OwnerRespondSheetProps) {
   const respond = useRespondToOffer(offer?.id ?? "");
+  // Lazily fetch the owner's private range only while the sheet is open.
+  const { data: range } = useCarRange(offer?.car.id ?? "", {
+    enabled: open && !!offer,
+  });
 
   const [mode, setMode] = useState<"form" | "success">("form");
   const [counterOpen, setCounterOpen] = useState(false);
@@ -205,6 +208,25 @@ export function OwnerRespondSheet({ offer, open, onOpenChange }: OwnerRespondShe
                     </div>
                   ) : null}
                 </div>
+
+                {/* The owner's private range — only ever shown here, to the owner. */}
+                {range && (range.min_price || range.max_price) ? (
+                  <div className="flex flex-col gap-2 rounded-xl border border-(--brc-primary)/20 bg-(--brc-primary-tint) p-4">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-(--brc-primary) [font-family:var(--brc-font-ui)]">
+                      <LockIcon className="size-3.5" aria-hidden="true" />
+                      Your acceptable range · only visible to you
+                    </div>
+                    <div className="flex items-baseline gap-2 tabular-nums [font-family:var(--brc-font-ui)]">
+                      <span className="text-lg font-extrabold text-(--brc-text)">
+                        {formatOfferAmount(range.min_price, range.currency)}
+                      </span>
+                      <span className="text-(--brc-text-muted)">–</span>
+                      <span className="text-lg font-extrabold text-(--brc-text)">
+                        {formatOfferAmount(range.max_price, range.currency)}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
 
                 {isAwaitingBuyer ? (
                   <div className="rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle) p-4 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">

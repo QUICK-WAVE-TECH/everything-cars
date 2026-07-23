@@ -161,3 +161,31 @@ class OwnerOfferListView(APIView):
             page, many=True, context={"request": request}
         )
         return paginator.get_paginated_response(serializer.data)
+
+
+class OwnerCarRangeView(APIView):
+    """The owner's private acceptable range for one of their cars.
+
+    Kept out of the offer list/sheet payloads on purpose (a buyer must never see
+    it); the owner fetches it here, lazily, when a respond sheet opens. 404 for
+    anyone who is not the car's owner — we don't confirm the car exists.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, car_id):
+        car = get_object_or_404(Car, id=car_id, owner=request.user)
+        return Response(
+            {
+                "min_price": (
+                    str(car.min_price) if car.min_price is not None else None
+                ),
+                "max_price": (
+                    str(car.max_price) if car.max_price is not None else None
+                ),
+                "sale_price": (
+                    str(car.sale_price) if car.sale_price is not None else None
+                ),
+                "currency": car.currency,
+            }
+        )
