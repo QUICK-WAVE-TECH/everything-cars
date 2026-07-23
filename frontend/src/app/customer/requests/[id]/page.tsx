@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ChevronDownIcon, MessageSquareIcon, ClockIcon } from "lucide-react";
+import { ChevronDownIcon, MessageSquareIcon, ClockIcon, HandshakeIcon } from "lucide-react";
+import { formatOfferAmount } from "@/features/offers/lib/offer-format";
 import { Breadcrumb } from "@/shared/components";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Icon } from "@/features/auth/components/icon";
@@ -236,6 +237,39 @@ export default function CustomerRequestDetailPage() {
           {request.status === "completed" && request.request_type === "rent" && (
             <div id="write-review-section">
               <WriteReviewSection carId={car.id} requestId={requestId} />
+            </div>
+          )}
+
+          {/* Provenance — shown when this purchase grew out of an accepted offer */}
+          {request.originating_offer && (
+            <div className="flex items-start gap-3 rounded-(--brc-radius-lg) border border-(--brc-success)/25 bg-(--brc-success-bg) px-4 py-3.5">
+              <HandshakeIcon
+                className="mt-0.5 size-5 shrink-0 text-(--brc-success)"
+                aria-hidden="true"
+              />
+              <div className="min-w-0 [font-family:var(--brc-font-ui)]">
+                <p className="m-0 text-sm font-bold text-(--brc-text)">
+                  Created from your accepted offer of{" "}
+                  <span className="tabular-nums">
+                    {formatOfferAmount(
+                      request.originating_offer.counter_amount ??
+                        request.originating_offer.amount,
+                      request.currency,
+                    )}
+                  </span>
+                </p>
+                {request.originating_offer.counter_amount && (
+                  <p className="m-0 mt-0.5 text-xs text-(--brc-text-muted) tabular-nums">
+                    You offered{" "}
+                    {formatOfferAmount(request.originating_offer.amount, request.currency)}
+                    {" · "}seller countered{" "}
+                    {formatOfferAmount(
+                      request.originating_offer.counter_amount,
+                      request.currency,
+                    )}
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
