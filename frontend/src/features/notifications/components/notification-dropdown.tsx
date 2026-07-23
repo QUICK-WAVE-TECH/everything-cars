@@ -43,6 +43,15 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
   payment_confirmed: "banknote",
   rental_active: "car",
   rental_completed: "check",
+  offer_submitted: "handshake",
+  offer_received: "handshake",
+  offer_countered: "handshake",
+  offer_accepted: "check",
+  offer_rejected: "car",
+  counter_accepted: "check",
+  counter_rejected: "file",
+  offer_expired: "clock",
+  car_no_longer_available: "car",
   system: "bell",
 };
 
@@ -90,6 +99,30 @@ function resolveHref(notification: NotificationItem, role: ViewerRole): string {
 
     case "inspection_cancelled":
       return `/admin/inspections`;
+
+    // ── Offers ──
+    case "offer_submitted":
+    case "offer_countered":
+    case "offer_expired":
+      return "/customer/offers";
+
+    case "offer_received":
+      return data.car_id ? `/owner/offers?car=${data.car_id}` : "/owner/offers";
+
+    case "counter_accepted":
+    case "counter_rejected":
+      return "/owner/offers";
+
+    case "offer_accepted":
+      return data.request_id
+        ? `/customer/requests/${data.request_id}`
+        : "/customer/offers";
+
+    case "offer_rejected":
+      return data.car_id ? `/cars/${data.car_id}` : "/cars";
+
+    case "car_no_longer_available":
+      return "/cars";
 
     case "system":
     default:

@@ -27,6 +27,17 @@ const NOTIFICATION_QUERY_DEPS: Partial<Record<NotificationType, string[][]>> = {
   request_approved: [["requests", "customer"]],
   request_rejected: [["requests", "customer"]],
   requests_auto_rejected: [["requests", "customer"]],
+  // Offers — refresh whichever side's list the event moves. Accepts also touch
+  // the request lists (a buy request is created) and public cars (now reserved).
+  offer_submitted: [["offers", "mine"]],
+  offer_received: [["offers", "owner"]],
+  offer_countered: [["offers", "mine"]],
+  offer_accepted: [["offers", "mine"], ["requests", "customer"]],
+  offer_rejected: [["offers", "mine"]],
+  counter_accepted: [["offers", "owner"], ["requests", "owner"]],
+  counter_rejected: [["offers", "owner"]],
+  offer_expired: [["offers", "mine"]],
+  car_no_longer_available: [["offers", "mine"], ["cars", "public"]],
   payment_submitted: [["requests", "admin"]],
   payment_confirmed: [
     ["requests", "customer"],
