@@ -779,6 +779,20 @@ class RequestCreateSerializer(serializers.ModelSerializer):
                                 }
                             )
 
+        if (
+            car
+            and request_type == ListingType.BUY
+            and car.is_negotiable
+            and self.instance is None
+        ):
+            raise serializers.ValidationError(
+                {
+                    "detail": (
+                        "This vehicle accepts offers. Submit an offer instead of a "
+                        "direct purchase request."
+                    )
+                }
+            )
         return data
 
     def create(self, validated_data):

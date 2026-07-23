@@ -88,6 +88,31 @@ def image_upload(name="car.jpg", size=(16, 16), image_format="JPEG"):
     )
 
 
+def test_direct_buy_request_rejected_on_negotiable_car(self):
+    """Negotiable listings transact through offers only."""
+    car = create_car(
+        self.owner,
+        listing_type=ListingType.BUY,
+        sale_price="18500000.00",
+        is_negotiable=True,
+        min_price="16000000.00",
+        max_price="18500000.00",
+    )
+    res = self._post(car, "buy", "18500000.00")
+    self.assertEqual(res.status_code, 400)
+    self.assertIn("offer", str(res.data).lower())
+
+
+def test_direct_buy_request_still_allowed_on_non_negotiable_car(self):
+    car = create_car(
+        self.owner,
+        listing_type=ListingType.BUY,
+        sale_price="18500000.00",
+        is_negotiable=False,
+    )
+    self.assertEqual(self._post(car, "buy", "18500000.00").status_code, 201)
+
+
 class CarStatusChoicesTest(APITestCase):
     def test_new_inspection_statuses_exist(self):
         """New inspection statuses are valid CarStatus choices."""
