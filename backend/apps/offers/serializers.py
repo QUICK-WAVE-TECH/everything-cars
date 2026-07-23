@@ -123,33 +123,20 @@ class OfferSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-from django.shortcuts import get_object_or_404
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.views import APIView
+class OfferRespondSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=["accept", "reject", "counter"])
+    counter_amount = serializers.DecimalField(
+        max_digits=14, decimal_places=2, required=False
+    )
+    message = serializers.CharField(max_length=400, required=False, allow_blank=True)
 
-from apps.listings.models import Car
-from .models import Offer
-from .serializers import OfferCreateSerializer, OfferSerializer
-
-
-class CarOfferCreateView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, car_id):
-        car = get_object_or_404(Car, id=car_id)
-        serializer = OfferCreateSerializer(
-            data=request.data, context={"request": request, "car": car}
-        )
-        serializer.is_valid(raise_exception=True)
-        offer = serializer.save()
-        offer = (
-            Offer.objects.select_related("car")
-            .prefetch_related("car__images")
-            .get(id=offer.id)
-        )
-        return Response(
-            OfferSerializer(offer, context={"request": request}).data,
-            status=status.HTTP_201_CREATED,
-        )
+    def validate(self, data):
+        if data["action"] == "counter" and data.get("counter_amount") is None:
+            raise serializers.ValidationError(
+                {"counter_amount": "Enter the amount you're countering with."}
+            )
+        if data.get("counter_amount") is not None and data["counter_amount"] <= 0:
+            raise serializers.ValidationError(
+                {"counter_amount": "Enter an amount greater than zero."}
+            )
+        return data

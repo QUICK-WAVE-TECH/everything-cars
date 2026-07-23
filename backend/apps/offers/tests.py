@@ -164,3 +164,141 @@ class PlaceOfferTest(APITestCase):
                 car=self.car, customer=self.customer, status=OfferStatus.PENDING
             ).update(status=OfferStatus.REJECTED)
         self.assertEqual(self._post().status_code, 400)
+
+
+class OwnerRespondTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("t3-owner@test.com", "owner")
+        self.customer = create_user("t3-cust@test.com")
+        self.other = create_user("t3-other@test.com")
+        self.car = create_negotiable_car(self.owner)
+        self.offer = Offer.objects.create(
+            car=self.car,
+            customer=self.customer,
+            amount="16500000.00",
+            currency="NGN",
+            expires_at=timezone.now() + timedelta(hours=48),
+        )
+
+    def _respond(self, actor, **payload):
+        self.client.force_authenticate(user=actor)
+        return self.client.post(
+            f"/api/v1/offers/offers/{self.offer.id}/respond", payload, format="json"
+        )
+
+    def test_owner_declines(self):
+        self.assertEqual(self._respond(self.owner, action="reject").status_code, 200)
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status, OfferStatus.REJECTED)
+        self.assertIsNotNone(self.offer.responded_at)
+
+    def test_owner_counters(self):
+        res = self._respond(self.owner, action="counter", counter_amount="17500000.00")
+        self.assertEqual(res.status_code, 200)
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status, OfferStatus.COUNTERED)
+        self.assertEqual(str(self.offer.counter_amount), "17500000.00")
+        self.assertIsNotNone(self.offer.countered_at)
+
+    def test_counter_resets_the_expiry_window(self):
+        self.offer.expires_at = timezone.now() + timedelta(hours=2)
+        self.offer.save(update_fields=["expires_at"])
+        self._respond(self.owner, action="counter", counter_amount="17500000.00")
+        self.offer.refresh_from_db()
+        self.assertGreater(self.offer.expires_at, timezone.now() + timedelta(hours=47))
+
+    def test_counter_requires_an_amount(self):
+        self.assertEqual(self._respond(self.owner, action="counter").status_code, 400)
+
+    def test_cannot_counter_twice(self):
+        self._respond(self.owner, action="counter", counter_amount="17500000.00")
+        second = self._respond(
+            self.owner, action="counter", counter_amount="17000000.00"
+        )
+        self.assertEqual(second.status_code, 400)
+
+    def test_stranger_cannot_respond(self):
+        self.assertEqual(self._respond(self.other, action="reject").status_code, 404)
+
+    def test_customer_cannot_use_owner_actions(self):
+        self.assertEqual(
+            self._respond(
+                self.customer, action="counter", counter_amount="1.00"
+            ).status_code,
+            400,
+        )
+
+    def test_expired_offer_cannot_be_actioned(self):
+        self.offer.expires_at = timezone.now() - timedelta(minutes=1)
+        self.offer.save(update_fields=["expires_at"])
+        self.assertEqual(self._respond(self.owner, action="reject").status_code, 400)
+
+
+class AcceptOfferTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("t4-owner@test.com", "owner")
+        self.buyer = create_user("t4-buyer@test.com")
+        self.rival = create_user("t4-rival@test.com")
+        self.car = create_negotiable_car(self.owner)
+        self.offer = Offer.objects.create(
+            car=self.car,
+            customer=self.buyer,
+            amount="17000000.00",
+            currency="NGN",
+            expires_at=timezone.now() + timedelta(hours=48),
+        )
+        self.rival_offer = Offer.objects.create(
+            car=self.car,
+            customer=self.rival,
+            amount="16200000.00",
+            currency="NGN",
+            expires_at=timezone.now() + timedelta(hours=48),
+        )
+
+    def _accept(self, offer=None):
+        self.client.force_authenticate(user=self.owner)
+        return self.client.post(
+            f"/api/v1/offers/offers/{(offer or self.offer).id}/respond",
+            {"action": "accept"},
+            format="json",
+        )
+
+    def test_accept_creates_approved_buy_request_at_agreed_amount(self):
+        self.assertEqual(self._accept().status_code, 200)
+        self.offer.refresh_from_db()
+        self.assertEqual(self.offer.status, OfferStatus.ACCEPTED)
+        req = self.offer.resulting_request
+        self.assertIsNotNone(req)
+        self.assertEqual(req.request_type, ListingType.BUY)
+        self.assertEqual(req.status, RequestStatus.APPROVED)
+        self.assertEqual(str(req.price_offered), "17000000.00")
+        self.assertEqual(req.customer, self.buyer)
+
+    def test_accepting_a_counter_uses_the_counter_amount(self):
+        self.offer.status = OfferStatus.COUNTERED
+        self.offer.counter_amount = "17800000.00"
+        self.offer.save(update_fields=["status", "counter_amount"])
+        self.client.force_authenticate(user=self.buyer)
+        res = self.client.post(
+            f"/api/v1/offers/offers/{self.offer.id}/respond",
+            {"action": "accept"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+        self.offer.refresh_from_db()
+        self.assertEqual(str(self.offer.resulting_request.price_offered), "17800000.00")
+
+    def test_rival_offers_superseded(self):
+        self._accept()
+        self.rival_offer.refresh_from_db()
+        self.assertEqual(self.rival_offer.status, OfferStatus.SUPERSEDED)
+
+    def test_car_reads_reserved_after_acceptance(self):
+        self._accept()
+        res = self.client.get(f"/api/v1/listings/cars/{self.car.id}")
+        self.assertEqual(res.data["availability_status"], "reserved")
+
+    def test_cannot_accept_a_second_offer_on_the_same_car(self):
+        self._accept()
+        # rival_offer is superseded; accepting it must fail
+        self.assertEqual(self._accept(self.rival_offer).status_code, 400)
