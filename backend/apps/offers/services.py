@@ -11,7 +11,16 @@ from apps.listings.models import (
     RequestStatusEvent,
 )
 
-from .models import OFFER_TTL_HOURS, Offer, OfferStatus
+from apps.notifications.notifications import schedule_notification
+from apps.notifications.service import (
+    notify_car_no_longer_available,
+    notify_counter_accepted,
+    notify_counter_rejected,
+    notify_offer_accepted,
+    notify_offer_countered,
+    notify_offer_rejected,
+)
+from .models import ACTIVE_OFFER_STATUSES, OFFER_TTL_HOURS, Offer, OfferStatus
 
 
 def owner_respond(offer, action, data):
@@ -22,6 +31,7 @@ def owner_respond(offer, action, data):
         offer.status = OfferStatus.REJECTED
         offer.responded_at = timezone.now()
         offer.save(update_fields=["status", "responded_at", "updated_at"])
+        schedule_notification(notify_offer_rejected, lambda o=offer: o)
         return offer
 
     if action == "counter":
@@ -41,14 +51,20 @@ def owner_respond(offer, action, data):
                 "updated_at",
             ]
         )
+        schedule_notification(notify_offer_countered, lambda o=offer: o)
         return offer
 
-    return accept_offer(offer)
+    # Owner accepted a pending offer → the buyer is the one to notify.
+    return accept_offer(offer, accepted_by="owner")
 
 
-def accept_offer(offer):
+def accept_offer(offer, accepted_by="owner"):
     """
     Accept an offer and hand the sale to the existing purchase pipeline.
+
+    ``accepted_by`` decides who hears about it: an owner accepting a pending
+    offer notifies the buyer (``offer_accepted``); a customer accepting a
+    counter notifies the owner (``counter_accepted``).
 
     Everything here is one transaction under a row lock on the car: without it,
     two offers on the same vehicle could both be accepted and we would create
@@ -98,13 +114,25 @@ def accept_offer(offer):
             ]
         )
 
-        # Everyone else loses; they are told the vehicle is gone
-        Offer.objects.filter(car=car, status__in=ACTIVE_OFFER_STATUSES).exclude(
-            id=offer.id
-        ).update(
+        # Everyone else loses; capture them before the bulk update so we can
+        # notify each buyer, then close them out.
+        rivals = list(
+            Offer.objects.filter(car=car, status__in=ACTIVE_OFFER_STATUSES)
+            .exclude(id=offer.id)
+            .select_related("car", "customer")
+        )
+        Offer.objects.filter(id__in=[r.id for r in rivals]).update(
             status=OfferStatus.SUPERSEDED,
             responded_at=timezone.now(),
         )
+
+    # After commit: the winner, plus every superseded rival.
+    if accepted_by == "customer":
+        schedule_notification(notify_counter_accepted, lambda o=offer: o)
+    else:
+        schedule_notification(notify_offer_accepted, lambda o=offer: o)
+    for rival in rivals:
+        schedule_notification(notify_car_no_longer_available, lambda o=rival: o)
     return offer
 
 
@@ -112,11 +140,13 @@ def customer_respond(offer, action):
     if offer.status != OfferStatus.COUNTERED:
         raise ValidationError("There is no counter-offer awaiting your response.")
     if action == "accept":
-        return accept_offer(offer)
+        # Customer accepted the owner's counter → notify the owner.
+        return accept_offer(offer, accepted_by="customer")
     if action == "reject":
         offer.status = OfferStatus.REJECTED
         offer.responded_at = timezone.now()
         offer.save(update_fields=["status", "responded_at", "updated_at"])
+        schedule_notification(notify_counter_rejected, lambda o=offer: o)
         return offer
     raise ValidationError("Unsupported action.")
 

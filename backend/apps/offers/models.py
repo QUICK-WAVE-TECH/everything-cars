@@ -17,7 +17,7 @@ class OfferStatus(models.TextChoices):
 # An offer still awaiting somebody's decision. Everything else is terminal.
 ACTIVE_OFFER_STATUSES = [OfferStatus.PENDING, OfferStatus.COUNTERED]
 
-MAX_OFFERS_PER_CAR = 4
+MAX_OFFERS_PER_CAR = 3
 OFFER_TTL_HOURS = 48
 
 

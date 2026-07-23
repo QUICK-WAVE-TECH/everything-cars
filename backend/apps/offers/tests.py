@@ -1,4 +1,3 @@
-from django.test import TestCase
 
 # Create your tests here.
 from datetime import timedelta
@@ -7,8 +6,8 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from apps.listings.models import Car, CarStatus, ListingType
-from apps.offers.models import ACTIVE_OFFER_STATUSES, Offer, OfferStatus
+from apps.listings.models import Car, CarStatus, ListingType, RequestStatus
+from apps.offers.models import Offer, OfferStatus
 from apps.users.models import User
 
 
@@ -31,8 +30,10 @@ def create_negotiable_car(owner, **extra):
         listing_type=ListingType.BUY,
         sale_price="18500000.00",
         is_negotiable=True,
+        # min/max kept distinct from sale_price so a leak test can tell the
+        # private range apart from the (public) asking price.
         min_price="16000000.00",
-        max_price="18500000.00",
+        max_price="17000000.00",
         brand="Toyota",
         model="Land Cruiser",
         year=2023,
@@ -119,9 +120,11 @@ class PlaceOfferTest(APITestCase):
         self.assertEqual(near.data, far.data)
 
     def test_response_never_leaks_the_range(self):
+        # The public sale price (18500000) may appear; the private min (16000000)
+        # and max (17000000) must not.
         body = str(self._post("15000000.00").data) + str(self._post().data)
         self.assertNotIn("16000000", body)
-        self.assertNotIn("18500000", body)
+        self.assertNotIn("17000000", body)
 
     def test_owner_cannot_offer_on_own_car(self):
         self.client.force_authenticate(user=self.owner)
@@ -401,3 +404,80 @@ class ExpiryTest(APITestCase):
         call_command("expire_offers")
         live.refresh_from_db()
         self.assertEqual(live.status, OfferStatus.PENDING)
+
+
+class OfferListTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("t9-owner@test.com", "owner")
+        self.buyer = create_user("t9-buyer@test.com")
+        self.stranger = create_user("t9-other@test.com")
+        self.car = create_negotiable_car(self.owner)
+        self.offer = Offer.objects.create(
+            car=self.car,
+            customer=self.buyer,
+            amount="16500000.00",
+            currency="NGN",
+            expires_at=timezone.now() + timedelta(hours=48),
+        )
+
+    def test_my_offers_returns_only_my_own(self):
+        self.client.force_authenticate(user=self.stranger)
+        res = self.client.get("/api/v1/offers/my-offers")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["results"], [])
+
+    def test_owner_offers_returns_only_offers_on_my_cars(self):
+        self.client.force_authenticate(user=self.stranger)
+        res = self.client.get("/api/v1/offers/owner-offers")
+        self.assertEqual(res.data["results"], [])
+
+    def test_owner_sees_buyer_name_but_not_contact_while_pending(self):
+        self.client.force_authenticate(user=self.owner)
+        row = self.client.get("/api/v1/offers/owner-offers").data["results"][0]
+        self.assertEqual(row["customer"]["first_name"], self.buyer.first_name)
+        self.assertIsNone(row["customer"]["email"])
+
+    def test_owner_sees_contact_once_accepted(self):
+        self.offer.status = OfferStatus.ACCEPTED
+        self.offer.save(update_fields=["status"])
+        self.client.force_authenticate(user=self.owner)
+        row = self.client.get("/api/v1/offers/owner-offers").data["results"][0]
+        self.assertEqual(row["customer"]["email"], self.buyer.email)
+
+    def test_no_payload_leaks_the_private_range(self):
+        self.client.force_authenticate(user=self.buyer)
+        mine = str(self.client.get("/api/v1/offers/my-offers").data)
+        self.assertNotIn("16000000", mine)  # min
+        self.assertNotIn("17000000", mine)  # max
+
+    def test_status_filter(self):
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.get("/api/v1/offers/owner-offers?status=rejected")
+        self.assertEqual(res.data["results"], [])
+
+
+class OfferNotificationTest(APITestCase):
+    def test_placing_an_offer_notifies_both_sides(self):
+        from apps.notifications.models import Notification
+
+        owner = create_user("t7-owner@test.com", "owner")
+        customer = create_user("t7-cust@test.com")
+        car = create_negotiable_car(owner)
+        self.client.force_authenticate(user=customer)
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                f"/api/v1/offers/cars/{car.id}/offers",
+                {"amount": "16500000.00"},
+                format="json",
+            )
+        self.assertEqual(res.status_code, 201)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=owner, notification_type="offer_received"
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=customer, notification_type="offer_submitted"
+            ).exists()
+        )

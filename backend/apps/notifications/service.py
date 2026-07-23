@@ -609,3 +609,128 @@ def notify_owner_verified(user):
             "action_url": _fe("/owner/my-cars/new"),
         },
     )
+
+
+# ── Offers (Spec D1) ──────────────────────────────────────────────────────────
+#
+# In-app notifications are the critical, tested path. Emails are fail-soft
+# (send_email never raises): where a template exists it is sent, otherwise the
+# attempt is logged and the flow continues. Only car_sold.html exists today —
+# the remaining offer_* email templates are a follow-up.
+
+
+def _offer_data(offer):
+    return {
+        "offer_id": str(offer.id),
+        "car_id": str(offer.car_id),
+        "car_title": offer.car.title,
+    }
+
+
+def notify_offer_submitted(offer):
+    """Confirm to the buyer that their offer went in."""
+    _create_notification(
+        recipient=offer.customer,
+        notification_type=NotificationType.OFFER_SUBMITTED,
+        title="Offer submitted",
+        message=f"Your offer on {offer.car.title} has been submitted.",
+        data=_offer_data(offer),
+    )
+
+
+def notify_offer_received(offer):
+    """Tell the owner a new offer arrived."""
+    _create_notification(
+        recipient=offer.car.owner,
+        notification_type=NotificationType.OFFER_RECEIVED,
+        title="New offer received",
+        message=f"You have a new offer on {offer.car.title}.",
+        data=_offer_data(offer),
+    )
+
+
+def notify_offer_countered(offer):
+    """Tell the buyer the owner countered."""
+    _create_notification(
+        recipient=offer.customer,
+        notification_type=NotificationType.OFFER_COUNTERED,
+        title="Counter-offer received",
+        message=f"The seller sent a counter-offer on {offer.car.title}.",
+        data=_offer_data(offer),
+    )
+
+
+def notify_offer_accepted(offer):
+    """Tell the buyer their offer was accepted."""
+    _create_notification(
+        recipient=offer.customer,
+        notification_type=NotificationType.OFFER_ACCEPTED,
+        title="Offer accepted",
+        message=f"Your offer on {offer.car.title} was accepted. Proceed to payment.",
+        data=_offer_data(offer),
+    )
+
+
+def notify_offer_rejected(offer):
+    """Tell the buyer their offer was declined. Neutral tone."""
+    _create_notification(
+        recipient=offer.customer,
+        notification_type=NotificationType.OFFER_REJECTED,
+        title="Offer declined",
+        message=f"Your offer on {offer.car.title} was not accepted.",
+        data=_offer_data(offer),
+    )
+
+
+def notify_counter_accepted(offer):
+    """Tell the owner the buyer accepted their counter."""
+    _create_notification(
+        recipient=offer.car.owner,
+        notification_type=NotificationType.COUNTER_ACCEPTED,
+        title="Counter-offer accepted",
+        message=f"The buyer accepted your counter-offer on {offer.car.title}.",
+        data=_offer_data(offer),
+    )
+
+
+def notify_counter_rejected(offer):
+    """Tell the owner the buyer declined their counter."""
+    _create_notification(
+        recipient=offer.car.owner,
+        notification_type=NotificationType.COUNTER_REJECTED,
+        title="Counter-offer declined",
+        message=f"The buyer declined your counter-offer on {offer.car.title}.",
+        data=_offer_data(offer),
+    )
+
+
+def notify_offer_expired(offer):
+    """Tell the buyer their offer timed out."""
+    _create_notification(
+        recipient=offer.customer,
+        notification_type=NotificationType.OFFER_EXPIRED,
+        title="Offer expired",
+        message=f"Your offer on {offer.car.title} has expired.",
+        data=_offer_data(offer),
+    )
+
+
+def notify_car_no_longer_available(offer):
+    """Tell a superseded bidder the vehicle is gone. Uses the existing template."""
+    _create_notification(
+        recipient=offer.customer,
+        notification_type=NotificationType.CAR_NO_LONGER_AVAILABLE,
+        title="Vehicle no longer available",
+        message=f"{offer.car.title} is no longer available — another buyer's offer was accepted.",
+        data=_offer_data(offer),
+    )
+    send_email(
+        recipient=offer.customer.email,
+        subject="A vehicle you offered on is no longer available",
+        template_key="car_sold",
+        context={
+            "first_name": offer.customer.first_name,
+            "car_title": offer.car.title,
+            "action_url": _fe("/cars"),
+        },
+    )

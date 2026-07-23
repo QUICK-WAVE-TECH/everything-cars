@@ -9,6 +9,7 @@ from .models import (
     MAX_OFFERS_PER_CAR,
     OFFER_TTL_HOURS,
     Offer,
+    OfferStatus,
 )
 
 # One fixed sentence for every rejected-too-low offer. Never interpolate the
@@ -140,3 +141,51 @@ class OfferRespondSerializer(serializers.Serializer):
                 {"counter_amount": "Enter an amount greater than zero."}
             )
         return data
+
+
+class OwnerOfferSerializer(serializers.ModelSerializer):
+    """Owner-facing offer row.
+
+    The buyer's name is always shown; email and phone appear only once the
+    offer is accepted — so a seller never gets a buyer's contact details for an
+    offer they then decline. Like the customer serializer, it carries nothing
+    about the owner's private range.
+    """
+
+    car = OfferCarSummarySerializer(read_only=True)
+    customer = serializers.SerializerMethodField()
+    is_expired = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Offer
+        fields = [
+            "id",
+            "car",
+            "customer",
+            "amount",
+            "currency",
+            "message",
+            "status",
+            "counter_amount",
+            "counter_message",
+            "countered_at",
+            "expires_at",
+            "responded_at",
+            "resulting_request",
+            "is_expired",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_customer(self, obj):
+        # Reveal is per-row: each offer decides on its own status, so this can't
+        # be a shared-context flag on a list.
+        revealed = obj.status == OfferStatus.ACCEPTED
+        buyer = obj.customer
+        return {
+            "id": str(buyer.id),
+            "first_name": buyer.first_name,
+            "last_name": buyer.last_name,
+            "email": buyer.email if revealed else None,
+            "phone": (buyer.phone or None) if revealed else None,
+        }
