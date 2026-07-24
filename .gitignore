@@ -46,8 +46,10 @@ htmlcov/
 # Docs (specs/plans generated locally)
 docs/
 
-#superdesign
+# Local design-agent workspaces
 superdesign/
+.superdesign/
+.superdesigns/
 
 docs/
 __tests__/
@@ -65,5 +67,6 @@ back images/
 /assets/
 /*.dc.html
 /Listing redesign prototype.zip
+/Listing redesign prototype2.zip
 /.thumbnail
 /support.js

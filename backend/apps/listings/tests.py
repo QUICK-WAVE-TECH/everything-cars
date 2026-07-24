@@ -5,7 +5,7 @@ import json
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
-from datetime import time, date
+from datetime import time, date, timedelta
 from PIL import Image
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -632,6 +632,53 @@ class AdminStatusCountsTest(APITestCase):
         self.client.force_authenticate(user=owner)
         res = self.client.get("/api/v1/listings/admin/cars/status-counts")
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class AdminCarOrderingTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user(
+            "staff-ordering@test.com",
+            "owner",
+            is_staff=True,
+        )
+        owner = create_user("owner-ordering@test.com", "owner")
+        create_owner_profile(owner)
+        self.older = create_car(
+            owner,
+            title="Older draft",
+            status=CarStatus.DRAFT,
+        )
+        self.newer = create_car(
+            owner,
+            title="Newer draft",
+            status=CarStatus.DRAFT,
+        )
+        Car.objects.filter(id=self.older.id).update(
+            created_at=timezone.now() - timedelta(days=2),
+        )
+        self.client.force_authenticate(user=self.staff)
+
+    def test_oldest_first_ordering_applies_before_pagination(self):
+        res = self.client.get(
+            "/api/v1/listings/admin/cars?status=draft&ordering=created_at",
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [car["title"] for car in res.data["results"][:2]],
+            ["Older draft", "Newer draft"],
+        )
+
+    def test_invalid_ordering_falls_back_to_newest_first(self):
+        res = self.client.get(
+            "/api/v1/listings/admin/cars?status=draft&ordering=owner__email",
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [car["title"] for car in res.data["results"][:2]],
+            ["Newer draft", "Older draft"],
+        )
 
 
 class PublicArchivedVisibilityTest(APITestCase):

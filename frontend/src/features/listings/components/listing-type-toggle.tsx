@@ -66,7 +66,7 @@ export function ListingTypeToggle({
             value={option.value}
             className={cn(
               "relative z-10 flex h-10.5 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-transparent text-sm font-bold transition-colors outline-none",
-              "text-(--brc-text-secondary) hover:text-(--brc-text) data-checked:text-(--brc-text-on-primary)",
+              "text-(--brc-text-secondary) hover:text-(--brc-text) data-checked:text-(--brc-text-on-primary) data-checked:hover:text-(--brc-text-on-primary)",
               "focus-visible:ring-[3px] focus-visible:ring-ring/50",
               disabled && "cursor-not-allowed",
             )}
