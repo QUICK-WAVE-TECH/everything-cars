@@ -70,6 +70,13 @@ export type RequestDetail = {
   created_at: string;
   updated_at: string;
   status_events: RequestStatusEvent[];
+  /** Present when this purchase grew out of an accepted offer. */
+  originating_offer: {
+    id: string;
+    amount: string;
+    counter_amount: string | null;
+    created_at: string;
+  } | null;
 };
 
 export type CreateRequestData = {

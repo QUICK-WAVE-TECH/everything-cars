@@ -43,7 +43,64 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
   payment_confirmed: "banknote",
   rental_active: "car",
   rental_completed: "check",
+  offer_submitted: "handshake",
+  offer_received: "handshake",
+  offer_countered: "handshake",
+  offer_accepted: "check",
+  offer_rejected: "car",
+  counter_accepted: "check",
+  counter_rejected: "file",
+  offer_expired: "clock",
+  car_no_longer_available: "car",
   system: "bell",
+};
+
+// ── Semantic tone mapping (additive, visual only) ─────────────────────────────
+
+type Tone = "success" | "danger" | "warning" | "neutral";
+
+const TONE_MAP: Record<NotificationType, Tone> = {
+  request_received: "neutral",
+  request_approved: "success",
+  request_rejected: "danger",
+  request_cancelled: "neutral",
+  requests_auto_rejected: "danger",
+  listing_suspended: "danger",
+  listing_approved: "success",
+  listing_submitted: "neutral",
+  changes_requested: "warning",
+  inspection_started: "neutral",
+  needs_clearance: "warning",
+  clearance_response: "neutral",
+  inspection_booked: "neutral",
+  inspection_booking_approved: "success",
+  inspection_booking_rejected: "danger",
+  inspection_passed: "success",
+  inspection_failed: "danger",
+  inspection_no_show: "danger",
+  inspection_rescheduled: "neutral",
+  inspection_cancelled: "warning",
+  payment_submitted: "neutral",
+  payment_confirmed: "success",
+  rental_active: "neutral",
+  rental_completed: "success",
+  offer_submitted: "warning",
+  offer_received: "warning",
+  offer_countered: "warning",
+  offer_accepted: "success",
+  offer_rejected: "danger",
+  counter_accepted: "success",
+  counter_rejected: "danger",
+  offer_expired: "warning",
+  car_no_longer_available: "danger",
+  system: "neutral",
+};
+
+const TONE_STYLE: Record<Tone, { bg: string; fg: string }> = {
+  success: { bg: "var(--brc-success-bg)", fg: "var(--brc-success)" },
+  danger: { bg: "var(--brc-danger-bg)", fg: "var(--brc-danger)" },
+  warning: { bg: "var(--brc-warning-bg)", fg: "var(--brc-primary)" },
+  neutral: { bg: "var(--brc-primary-tint)", fg: "var(--brc-primary)" },
 };
 
 // ── Navigation helper ─────────────────────────────────────────────────────────
@@ -91,6 +148,30 @@ function resolveHref(notification: NotificationItem, role: ViewerRole): string {
     case "inspection_cancelled":
       return `/admin/inspections`;
 
+    // ── Offers ──
+    case "offer_submitted":
+    case "offer_countered":
+    case "offer_expired":
+      return "/customer/offers";
+
+    case "offer_received":
+      return data.car_id ? `/owner/offers?car=${data.car_id}` : "/owner/offers";
+
+    case "counter_accepted":
+    case "counter_rejected":
+      return "/owner/offers";
+
+    case "offer_accepted":
+      return data.request_id
+        ? `/customer/requests/${data.request_id}`
+        : "/customer/offers";
+
+    case "offer_rejected":
+      return data.car_id ? `/cars/${data.car_id}` : "/cars";
+
+    case "car_no_longer_available":
+      return "/cars";
+
     case "system":
     default:
       return home;
@@ -107,47 +188,51 @@ type NotificationRowProps = {
 
 function NotificationRow({ notification, role, onRead }: NotificationRowProps) {
   const icon = TYPE_ICON[notification.notification_type] ?? "bell";
+  const tone = TONE_STYLE[TONE_MAP[notification.notification_type] ?? "neutral"];
   const href = resolveHref(notification, role);
+  const unread = !notification.is_read;
 
   return (
     <button
       onClick={() => onRead(notification.id, href)}
+      aria-label={unread ? `${notification.title} — unread` : notification.title}
       style={{
         display: "flex",
-        gap: 12,
+        alignItems: "flex-start",
+        gap: 11,
         width: "100%",
         textAlign: "left",
-        background: notification.is_read ? "transparent" : "var(--brc-bg-subtle)",
+        background: unread ? "var(--brc-bg-subtle)" : "transparent",
         border: "none",
-        borderLeft: notification.is_read ? "3px solid transparent" : "3px solid var(--brc-primary)",
-        padding: "12px 16px",
+        borderTop: "1px solid var(--brc-border)",
+        padding: "13px 18px",
         cursor: "pointer",
-        transition: "background 0.15s",
+        transition: "background 0.15s ease",
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLButtonElement).style.background = "var(--brc-bg-subtle)";
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background = notification.is_read
-          ? "transparent"
-          : "var(--brc-bg-subtle)";
+        (e.currentTarget as HTMLButtonElement).style.background = unread
+          ? "var(--brc-bg-subtle)"
+          : "transparent";
       }}
     >
       {/* Icon */}
       <span
+        aria-hidden="true"
         style={{
           flexShrink: 0,
           width: 34,
           height: 34,
           borderRadius: "var(--brc-radius-pill)",
-          background: "var(--brc-bg-subtle)",
-          border: "1px solid var(--brc-border)",
+          background: tone.bg,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        <Icon name={icon} size={16} stroke="var(--brc-text-secondary)" />
+        <Icon name={icon} size={16} stroke={tone.fg} />
       </span>
 
       {/* Text */}
@@ -157,7 +242,7 @@ function NotificationRow({ notification, role, onRead }: NotificationRowProps) {
             display: "block",
             fontFamily: "var(--brc-font-ui)",
             fontSize: 13,
-            fontWeight: notification.is_read ? 400 : 600,
+            fontWeight: unread ? 600 : 400,
             color: "var(--brc-text)",
             lineHeight: 1.4,
             marginBottom: 2,
@@ -192,6 +277,21 @@ function NotificationRow({ notification, role, onRead }: NotificationRowProps) {
           {formatRelativeDate(notification.created_at)}
         </span>
       </span>
+
+      {/* Unread dot */}
+      {unread && (
+        <span
+          aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            width: 8,
+            height: 8,
+            marginTop: 5,
+            borderRadius: "var(--brc-radius-pill)",
+            background: "var(--brc-primary)",
+          }}
+        />
+      )}
     </button>
   );
 }
@@ -244,7 +344,7 @@ export function NotificationDropdown({ role, unreadCount }: NotificationDropdown
       {/* Bell trigger */}
       <button
         onClick={() => setOpen((o) => !o)}
-        aria-label="Notifications"
+        aria-label={hasUnread ? `Notifications, ${unreadCount} unread` : "Notifications"}
         aria-expanded={open}
         className="brc-button-motion-icon"
         style={{
@@ -299,9 +399,18 @@ export function NotificationDropdown({ role, unreadCount }: NotificationDropdown
             left: 50% !important;
             right: auto !important;
             transform: translateX(-50%) !important;
-            width: min(360px, calc(100vw - 24px)) !important;
+            width: min(380px, calc(100vw - 24px)) !important;
             max-height: calc(100dvh - 96px) !important;
           }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .brc-notif-panel {
+            animation: none !important;
+          }
+        }
+        @keyframes brcNotifIn {
+          from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
 
@@ -316,15 +425,16 @@ export function NotificationDropdown({ role, unreadCount }: NotificationDropdown
             top: "calc(100% + 10px)",
             right: 0,
             zIndex: 200,
-            width: "min(360px, calc(100vw - 32px))",
+            width: "min(380px, calc(100vw - 32px))",
             maxHeight: 480,
             background: "#fff",
             border: "1px solid var(--brc-border)",
-            borderRadius: "var(--brc-radius-md)",
-            boxShadow: "var(--brc-shadow-md)",
+            borderRadius: "var(--brc-radius-lg)",
+            boxShadow: "var(--brc-shadow-lg)",
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
+            animation: "brcNotifIn 0.18s ease",
           }}
         >
           {/* Header */}
@@ -333,7 +443,8 @@ export function NotificationDropdown({ role, unreadCount }: NotificationDropdown
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              padding: "14px 16px",
+              gap: 10,
+              padding: "14px 18px",
               borderBottom: "1px solid var(--brc-border)",
               flexShrink: 0,
             }}
@@ -341,29 +452,12 @@ export function NotificationDropdown({ role, unreadCount }: NotificationDropdown
             <span
               style={{
                 fontFamily: "var(--brc-font-display)",
-                fontSize: 15,
-                fontWeight: 600,
+                fontSize: 16,
+                fontWeight: 800,
                 color: "var(--brc-text)",
               }}
             >
               Notifications
-              {hasUnread && (
-                <span
-                  style={{
-                    marginLeft: 8,
-                    background: "var(--brc-danger)",
-                    color: "#fff",
-                    borderRadius: "var(--brc-radius-pill)",
-                    fontFamily: "var(--brc-font-ui)",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: "1px 7px",
-                    verticalAlign: "middle",
-                  }}
-                >
-                  {unreadCount}
-                </span>
-              )}
             </span>
 
             {hasUnread && (
@@ -373,15 +467,16 @@ export function NotificationDropdown({ role, unreadCount }: NotificationDropdown
                 style={{
                   fontFamily: "var(--brc-font-ui)",
                   fontSize: 12,
+                  fontWeight: 700,
                   color: "var(--brc-primary)",
                   background: "transparent",
                   border: "none",
                   cursor: "pointer",
-                  padding: "4px 0",
+                  padding: "2px",
                   opacity: markAllRead.isPending ? 0.5 : 1,
                 }}
               >
-                Mark all as read
+                Mark all read
               </button>
             )}
           </div>
@@ -453,7 +548,7 @@ export function NotificationDropdown({ role, unreadCount }: NotificationDropdown
                 textAlign: "center",
                 fontFamily: "var(--brc-font-ui)",
                 fontSize: 13,
-                fontWeight: 500,
+                fontWeight: 700,
                 color: "var(--brc-primary)",
                 background: "transparent",
                 border: "none",
@@ -461,7 +556,7 @@ export function NotificationDropdown({ role, unreadCount }: NotificationDropdown
                 padding: "4px 0",
               }}
             >
-              View all notifications
+              View all
             </button>
           </div>
         </div>

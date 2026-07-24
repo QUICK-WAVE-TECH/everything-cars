@@ -49,6 +49,14 @@ const QUICK_LINKS: QuickLink[] = [
     fg: "var(--brc-text-secondary)",
   },
   {
+    label: "My Offers",
+    description: "Track your purchase offers and counter-offers.",
+    icon: "handshake",
+    href: "/customer/offers",
+    bg: "var(--brc-accent-bg)",
+    fg: "var(--brc-accent)",
+  },
+  {
     label: "Transactions",
     description: "Review receipts, payments, and history.",
     icon: "banknote",

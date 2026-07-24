@@ -46,8 +46,10 @@ htmlcov/
 # Docs (specs/plans generated locally)
 docs/
 
-#superdesign
+# Local design-agent workspaces
 superdesign/
+.superdesign/
+.superdesigns/
 
 docs/
 __tests__/
@@ -58,3 +60,13 @@ back images/
 
 # RSA JWT keys (never commit)
 *.pem
+
+# Claude Design prototypes / exports — kept locally, never pushed
+/listingRedesign/
+/_ds/
+/assets/
+/*.dc.html
+/Listing redesign prototype.zip
+/Listing redesign prototype2.zip
+/.thumbnail
+/support.js

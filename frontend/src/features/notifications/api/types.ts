@@ -23,6 +23,15 @@ export type NotificationType =
   | "rental_active"
   | "rental_completed"
   | "requests_auto_rejected"
+  | "offer_submitted"
+  | "offer_received"
+  | "offer_countered"
+  | "offer_accepted"
+  | "offer_rejected"
+  | "counter_accepted"
+  | "counter_rejected"
+  | "offer_expired"
+  | "car_no_longer_available"
   | "system";
 
 export type NotificationItem = {

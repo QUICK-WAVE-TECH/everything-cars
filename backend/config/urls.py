@@ -28,6 +28,7 @@ urlpatterns = [
     path("api/v1/listings/", include("apps.reviews.urls")),
     path("api/v1/inspections/", include("apps.inspections.urls")),
     path("api/v1/notifications/", include("apps.notifications.urls")),
+    path("api/v1/offers/", include("apps.offers.urls")),
 ]
 
 if settings.DEBUG:

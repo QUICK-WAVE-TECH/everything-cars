@@ -10,6 +10,7 @@ type AdminListParams = {
   search?: string;
   page?: number;
   page_size?: number;
+  ordering?: "created_at" | "-created_at";
 };
 
 export const adminListingKeys = {

@@ -39,12 +39,16 @@ import {
   type CreateCarFormValues,
   type CreateCarInput,
 } from "@/features/listings/schemas";
+import {
+  formatDecimalInput,
+  normalizeDecimalInput,
+} from "@/features/listings/lib/decimal-input";
+import { capitalizeFirstLetter } from "@/features/listings/lib/text-input";
 import { ApiError } from "@/lib/api-client";
 
 // ---------- Form field components ----------
 
 function stripNonDigits(v: string) { return v.replace(/[^\d]/g, ""); }
-function stripNonDecimal(v: string) { return v.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1"); }
 
 function TextField({ label, placeholder, value, onChange, prefix, className, inputMode, filter }: {
   label: string;
@@ -58,7 +62,7 @@ function TextField({ label, placeholder, value, onChange, prefix, className, inp
 }) {
   function handleChange(raw: string) {
     if (filter === "digits") return onChange(stripNonDigits(raw));
-    if (filter === "decimal") return onChange(stripNonDecimal(raw));
+    if (filter === "decimal") return onChange(normalizeDecimalInput(raw));
     onChange(raw);
   }
 
@@ -68,7 +72,7 @@ function TextField({ label, placeholder, value, onChange, prefix, className, inp
       <div className="flex h-12 items-center gap-2 rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) px-4 sm:h-14 sm:px-5">
         {prefix && <span className="text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{prefix}</span>}
         <input
-          value={value}
+          value={filter === "decimal" ? formatDecimalInput(value) : value}
           placeholder={placeholder}
           inputMode={inputMode}
           onChange={(e) => handleChange(e.target.value)}
@@ -547,9 +551,9 @@ export default function ListCarPage() {
                   serverError={vehicleServerError}
                 />
 
-                <TextField label="Brand" placeholder="Enter brand name" value={w.brand ?? ""} onChange={(v) => form.setValue("brand", v)} />
-                <TextField label="Model" placeholder="Enter model" value={w.model ?? ""} onChange={(v) => form.setValue("model", v)} />
-                <TextField label="Color" placeholder="Enter color" value={w.color ?? ""} onChange={(v) => form.setValue("color", v)} />
+                <TextField label="Brand" placeholder="Enter brand name" value={w.brand ?? ""} onChange={(v) => form.setValue("brand", capitalizeFirstLetter(v))} />
+                <TextField label="Model" placeholder="Enter model" value={w.model ?? ""} onChange={(v) => form.setValue("model", capitalizeFirstLetter(v))} />
+                <TextField label="Color" placeholder="Enter color" value={w.color ?? ""} onChange={(v) => form.setValue("color", capitalizeFirstLetter(v))} />
 
                 <TextField label="Year" placeholder="e.g. 2024" value={w.year ?? ""} onChange={(v) => form.setValue("year", v)} inputMode="numeric" filter="digits" />
                 <SelectField label="Body Type" placeholder="Select body type" value={w.body_type ?? ""} options={["sedan", "suv", "hatchback", "coupe", "truck", "van", "wagon", "convertible", "minivan", "crossover"]} onPick={(v) => form.setValue("body_type", v)} />

@@ -14,6 +14,7 @@ const customerLinks: SidebarLink[] = [
   { href: "/customer/dashboard", label: "Dashboard" },
   { href: "/customer/listings", label: "Browse Cars" },
   { href: "/customer/requests", label: "My Requests" },
+  { href: "/customer/offers", label: "Offers" },
   { href: "/customer/payments", label: "Payments" },
   { href: "/customer/transactions", label: "Transactions" },
 ];
@@ -22,6 +23,7 @@ const ownerLinks: SidebarLink[] = [
   { href: "/owner/dashboard", label: "Dashboard" },
   { href: "/owner/my-cars", label: "My Cars" },
   { href: "/owner/requests", label: "Requests" },
+  { href: "/owner/offers", label: "Offers" },
   { href: "/owner/payments", label: "Payments" },
   { href: "/owner/transactions", label: "Transactions" },
 ];

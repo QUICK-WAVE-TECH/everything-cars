@@ -1140,6 +1140,11 @@ class AdminCarListView(APIView):
         if state:
             cars = cars.filter(state__icontains=state)
 
+        ordering = request.query_params.get("ordering", "-created_at")
+        if ordering not in {"created_at", "-created_at"}:
+            ordering = "-created_at"
+        cars = cars.order_by(ordering)
+
         paginator = StandardPagination()
         page = paginator.paginate_queryset(cars, request)
         serializer = CarListSerializer(page, many=True, context={"request": request})

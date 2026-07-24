@@ -643,6 +643,7 @@ class RequestDetailSerializer(serializers.ModelSerializer):
     car = CarDetailSerializer(read_only=True)
     customer = RequestCustomerSerializer(read_only=True)
     status_events = RequestStatusEventSerializer(many=True, read_only=True)
+    originating_offer = serializers.SerializerMethodField()
 
     class Meta:
         model = Request
@@ -663,7 +664,25 @@ class RequestDetailSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "status_events",
+            "originating_offer",
         ]
+
+    def get_originating_offer(self, obj):
+        """The accepted offer this purchase request grew out of, if any — lets
+        the request page show 'created from your offer of ₦X' provenance."""
+        offer = obj.originating_offers.first()
+        if offer is None:
+            return None
+        return {
+            "id": str(offer.id),
+            "amount": str(offer.amount),
+            "counter_amount": (
+                str(offer.counter_amount)
+                if offer.counter_amount is not None
+                else None
+            ),
+            "created_at": offer.created_at.isoformat(),
+        }
 
 
 class RequestCreateSerializer(serializers.ModelSerializer):
@@ -779,6 +798,20 @@ class RequestCreateSerializer(serializers.ModelSerializer):
                                 }
                             )
 
+        if (
+            car
+            and request_type == ListingType.BUY
+            and car.is_negotiable
+            and self.instance is None
+        ):
+            raise serializers.ValidationError(
+                {
+                    "detail": (
+                        "This vehicle accepts offers. Submit an offer instead of a "
+                        "direct purchase request."
+                    )
+                }
+            )
         return data
 
     def create(self, validated_data):
