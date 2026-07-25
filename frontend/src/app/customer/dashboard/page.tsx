@@ -978,7 +978,7 @@ export default function CustomerDashboard() {
               title="The Weekend Drop"
               subtitle="Premium rides, ready to roll. Limited runs only."
               ctaLabel="Browse Cars"
-              href="/customer/listings"
+              href="/services"
               image="/customer-banner.jpg"
               imagePosition="50% 36%"
               tone="primary"

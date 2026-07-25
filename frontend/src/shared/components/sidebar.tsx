@@ -12,7 +12,7 @@ type SidebarLink = {
 
 const customerLinks: SidebarLink[] = [
   { href: "/customer/dashboard", label: "Dashboard" },
-  { href: "/customer/listings", label: "Browse Cars" },
+  { href: "/services", label: "Browse Cars" },
   { href: "/customer/requests", label: "My Requests" },
   { href: "/customer/offers", label: "Offers" },
   { href: "/customer/payments", label: "Payments" },
