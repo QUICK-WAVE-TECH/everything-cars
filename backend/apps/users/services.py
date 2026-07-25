@@ -88,9 +88,23 @@ def generate_and_send_code(email: str, purpose: str, user=None) -> AccessCode:
     # Lazy import avoids any users<->notifications import-order issues.
     from apps.notifications.email_service import send_email
 
+    context = {
+        "code": code_obj.plain_code,
+        "expires_minutes": ACCESS_CODE_EXPIRY_MINUTES,
+    }
+
     if purpose == AccessCode.Purpose.SIGN_UP_VERIFY:
         template_key = "auth_signup_code"
-        subject = "Verify your email — your code inside"
+        subject = "Verify your email"
+        # A one-click verification link that carries the code, so the recipient
+        # can just tap the button instead of copying the digits.
+        from urllib.parse import urlencode
+
+        context["verify_url"] = (
+            settings.FRONTEND_URL.rstrip("/")
+            + "/verify-email?"
+            + urlencode({"email": email, "code": code_obj.plain_code})
+        )
     else:
         template_key = "auth_login_code"
         subject = "Your EverythingCars login code"
@@ -99,10 +113,7 @@ def generate_and_send_code(email: str, purpose: str, user=None) -> AccessCode:
         recipient=email,
         subject=subject,
         template_key=template_key,
-        context={
-            "code": code_obj.plain_code,
-            "expires_minutes": ACCESS_CODE_EXPIRY_MINUTES,
-        },
+        context=context,
     )
 
     # Dev convenience: still echo the code to the console so you don't have to

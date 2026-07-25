@@ -466,3 +466,43 @@ class ForgotPasswordEmailTest(APITestCase):
         # Same generic response, but no email and no account leak.
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(len(mail.outbox), 0)
+
+
+class CustomerVerificationEmailTest(APITestCase):
+    """Sign-up creates an inactive user and emails a one-click verify link."""
+
+    def test_signup_sends_verification_link_and_leaves_user_inactive(self):
+        from django.core import mail
+
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.post(
+                "/api/v1/auth/sign-up",
+                {
+                    "email": "verify-me@test.com", "first_name": "Vee",
+                    "last_name": "Rify", "password": "securepass123",
+                    "role": "customer",
+                },
+                format="multipart",
+            )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        user = User.objects.get(email="verify-me@test.com")
+        self.assertFalse(user.is_active)  # can't sign in until verified
+
+        self.assertEqual(len(mail.outbox), 1)
+        html = mail.outbox[0].alternatives[0][0]
+        self.assertIn("/verify-email?email=", html)
+        self.assertIn("Verify My Account", html)
+
+    def test_unverified_signin_is_blocked(self):
+        User.objects.create_user(
+            email="pending@test.com", first_name="Pend", last_name="Ing",
+            password="securepass123", role="customer", is_active=False,
+        )
+        res = self.client.post(
+            "/api/v1/auth/sign-in",
+            {"email": "pending@test.com", "password": "securepass123"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(res.data.get("requires_verification"))
