@@ -19,8 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Field, FieldLabel } from "@/components/ui/field";
 import {
   InputOTP,
   InputOTPGroup,
@@ -179,7 +178,7 @@ function VerifyContent() {
                 background: "var(--brc-primary-tint)",
               }}
             >
-              <ShieldCheckIcon
+              <MailIcon
                 size={28}
                 strokeWidth={1.8}
                 style={{ color: "var(--brc-primary)" }}
@@ -193,7 +192,7 @@ function VerifyContent() {
                   color: "var(--brc-text)",
                 }}
               >
-                Verify Your Identity
+                Check your email
               </CardTitle>
               <CardDescription
                 className="text-sm"
@@ -202,52 +201,88 @@ function VerifyContent() {
                   color: "var(--brc-text-muted)",
                 }}
               >
-                We sent a 6-digit verification code to{" "}
+                We sent a verification link to{" "}
                 <span
-                  className="inline-flex items-center gap-1 font-medium"
+                  className="font-medium"
                   style={{ color: "var(--brc-text)" }}
                 >
-                  <MailIcon size={14} />
                   {maskedEmail}
                 </span>
+                . Open it to activate your account.
               </CardDescription>
             </div>
           </CardHeader>
 
+          <CardContent className="flex flex-col gap-4 pt-4">
+            <AuthButton
+              full
+              type="button"
+              variant="primary"
+              loading={isResending}
+              disabled={cooldown > 0 || isResending}
+              onClick={handleResend}
+            >
+              {isResending ? (
+                "Sending..."
+              ) : cooldown > 0 ? (
+                `Resend email in ${cooldown}s`
+              ) : (
+                <span className="inline-flex items-center gap-2">
+                  <RefreshCwIcon size={16} />
+                  Didn&apos;t get it? Resend email
+                </span>
+              )}
+            </AuthButton>
+            <p
+              className="text-center text-xs"
+              style={{
+                fontFamily: "var(--brc-font-ui)",
+                color: "var(--brc-text-muted)",
+              }}
+            >
+              Check your spam folder if you don&apos;t see it within a
+              minute.
+            </p>
+          </CardContent>
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)}>
-              <CardContent className="flex flex-col gap-6 pt-4">
+              <CardContent className="flex flex-col gap-4 pt-2">
+                <div
+                  className="flex items-center gap-3"
+                  aria-hidden="true"
+                  style={{ color: "var(--brc-border)" }}
+                >
+                  <span className="h-px flex-1" style={{ background: "var(--brc-border)" }} />
+                  <span
+                    className="text-xs font-medium"
+                    style={{
+                      fontFamily: "var(--brc-font-ui)",
+                      color: "var(--brc-text-muted)",
+                    }}
+                  >
+                    OR
+                  </span>
+                  <span className="h-px flex-1" style={{ background: "var(--brc-border)" }} />
+                </div>
+
                 <FormField
                   control={form.control}
                   name="code"
                   render={({ field }) => (
                     <FormItem>
                       <Field>
-                        <div className="flex items-center justify-between">
-                          <FieldLabel
-                            htmlFor="otp-verification"
-                            style={{
-                              fontFamily: "var(--brc-font-ui)",
-                              color: "var(--brc-text)",
-                            }}
-                          >
-                            Verification code
-                          </FieldLabel>
-                          <Button
-                            variant="outline"
-                            size="xs"
-                            type="button"
-                            disabled={cooldown > 0 || isResending}
-                            onClick={handleResend}
-                          >
-                            <RefreshCwIcon
-                              className={isResending ? "animate-spin" : ""}
-                            />
-                            {cooldown > 0
-                              ? `Resend in ${cooldown}s`
-                              : "Resend Code"}
-                          </Button>
-                        </div>
+                        <FieldLabel
+                          htmlFor="otp-verification"
+                          className="text-center"
+                          style={{
+                            fontFamily: "var(--brc-font-ui)",
+                            color: "var(--brc-text-muted)",
+                          }}
+                        >
+                          Prefer to enter the code? Type the 6 digits from
+                          the email below.
+                        </FieldLabel>
                         <div className="flex justify-center py-2">
                           <InputOTP
                             maxLength={6}
@@ -299,9 +334,6 @@ function VerifyContent() {
                             </>
                           )}
                         </div>
-                        <FieldDescription className="text-center">
-                          Didn&apos;t receive the code? Check your spam folder.
-                        </FieldDescription>
                       </Field>
                     </FormItem>
                   )}
@@ -311,6 +343,7 @@ function VerifyContent() {
               <CardFooter className="flex flex-col gap-4">
                 <AuthButton
                   full
+                  variant="neutral"
                   type="submit"
                   loading={verify.isPending}
                   disabled={isExpired || isThrottled}
@@ -321,7 +354,7 @@ function VerifyContent() {
                       ? `Too many attempts — wait ${throttledUntil}s`
                       : isExpired
                         ? "Code Expired"
-                        : "Verify & Continue"}
+                        : "Verify code"}
                 </AuthButton>
                 <p
                   className="text-center text-sm"
