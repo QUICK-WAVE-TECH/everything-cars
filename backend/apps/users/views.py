@@ -387,7 +387,17 @@ class ForgotPasswordView(APIView):
                         "Failed to send password reset email for user %s", user.id
                     )
             else:
-                print(f"\n[DEV] Password reset link for {email}: {reset_url}\n")
+                # No Resend key (dev / self-hosted): send through the app's
+                # email service so it goes wherever EMAIL_BACKEND points —
+                # Mailpit in dev — instead of only printing to the console.
+                from apps.notifications.email_service import send_email
+
+                send_email(
+                    recipient=email,
+                    subject="Reset your EverythingCars Password",
+                    template_key="auth_password_reset",
+                    context={"reset_url": reset_url},
+                )
 
         return Response(
             {"message": "If this email is registered, a reset link has been sent."},

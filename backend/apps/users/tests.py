@@ -434,3 +434,35 @@ class CustomerSignUpNoNinTest(APITestCase):
         res = self.client.post("/api/v1/auth/sign-up", payload, format="multipart")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("national_id", res.data)
+
+
+class ForgotPasswordEmailTest(APITestCase):
+    """A reset request emails the link (Mailpit in dev) rather than only printing."""
+
+    def test_forgot_password_sends_reset_email(self):
+        from django.core import mail
+
+        User.objects.create_user(
+            email="reset-me@test.com", first_name="Reset", last_name="Me",
+            password="securepass123", role="customer", is_active=True,
+        )
+        res = self.client.post(
+            "/api/v1/auth/forgot-password", {"email": "reset-me@test.com"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["reset-me@test.com"])
+        body = mail.outbox[0].alternatives[0][0]
+        self.assertIn("reset-password?token=", body)
+
+    def test_forgot_password_unknown_email_sends_nothing(self):
+        from django.core import mail
+
+        res = self.client.post(
+            "/api/v1/auth/forgot-password", {"email": "nobody@test.com"},
+            format="json",
+        )
+        # Same generic response, but no email and no account leak.
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 0)
