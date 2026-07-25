@@ -78,10 +78,13 @@ class SignUpSerializer(serializers.Serializer):
         return value
 
     def validate(self, data):
-        if not data.get("national_id"):
-            raise serializers.ValidationError({"national_id": "ID number is required."})
-
+        # Customers no longer supply an ID number at sign-up — only owners,
+        # who must still provide and match a means of identification.
         if data["role"] == "owner":
+            if not data.get("national_id"):
+                raise serializers.ValidationError(
+                    {"national_id": "ID number is required."}
+                )
             if not data.get("id_type"):
                 raise serializers.ValidationError(
                     {"id_type": "Select a means of identification."}
@@ -105,12 +108,6 @@ class SignUpSerializer(serializers.Serializer):
             if not data.get("document"):
                 raise serializers.ValidationError(
                     {"document": "Document upload is required for owner accounts."}
-                )
-        else:
-            # Customers identify with their NIN — keep the digits-only rule.
-            if not data["national_id"].isdigit():
-                raise serializers.ValidationError(
-                    {"national_id": "NIN must contain digits only."}
                 )
         return data
 

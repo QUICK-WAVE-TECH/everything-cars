@@ -42,11 +42,6 @@ export const customerSignUpSchema = z
     phone: phoneSchema,
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string(),
-    national_id: requiredDigitsSchema(
-      "NIN is required",
-      "NIN must contain digits only",
-    ),
-    drivers_license: z.string().trim().optional(),
     date_of_birth: z.string().trim().optional(),
     address: z.string().trim().optional(),
     state: z.string().trim().optional(),

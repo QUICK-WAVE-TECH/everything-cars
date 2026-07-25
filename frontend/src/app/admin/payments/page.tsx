@@ -1,29 +1,49 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { toast } from "sonner";
-import { SearchIcon, Loader2Icon, XIcon, CheckIcon, ExternalLinkIcon } from "lucide-react";
+import {
+  SearchIcon,
+  RefreshCwIcon,
+  XIcon,
+  ChevronDownIcon,
+} from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
-import type { IconName } from "@/features/auth/components/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/features/requests/components/status-badge";
 import { cn } from "@/lib/utils";
-import { useAdminRequests, useAdminRequestDetail } from "@/features/listings/api/admin-api";
-import { useStaffConfirmPayment } from "@/features/payments/api";
+import { useAdminRequests } from "@/features/listings/api/admin-api";
 import type { RequestListItem } from "@/features/requests/api/types";
+import { PaymentSummaryBand, type PaymentCounts } from "@/features/payments/components/payment-summary-band";
+import { PaymentDrawer } from "@/features/payments/components/payment-drawer";
 
 // ── Helpers ──
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
 function fmtMoney(amount: string | number, currency: string) {
-  const sym: Record<string, string> = { NGN: "\u20A6", USD: "$", GBP: "\u00A3", EUR: "\u20AC" };
+  const sym: Record<string, string> = { NGN: "₦", USD: "$", GBP: "£", EUR: "€" };
   return `${sym[currency] ?? currency}${Number(amount).toLocaleString("en-NG")}`;
 }
 
+function relativeTime(fromMs: number, nowMs: number) {
+  const diffSec = Math.floor((nowMs - fromMs) / 1000);
+  if (diffSec < 5) return "just now";
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const min = Math.floor(diffSec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  return `${hr}h ago`;
+}
+
 type TabKey = "payment_submitted" | "paid" | "active" | "completed";
+type SortKey = "newest" | "oldest" | "highest" | "lowest";
+type TypeFilter = "all" | "rent" | "buy";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "payment_submitted", label: "Awaiting Verification" },
@@ -32,240 +52,22 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "completed", label: "Completed" },
 ];
 
-// ── KPI Card ──
-function KpiCard({ icon, label, value, accent }: { icon: IconName; label: string; value: number; accent: string }) {
-  return (
-    <div className="group/kpi relative isolate flex min-w-0 overflow-hidden rounded-2xl border border-(--brc-border) bg-white p-[1px] shadow-[var(--brc-shadow-xs)] transition-all duration-300 ease-out hover:-translate-y-1 hover:border-transparent hover:shadow-[0_18px_38px_rgba(0,0,139,0.12)]">
-      <span className="pointer-events-none absolute inset-x-0 top-0 h-px opacity-0 transition-opacity duration-300 group-hover/kpi:opacity-100" style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }} />
-      <div className="relative z-10 flex w-full min-w-0 flex-col gap-3 rounded-[calc(1rem-1px)] bg-white p-4 sm:p-5">
-        <div className="flex items-center justify-between">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border transition-transform duration-300 ease-out group-hover/kpi:scale-110 group-hover/kpi:-rotate-3 sm:size-11" style={{ background: `color-mix(in srgb, ${accent} 13%, #fff)`, borderColor: `color-mix(in srgb, ${accent} 22%, transparent)` }}>
-            <Icon name={icon} size={21} stroke={accent} />
-          </span>
-        </div>
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="truncate text-[26px] font-extrabold leading-none tracking-tight text-(--brc-text) [font-family:var(--brc-font-display)] sm:text-[36px]">{value}</span>
-          <span className="truncate text-xs font-semibold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{label}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Review drawer for payment verification ──
-function PaymentDrawer({ requestId, open, onClose, onConfirmed }: {
-  requestId: string | null; open: boolean; onClose: () => void; onConfirmed: () => void;
-}) {
-  const { data: req } = useAdminRequestDetail(open ? requestId : null);
-  const confirmPayment = useStaffConfirmPayment();
-
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", h);
-    return () => document.removeEventListener("keydown", h);
-  }, [onClose]);
-
-  async function handleConfirm() {
-    if (!requestId) return;
-    try {
-      await confirmPayment.mutateAsync(requestId);
-      toast.success("Payment confirmed — transaction created");
-      onConfirmed();
-      onClose();
-    } catch {
-      toast.error("Failed to confirm payment");
-    }
-  }
-
-  const car = req?.car;
-  const primaryImage = car?.images?.find((img) => img.is_primary)?.image ?? car?.images?.[0]?.image;
-  const ownerName = car ? `${car.owner.first_name} ${car.owner.last_name}` : "";
-  const customerName = req ? `${req.customer.first_name} ${req.customer.last_name}` : "";
-  const canConfirm = req?.status === "payment_submitted";
-
-  return (
-    <div aria-hidden={!open} className={cn("fixed inset-0 z-[100]", open ? "pointer-events-auto" : "pointer-events-none")}>
-      <div onClick={onClose} className="absolute inset-0 transition-opacity duration-300" style={{ background: "rgba(18,18,18,0.42)", opacity: open ? 1 : 0 }} />
-      <aside
-        className="absolute bottom-0 right-0 top-0 flex w-full flex-col bg-white shadow-lg sm:w-[min(560px,92vw)]"
-        style={{ transform: open ? "translateX(0)" : "translateX(102%)", transition: "transform .34s cubic-bezier(.2,.8,.2,1)" }}
-      >
-        {!req ? (
-          <div className="flex flex-1 flex-col gap-4 p-6">
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-[200px] w-full rounded-xl" />
-            <Skeleton className="h-20 w-full rounded-xl" />
-            <Skeleton className="h-36 w-full rounded-xl" />
-          </div>
-        ) : (
-          <>
-            {/* Header */}
-            <div className="flex shrink-0 items-center gap-3 border-b border-(--brc-border) px-6 py-[18px]">
-              <div className="min-w-0 flex-1">
-                <span className="block truncate text-lg font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">Payment Verification</span>
-                <span className="text-[13px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                  {req.request_type === "rent" ? "Rental" : "Purchase"} request · {formatDate(req.created_at)}
-                </span>
-              </div>
-              <StatusBadge status={req.status} />
-              <button onClick={onClose} aria-label="Close" className="flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-lg border-none bg-(--brc-bg-subtle)">
-                <XIcon size={17} className="text-(--brc-text)" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
-              {/* Car info */}
-              <section className="flex items-center gap-4 rounded-xl border border-(--brc-border) p-4">
-                {primaryImage ? (
-                  <Image src={primaryImage} alt={car?.title ?? ""} width={80} height={60} className="rounded-lg object-cover" />
-                ) : (
-                  <span className="flex size-[60px] items-center justify-center rounded-lg bg-(--brc-bg-subtle)">
-                    <Icon name="car" size={24} stroke="var(--brc-text-muted)" />
-                  </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <span className="block truncate text-base font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">{car?.title}</span>
-                  <span className="text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{car?.year} · {car?.brand} {car?.model}</span>
-                </div>
-              </section>
-
-              {/* Amount */}
-              <section className="rounded-xl bg-(--brc-primary-tint) p-5">
-                <span className="text-xs font-semibold uppercase tracking-widest text-(--brc-primary) [font-family:var(--brc-font-ui)]">Amount</span>
-                <span className="mt-1 block text-[32px] font-extrabold text-(--brc-primary) [font-family:var(--brc-font-display)]">
-                  {fmtMoney(req.price_offered, req.currency)}
-                </span>
-                {req.payment_method_choice && (
-                  <span className="mt-1 text-sm text-(--brc-primary)/70 [font-family:var(--brc-font-ui)]">
-                    via {req.payment_method_choice === "transfer" ? "Bank Transfer" : "Card"}
-                  </span>
-                )}
-              </section>
-
-              {/* Parties */}
-              <section className="flex flex-col gap-3">
-                <h3 className="m-0 text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Parties</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="min-w-0 rounded-lg border border-(--brc-border) p-3.5">
-                    <span className="block truncate text-[11px] font-semibold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Customer (Payer)</span>
-                    <span className="mt-1 block truncate text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">{customerName}</span>
-                  </div>
-                  <div className="min-w-0 rounded-lg border border-(--brc-border) p-3.5">
-                    <span className="block truncate text-[11px] font-semibold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Owner (Receiver)</span>
-                    <span className="mt-1 block truncate text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">{ownerName}</span>
-                  </div>
-                </div>
-              </section>
-
-              {/* Request details */}
-              <section className="flex flex-col gap-3">
-                <h3 className="m-0 text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Request Details</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    ["Type", req.request_type === "rent" ? "Rental" : "Purchase"],
-                    ["Duration", req.duration_days ? `${req.duration_days} days` : "—"],
-                    ["Start Date", req.start_date ? formatDate(req.start_date) : "—"],
-                    ["Submitted", formatDate(req.created_at)],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex flex-col gap-[3px] rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) px-3 py-2.5">
-                      <span className="text-[11px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{label}</span>
-                      <span className="text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* Receipt */}
-              {req.payment_receipt && (
-                <section className="flex flex-col gap-3">
-                  <h3 className="m-0 text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Payment Receipt</h3>
-                  <div className="overflow-hidden rounded-xl border border-(--brc-border)">
-                    {req.payment_receipt.match(/\.(jpg|jpeg|png|webp)$/i) ? (
-                      <Image src={req.payment_receipt} alt="Payment receipt" width={500} height={300} className="w-full object-contain" />
-                    ) : (
-                      <a href={req.payment_receipt} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-3 p-4 text-sm font-semibold text-(--brc-primary) no-underline hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]">
-                        <Icon name="file" size={20} stroke="var(--brc-primary)" />
-                        View Receipt (PDF)
-                        <ExternalLinkIcon size={14} />
-                      </a>
-                    )}
-                  </div>
-                </section>
-              )}
-
-              {/* Message */}
-              {req.message && (
-                <section className="flex flex-col gap-3">
-                  <h3 className="m-0 text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Customer Message</h3>
-                  <p className="m-0 text-sm leading-relaxed text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">{req.message}</p>
-                </section>
-              )}
-
-              {/* Status events */}
-              {req.status_events.length > 0 && (
-                <section className="flex flex-col gap-3">
-                  <h3 className="m-0 text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Status History</h3>
-                  <div className="relative ml-4 border-l-2 border-(--brc-border) pl-5">
-                    {req.status_events.map((event, i) => (
-                      <div key={event.id} className="relative pb-4 last:pb-0">
-                        <span className="absolute left-[-25px] top-0.5 size-3 rounded-full border-2 border-white" style={{ background: i === req.status_events.length - 1 ? "var(--brc-primary)" : "var(--brc-border)" }} />
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
-                            <StatusBadge status={event.to_status} />
-                          </div>
-                          {event.note && <p className="m-0 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">{event.note}</p>}
-                          <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{event.actor_name} · {formatDate(event.created_at)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-            </div>
-
-            {/* Action bar */}
-            <div className="shrink-0 border-t border-(--brc-border) bg-white px-6 py-3.5">
-              {canConfirm ? (
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex gap-2.5">
-                    <button type="button" onClick={onClose}
-                      className="flex h-[46px] flex-1 cursor-pointer items-center justify-center rounded-lg border border-(--brc-border) bg-white text-sm font-bold text-(--brc-text) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]">
-                      Close
-                    </button>
-                    <button type="button" disabled={confirmPayment.isPending} onClick={handleConfirm}
-                      className="flex h-[46px] flex-[2] cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-success) text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]">
-                      {confirmPayment.isPending ? <Loader2Icon size={16} className="animate-spin" /> : <CheckIcon size={16} />}
-                      Confirm Payment
-                    </button>
-                  </div>
-                  <span className="text-center text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                    This will create a transaction and mark the request as paid.
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center gap-2 py-1">
-                  <CheckIcon size={16} className="text-(--brc-success)" />
-                  <span className="text-sm font-semibold text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
-                    Payment already verified
-                  </span>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </aside>
-    </div>
-  );
-}
+const EMPTY_COPY: Record<TabKey, { title: string; body: string }> = {
+  payment_submitted: { title: "Nothing awaiting verification", body: "All submitted payments in this view have been handled." },
+  paid: { title: "No confirmed payments", body: "Confirmed payments waiting to become active will appear here." },
+  active: { title: "No active transactions", body: "Active rentals and purchases will show up here." },
+  completed: { title: "No completed transactions", body: "Finished transactions land here for your records." },
+};
 
 // ── Mobile card (md:hidden) ──
 function MobileRequestCard({ req, onOpen }: { req: RequestListItem; onOpen: (req: RequestListItem) => void }) {
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={() => onOpen(req)}
-      className="cursor-pointer rounded-xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] transition-colors active:bg-(--brc-bg-subtle)"
+      onKeyDown={(e) => { if (e.key === "Enter") onOpen(req); }}
+      className="cursor-pointer rounded-xl border border-(--brc-border) bg-(--brc-bg) p-4 shadow-[var(--brc-shadow-xs)] transition-colors active:bg-(--brc-bg-subtle)"
     >
       <div className="flex items-center gap-3">
         <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-(--brc-bg-subtle)">
@@ -289,7 +91,7 @@ function MobileRequestCard({ req, onOpen }: { req: RequestListItem; onOpen: (req
         </div>
         <div className="min-w-0 rounded-lg bg-(--brc-bg-subtle) px-2.5 py-2">
           <span className="block text-[11px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Amount</span>
-          <span className="block truncate text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">{fmtMoney(req.price_offered, req.currency)}</span>
+          <span className="block truncate text-sm font-semibold tabular-nums text-(--brc-text) [font-family:var(--brc-font-ui)]">{fmtMoney(req.price_offered, req.currency)}</span>
         </div>
       </div>
 
@@ -300,7 +102,7 @@ function MobileRequestCard({ req, onOpen }: { req: RequestListItem; onOpen: (req
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onOpen(req); }}
-          className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-(--brc-border) bg-white px-3 text-[13px] font-bold text-(--brc-primary) [font-family:var(--brc-font-ui)]"
+          className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-(--brc-border) bg-(--brc-bg) px-3 text-[13px] font-bold text-(--brc-primary) [font-family:var(--brc-font-ui)]"
         >
           <span>{req.status === "payment_submitted" ? "Verify" : "View"}</span>
           <Icon name="chevright" size={12} stroke="currentColor" />
@@ -313,11 +115,43 @@ function MobileRequestCard({ req, onOpen }: { req: RequestListItem; onOpen: (req
 // ── Main Page ──
 const PAGE_SIZE = 20;
 
+/**
+ * Windowed page list: first and last page always, the current page with a
+ * neighbour either side, and "…" gaps — so a 40-page queue never renders 40
+ * buttons. Returns page numbers interleaved with the "ellipsis" sentinel.
+ */
+const ELLIPSIS = "ellipsis" as const;
+function pageWindow(current: number, total: number): (number | typeof ELLIPSIS)[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = new Set([1, total, current, current - 1, current + 1]);
+  const sorted = [...pages].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
+  const out: (number | typeof ELLIPSIS)[] = [];
+  let prev = 0;
+  for (const n of sorted) {
+    if (n - prev > 1) out.push(ELLIPSIS);
+    out.push(n);
+    prev = n;
+  }
+  return out;
+}
+
 export default function AdminPaymentsPage() {
   const [tab, setTab] = useState<TabKey>("payment_submitted");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<SortKey>("newest");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+
+  // "just now" freshens once after mount, then every 30s — kept out of the
+  // effect body itself (repo lints react-hooks/set-state-in-effect).
+  const [nowMs, setNowMs] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setNowMs(Date.now());
+    const initial = window.setTimeout(tick, 0);
+    const id = window.setInterval(tick, 30_000);
+    return () => { window.clearTimeout(initial); window.clearInterval(id); };
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -327,16 +161,31 @@ export default function AdminPaymentsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const { data: paginatedData, isLoading, isFetching } = useAdminRequests({
+  const ordering = sort === "oldest" ? "created_at" : "-created_at";
+
+  const { data: paginatedData, isLoading, isFetching, dataUpdatedAt, refetch } = useAdminRequests({
     status: tab,
     search: debouncedSearch || undefined,
     page,
+    ordering,
   });
 
   const showSkeleton = isLoading || (isFetching && !paginatedData);
-  const requests = paginatedData?.results ?? [];
+  const requests = useMemo(() => paginatedData?.results ?? [], [paginatedData]);
   const totalCount = paginatedData?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  // Type filter and amount sort are applied client-side to the current page.
+  // TODO: the admin requests API has no `request_type` query param and only
+  // supports ordering by `created_at` — pushing these server-side (and
+  // getting an accurate total count back) needs backend support first.
+  const displayedRequests = useMemo(() => {
+    let rows = requests;
+    if (typeFilter !== "all") rows = rows.filter((r) => r.request_type === typeFilter);
+    if (sort === "highest") rows = [...rows].sort((a, b) => Number(b.price_offered) - Number(a.price_offered));
+    else if (sort === "lowest") rows = [...rows].sort((a, b) => Number(a.price_offered) - Number(b.price_offered));
+    return rows;
+  }, [requests, typeFilter, sort]);
 
   // Counts for KPIs
   const { data: awaitingData } = useAdminRequests({ status: "payment_submitted" });
@@ -344,7 +193,7 @@ export default function AdminPaymentsPage() {
   const { data: activeData } = useAdminRequests({ status: "active" });
   const { data: completedData } = useAdminRequests({ status: "completed" });
 
-  const counts = useMemo(() => ({
+  const counts: PaymentCounts = useMemo(() => ({
     payment_submitted: awaitingData?.count ?? 0,
     paid: confirmedData?.count ?? 0,
     active: activeData?.count ?? 0,
@@ -359,58 +208,85 @@ export default function AdminPaymentsPage() {
     setDrawerOpen(true);
   }
 
+  const filtersActive = search.trim() !== "" || typeFilter !== "all" || sort !== "newest";
+  function clearFilters() {
+    setSearch("");
+    setTypeFilter("all");
+    setSort("newest");
+    setPage(1);
+  }
+
+  const emptyCopy = filtersActive && requests.length === 0
+    ? { title: "No matching payments", body: "No payments match your current search or filters. Try adjusting them." }
+    : EMPTY_COPY[tab];
+
+  const showingLabel = totalCount === 0
+    ? "No requests"
+    : typeFilter !== "all"
+      ? `Showing ${displayedRequests.length} of ${requests.length} on this page`
+      : `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, totalCount)} of ${totalCount} requests`;
+
   return (
     <>
       {/* Hero */}
-      <section className="border-b border-(--brc-border) bg-white">
-        <div className="mx-auto flex max-w-[1320px] flex-wrap items-end justify-between gap-8 px-4 pb-8 pt-10 sm:px-6 lg:px-(--brc-space-10,40px)">
+      <section className="border-b border-(--brc-border) bg-(--brc-bg)">
+        <div className="mx-auto flex max-w-[1320px] flex-wrap items-start justify-between gap-6 px-4 pb-8 pt-10 sm:px-6 lg:px-(--brc-space-10,40px)">
           <div className="max-w-[580px]">
             <span className="text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
               Moderation · Payment desk
             </span>
-            <h1 className="mt-3 text-[clamp(32px,5vw,44px)] font-extrabold leading-tight tracking-tight text-(--brc-text) [font-family:var(--brc-font-display)]">
+            <h1 className="mt-3 text-[clamp(28px,5vw,40px)] font-extrabold leading-tight tracking-tight text-(--brc-text) [font-family:var(--brc-font-display)]">
               Payment Verification
             </h1>
             <p className="mt-2.5 text-base leading-relaxed text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-              Review and confirm customer payments before they&apos;re processed.
+              Review and confirm customer payments before they&apos;re processed into transactions.
             </p>
+          </div>
+          <div className="flex flex-col items-end gap-1.5">
+            <button
+              type="button"
+              onClick={() => refetch()}
+              aria-label="Refresh queue"
+              title="Refresh queue"
+              className="flex size-10 cursor-pointer items-center justify-center rounded-lg border border-(--brc-border) bg-(--brc-bg) text-(--brc-text-secondary) transition-colors hover:bg-(--brc-bg-subtle)"
+            >
+              <RefreshCwIcon size={17} className={cn(isFetching && "animate-spin motion-reduce:animate-none")} />
+            </button>
+            <span className="whitespace-nowrap text-[11.5px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+              {isFetching ? "Updating…" : nowMs === null ? "" : `Updated ${relativeTime(dataUpdatedAt, nowMs)}`}
+            </span>
           </div>
         </div>
       </section>
 
       <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-(--brc-space-10,40px)">
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-[18px] lg:grid-cols-4">
-          <KpiCard icon="clock" label="Awaiting Verification" value={counts.payment_submitted} accent="#C8870B" />
-          <KpiCard icon="check" label="Confirmed" value={counts.paid} accent="var(--brc-success)" />
-          <KpiCard icon="car" label="Active Rentals" value={counts.active} accent="var(--brc-primary)" />
-          <KpiCard icon="banknote" label="Completed" value={counts.completed} accent="var(--brc-accent)" />
-        </div>
+        {/* Summary band */}
+        <PaymentSummaryBand counts={counts} />
 
-        {/* Table card */}
-        <div className="flex flex-col gap-4 rounded-2xl border border-(--brc-border) bg-white p-4 shadow-[var(--brc-shadow-xs)] sm:p-6">
-          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        {/* Queue card */}
+        <div className="flex flex-col gap-0 overflow-hidden rounded-2xl border border-(--brc-border) bg-(--brc-bg) shadow-[var(--brc-shadow-xs)]">
+          <div className="flex flex-col items-start gap-3 px-4 pb-2 pt-5 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6">
             <div className="min-w-0">
               <h2 className="m-0 text-xl font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">Payment queue</h2>
               <p className="mt-1 text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Customer payments awaiting verification</p>
             </div>
             {counts.payment_submitted > 0 && (
-              <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-(--brc-warning-bg) px-3.5 py-1.5 text-[13px] font-bold text-[#9a7400] [font-family:var(--brc-font-ui)]">
-                <span className="size-[7px] rounded-full bg-[#C8870B]" />
+              <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-(--brc-warning-bg) px-3.5 py-1.5 text-[13px] font-bold text-(--brc-accent-deep) [font-family:var(--brc-font-ui)]">
+                <span className="size-[7px] rounded-full bg-(--brc-accent-deep)" />
                 {counts.payment_submitted} awaiting
               </span>
             )}
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 overflow-x-auto border-b border-(--brc-border)">
+          <div className="ec-tabscroll flex gap-1 overflow-x-auto border-b border-(--brc-border) px-4 sm:px-6">
             {TABS.map((t) => {
               const active = t.key === tab;
               return (
                 <button key={t.key} type="button" onClick={() => { setTab(t.key); setPage(1); }}
                   className={cn("relative flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap border-none bg-transparent px-3.5 pb-3 pt-2.5 text-sm transition-colors [font-family:var(--brc-font-ui)]", active ? "font-bold text-(--brc-primary)" : "font-medium text-(--brc-text-muted) hover:text-(--brc-text)")}>
                   {t.label}
-                  <span className={cn("inline-flex h-[18px] items-center rounded-full px-[7px] text-[11px] font-bold", active ? "bg-(--brc-primary-tint) text-(--brc-primary)" : "bg-(--brc-bg-muted) text-(--brc-text-muted)")}>
+                  <span className={cn("inline-flex h-[18px] items-center rounded-full px-[7px] text-[11px] font-bold tabular-nums", active ? "bg-(--brc-primary-tint) text-(--brc-primary)" : "bg-(--brc-bg-muted) text-(--brc-text-muted)")}>
                     {counts[t.key]}
                   </span>
                   {active && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded bg-(--brc-primary)" />}
@@ -419,130 +295,204 @@ export default function AdminPaymentsPage() {
             })}
           </div>
 
-          {/* Search */}
-          <div className="flex h-10 w-full items-center gap-2 rounded-xl border border-(--brc-border) bg-white px-3 sm:w-72">
-            <SearchIcon size={18} className="text-(--brc-text-muted)" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search car, customer or owner"
-              className="flex-1 border-none bg-transparent text-sm text-(--brc-text) outline-none placeholder:text-(--brc-text-muted) [font-family:var(--brc-font-ui)]" />
+          {/* Toolbar */}
+          <div className="flex flex-wrap items-center gap-2.5 px-4 py-3.5 sm:px-6">
+            <div className="flex h-10 min-w-[200px] flex-1 items-center gap-2 rounded-lg border border-(--brc-border) bg-(--brc-bg) px-3 sm:max-w-72">
+              <SearchIcon size={16} className="shrink-0 text-(--brc-text-muted)" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search car, customer or owner"
+                aria-label="Search payments"
+                className="w-full min-w-0 border-none bg-transparent text-sm text-(--brc-text) outline-none placeholder:text-(--brc-text-muted) [font-family:var(--brc-font-ui)]"
+              />
+            </div>
+
+            <div className="relative inline-flex">
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortKey)}
+                aria-label="Sort payments"
+                className="h-10 cursor-pointer appearance-none rounded-lg border border-(--brc-border) bg-(--brc-bg) py-0 pl-3 pr-8 text-[12.5px] font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]"
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="highest">Highest amount</option>
+                <option value="lowest">Lowest amount</option>
+              </select>
+              <ChevronDownIcon size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-(--brc-text-muted)" />
+            </div>
+
+            <div className="relative inline-flex">
+              <select
+                value={typeFilter}
+                onChange={(e) => { setTypeFilter(e.target.value as TypeFilter); }}
+                aria-label="Filter by request type"
+                className="h-10 cursor-pointer appearance-none rounded-lg border border-(--brc-border) bg-(--brc-bg) py-0 pl-3 pr-8 text-[12.5px] font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]"
+              >
+                <option value="all">All types</option>
+                <option value="rent">Rent</option>
+                <option value="buy">Buy</option>
+              </select>
+              <ChevronDownIcon size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-(--brc-text-muted)" />
+            </div>
+
+            {filtersActive && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-(--brc-border) bg-(--brc-bg) px-3 text-[12.5px] font-bold text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]"
+              >
+                <XIcon size={13} /> Clear
+              </button>
+            )}
+
+            <span className="ml-auto whitespace-nowrap text-[12.5px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{showingLabel}</span>
           </div>
 
-          {/* Loading bar */}
-          {isFetching && !showSkeleton && (
-            <div className="h-0.5 w-full overflow-hidden rounded-full bg-(--brc-bg-muted)">
-              <div className="h-full w-1/3 animate-pulse rounded-full bg-(--brc-primary)" />
-            </div>
-          )}
+          {/* Refresh loading bar */}
+          <div className="relative h-0.5 w-full overflow-hidden bg-transparent">
+            {isFetching && !showSkeleton && (
+              <span className="absolute inset-y-0 w-1/3 rounded-full bg-(--brc-primary) motion-safe:animate-[brc-loadbar_1s_linear_infinite] motion-reduce:opacity-60" />
+            )}
+          </div>
+          <style>{"@keyframes brc-loadbar { from { left: -35%; } to { left: 100%; } }"}</style>
 
-          {/* Table / Mobile list */}
-          {showSkeleton ? (
-            <div className="flex flex-col gap-2 md:gap-1">
-              <Skeleton className="hidden h-12 w-full rounded-lg md:block" />
-              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg md:rounded-none" />)}
-            </div>
-          ) : requests.length === 0 ? (
-            <div className="py-12 text-center text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">No requests match your filters.</div>
-          ) : (
-            <>
-              {/* Mobile cards */}
-              <div className="flex flex-col gap-3 md:hidden">
-                {requests.map((req) => (
-                  <MobileRequestCard key={req.id} req={req} onOpen={openDrawer} />
-                ))}
+          <div className="flex flex-col gap-4 p-4 pt-3 sm:p-6 sm:pt-3">
+            {/* Table / Mobile list */}
+            {showSkeleton ? (
+              <div className="flex flex-col gap-2 md:gap-1">
+                <Skeleton className="hidden h-12 w-full rounded-lg md:block" />
+                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg md:rounded-none" />)}
               </div>
-
-              {/* Desktop table */}
-              <div className="hidden overflow-x-auto md:block">
-              <table className="w-full border-collapse" style={{ minWidth: 860 }}>
-                <thead>
-                  <tr className="bg-(--brc-bg-subtle)">
-                    <th className="rounded-l-lg px-4 py-3 text-left text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Car</th>
-                    <th className="px-3 py-3 text-left text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Customer</th>
-                    <th className="px-3 py-3 text-left text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Type</th>
-                    <th className="px-3 py-3 text-left text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Amount</th>
-                    <th className="px-3 py-3 text-left text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Date</th>
-                    <th className="px-3 py-3 text-left text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Status</th>
-                    <th className="rounded-r-lg px-3 py-3 text-left text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map((req, i) => (
-                    <tr key={req.id} onClick={() => openDrawer(req)}
-                      className="group/row relative cursor-pointer transition-[background-color,box-shadow,transform] duration-300 ease-out hover:-translate-y-0.5 hover:bg-[rgba(0,0,139,0.035)] hover:shadow-[0_16px_34px_rgba(0,0,139,0.10)]"
-                      style={{ borderBottom: i === requests.length - 1 ? "none" : "1px solid var(--brc-border)" }}>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <span className="relative flex size-[48px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-transparent bg-(--brc-bg-subtle) transition-all duration-300 group-hover/row:border-(--brc-primary) group-hover/row:bg-(--brc-primary-tint)">
-                            {req.car.primary_image ? (
-                              <Image src={req.car.primary_image} alt="" width={44} height={33} className="object-contain transition-transform duration-500 group-hover/row:scale-110" />
-                            ) : (
-                              <Icon name="car" size={18} stroke="var(--brc-text-muted)" />
-                            )}
-                          </span>
-                          <div className="min-w-0">
-                            <span className="block truncate text-sm font-semibold text-(--brc-text) transition-colors duration-300 group-hover/row:text-(--brc-primary) [font-family:var(--brc-font-ui)]">{req.car.title}</span>
-                            <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{req.car.year} · {req.car.brand}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
-                        {req.customer.first_name} {req.customer.last_name}
-                      </td>
-                      <td className="px-3 py-3">
-                        <span className="whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-bold [font-family:var(--brc-font-ui)]"
-                          style={{ background: req.request_type === "rent" ? "var(--brc-primary-tint)" : "var(--brc-accent-bg)", color: req.request_type === "rent" ? "var(--brc-primary)" : "var(--brc-accent)" }}>
-                          {req.request_type === "rent" ? "Rent" : "Buy"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-sm font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]">
-                        {fmtMoney(req.price_offered, req.currency)}
-                      </td>
-                      <td className="px-3 py-3 text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                        {formatDate(req.created_at)}
-                      </td>
-                      <td className="px-3 py-3">
-                        <StatusBadge status={req.status} />
-                      </td>
-                      <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                        <button type="button" onClick={() => openDrawer(req)}
-                          className="group/btn inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-lg border border-(--brc-border) bg-white px-3 text-[13px] font-bold text-(--brc-primary) shadow-[0_4px_10px_rgba(18,18,18,0.03)] transition-all duration-250 hover:-translate-y-0.5 hover:border-(--brc-primary) hover:bg-(--brc-primary) hover:text-white hover:shadow-[0_10px_18px_rgba(0,0,139,0.16)] [font-family:var(--brc-font-ui)]">
-                          <span>{req.status === "payment_submitted" ? "Verify" : "View"}</span>
-                          <Icon name="chevright" size={13} stroke="currentColor" />
-                        </button>
-                      </td>
-                    </tr>
+            ) : displayedRequests.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-14 text-center">
+                <span className="flex size-14 items-center justify-center rounded-full bg-(--brc-bg-subtle) text-(--brc-text-muted)">
+                  <SearchIcon size={24} />
+                </span>
+                <div>
+                  <div className="text-[17px] font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">{emptyCopy.title}</div>
+                  <p className="mx-auto mt-1 max-w-[380px] text-sm leading-relaxed text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{emptyCopy.body}</p>
+                </div>
+                {filtersActive && (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="h-10 cursor-pointer rounded-lg border border-(--brc-border) bg-(--brc-bg) px-4 text-[13px] font-bold text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* Mobile cards */}
+                <div className="flex flex-col gap-3 md:hidden">
+                  {displayedRequests.map((req) => (
+                    <MobileRequestCard key={req.id} req={req} onOpen={openDrawer} />
                   ))}
-                </tbody>
-              </table>
-              </div>
-            </>
-          )}
+                </div>
 
-          {/* Pagination */}
-          {!showSkeleton && totalPages > 1 && (
-            <div className="flex items-center justify-center gap-[7px] pt-2">
-              <button type="button" disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="flex size-[34px] cursor-pointer items-center justify-center rounded-md border border-(--brc-border) bg-white text-sm font-semibold transition-colors disabled:cursor-default disabled:opacity-60 [font-family:var(--brc-font-ui)]">
-                <Icon name="chevleft" size={16} stroke={page === 1 ? "var(--brc-border)" : "var(--brc-text)"} />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                <button key={n} type="button" onClick={() => setPage(n)}
-                  className="flex size-[34px] cursor-pointer items-center justify-center rounded-md border text-sm font-semibold transition-colors [font-family:var(--brc-font-ui)]"
-                  style={{ background: n === page ? "var(--brc-primary)" : "#fff", color: n === page ? "#fff" : "var(--brc-text)", borderColor: "var(--brc-border)" }}>
-                  {n}
+                {/* Desktop table */}
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full border-collapse" style={{ minWidth: 860 }}>
+                    <thead>
+                      <tr className="bg-(--brc-bg-subtle)">
+                        <th className="rounded-l-lg px-4 py-3 text-left text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Vehicle</th>
+                        <th className="px-3 py-3 text-left text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Customer</th>
+                        <th className="px-3 py-3 text-left text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Type</th>
+                        <th className="px-3 py-3 text-left text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Amount</th>
+                        <th className="px-3 py-3 text-left text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Submitted</th>
+                        <th className="px-3 py-3 text-left text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Status</th>
+                        <th className="rounded-r-lg px-3 py-3 text-right text-[13px] font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">Review</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayedRequests.map((req, i) => (
+                        <tr key={req.id} onClick={() => openDrawer(req)}
+                          className="group/row relative cursor-pointer transition-[background-color,box-shadow,transform] duration-300 ease-out hover:-translate-y-0.5 hover:bg-(--brc-primary-tint) hover:shadow-[0_16px_34px_rgba(0,0,139,0.10)] motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+                          style={{ borderBottom: i === displayedRequests.length - 1 ? "none" : "1px solid var(--brc-border)" }}>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <span className="relative flex size-[48px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-transparent bg-(--brc-bg-subtle) transition-all duration-300 group-hover/row:border-(--brc-primary) group-hover/row:bg-(--brc-primary-tint)">
+                                {req.car.primary_image ? (
+                                  <Image src={req.car.primary_image} alt="" width={44} height={33} className="object-contain transition-transform duration-500 group-hover/row:scale-110" />
+                                ) : (
+                                  <Icon name="car" size={18} stroke="var(--brc-text-muted)" />
+                                )}
+                              </span>
+                              <div className="min-w-0">
+                                <span className="block truncate text-sm font-semibold text-(--brc-text) transition-colors duration-300 group-hover/row:text-(--brc-primary) [font-family:var(--brc-font-ui)]">{req.car.title}</span>
+                                <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{req.car.year} · {req.car.brand}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+                            {req.customer.first_name} {req.customer.last_name}
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className="whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-bold [font-family:var(--brc-font-ui)]"
+                              style={{ background: req.request_type === "rent" ? "var(--brc-primary-tint)" : "var(--brc-accent-bg)", color: req.request_type === "rent" ? "var(--brc-primary)" : "var(--brc-accent)" }}>
+                              {req.request_type === "rent" ? "Rent" : "Buy"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-sm font-semibold tabular-nums text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                            {fmtMoney(req.price_offered, req.currency)}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3">
+                            <div className="text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">{formatDate(req.created_at)}</div>
+                            <div className="text-[11.5px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">{formatTime(req.created_at)}</div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <StatusBadge status={req.status} />
+                          </td>
+                          <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                            <button type="button" onClick={() => openDrawer(req)}
+                              className="group/btn inline-flex h-[30px] cursor-pointer items-center gap-1.5 rounded-lg border border-(--brc-border) bg-(--brc-bg) px-3 text-[13px] font-bold text-(--brc-primary) shadow-[0_4px_10px_rgba(18,18,18,0.03)] transition-all duration-250 hover:-translate-y-0.5 hover:border-(--brc-primary) hover:bg-(--brc-primary) hover:text-white hover:shadow-[0_10px_18px_rgba(0,0,139,0.16)] motion-reduce:transition-none motion-reduce:hover:translate-y-0 [font-family:var(--brc-font-ui)]">
+                              <span>{req.status === "payment_submitted" ? "Verify" : "View"}</span>
+                              <Icon name="chevright" size={13} stroke="currentColor" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
+            {/* Pagination */}
+            {!showSkeleton && totalPages > 1 && (
+              <div className="flex items-center justify-center gap-[7px] pt-2">
+                <button type="button" disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  aria-label="Previous page"
+                  className="flex size-[34px] cursor-pointer items-center justify-center rounded-md border border-(--brc-border) bg-(--brc-bg) text-sm font-semibold transition-colors disabled:cursor-default disabled:opacity-60 [font-family:var(--brc-font-ui)]">
+                  <Icon name="chevleft" size={16} stroke={page === 1 ? "var(--brc-border)" : "var(--brc-text)"} />
                 </button>
-              ))}
-              <button type="button" disabled={page === totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="flex size-[34px] cursor-pointer items-center justify-center rounded-md border border-(--brc-border) bg-white text-sm font-semibold transition-colors disabled:cursor-default disabled:opacity-60 [font-family:var(--brc-font-ui)]">
-                <Icon name="chevright" size={16} stroke={page === totalPages ? "var(--brc-border)" : "var(--brc-text)"} />
-              </button>
-            </div>
-          )}
-
-          {!showSkeleton && requests.length > 0 && (
-            <span className="text-center text-[13px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalCount)} of {totalCount} requests
-            </span>
-          )}
+                {pageWindow(page, totalPages).map((n, i) =>
+                  n === ELLIPSIS ? (
+                    <span key={`gap-${i}`} aria-hidden="true"
+                      className="flex size-[34px] items-center justify-center text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                      &hellip;
+                    </span>
+                  ) : (
+                    <button key={n} type="button" onClick={() => setPage(n)}
+                      aria-label={`Go to page ${n}`}
+                      aria-current={n === page ? "page" : undefined}
+                      className="flex size-[34px] cursor-pointer items-center justify-center rounded-md border text-sm font-semibold tabular-nums transition-colors [font-family:var(--brc-font-ui)]"
+                      style={{ background: n === page ? "var(--brc-primary)" : "var(--brc-bg)", color: n === page ? "#fff" : "var(--brc-text)", borderColor: "var(--brc-border)" }}>
+                      {n}
+                    </button>
+                  ),
+                )}
+                <button type="button" disabled={page === totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  aria-label="Next page"
+                  className="flex size-[34px] cursor-pointer items-center justify-center rounded-md border border-(--brc-border) bg-(--brc-bg) text-sm font-semibold transition-colors disabled:cursor-default disabled:opacity-60 [font-family:var(--brc-font-ui)]">
+                  <Icon name="chevright" size={16} stroke={page === totalPages ? "var(--brc-border)" : "var(--brc-text)"} />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -551,9 +501,6 @@ export default function AdminPaymentsPage() {
         requestId={drawerRequestId}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        onConfirmed={() => {
-          // Refetch happens via query invalidation in the hook
-        }}
       />
     </>
   );

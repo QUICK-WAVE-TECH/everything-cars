@@ -24,7 +24,7 @@ import {
 } from "@/features/auth/schemas";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import {
   CalendarIcon,
   ChevronLeftIcon,
@@ -39,7 +39,6 @@ import {
 
 const MIN_BIRTH_YEAR = 1920;
 const DEFAULT_BIRTH_MONTH = new Date(2000, 0);
-const onlyDigits = (value: string) => value.replace(/\D/g, "");
 
 export default function SignUpPage() {
   const [step, setStep] = useState(1);
@@ -64,8 +63,6 @@ export default function SignUpPage() {
       phone: "",
       password: "",
       confirmPassword: "",
-      national_id: "",
-      drivers_license: "",
       date_of_birth: "",
       address: "",
       state: "",
@@ -153,8 +150,6 @@ export default function SignUpPage() {
         last_name: values.last_name,
         password: values.password,
         phone: values.phone,
-        national_id: values.national_id,
-        drivers_license: values.drivers_license,
         date_of_birth: values.date_of_birth,
         address: values.address,
         state: values.state,
@@ -313,39 +308,6 @@ export default function SignUpPage() {
                   <div className="flex flex-col gap-4">
                     <FormField
                       control={form.control}
-                      name="drivers_license"
-                      render={({ field }) => (
-                        <FormItem>
-                          <AuthField
-                            label="Driver's License"
-                            placeholder="Enter license number"
-                            value={field.value ?? ""}
-                            onChange={field.onChange}
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="national_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <AuthField
-                            label="NIN"
-                            placeholder="Enter your NIN"
-                            value={field.value ?? ""}
-                            onChange={(value) => field.onChange(onlyDigits(value))}
-                            type="tel"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
                       name="date_of_birth"
                       render={({ field }) => (
                         <FormItem>
@@ -374,7 +336,7 @@ export default function SignUpPage() {
                                 >
                                   {field.value
                                     ? format(
-                                        new Date(field.value),
+                                        parseISO(field.value),
                                         "dd/MM/yyyy",
                                       )
                                     : "Select date of birth"}
@@ -461,7 +423,7 @@ export default function SignUpPage() {
                                   mode="single"
                                   selected={
                                     field.value
-                                      ? new Date(field.value)
+                                      ? parseISO(field.value)
                                       : undefined
                                   }
                                   onSelect={(date) => {
