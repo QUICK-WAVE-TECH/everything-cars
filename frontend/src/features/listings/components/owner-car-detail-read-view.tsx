@@ -16,6 +16,7 @@ import {
   ExternalLinkIcon,
   FuelIcon,
   GaugeIcon,
+  HandshakeIcon,
   LockIcon,
   MapPinIcon,
   PaintbrushIcon,
@@ -55,10 +56,11 @@ type OwnerCarDetailReadViewProps = {
   onResubmit: () => void;
   onPause: () => void;
   onRepublish: () => void;
+  onViewOffers: () => void;
 };
 
 type Tone = "neutral" | "success" | "warning" | "accent" | "danger";
-type Command = "book" | "reschedule" | "cancel" | "edit" | "archive" | "resubmit" | "pause" | "republish";
+type Command = "book" | "reschedule" | "cancel" | "edit" | "archive" | "resubmit" | "pause" | "republish" | "offers";
 
 type StatusPresentation = {
   label: string;
@@ -206,10 +208,11 @@ const COMMAND_LABELS: Record<Command, { label: string; icon: IconComponent; dang
   reschedule: { label: "Reschedule", icon: RotateCcwIcon },
   cancel: { label: "Cancel booking", icon: AlertTriangleIcon, danger: true },
   edit: { label: "Edit listing", icon: PencilIcon },
-  archive: { label: "Archive listing", icon: ArchiveIcon, danger: true },
+  archive: { label: "Close listing", icon: ArchiveIcon, danger: true },
   resubmit: { label: "Resubmit for review", icon: RefreshCcwIcon },
   pause: { label: "Pause listing", icon: PauseIcon },
   republish: { label: "Republish", icon: PlayIcon },
+  offers: { label: "View offers", icon: HandshakeIcon },
 };
 
 function currencySymbol(code: string) {
@@ -264,6 +267,7 @@ export function OwnerCarDetailReadView({
   onResubmit,
   onPause,
   onRepublish,
+  onViewOffers,
 }: OwnerCarDetailReadViewProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const presentation =
@@ -293,12 +297,35 @@ export function OwnerCarDetailReadView({
     resubmit: onResubmit,
     pause: onPause,
     republish: onRepublish,
+    offers: onViewOffers,
   };
 
   function run(command: Command) {
     setMoreOpen(false);
     handlers[command]();
   }
+
+  // Live/paused negotiable-buy listings gain a "View offers" shortcut. A car
+  // reserved by an accepted offer can't be closed — the backend blocks
+  // archiving a car with an active request — so drop "archive" while reserved.
+  const acceptsOffers =
+    car.listing_type === "buy" && Boolean(car.is_negotiable);
+  const isReserved =
+    car.availability_status === "reserved" || car.availability_status === "sold";
+  const moreCommands: Command[] = (() => {
+    let commands = [...(presentation.more ?? [])];
+    if (
+      acceptsOffers &&
+      (car.status === "published" || car.status === "paused") &&
+      !commands.includes("offers")
+    ) {
+      commands = ["offers", ...commands];
+    }
+    if (isReserved) {
+      commands = commands.filter((command) => command !== "archive");
+    }
+    return commands;
+  })();
 
   function renderPrimary(mobile = false) {
     const primary = presentation.primary;
@@ -707,7 +734,7 @@ export function OwnerCarDetailReadView({
             </div>
           </section>
 
-          {(presentation.more?.length ?? 0) > 0 && (
+          {moreCommands.length > 0 && (
             <div className="relative">
               <button
                 type="button"
@@ -727,7 +754,7 @@ export function OwnerCarDetailReadView({
                     className="fixed inset-0 z-20 cursor-default"
                   />
                   <div className="absolute bottom-[52px] left-0 right-0 z-30 rounded-xl border border-(--brc-border) bg-white p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.16)]">
-                    {presentation.more?.map((command) => {
+                    {moreCommands.map((command) => {
                       const item = COMMAND_LABELS[command];
                       const ItemIcon = item.icon;
                       return (
