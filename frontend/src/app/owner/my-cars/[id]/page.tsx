@@ -715,6 +715,7 @@ export default function CarDetailPage() {
             }}
             onCancelBooking={() => setCancelDialogOpen(true)}
             onEdit={startEditing}
+            onViewOffers={() => router.push(`/owner/offers?car=${car.id}`)}
             onArchive={() => setConfirmArchiveOpen(true)}
             onResubmit={() =>
               handleStatusChange(
