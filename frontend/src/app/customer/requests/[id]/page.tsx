@@ -174,7 +174,7 @@ export default function CustomerRequestDetailPage() {
       case "cancelled":
       case "rejected":
         return (
-          <ActionButton kind="secondary" onClick={() => router.push("/customer/listings")}>
+          <ActionButton kind="secondary" onClick={() => router.push("/services")}>
             Browse Cars
           </ActionButton>
         );
