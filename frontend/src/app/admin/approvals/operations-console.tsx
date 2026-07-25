@@ -10,12 +10,22 @@ import {
 import Image from "next/image";
 import {
   ArrowDownUpIcon,
+  BadgeCheckIcon,
+  CalendarClockIcon,
   CarFrontIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CircleCheckBigIcon,
+  CircleXIcon,
   ClipboardListIcon,
+  FileSearchIcon,
+  FileWarningIcon,
+  Globe2Icon,
+  PauseCircleIcon,
   SearchIcon,
+  ShieldAlertIcon,
+  UserRoundXIcon,
+  WrenchIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -56,6 +66,22 @@ const PAGE_SIZE = 20;
 
 type Counts = Record<AdminApprovalStatus, number>;
 type SortMode = "newest" | "oldest";
+
+const STATUS_ICONS: Record<
+  AdminApprovalStatus,
+  typeof ClipboardListIcon
+> = {
+  draft: FileSearchIcon,
+  listing_approved: BadgeCheckIcon,
+  inspection_pending: CalendarClockIcon,
+  inspection_in_progress: WrenchIcon,
+  needs_clearance: ShieldAlertIcon,
+  inspection_no_show: UserRoundXIcon,
+  inspection_rejected: CircleXIcon,
+  needs_changes: FileWarningIcon,
+  published: Globe2Icon,
+  suspended: PauseCircleIcon,
+};
 
 function QueueMetric({
   label,
@@ -98,11 +124,11 @@ function WorkflowSidebar({
 
   return (
     <Sidebar
-      collapsible="offcanvas"
+      collapsible="icon"
       className="top-[72px] h-[calc(100svh-72px)] border-(--brc-border) sm:top-[84px] sm:h-[calc(100svh-84px)]"
       style={{ "--sidebar-width": "15rem" } as CSSProperties}
     >
-      <div className="border-b border-(--brc-border) px-4 py-4">
+      <div className="border-b border-(--brc-border) px-4 py-4 group-data-[collapsible=icon]:hidden">
         <span className="block text-xs font-bold uppercase text-(--brc-primary)">
           Review workflow
         </span>
@@ -129,6 +155,7 @@ function WorkflowSidebar({
                 <SidebarMenu className="gap-1">
                   {group.statuses.map((status) => {
                     const active = activeStatus === status;
+                    const StatusIcon = STATUS_ICONS[status];
                     return (
                       <SidebarMenuItem key={status}>
                         <SidebarMenuButton
@@ -146,14 +173,7 @@ function WorkflowSidebar({
                               : "text-(--brc-text-secondary) hover:bg-white hover:text-(--brc-text)",
                           )}
                         >
-                          <span
-                            className={cn(
-                              "size-1.5 shrink-0 rounded-full",
-                              active
-                                ? "bg-(--brc-primary)"
-                                : "bg-(--brc-border-strong)",
-                            )}
-                          />
+                          <StatusIcon aria-hidden="true" />
                           <span>{ADMIN_APPROVAL_LABELS[status]}</span>
                         </SidebarMenuButton>
                         <SidebarMenuBadge
