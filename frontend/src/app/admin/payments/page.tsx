@@ -115,6 +115,26 @@ function MobileRequestCard({ req, onOpen }: { req: RequestListItem; onOpen: (req
 // ── Main Page ──
 const PAGE_SIZE = 20;
 
+/**
+ * Windowed page list: first and last page always, the current page with a
+ * neighbour either side, and "…" gaps — so a 40-page queue never renders 40
+ * buttons. Returns page numbers interleaved with the "ellipsis" sentinel.
+ */
+const ELLIPSIS = "ellipsis" as const;
+function pageWindow(current: number, total: number): (number | typeof ELLIPSIS)[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = new Set([1, total, current, current - 1, current + 1]);
+  const sorted = [...pages].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
+  const out: (number | typeof ELLIPSIS)[] = [];
+  let prev = 0;
+  for (const n of sorted) {
+    if (n - prev > 1) out.push(ELLIPSIS);
+    out.push(n);
+    prev = n;
+  }
+  return out;
+}
+
 export default function AdminPaymentsPage() {
   const [tab, setTab] = useState<TabKey>("payment_submitted");
   const [search, setSearch] = useState("");
@@ -449,15 +469,22 @@ export default function AdminPaymentsPage() {
                   className="flex size-[34px] cursor-pointer items-center justify-center rounded-md border border-(--brc-border) bg-(--brc-bg) text-sm font-semibold transition-colors disabled:cursor-default disabled:opacity-60 [font-family:var(--brc-font-ui)]">
                   <Icon name="chevleft" size={16} stroke={page === 1 ? "var(--brc-border)" : "var(--brc-text)"} />
                 </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                  <button key={n} type="button" onClick={() => setPage(n)}
-                    aria-label={`Go to page ${n}`}
-                    aria-current={n === page ? "page" : undefined}
-                    className="flex size-[34px] cursor-pointer items-center justify-center rounded-md border text-sm font-semibold tabular-nums transition-colors [font-family:var(--brc-font-ui)]"
-                    style={{ background: n === page ? "var(--brc-primary)" : "var(--brc-bg)", color: n === page ? "#fff" : "var(--brc-text)", borderColor: "var(--brc-border)" }}>
-                    {n}
-                  </button>
-                ))}
+                {pageWindow(page, totalPages).map((n, i) =>
+                  n === ELLIPSIS ? (
+                    <span key={`gap-${i}`} aria-hidden="true"
+                      className="flex size-[34px] items-center justify-center text-sm text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                      &hellip;
+                    </span>
+                  ) : (
+                    <button key={n} type="button" onClick={() => setPage(n)}
+                      aria-label={`Go to page ${n}`}
+                      aria-current={n === page ? "page" : undefined}
+                      className="flex size-[34px] cursor-pointer items-center justify-center rounded-md border text-sm font-semibold tabular-nums transition-colors [font-family:var(--brc-font-ui)]"
+                      style={{ background: n === page ? "var(--brc-primary)" : "var(--brc-bg)", color: n === page ? "#fff" : "var(--brc-text)", borderColor: "var(--brc-border)" }}>
+                      {n}
+                    </button>
+                  ),
+                )}
                 <button type="button" disabled={page === totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   aria-label="Next page"
                   className="flex size-[34px] cursor-pointer items-center justify-center rounded-md border border-(--brc-border) bg-(--brc-bg) text-sm font-semibold transition-colors disabled:cursor-default disabled:opacity-60 [font-family:var(--brc-font-ui)]">
