@@ -148,7 +148,9 @@ const STATUS_PRESENTATIONS: Record<string, StatusPresentation> = {
     body: "Customers can see this listing and make requests. Keep its details up to date.",
     primary: { label: "View Public Listing", icon: ExternalLinkIcon, href: "" },
     secondary: { label: "Pause listing", icon: PauseIcon, command: "pause" },
-    more: ["edit", "archive"],
+    // A live listing is locked — details can only change when staff request
+    // changes (backend EDITABLE_CAR_STATUSES = [needs_changes]).
+    more: ["archive"],
   },
   paused: {
     label: "Paused",
@@ -157,7 +159,8 @@ const STATUS_PRESENTATIONS: Record<string, StatusPresentation> = {
     title: "Listing is paused",
     body: "It is hidden from the marketplace. Republish whenever you are ready.",
     primary: { label: "Republish", icon: PlayIcon, command: "republish" },
-    more: ["edit", "archive"],
+    // Still a published listing under the hood — not editable.
+    more: ["archive"],
   },
   suspended: {
     label: "Suspended",
