@@ -383,3 +383,54 @@ class OwnerProfileIdentityLockTest(APITestCase):
         self.assertEqual(profile.national_id, "12345678901")
         self.assertIn("locked-id", profile.id_document.name)
         self.assertNotIn("new-id", profile.id_document.name)
+
+
+class CustomerSignUpNoNinTest(APITestCase):
+    """Customers no longer supply a NIN / national_id at sign-up."""
+
+    def _customer_payload(self, **overrides):
+        payload = {
+            "email": "newcustomer@test.com",
+            "first_name": "New",
+            "last_name": "Customer",
+            "password": "securepass123",
+            "role": "customer",
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_customer_signup_succeeds_without_national_id(self):
+        res = self.client.post(
+            "/api/v1/auth/sign-up", self._customer_payload(), format="multipart"
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(email="newcustomer@test.com")
+        self.assertEqual(user.role, "customer")
+        self.assertEqual(user.customer_profile.national_id, "")
+
+    def test_customer_signup_ignores_non_digit_national_id(self):
+        # Even if a value is sent, it is no longer validated for customers.
+        res = self.client.post(
+            "/api/v1/auth/sign-up",
+            self._customer_payload(email="c2@test.com", national_id="not-a-nin"),
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    def test_owner_still_requires_national_id(self):
+        payload = {
+            "email": "o-nonid@test.com",
+            "first_name": "No",
+            "last_name": "Id",
+            "password": "securepass123",
+            "role": "owner",
+            "owner_type": "individual",
+            "bank_account": "1234567890",
+            "bank_name": "Test Bank",
+            "id_type": "nin",
+            "document": id_image("ownership.jpg"),
+            "id_document": id_image("id.jpg"),
+        }
+        res = self.client.post("/api/v1/auth/sign-up", payload, format="multipart")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("national_id", res.data)

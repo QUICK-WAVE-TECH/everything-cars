@@ -16,7 +16,6 @@ type BaseSignUpData = {
 
 export type CustomerSignUpData = BaseSignUpData & {
   role: "customer";
-  national_id: string;
   drivers_license?: string;
   date_of_birth?: string;
   address?: string;

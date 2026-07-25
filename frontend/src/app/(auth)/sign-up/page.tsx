@@ -39,7 +39,6 @@ import {
 
 const MIN_BIRTH_YEAR = 1920;
 const DEFAULT_BIRTH_MONTH = new Date(2000, 0);
-const onlyDigits = (value: string) => value.replace(/\D/g, "");
 
 export default function SignUpPage() {
   const [step, setStep] = useState(1);
@@ -64,7 +63,6 @@ export default function SignUpPage() {
       phone: "",
       password: "",
       confirmPassword: "",
-      national_id: "",
       drivers_license: "",
       date_of_birth: "",
       address: "",
@@ -153,7 +151,6 @@ export default function SignUpPage() {
         last_name: values.last_name,
         password: values.password,
         phone: values.phone,
-        national_id: values.national_id,
         drivers_license: values.drivers_license,
         date_of_birth: values.date_of_birth,
         address: values.address,
@@ -321,24 +318,6 @@ export default function SignUpPage() {
                             placeholder="Enter license number"
                             value={field.value ?? ""}
                             onChange={field.onChange}
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="national_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <AuthField
-                            label="NIN"
-                            placeholder="Enter your NIN"
-                            value={field.value ?? ""}
-                            onChange={(value) => field.onChange(onlyDigits(value))}
-                            type="tel"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
                           />
                           <FormMessage />
                         </FormItem>
