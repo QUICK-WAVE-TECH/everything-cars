@@ -131,17 +131,20 @@ export function MakeOfferDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-h-[90dvh] max-w-115 gap-0 overflow-y-auto p-6 sm:max-w-115"
+        // Flex column (not the default grid), real side-margins on mobile, and
+        // a height cap that only scrolls on genuinely tiny screens — the content
+        // is compact enough to fit a normal phone/laptop without a scrollbar.
+        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-y-auto p-5 sm:max-w-115"
         aria-describedby={undefined}
       >
-        <DialogHeader className="mb-4">
+        <DialogHeader className="mb-3">
           <DialogTitle className="text-xl font-extrabold [font-family:var(--brc-font-display)]">
             Make an offer
           </DialogTitle>
         </DialogHeader>
 
         {/* Car summary strip */}
-        <div className="mb-5 flex items-center gap-3 rounded-(--brc-radius-md) border border-(--brc-border) bg-(--brc-bg-subtle) p-3">
+        <div className="mb-4 flex items-center gap-3 rounded-(--brc-radius-md) border border-(--brc-border) bg-(--brc-bg-subtle) p-3">
           <div className="relative size-13 shrink-0 overflow-hidden rounded-(--brc-radius-sm) border border-(--brc-border) bg-white">
             {primaryImage ? (
               <Image src={primaryImage} alt={carTitle} fill className="object-cover" />
@@ -163,13 +166,13 @@ export function MakeOfferDialog({
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-1">
           {/* Amount — the hero input */}
-          <label className="mb-3.5 flex flex-col gap-2">
+          <label className="mb-3 flex flex-col gap-1.5">
             <span className="text-sm font-semibold text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
               Your offer
             </span>
             <span
               className={cn(
-                "flex h-15.5 items-center gap-2 rounded-(--brc-radius-md) border bg-white px-4.5 transition-colors",
+                "flex h-14 items-center gap-2 rounded-(--brc-radius-md) border bg-white px-4 transition-colors",
                 inlineError ? "border-(--brc-danger)" : "border-(--brc-border)",
               )}
             >
@@ -203,13 +206,13 @@ export function MakeOfferDialog({
           </label>
 
           {/* Quick picks */}
-          <div className="mb-5 flex gap-2">
+          <div className="mb-4 flex gap-2">
             {quickPicks.map((pick) => (
               <button
                 key={pick.label}
                 type="button"
                 onClick={() => applyQuickPick(pick.value)}
-                className="h-10 flex-1 rounded-(--brc-radius-sm) border border-(--brc-border) bg-white text-sm font-bold text-(--brc-primary) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
+                className="h-9 flex-1 rounded-(--brc-radius-sm) border border-(--brc-border) bg-white text-sm font-bold text-(--brc-primary) transition-colors hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
               >
                 {pick.label}
               </button>
@@ -217,7 +220,7 @@ export function MakeOfferDialog({
           </div>
 
           {/* Optional message */}
-          <label className="mb-4.5 flex flex-col gap-2">
+          <label className="mb-3.5 flex flex-col gap-1.5">
             <span className="flex items-center justify-between">
               <span className="text-sm font-semibold text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
                 Message <span className="font-normal text-(--brc-text-muted)">(optional)</span>
@@ -229,14 +232,14 @@ export function MakeOfferDialog({
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value.slice(0, MESSAGE_MAX))}
-              rows={3}
+              rows={2}
               placeholder="Add a note for the owner…"
-              className="resize-none rounded-(--brc-radius-md) border border-(--brc-border) bg-white px-3.5 py-3 text-sm text-(--brc-text) outline-none [font-family:var(--brc-font-ui)]"
+              className="resize-none rounded-(--brc-radius-md) border border-(--brc-border) bg-white px-3.5 py-2.5 text-sm text-(--brc-text) outline-none [font-family:var(--brc-font-ui)]"
             />
           </label>
 
           {/* Footer note */}
-          <div className="mb-4.5 flex items-start gap-2 rounded-(--brc-radius-sm) bg-(--brc-bg-subtle) px-3.5 py-2.5">
+          <div className="mb-4 flex items-start gap-2 rounded-(--brc-radius-sm) bg-(--brc-bg-subtle) px-3.5 py-2.5">
             <HourglassIcon className="mt-0.5 size-4 shrink-0 text-(--brc-text-muted)" aria-hidden="true" />
             <span className="text-xs leading-snug text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
               Your offer is valid for 48 hours. You can make up to 3 offers on this vehicle.
@@ -253,7 +256,7 @@ export function MakeOfferDialog({
             type="submit"
             disabled={!amountDigits || placeOffer.isPending}
             className={cn(
-              "h-12.5 w-full rounded-(--brc-radius-sm) text-[15px] font-bold transition-colors",
+              "h-12 w-full shrink-0 rounded-(--brc-radius-sm) text-[15px] font-bold transition-colors",
               "bg-(--brc-primary) text-white hover:bg-(--brc-primary-hover)",
               // Clear disabled treatment — a solid muted grey, not faded navy,
               // so it reads as 'enter an amount first' rather than broken.
