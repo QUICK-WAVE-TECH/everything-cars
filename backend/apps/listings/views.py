@@ -188,6 +188,17 @@ def car_has_active_requests(car_id):
     ).exists()
 
 
+def car_is_reserved(car_id):
+    """True when a buy purchase is in progress (e.g. an accepted offer) — the
+    car reads as 'reserved'. Such a listing can't be paused or archived while the
+    sale is live."""
+    return Request.objects.filter(
+        car_id=car_id,
+        request_type=ListingType.BUY,
+        status__in=REQUEST_APPROVAL_BLOCKING_STATUSES,
+    ).exists()
+
+
 def active_request_archive_response():
     return Response(
         {
@@ -771,6 +782,19 @@ class MyCarStatusView(APIView):
 
             if new_status == CarStatus.ARCHIVED and car_has_active_requests(car.id):
                 return active_request_archive_response()
+
+            # A reserved car (accepted offer / purchase in progress) can't be
+            # hidden from the buyer mid-sale.
+            if new_status == CarStatus.PAUSED and car_is_reserved(car.id):
+                return Response(
+                    {
+                        "detail": (
+                            "This vehicle is reserved by an accepted offer and "
+                            "can't be paused until the sale is resolved."
+                        )
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
 
             extra = []
             if new_status == CarStatus.PUBLISHED and not car.published_at:

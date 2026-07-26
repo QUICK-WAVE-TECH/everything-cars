@@ -642,7 +642,10 @@ export function OwnerCarDetailReadView({
               )
             )}
 
-            {presentation.secondary && car.status !== "inspection_pending" && (
+            {presentation.secondary &&
+              car.status !== "inspection_pending" &&
+              // A reserved car can't be paused — hide the pause action.
+              !(presentation.secondary.command === "pause" && isReserved) && (
               <button
                 type="button"
                 onClick={() => run(presentation.secondary!.command)}

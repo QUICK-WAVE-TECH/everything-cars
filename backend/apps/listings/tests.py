@@ -1225,3 +1225,38 @@ class RequestTypeMatchTest(APITestCase):
 
     def test_matching_buy_request_ok(self):
         self.assertEqual(self._post(self.buy_car, "buy", "5000000.00").status_code, 201)
+
+
+class ReservedListingPauseTest(APITestCase):
+    """A car reserved by an accepted offer (active buy request) can't be paused."""
+
+    def setUp(self):
+        self.owner = create_user("pause-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.customer = create_user("pause-buyer@test.com", "customer")
+        self.car = create_car(
+            self.owner, listing_type=ListingType.BUY, sale_price="5000000.00",
+            status=CarStatus.PUBLISHED,
+        )
+        self.client.force_authenticate(user=self.owner)
+
+    def _pause(self):
+        return self.client.post(
+            f"/api/v1/listings/my-cars/{self.car.id}/status",
+            {"status": "paused"}, format="json",
+        )
+
+    def test_pause_blocked_when_reserved(self):
+        Request.objects.create(
+            car=self.car, customer=self.customer, request_type=ListingType.BUY,
+            price_offered="5000000.00", status=RequestStatus.APPROVED,
+        )
+        res = self._pause()
+        self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
+        self.car.refresh_from_db()
+        self.assertEqual(self.car.status, CarStatus.PUBLISHED)
+
+    def test_pause_allowed_when_not_reserved(self):
+        self.assertEqual(self._pause().status_code, status.HTTP_200_OK)
+        self.car.refresh_from_db()
+        self.assertEqual(self.car.status, CarStatus.PAUSED)
