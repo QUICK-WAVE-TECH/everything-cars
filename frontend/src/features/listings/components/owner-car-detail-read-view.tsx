@@ -89,7 +89,8 @@ const STATUS_PRESENTATIONS: Record<string, StatusPresentation> = {
     title: "Book your inspection",
     body: "Your listing passed review. Book a vehicle inspection to move toward going live.",
     primary: { label: "Book Inspection", icon: CalendarCheckIcon, command: "book" },
-    more: ["edit", "archive"],
+    // Not editable — the backend only allows edits in needs_changes.
+    more: ["archive"],
   },
   inspection_pending: {
     label: "Inspection pending",
@@ -121,7 +122,9 @@ const STATUS_PRESENTATIONS: Record<string, StatusPresentation> = {
     title: "Fix and resubmit",
     body: "Address the issues found during inspection, then submit the listing for another review.",
     primary: { label: "Resubmit for Review", icon: CheckIcon, command: "resubmit" },
-    more: ["edit", "archive"],
+    // Resubmit sends it back through review; direct edits are only allowed once
+    // staff request changes (needs_changes).
+    more: ["archive"],
   },
   inspection_no_show: {
     label: "No show",
