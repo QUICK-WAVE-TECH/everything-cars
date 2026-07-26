@@ -131,7 +131,7 @@ export function MakeOfferDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-115 gap-0 p-6 sm:max-w-115"
+        className="max-h-[90dvh] max-w-115 gap-0 overflow-y-auto p-6 sm:max-w-115"
         aria-describedby={undefined}
       >
         <DialogHeader className="mb-4">
@@ -252,7 +252,13 @@ export function MakeOfferDialog({
           <Button
             type="submit"
             disabled={!amountDigits || placeOffer.isPending}
-            className="h-12.5 w-full rounded-(--brc-radius-sm) bg-(--brc-primary) text-[15px] font-bold text-white hover:bg-(--brc-primary)/90"
+            className={cn(
+              "h-12.5 w-full rounded-(--brc-radius-sm) text-[15px] font-bold transition-colors",
+              "bg-(--brc-primary) text-white hover:bg-(--brc-primary-hover)",
+              // Clear disabled treatment — a solid muted grey, not faded navy,
+              // so it reads as 'enter an amount first' rather than broken.
+              "disabled:pointer-events-none disabled:opacity-100 disabled:bg-(--brc-bg-muted) disabled:text-(--brc-text-muted)",
+            )}
           >
             {placeOffer.isPending ? (
               <>
