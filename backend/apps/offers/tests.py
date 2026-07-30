@@ -4,7 +4,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from apps.listings.models import Car, CarStatus, ListingType, RequestStatus
+from apps.listings.models import Car, CarStatus, ListingType
 from apps.offers.models import Offer, OfferStatus
 from apps.users.models import User
 
