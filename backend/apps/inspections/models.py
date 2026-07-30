@@ -126,6 +126,7 @@ class InspectionSlot(models.Model):
 
 
 class BookingStatus(models.TextChoices):
+    AWAITING_PAYMENT = "awaiting_payment", "Awaiting payment"
     PENDING = "pending", "Pending"
     APPROVED = "approved", "Approved"
     REJECTED = "rejected", "Rejected"
@@ -139,12 +140,17 @@ class AssistanceStatus(models.TextChoices):
     HANDLED = "handled", "Handled"
 
 
-ACTIVE_BOOKING_STATUSES = [BookingStatus.PENDING, BookingStatus.APPROVED]
+ACTIVE_BOOKING_STATUSES = [
+    BookingStatus.AWAITING_PAYMENT,
+    BookingStatus.PENDING,
+    BookingStatus.APPROVED,
+]
 
 # Bookings that actually took the slot — used for the staff calendar's display
 # count so a completed/no-show inspection still reads as "booked" (it happened),
 # matching the day-activity view. Only cancelled/rejected free the slot.
 OCCUPIED_BOOKING_STATUSES = [
+    BookingStatus.AWAITING_PAYMENT,
     BookingStatus.PENDING,
     BookingStatus.APPROVED,
     BookingStatus.COMPLETED,

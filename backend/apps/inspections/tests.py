@@ -1855,3 +1855,39 @@ class FeeSettingTest(TestCase):
         fee.save()
         # subtotal 13333.33 * 0.075 = 999.99975 -> 1000.00
         self.assertEqual(fee.quote()["vat_amount"], Decimal("1000.00"))
+
+
+import uuid
+
+from django.db.utils import IntegrityError
+
+from apps.inspections.models import ACTIVE_BOOKING_STATUSES
+
+
+def make_booking_ctx():
+    """Owner (ID on file) + bookable car + active future slot, for payment tests."""
+    uid = uuid.uuid4().hex[:8]
+    staff = create_user(f"bkstaff-{uid}@t.com", "owner", is_staff=True)
+    owner = create_user(f"bkowner-{uid}@t.com", "owner")
+    create_owner_profile(owner)
+    car = create_car(owner, status=CarStatus.LISTING_APPROVED)
+    center = create_center(staff)
+    slot = create_slot(staff, center=center)
+    return {"staff": staff, "owner": owner, "car": car, "center": center, "slot": slot}
+
+
+class AwaitingPaymentStatusTest(TestCase):
+    def test_awaiting_payment_is_an_active_status(self):
+        self.assertIn(BookingStatus.AWAITING_PAYMENT, ACTIVE_BOOKING_STATUSES)
+
+    def test_awaiting_payment_holds_the_slot_uniquely_per_car(self):
+        ctx = make_booking_ctx()
+        InspectionBooking.objects.create(
+            car=ctx["car"], slot=ctx["slot"], booked_by=ctx["owner"],
+            status=BookingStatus.AWAITING_PAYMENT,
+        )
+        with self.assertRaises(IntegrityError):
+            InspectionBooking.objects.create(
+                car=ctx["car"], slot=ctx["slot"], booked_by=ctx["owner"],
+                status=BookingStatus.AWAITING_PAYMENT,
+            )
