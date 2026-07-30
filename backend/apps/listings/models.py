@@ -218,7 +218,7 @@ class ListingFeature(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     car = models.ForeignKey(Car, on_delete=models.CASCADE, related_name="features")
     name = models.CharField(max_length=100)
-    value = models.CharField(max_length=200, blank=True)
+    description = models.CharField(max_length=200, blank=True)
     sort_order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:

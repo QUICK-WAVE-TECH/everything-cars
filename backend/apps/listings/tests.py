@@ -18,7 +18,9 @@ from apps.listings.models import (
     ListingType,
     Request,
     RequestStatus,
+    ListingFeature,
 )
+from apps.listings.serializers import ListingFeatureSerializer
 from apps.users.models import CustomerProfile, OwnerProfile, User
 from apps.listings.migration_helpers import delete_both_cars
 
@@ -1228,3 +1230,21 @@ class ReservedListingPauseTest(APITestCase):
         self.assertEqual(self._pause().status_code, status.HTTP_200_OK)
         self.car.refresh_from_db()
         self.assertEqual(self.car.status, CarStatus.PAUSED)
+
+
+class ListingFeatureFieldTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("feat-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner)
+
+    def test_listing_feature_uses_description_not_value(self):
+        field_names = {f.name for f in ListingFeature._meta.get_fields()}
+        self.assertIn("description", field_names)
+        self.assertNotIn("value", field_names)
+
+    def test_feature_serializer_exposes_description(self):
+        ListingFeature.objects.create(car=self.car, name="GPS", description="Built-in")
+        data = ListingFeatureSerializer(self.car.features.first()).data
+        self.assertEqual(data["description"], "Built-in")
+        self.assertNotIn("value", data)

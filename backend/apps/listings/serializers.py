@@ -62,7 +62,7 @@ class ListingFeatureSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ListingFeature
-        fields = ["id", "name", "value", "sort_order"]
+        fields = ["id", "name", "description", "sort_order"]
         read_only_fields = ["id"]
 
 

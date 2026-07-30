@@ -34,7 +34,7 @@ class CarImageAdmin(admin.ModelAdmin):
 
 @admin.register(ListingFeature)
 class ListingFeatureAdmin(admin.ModelAdmin):
-    list_display = ["car", "name", "value", "sort_order"]
+    list_display = ["car", "name", "description", "sort_order"]
 
 
 class RequestStatusEventInline(admin.TabularInline):
