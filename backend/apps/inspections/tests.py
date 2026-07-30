@@ -1891,3 +1891,27 @@ class AwaitingPaymentStatusTest(TestCase):
                 car=ctx["car"], slot=ctx["slot"], booked_by=ctx["owner"],
                 status=BookingStatus.AWAITING_PAYMENT,
             )
+
+
+class InspectionPaymentModelTest(TestCase):
+    def test_payment_snapshots_amounts_and_links_one_to_one(self):
+        from apps.inspections.models import InspectionPayment
+
+        ctx = make_booking_ctx()
+        booking = InspectionBooking.objects.create(
+            car=ctx["car"], slot=ctx["slot"], booked_by=ctx["owner"],
+            status=BookingStatus.AWAITING_PAYMENT,
+        )
+        payment = InspectionPayment.objects.create(
+            booking=booking,
+            inspection_fee=Decimal("15000.00"),
+            listing_fee=Decimal("5000.00"),
+            vat_amount=Decimal("1500.00"),
+            total=Decimal("21500.00"),
+            currency="NGN",
+            receipt="inspection_payments/r.pdf",
+            payment_method="transfer",
+        )
+        self.assertEqual(booking.payment, payment)  # reverse OneToOne
+        self.assertEqual(payment.status, "submitted")  # default
+        self.assertEqual(payment.total, Decimal("21500.00"))

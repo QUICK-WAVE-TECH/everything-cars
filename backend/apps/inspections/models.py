@@ -216,6 +216,51 @@ class InspectionBooking(models.Model):
         return f"Booking {self.car} → {self.slot} ({self.status})"
 
 
+class InspectionPaymentStatus(models.TextChoices):
+    SUBMITTED = "submitted", "Submitted"
+    CONFIRMED = "confirmed", "Confirmed"
+    REJECTED = "rejected", "Rejected"
+
+
+class InspectionPayment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    booking = models.OneToOneField(
+        InspectionBooking, on_delete=models.CASCADE, related_name="payment"
+    )
+    # Amounts are snapshotted at submit time so later FeeSetting edits never
+    # rewrite an existing payment record.
+    inspection_fee = models.DecimalField(max_digits=12, decimal_places=2)
+    listing_fee = models.DecimalField(max_digits=12, decimal_places=2)
+    vat_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    total = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=3, default="NGN")
+
+    receipt = models.FileField(upload_to="inspection_payments/")
+    payment_method = models.CharField(
+        max_length=20,
+        choices=[("transfer", "Bank Transfer"), ("card", "Card")],
+        default="transfer",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=InspectionPaymentStatus.choices,
+        default=InspectionPaymentStatus.SUBMITTED,
+        db_index=True,
+    )
+    staff_note = models.CharField(max_length=400, blank=True, default="")
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    confirmed_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["-submitted_at"]
+
+    def __str__(self):
+        return f"Payment {self.total} {self.currency} ({self.status})"
+
+
 class VehicleUsedCondition(models.TextChoices):
     USED = "used", "Used"
     BRAND_NEW = "brand_new", "Brand New"

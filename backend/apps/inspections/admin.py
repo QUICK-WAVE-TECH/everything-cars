@@ -6,9 +6,21 @@ from .models import (
     InspectionBooking,
     InspectionCenter,
     InspectionDocument,
+    InspectionPayment,
     InspectionSlot,
     PhysicalInspection,
 )
+
+
+@admin.register(InspectionPayment)
+class InspectionPaymentAdmin(admin.ModelAdmin):
+    list_display = ("booking", "total", "currency", "status", "submitted_at")
+    list_filter = ("status", "payment_method")
+    readonly_fields = (
+        "booking", "inspection_fee", "listing_fee", "vat_amount", "total",
+        "currency", "receipt", "payment_method", "submitted_at", "confirmed_at",
+        "confirmed_by",
+    )
 
 
 @admin.register(FeeSetting)
