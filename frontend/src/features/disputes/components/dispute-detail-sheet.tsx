@@ -31,7 +31,7 @@ function ContactCard({
   party: DisputeDeal["buyer"];
 }) {
   return (
-    <div className="flex flex-col gap-2.5 rounded-(--brc-radius-lg) bg-(--brc-bg) p-3.5 ring-1 ring-(--brc-border)">
+    <div className="flex flex-col gap-2.5 rounded-(--brc-radius-lg) bg-(--brc-bg) p-4 ring-1 ring-(--brc-border)">
       <span className={`${label} ${roleClass}`}>{role}</span>
       <span className="text-[15px] font-bold text-(--brc-text)">{party.name}</span>
       <div className="flex flex-col gap-1.5">
@@ -64,12 +64,12 @@ export function DisputeDetailSheet({
       <SheetContent
         side="right"
         showCloseButton
-        className="w-full gap-0 bg-(--brc-bg) p-0 sm:max-w-[620px]"
+        className="w-full gap-0 bg-(--brc-bg) p-0 sm:max-w-[720px] lg:max-w-[820px]"
       >
         {deal && pill ? (
           <div className="flex h-full flex-col">
             {/* Header */}
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-(--brc-border) p-5 pr-14">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-(--brc-border) p-6 pr-14">
               <div className="flex flex-col gap-2">
                 <span className={`${label} text-(--brc-text-muted)`}>
                   Dispute case
@@ -89,7 +89,7 @@ export function DisputeDetailSheet({
             </div>
 
             {/* Body */}
-            <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-5">
+            <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
               {/* Car + amount */}
               <div className="flex flex-wrap items-center gap-4 rounded-(--brc-radius-lg) bg-(--brc-bg-subtle) p-3.5 ring-1 ring-(--brc-border)">
                 <div
@@ -121,7 +121,7 @@ export function DisputeDetailSheet({
               </div>
 
               {/* Parties */}
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <ContactCard
                   role="Buyer — complainant"
                   roleClass="text-(--brc-accent)"
