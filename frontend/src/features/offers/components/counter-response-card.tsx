@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckIcon, InfoIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,6 +18,7 @@ import { formatOfferAmount } from "@/features/offers/lib/offer-format";
  * vehicle and declining closes the offer — neither is undoable.
  */
 export function CounterResponseCard({ offer }: { offer: Offer }) {
+  const router = useRouter();
   const respond = useRespondToOffer(offer.id);
   const [confirmAction, setConfirmAction] = useState<"accept" | "reject" | null>(
     null,
@@ -30,13 +32,15 @@ export function CounterResponseCard({ offer }: { offer: Offer }) {
     respond.mutate(
       { action: confirmAction },
       {
-        onSuccess: () => {
-          toast.success(
-            confirmAction === "accept"
-              ? "Counter accepted — your purchase request has been created."
-              : "Counter declined.",
-          );
+        onSuccess: (updated) => {
           setConfirmAction(null);
+          if (confirmAction === "accept" && updated.resulting_deal) {
+            router.push(`/deals/${updated.resulting_deal}`);
+            return;
+          }
+          toast.success(
+            confirmAction === "accept" ? "Counter accepted." : "Counter declined.",
+          );
         },
         onError: () => {
           toast.error("Something went wrong. Please try again.");

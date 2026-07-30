@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeftRightIcon,
   CarFrontIcon,
@@ -215,6 +216,7 @@ type OwnerRespondSheetProps = {
 };
 
 export function OwnerRespondSheet({ offer, open, onOpenChange }: OwnerRespondSheetProps) {
+  const router = useRouter();
   const respond = useRespondToOffer(offer?.id ?? "");
 
   const [mode, setMode] = useState<"form" | "success">("form");
@@ -248,9 +250,13 @@ export function OwnerRespondSheet({ offer, open, onOpenChange }: OwnerRespondShe
 
   async function handleAccept() {
     try {
-      await respond.mutateAsync({ action: "accept" });
-      setMode("success");
-      toast.success("Offer accepted");
+      const updated = await respond.mutateAsync({ action: "accept" });
+      onOpenChange(false);
+      if (updated.resulting_deal) {
+        router.push(`/deals/${updated.resulting_deal}`);
+      } else {
+        toast.success("Offer accepted");
+      }
     } catch (error) {
       toast.error(errorMessage(error, "Couldn't accept this offer"));
     } finally {
