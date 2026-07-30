@@ -797,3 +797,8 @@ def notify_car_no_longer_available(offer):
             "action_url": _fe("/cars"),
         },
     )
+
+
+def notify_deal_reached(deal):
+    """Both parties: contacts unlocked, coordinate the sale. Filled in Task 5."""
+    return None

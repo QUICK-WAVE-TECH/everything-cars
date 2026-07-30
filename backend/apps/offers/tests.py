@@ -240,16 +240,23 @@ class AcceptOfferTest(APITestCase):
             format="json",
         )
 
-    def test_accept_creates_approved_buy_request_at_agreed_amount(self):
-        self.assertEqual(self._accept().status_code, 200)
-        self.offer.refresh_from_db()
-        self.assertEqual(self.offer.status, OfferStatus.ACCEPTED)
-        req = self.offer.resulting_request
-        self.assertIsNotNone(req)
-        self.assertEqual(req.request_type, ListingType.BUY)
-        self.assertEqual(req.status, RequestStatus.APPROVED)
-        self.assertEqual(str(req.price_offered), "17000000.00")
-        self.assertEqual(req.customer, self.buyer)
+        def test_accept_creates_a_deal_at_the_agreed_amount(self):
+            from apps.sales.models import Deal, DealStatus
+            from apps.listings.models import Request, ListingType
+
+            self.assertEqual(self._accept().status_code, 200)
+            self.offer.refresh_from_db()
+            self.assertEqual(self.offer.status, OfferStatus.ACCEPTED)
+            deal = Deal.objects.get(offer=self.offer)
+            self.assertEqual(deal.status, DealStatus.ACTIVE)
+            self.assertEqual(str(deal.agreed_amount), "17000000.00")
+            self.assertEqual(deal.buyer, self.buyer)
+            self.assertEqual(deal.seller, self.owner)
+            self.assertFalse(
+                Request.objects.filter(
+                    car=self.car, request_type=ListingType.BUY
+                ).exists()
+            )
 
     def test_accepting_a_counter_uses_the_counter_amount(self):
         self.offer.status = OfferStatus.COUNTERED
@@ -263,7 +270,7 @@ class AcceptOfferTest(APITestCase):
         )
         self.assertEqual(res.status_code, 200)
         self.offer.refresh_from_db()
-        self.assertEqual(str(self.offer.resulting_request.price_offered), "17800000.00")
+        self.assertEqual(str(self.offer.deal.agreed_amount), "17800000.00")
 
     def test_rival_offers_superseded(self):
         self._accept()

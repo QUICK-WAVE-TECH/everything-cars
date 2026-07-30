@@ -3,23 +3,17 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db import transaction
 
-from apps.listings.models import (
-    Car,
-    ListingType,
-    Request,
-    RequestStatus,
-    RequestStatusEvent,
-)
+from apps.listings.models import Car
 
 from apps.notifications.notifications import schedule_notification
 from apps.notifications.service import (
     notify_car_no_longer_available,
-    notify_counter_accepted,
     notify_counter_rejected,
-    notify_offer_accepted,
+    notify_deal_reached,
     notify_offer_countered,
     notify_offer_rejected,
 )
+from apps.sales.models import Deal, DEAL_TTL_DAYS
 from .models import ACTIVE_OFFER_STATUSES, OFFER_TTL_HOURS, Offer, OfferStatus
 
 
@@ -60,15 +54,11 @@ def owner_respond(offer, action, data):
 
 def accept_offer(offer, accepted_by="owner"):
     """
-    Accept an offer and hand the sale to the existing purchase pipeline.
+    Accept an offer and open a Deal. Both parties then coordinate the sale and
+    payment off-platform via the revealed contact details.
 
-    ``accepted_by`` decides who hears about it: an owner accepting a pending
-    offer notifies the buyer (``offer_accepted``); a customer accepting a
-    counter notifies the owner (``counter_accepted``).
-
-    Everything here is one transaction under a row lock on the car: without it,
-    two offers on the same vehicle could both be accepted and we would create
-    two competing purchase requests for one car.
+    One transaction under a row lock on the car so two offers on the same
+    vehicle can't both be accepted.
     """
     with transaction.atomic():
         car = Car.objects.select_for_update().get(id=offer.car_id)
@@ -82,40 +72,20 @@ def accept_offer(offer, accepted_by="owner"):
         if offer.status not in ACTIVE_OFFER_STATUSES:
             raise ValidationError("This offer is no longer open.")
 
-        amount = offer.agreed_amount
-
-        # Owner approval is implicit in accepting, so the request skips PENDING
-        # and lands ready for payment.
-        req = Request.objects.create(
-            car=car,
-            customer=offer.customer,
-            request_type=ListingType.BUY,
-            price_offered=amount,
-            currency=car.currency,
-            status=RequestStatus.APPROVED,
-        )
-        RequestStatusEvent.objects.create(
-            request=req,
-            from_status="",
-            to_status=RequestStatus.APPROVED,
-            actor=car.owner,
-            note="Created from an accepted offer.",
-        )
-
         offer.status = OfferStatus.ACCEPTED
         offer.responded_at = timezone.now()
-        offer.resulting_request = req
-        offer.save(
-            update_fields=[
-                "status",
-                "responded_at",
-                "resulting_request",
-                "updated_at",
-            ]
+        offer.save(update_fields=["status", "responded_at", "updated_at"])
+
+        deal = Deal.objects.create(
+            car=car,
+            buyer=offer.customer,
+            seller=car.owner,
+            offer=offer,
+            agreed_amount=offer.agreed_amount,
+            currency=car.currency,
+            expires_at=timezone.now() + timedelta(days=DEAL_TTL_DAYS),
         )
 
-        # Everyone else loses; capture them before the bulk update so we can
-        # notify each buyer, then close them out.
         rivals = list(
             Offer.objects.filter(car=car, status__in=ACTIVE_OFFER_STATUSES)
             .exclude(id=offer.id)
@@ -126,11 +96,7 @@ def accept_offer(offer, accepted_by="owner"):
             responded_at=timezone.now(),
         )
 
-    # After commit: the winner, plus every superseded rival.
-    if accepted_by == "customer":
-        schedule_notification(notify_counter_accepted, lambda o=offer: o)
-    else:
-        schedule_notification(notify_offer_accepted, lambda o=offer: o)
+    schedule_notification(notify_deal_reached, lambda d=deal: d)
     for rival in rivals:
         schedule_notification(notify_car_no_longer_available, lambda o=rival: o)
     return offer
