@@ -287,6 +287,15 @@ class AcceptOfferTest(APITestCase):
         # rival_offer is superseded; accepting it must fail
         self.assertEqual(self._accept(self.rival_offer).status_code, 400)
 
+    def test_accepted_offer_exposes_resulting_deal(self):
+        self._accept()
+        self.offer.refresh_from_db()
+        self.client.force_authenticate(user=self.buyer)
+        res = self.client.get("/api/v1/offers/my-offers")
+        rows = res.data["results"] if isinstance(res.data, dict) else res.data
+        row = next(r for r in rows if r["id"] == str(self.offer.id))
+        self.assertEqual(row["resulting_deal"], str(self.offer.deal.id))
+
 
 class CustomerRespondTest(APITestCase):
     def setUp(self):

@@ -91,6 +91,7 @@ class OfferSerializer(serializers.ModelSerializer):
 
     car = OfferCarSummarySerializer(read_only=True)
     is_expired = serializers.BooleanField(read_only=True)
+    resulting_deal = serializers.SerializerMethodField()
 
     class Meta:
         model = Offer
@@ -107,10 +108,15 @@ class OfferSerializer(serializers.ModelSerializer):
             "expires_at",
             "responded_at",
             "resulting_request",
+            "resulting_deal",
             "is_expired",
             "created_at",
         ]
         read_only_fields = fields
+
+    def get_resulting_deal(self, offer):
+        deal = getattr(offer, "deal", None)
+        return str(deal.id) if deal else None
 
 
 class OfferRespondSerializer(serializers.Serializer):
@@ -144,6 +150,7 @@ class OwnerOfferSerializer(serializers.ModelSerializer):
     car = OfferCarSummarySerializer(read_only=True)
     customer = serializers.SerializerMethodField()
     is_expired = serializers.BooleanField(read_only=True)
+    resulting_deal = serializers.SerializerMethodField()
 
     class Meta:
         model = Offer
@@ -161,10 +168,15 @@ class OwnerOfferSerializer(serializers.ModelSerializer):
             "expires_at",
             "responded_at",
             "resulting_request",
+            "resulting_deal",
             "is_expired",
             "created_at",
         ]
         read_only_fields = fields
+
+    def get_resulting_deal(self, offer):
+        deal = getattr(offer, "deal", None)
+        return str(deal.id) if deal else None
 
     def get_customer(self, obj):
         # Reveal is per-row: each offer decides on its own status, so this can't
