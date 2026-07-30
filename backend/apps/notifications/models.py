@@ -52,6 +52,7 @@ class NotificationType(models.TextChoices):
     DEAL_CANCELLED = "deal_cancelled", "Deal cancelled"
     CAR_AVAILABLE_AGAIN = "car_available_again", "Vehicle available again"
     DEAL_DISPUTED = "deal_disputed", "Deal completion disputed"
+    DISPUTE_DISMISSED = "dispute_dismissed", "Dispute dismissed — sale stands"
     SYSTEM = "system", "System announcement"
 
 

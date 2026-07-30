@@ -11,9 +11,15 @@ from apps.notifications.service import (
     notify_deal_cancelled,
     notify_deal_completed,
     notify_deal_disputed,
+    notify_dispute_dismissed,
 )
 from apps.offers.models import Offer, OfferStatus
-from .models import DEAL_DISPUTE_WINDOW_DAYS, DealCancelledBy, DealStatus
+from .models import (
+    DEAL_DISPUTE_WINDOW_DAYS,
+    DealCancelledBy,
+    DealStatus,
+    DisputeResolution,
+)
 
 
 def complete_deal(deal):
@@ -76,9 +82,10 @@ def dispute_deal(deal, reason=""):
     return deal
 
 
-def reverse_deal(deal):
-    """Staff undo a completed sale (e.g. after a buyer dispute): the car goes back
-    on the market and both parties + prior bidders are notified."""
+def reverse_deal(deal, by=None):
+    """Staff uphold a dispute: undo a completed sale, the car goes back on the
+    market, and both parties + prior bidders are notified. `by` is the staff user
+    resolving it (recorded on the case)."""
     if deal.status != DealStatus.COMPLETED:
         raise ValidationError("Only a completed deal can be reversed.")
     with transaction.atomic():
@@ -88,6 +95,14 @@ def reverse_deal(deal):
         deal.cancelled_by = DealCancelledBy.SYSTEM
         deal.cancel_reason = "Reversed by staff after a buyer dispute."
         deal.completed_at = None
+        deal.dispute_resolution = DisputeResolution.UPHELD
+        deal.dispute_resolved_at = timezone.now()
+        deal.dispute_resolved_by = by
+        deal.dispute_resolution_note = (
+            deal.dispute_resolution_note
+            or "Dispute upheld. Deal reversed and the car relisted; "
+            "both parties and prior bidders notified."
+        )
         deal.save(
             update_fields=[
                 "status",
@@ -95,6 +110,10 @@ def reverse_deal(deal):
                 "cancelled_by",
                 "cancel_reason",
                 "completed_at",
+                "dispute_resolution",
+                "dispute_resolved_at",
+                "dispute_resolved_by",
+                "dispute_resolution_note",
             ]
         )
         car.status = CarStatus.PUBLISHED
@@ -110,4 +129,31 @@ def reverse_deal(deal):
         )
     for offer in prior:
         schedule_notification(notify_car_available_again, lambda o=offer: o)
+    return deal
+
+
+def dismiss_dispute(deal, note, by=None):
+    """Staff dismiss a dispute: the sale stands. The buyer is notified of the
+    outcome and the note is recorded on the case for audit. `note` is required."""
+    if deal.disputed_at is None:
+        raise ValidationError("This deal has not been disputed.")
+    if deal.dispute_resolution:
+        raise ValidationError("This dispute has already been resolved.")
+    note = (note or "").strip()
+    if len(note) < 15:
+        raise ValidationError("Add a note of at least 15 characters.")
+
+    deal.dispute_resolution = DisputeResolution.DISMISSED
+    deal.dispute_resolved_at = timezone.now()
+    deal.dispute_resolved_by = by
+    deal.dispute_resolution_note = note
+    deal.save(
+        update_fields=[
+            "dispute_resolution",
+            "dispute_resolved_at",
+            "dispute_resolved_by",
+            "dispute_resolution_note",
+        ]
+    )
+    schedule_notification(notify_dispute_dismissed, lambda d=deal: d)
     return deal

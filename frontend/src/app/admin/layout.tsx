@@ -13,14 +13,24 @@ const NAV_LINKS = [
   { label: "Approvals", href: "/admin/approvals" },
   { label: "Owners", href: "/admin/owners" },
   { label: "Inspections", href: "/admin/inspections" },
+  { label: "Disputes", href: "/admin/disputes" },
   { label: "Payments", href: "/admin/payments" },
   { label: "Transactions", href: "/admin/transactions" },
 ];
+
+/** Two-letter initials for the staff avatar, name first, email as a fallback. */
+function initials(user: { first_name?: string; last_name?: string; email?: string }): string {
+  const first = user.first_name?.[0] ?? "";
+  const last = user.last_name?.[0] ?? "";
+  const combined = `${first}${last}`.trim();
+  return (combined || user.email?.[0] || "S").toUpperCase();
+}
 
 function AdminNavbar() {
   const pathname = usePathname();
   const router = useRouter();
   const signOut = useSignOut();
+  const { data: user } = useMe();
   const { data: unreadData } = useUnreadCount();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -70,9 +80,19 @@ function AdminNavbar() {
 
           <div className="flex items-center gap-4 sm:gap-5">
             <NotificationDropdown role="admin" unreadCount={unreadData?.unread_count ?? 0} />
-            <button type="button" className="flex cursor-pointer border-none bg-transparent p-0">
-              <Icon name="user" size={22} stroke="var(--brc-text)" />
-            </button>
+            {user ? (
+              <div
+                className="flex size-9 items-center justify-center rounded-full bg-(--brc-primary-tint) text-[13px] font-bold text-(--brc-primary) ring-1 ring-(--brc-border)"
+                title={`${user.first_name ?? ""} ${user.last_name ?? ""}`.trim() || user.email}
+                aria-label="Staff account"
+              >
+                {initials(user)}
+              </div>
+            ) : (
+              <button type="button" className="flex cursor-pointer border-none bg-transparent p-0">
+                <Icon name="user" size={22} stroke="var(--brc-text)" />
+              </button>
+            )}
             <button
               type="button"
               onClick={handleSignOut}
