@@ -525,7 +525,11 @@ export default function CarDetailPage() {
   }, [car, editing, form]);
 
   function startEditing() {
-    if (car) form.reset(populateForm(car));
+    // Editing is only permitted once staff request changes — mirrors the backend
+    // EDITABLE_CAR_STATUSES = [needs_changes]. Guard here so no affordance can
+    // open the edit form for a listed car.
+    if (car?.status !== "needs_changes") return;
+    form.reset(populateForm(car));
     setEditing(true);
   }
 

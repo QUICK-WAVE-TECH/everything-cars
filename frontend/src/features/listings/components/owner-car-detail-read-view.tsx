@@ -80,7 +80,9 @@ const STATUS_PRESENTATIONS: Record<string, StatusPresentation> = {
     icon: RefreshCcwIcon,
     title: "Awaiting review",
     body: "Our team is reviewing your listing. Nothing is required from you right now.",
-    more: ["edit", "archive"],
+    // Locked while under review — the backend only permits edits in needs_changes
+    // (EDITABLE_CAR_STATUSES = [needs_changes]).
+    more: ["archive"],
   },
   listing_approved: {
     label: "Approved",
