@@ -25,12 +25,12 @@ from apps.notifications.service import (
     notify_inspection_no_show,
     notify_inspection_rescheduled,
     notify_inspection_cancelled,
+    notify_inspection_payment_submitted,
     notify_assistance_requested,
 )
 from apps.notifications.email_service import (
     send_assistance_booked,
     send_assistance_received,
-    send_booking_confirmation,
 )
 from .models import (
     ACTIVE_BOOKING_STATUSES,
@@ -141,7 +141,8 @@ def booking_detail_queryset():
 
 
 def create_booking_core(
-    *, car, slot, booked_by, attendee, actor, actor_role, request=None
+    *, car, slot, booked_by, attendee, actor, actor_role, request=None,
+    initial_status=BookingStatus.PENDING,
 ):
     """Shared booking rules for owner-self-booking and staff-books-for-owner.
 
@@ -198,6 +199,7 @@ def create_booking_core(
             car=car,
             slot=slot,
             booked_by=booked_by,
+            status=initial_status,
             reschedule_count=reschedule_count,
             attendee_type=attendee["attendee_type"],
             rep_name=attendee.get("rep_name", ""),
@@ -610,6 +612,14 @@ class FeeQuoteView(APIView):
 
 class OwnerBookingCreateView(APIView):
     permission_classes = [IsOwner]
+    parser_classes = [MultiPartParser, FormParser]
+
+    ALLOWED_RECEIPT_TYPES = [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "application/pdf",
+    ]
 
     def post(self, request):
         serializer = BookingCreateSerializer(data=request.data)
@@ -627,6 +637,30 @@ class OwnerBookingCreateView(APIView):
                         "before booking."
                     )
                 },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Payment gate — the owner pays (inspection + listing + VAT) up front.
+        method = request.data.get("payment_method", "transfer")
+        if method not in ("transfer", "card"):
+            return Response(
+                {"detail": "Invalid payment method. Must be 'transfer' or 'card'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        receipt = request.FILES.get("receipt")
+        if not receipt:
+            return Response(
+                {"detail": "Payment receipt is required to book an inspection."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if receipt.content_type not in self.ALLOWED_RECEIPT_TYPES:
+            return Response(
+                {"detail": "Receipt must be a JPG, PNG, WebP, or PDF file."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if receipt.size > 5 * 1024 * 1024:
+            return Response(
+                {"detail": "Receipt file must be 5MB or smaller."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -659,16 +693,26 @@ class OwnerBookingCreateView(APIView):
                 actor=request.user,
                 actor_role=ActorRole.OWNER,
                 request=request,
+                initial_status=BookingStatus.AWAITING_PAYMENT,
             )
             if error:
                 return error
 
+            quote = FeeSetting.get_solo().quote()
+            InspectionPayment.objects.create(
+                booking=booking,
+                inspection_fee=quote["inspection_fee"],
+                listing_fee=quote["listing_fee"],
+                vat_amount=quote["vat_amount"],
+                total=quote["total"],
+                currency=quote["currency"],
+                receipt=receipt,
+                payment_method=method,
+                status=InspectionPaymentStatus.SUBMITTED,
+            )
+
         schedule_notification(
-            notify_inspection_booked,
-            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
-        )
-        schedule_notification(
-            send_booking_confirmation,
+            notify_inspection_payment_submitted,
             lambda bid=booking.id: booking_detail_queryset().get(id=bid),
         )
         detail = booking_detail_queryset().get(id=booking.id)
