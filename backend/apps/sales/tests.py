@@ -209,3 +209,28 @@ class ExpireDealsCommandTest(DealEndpointTest):
         call_command("expire_deals")
         self.deal.refresh_from_db()
         self.assertEqual(self.deal.status, DealStatus.ACTIVE)
+
+
+class BackfillDealsCommandTest(APITestCase):
+    def setUp(self):
+        self.owner = make_owner("bf-owner@test.com")
+        self.buyer = make_user("bf-buyer@test.com")
+        self.car = make_negotiable_car(self.owner)
+        self.offer = make_accepted_offer(self.car, self.buyer, "9000000.00")
+        self.offer.status = OfferStatus.ACCEPTED
+        self.offer.save(update_fields=["status"])
+
+    def test_backfill_creates_deal_for_legacy_accepted_offer(self):
+        from django.core.management import call_command
+        call_command("backfill_deals")
+        self.offer.refresh_from_db()
+        self.assertTrue(Deal.objects.filter(offer=self.offer).exists())
+        self.assertEqual(str(self.offer.deal.agreed_amount), "9000000.00")
+        self.assertEqual(self.offer.deal.buyer, self.buyer)
+        self.assertEqual(self.offer.deal.seller, self.owner)
+
+    def test_backfill_is_idempotent(self):
+        from django.core.management import call_command
+        call_command("backfill_deals")
+        call_command("backfill_deals")
+        self.assertEqual(Deal.objects.filter(offer=self.offer).count(), 1)
