@@ -48,6 +48,7 @@ const STATUS_STYLE: Record<
   InspectionBooking["status"],
   { label: string; bg: string; color: string }
 > = {
+  awaiting_payment: { label: "Awaiting payment", bg: "var(--brc-warning-bg, #fff3cd)", color: "var(--brc-accent)" },
   pending: { label: "Awaiting inspection", bg: "var(--brc-warning-bg, #fff3cd)", color: "#9a7400" },
   approved: { label: "Approved", bg: "var(--brc-primary-tint, #e8f0ff)", color: "var(--brc-primary)" },
   completed: { label: "Completed", bg: "var(--brc-success-bg, #d4edda)", color: "var(--brc-success)" },
@@ -114,6 +115,15 @@ function AttendeeRow({ booking }: { booking: InspectionBooking }) {
           className="mt-3 flex h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-(--brc-primary) text-[13px] font-bold text-white shadow-[0_8px_18px_rgba(0,0,139,0.18)] transition-all hover:brightness-95 [font-family:var(--brc-font-ui)]"
         >
           Start inspection <ArrowRightIcon size={14} />
+        </Link>
+      )}
+
+      {booking.status === "awaiting_payment" && (
+        <Link
+          href={`/admin/inspections/${booking.id}/inspect`}
+          className="mt-3 flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-(--brc-border-strong) bg-white text-[13px] font-bold text-(--brc-text) transition-all hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
+        >
+          Review payment <ArrowRightIcon size={14} />
         </Link>
       )}
     </div>

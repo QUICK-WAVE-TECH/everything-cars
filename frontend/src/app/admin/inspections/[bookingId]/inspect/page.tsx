@@ -44,6 +44,7 @@ import {
   useSubmitInspection,
 } from "@/features/inspections/api/inspections-api";
 import type { PhysicalInspectionPayload } from "@/features/inspections/api/types";
+import { InspectionPaymentReview } from "@/features/inspections/components/inspection-payment-review";
 import { ApiError } from "@/lib/api-client";
 
 // ── Helpers ──
@@ -391,6 +392,12 @@ export default function StaffInspectionFormPage() {
           </div>
         </div>
       </section>
+
+      {booking.status === "awaiting_payment" && (
+        <div className="mx-auto w-full max-w-[1180px] px-4 pt-8 sm:px-6">
+          <InspectionPaymentReview booking={booking} />
+        </div>
+      )}
 
       <div className="mx-auto grid w-full max-w-[1180px] grid-cols-1 gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-5">
