@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.utils import timezone
@@ -103,3 +104,53 @@ class DealModelTest(APITestCase):
                 currency=self.car.currency,
                 expires_at=timezone.now(),
             )
+
+
+class DealEndpointTest(APITestCase):
+    def setUp(self):
+        self.owner = make_owner("de-owner@test.com")
+        self.owner.phone = "08011112222"
+        self.owner.save(update_fields=["phone"])
+        self.buyer = make_user("de-buyer@test.com")
+        self.buyer.phone = "08033334444"
+        self.buyer.save(update_fields=["phone"])
+        self.stranger = make_user("de-stranger@test.com")
+        self.car = make_negotiable_car(self.owner)
+        self.offer = make_accepted_offer(self.car, self.buyer)
+        self.offer.status = OfferStatus.ACCEPTED
+        self.offer.save(update_fields=["status"])
+        self.deal = Deal.objects.create(
+            car=self.car, buyer=self.buyer, seller=self.owner, offer=self.offer,
+            agreed_amount="14000000.00", currency=self.car.currency,
+            expires_at=timezone.now() + timedelta(days=DEAL_TTL_DAYS),
+        )
+
+    def _url(self):
+        return f"/api/v1/deals/{self.deal.id}"
+
+    def test_buyer_sees_both_contacts(self):
+        self.client.force_authenticate(user=self.buyer)
+        res = self.client.get(self._url())
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["viewer_role"], "buyer")
+        self.assertEqual(res.data["seller"]["phone"], "08011112222")
+        self.assertEqual(res.data["seller"]["email"], self.owner.email)
+        self.assertEqual(res.data["buyer"]["phone"], "08033334444")
+
+    def test_seller_sees_both_contacts(self):
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.get(self._url())
+        self.assertEqual(res.data["viewer_role"], "seller")
+
+    def test_non_participant_gets_404(self):
+        self.client.force_authenticate(user=self.stranger)
+        self.assertEqual(self.client.get(self._url()).status_code, 404)
+
+    def test_anonymous_rejected(self):
+        self.assertIn(self.client.get(self._url()).status_code, (401, 403))
+
+    def test_my_deals_lists_participant_deals(self):
+        self.client.force_authenticate(user=self.buyer)
+        res = self.client.get("/api/v1/deals/")
+        rows = res.data["results"] if isinstance(res.data, dict) else res.data
+        self.assertTrue(any(str(self.deal.id) == r["id"] for r in rows))
