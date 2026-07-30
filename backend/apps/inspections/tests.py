@@ -22,6 +22,9 @@ from .services import generate_tracking_id, record_status_change
 
 from apps.listings.models import CarStatus
 from apps.listings.tests import create_car, create_owner_profile, create_user
+from decimal import Decimal
+
+from apps.inspections.models import FeeSetting
 
 
 def create_slot(staff, days_ahead=7, **overrides):
@@ -54,9 +57,7 @@ class StaffHistoryNamesTest(APITestCase):
 
     def test_staff_history_shows_name_owner_does_not(self):
         self.client.force_authenticate(user=self.staff)
-        self.client.post(
-            f"/api/v1/listings/admin/cars/{self.car.id}/approve-listing"
-        )
+        self.client.post(f"/api/v1/listings/admin/cars/{self.car.id}/approve-listing")
         staff_res = self.client.get(
             f"/api/v1/listings/admin/cars/{self.car.id}/history"
         )
@@ -64,9 +65,7 @@ class StaffHistoryNamesTest(APITestCase):
         self.assertEqual(staff_res.data[0]["actor_name"], "Jane Doe")
 
         self.client.force_authenticate(user=self.owner)
-        owner_res = self.client.get(
-            f"/api/v1/listings/my-cars/{self.car.id}/history"
-        )
+        owner_res = self.client.get(f"/api/v1/listings/my-cars/{self.car.id}/history")
         self.assertEqual(owner_res.status_code, status.HTTP_200_OK)
         self.assertNotIn("actor_name", owner_res.data[0])
 
@@ -552,9 +551,7 @@ class OwnerBookingTest(APITestCase):
         self.car.status = CarStatus.INSPECTION_PENDING
         self.car.save(update_fields=["status"])
         with self.captureOnCommitCallbacks(execute=True):
-            res = self.client.post(
-                f"/api/v1/inspections/bookings/{booking.id}/cancel/"
-            )
+            res = self.client.post(f"/api/v1/inspections/bookings/{booking.id}/cancel/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertTrue(
             Notification.objects.filter(
@@ -666,15 +663,11 @@ class OwnerBookingTest(APITestCase):
         self.assertNotIn(str(self.slot.id), slot_ids)
 
     def test_available_slots_rejects_malformed_center(self):
-        res = self.client.get(
-            "/api/v1/inspections/available-slots/?center=not-a-uuid"
-        )
+        res = self.client.get("/api/v1/inspections/available-slots/?center=not-a-uuid")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_available_slots_rejects_malformed_date(self):
-        res = self.client.get(
-            "/api/v1/inspections/available-slots/?date=13/07/2026"
-        )
+        res = self.client.get("/api/v1/inspections/available-slots/?date=13/07/2026")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_available_slots_date_range_filter(self):
@@ -803,9 +796,7 @@ class OwnerBookingTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("consent_accepted", res.data)
         # The original booking is untouched — no new booking created.
-        self.assertFalse(
-            InspectionBooking.objects.filter(slot=new_slot).exists()
-        )
+        self.assertFalse(InspectionBooking.objects.filter(slot=new_slot).exists())
 
     def test_reschedule_self_booking_needs_no_consent(self):
         # A self booking reschedules without any consent field.
@@ -1054,15 +1045,11 @@ class StaffInspectionFlowTest(APITestCase):
     def test_booking_detail_exposes_inspection_record(self):
         self._start()
         self._submit_with_documents(result="passed")
-        res = self.client.get(
-            f"/api/v1/inspections/admin/bookings/{self.booking.id}/"
-        )
+        res = self.client.get(f"/api/v1/inspections/admin/bookings/{self.booking.id}/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIsNotNone(res.data["inspection"])
         self.assertEqual(res.data["inspection"]["presented_attendee"], "owner")
-        self.assertEqual(
-            res.data["inspection"]["presented_id_number"], "22334455667"
-        )
+        self.assertEqual(res.data["inspection"]["presented_id_number"], "22334455667")
         # Sale-car documents are surfaced for staff review.
         self.assertIsNotNone(res.data["inspection"]["documents"])
         self.assertTrue(res.data["inspection"]["documents"]["car_documents"])
@@ -1838,3 +1825,33 @@ class StaffBookForOwnerTest(APITestCase):
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class FeeSettingTest(TestCase):
+    def test_get_solo_creates_one_row_with_default(self):
+        fee = FeeSetting.get_solo()
+        self.assertEqual(fee.pk, 1)
+        self.assertEqual(FeeSetting.get_solo().pk, 1)  # idempotent
+        self.assertEqual(FeeSetting.objects.count(), 1)
+        self.assertEqual(fee.vat_rate, Decimal("0.0750"))
+
+    def test_quote_computes_vat_and_total(self):
+        fee = FeeSetting.get_solo()
+        fee.inspection_fee = Decimal("15000.00")
+        fee.listing_fee = Decimal("5000.00")
+        fee.vat_rate = Decimal("0.0750")
+        fee.save()
+        q = fee.quote()
+        self.assertEqual(q["subtotal"], Decimal("20000.00"))
+        self.assertEqual(q["vat_amount"], Decimal("1500.00"))
+        self.assertEqual(q["total"], Decimal("21500.00"))
+        self.assertEqual(q["currency"], "NGN")
+
+    def test_quote_rounds_vat_half_up_to_two_dp(self):
+        fee = FeeSetting.get_solo()
+        fee.inspection_fee = Decimal("10000.00")
+        fee.listing_fee = Decimal("3333.33")
+        fee.vat_rate = Decimal("0.0750")
+        fee.save()
+        # subtotal 13333.33 * 0.075 = 999.99975 -> 1000.00
+        self.assertEqual(fee.quote()["vat_amount"], Decimal("1000.00"))

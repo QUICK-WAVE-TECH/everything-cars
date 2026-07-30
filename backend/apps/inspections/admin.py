@@ -2,12 +2,25 @@ from django.contrib import admin
 
 from .models import (
     CarStatusHistory,
+    FeeSetting,
     InspectionBooking,
     InspectionCenter,
     InspectionDocument,
     InspectionSlot,
     PhysicalInspection,
 )
+
+
+@admin.register(FeeSetting)
+class FeeSettingAdmin(admin.ModelAdmin):
+    list_display = ("inspection_fee", "listing_fee", "vat_rate", "updated_at")
+
+    def has_add_permission(self, request):
+        # Singleton — edit the one row, never add more.
+        return not FeeSetting.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(InspectionCenter)

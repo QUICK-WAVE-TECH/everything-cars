@@ -1,10 +1,58 @@
 import uuid
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import models
 
 from apps.listings.models import Car
 from apps.users.models import User, IDType
 from django_countries.fields import CountryField
+
+
+class FeeSetting(models.Model):
+    """Admin-editable singleton (pk pinned to 1) holding the owner listing/inspection
+    fees. `get_solo()` returns the single row, creating it with defaults on first
+    read."""
+
+    inspection_fee = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    listing_fee = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    vat_rate = models.DecimalField(
+        max_digits=5, decimal_places=4, default=Decimal("0.0750")
+    )
+    # Platform bank details shown on the payment Summary.
+    bank_name = models.CharField(max_length=100, blank=True, default="")
+    bank_account_name = models.CharField(max_length=200, blank=True, default="")
+    bank_account_number = models.CharField(max_length=20, blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Fee Setting"
+        verbose_name_plural = "Fee Settings"
+
+    def __str__(self):
+        return f"Fees: inspection {self.inspection_fee}, listing {self.listing_fee}"
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def quote(self):
+        subtotal = self.inspection_fee + self.listing_fee
+        vat_amount = (subtotal * self.vat_rate).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        return {
+            "inspection_fee": self.inspection_fee,
+            "listing_fee": self.listing_fee,
+            "subtotal": subtotal,
+            "vat_amount": vat_amount,
+            "total": subtotal + vat_amount,
+            "currency": "NGN",
+        }
 
 
 class InspectionCenter(models.Model):
