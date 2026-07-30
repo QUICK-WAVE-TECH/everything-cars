@@ -869,7 +869,7 @@ def notify_deal_cancelled(deal, recipient):
 def notify_deal_disputed(deal):
     """Alert staff that a buyer says a completed sale never actually happened."""
     staff_users = User.objects.filter(is_staff=True, is_active=True)
-    review_url = _fe("/admin/sales/deal")
+    review_url = _fe("/admin/disputes")
     buyer_name = deal.buyer.get_full_name() or deal.buyer.email
     for staff in staff_users:
         _create_notification(
@@ -893,6 +893,29 @@ def notify_deal_disputed(deal):
                 "review_url": review_url,
             },
         )
+
+
+def notify_dispute_dismissed(deal):
+    """The buyer: staff reviewed the dispute and the sale stands."""
+    _create_notification(
+        recipient=deal.buyer,
+        notification_type=NotificationType.DISPUTE_DISMISSED,
+        title="Dispute reviewed — the sale stands",
+        message=(
+            f"We reviewed your dispute on {deal.car.title} and the sale stands. "
+            "See the outcome for details."
+        ),
+        data=_deal_data(deal),
+    )
+    send_email(
+        recipient=deal.buyer.email,
+        subject="Your dispute was reviewed",
+        template_key="dispute_dismissed",
+        context={
+            "car_title": deal.car.title,
+            "note": deal.dispute_resolution_note,
+        },
+    )
 
 
 def notify_car_available_again(offer):

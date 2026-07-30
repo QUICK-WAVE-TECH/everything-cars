@@ -23,6 +23,11 @@ class DealCancelledBy(models.TextChoices):
     SYSTEM = "system", "System"
 
 
+class DisputeResolution(models.TextChoices):
+    UPHELD = "upheld", "Upheld"
+    DISMISSED = "dismissed", "Dismissed"
+
+
 class Deal(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     car = models.ForeignKey(Car, on_delete=models.CASCADE, related_name="deals")
@@ -54,6 +59,25 @@ class Deal(models.Model):
     # A buyer can flag a completion they say never happened; staff then review.
     disputed_at = models.DateTimeField(null=True, blank=True)
     dispute_reason = models.CharField(max_length=400, blank=True)
+    # Staff resolution of a dispute. Blank while a dispute is still open.
+    dispute_resolution = models.CharField(
+        max_length=10, choices=DisputeResolution.choices, blank=True, default=""
+    )
+    dispute_resolved_at = models.DateTimeField(null=True, blank=True)
+    dispute_resolved_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    dispute_resolution_note = models.CharField(max_length=400, blank=True, default="")
+
+    @property
+    def dispute_state(self):
+        """open → awaiting staff, else the resolution (upheld/dismissed). 'none'
+        when never disputed."""
+        if self.dispute_resolution:
+            return self.dispute_resolution
+        if self.disputed_at is not None:
+            return "open"
+        return "none"
 
     class Meta:
         ordering = ["-created_at"]

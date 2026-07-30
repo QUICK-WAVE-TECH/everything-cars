@@ -209,6 +209,101 @@ class DealDisputeTest(DealEndpointTest):
         self.assertEqual(detail.data["availability_status"], "available")
 
 
+class StaffDisputeResolutionTest(APITestCase):
+    def setUp(self):
+        self.owner = make_owner("sd-owner@test.com")
+        self.owner.phone = "08011112222"
+        self.owner.save(update_fields=["phone"])
+        self.buyer = make_user("sd-buyer@test.com")
+        self.buyer.phone = "08033334444"
+        self.buyer.save(update_fields=["phone"])
+        self.staff = make_user("sd-staff@test.com")
+        self.staff.is_staff = True
+        self.staff.save(update_fields=["is_staff"])
+        self.car = make_negotiable_car(self.owner)
+        self.offer = make_accepted_offer(self.car, self.buyer)
+        self.offer.status = OfferStatus.ACCEPTED
+        self.offer.save(update_fields=["status"])
+        self.deal = Deal.objects.create(
+            car=self.car, buyer=self.buyer, seller=self.owner, offer=self.offer,
+            agreed_amount="14000000.00", currency=self.car.currency,
+            expires_at=timezone.now() + timedelta(days=DEAL_TTL_DAYS),
+        )
+        # Complete then dispute the deal so it lands in the staff queue.
+        self.client.force_authenticate(user=self.owner)
+        self.client.post(f"/api/v1/deals/{self.deal.id}/complete")
+        self.client.force_authenticate(user=self.buyer)
+        self.client.post(
+            f"/api/v1/deals/{self.deal.id}/dispute",
+            {"reason": "I never bought this car and never got it."},
+            format="json",
+        )
+        self.deal.refresh_from_db()
+
+    def test_staff_list_shows_open_dispute(self):
+        self.client.force_authenticate(user=self.staff)
+        res = self.client.get("/api/v1/deals/staff/disputes/")
+        self.assertEqual(res.status_code, 200)
+        rows = res.data["results"] if isinstance(res.data, dict) else res.data
+        self.assertTrue(any(str(self.deal.id) == r["id"] for r in rows))
+        row = next(r for r in rows if str(self.deal.id) == r["id"])
+        self.assertEqual(row["dispute_status"], "open")
+        self.assertEqual(row["buyer"]["phone"], "08033334444")
+        self.assertTrue(row["ref"].startswith("DSP-"))
+
+    def test_non_staff_forbidden(self):
+        self.client.force_authenticate(user=self.buyer)
+        res = self.client.get("/api/v1/deals/staff/disputes/")
+        self.assertEqual(res.status_code, 403)
+
+    def test_uphold_reverses_and_relists(self):
+        from apps.listings.models import CarStatus
+
+        self.client.force_authenticate(user=self.staff)
+        res = self.client.post(
+            f"/api/v1/deals/staff/disputes/{self.deal.id}/uphold/"
+        )
+        self.assertEqual(res.status_code, 200, res.data)
+        self.deal.refresh_from_db()
+        self.car.refresh_from_db()
+        self.assertEqual(self.deal.status, DealStatus.CANCELLED)
+        self.assertEqual(self.deal.dispute_resolution, "upheld")
+        self.assertEqual(self.deal.dispute_resolved_by_id, self.staff.id)
+        self.assertEqual(self.car.status, CarStatus.PUBLISHED)
+
+    def test_dismiss_keeps_sale_and_records_note(self):
+        self.client.force_authenticate(user=self.staff)
+        res = self.client.post(
+            f"/api/v1/deals/staff/disputes/{self.deal.id}/dismiss/",
+            {"note": "Buyer confirmed receipt by phone; payment ref verified."},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200, res.data)
+        self.deal.refresh_from_db()
+        self.assertEqual(self.deal.status, DealStatus.COMPLETED)  # sale stands
+        self.assertEqual(self.deal.dispute_resolution, "dismissed")
+        self.assertIn("payment ref verified", self.deal.dispute_resolution_note)
+
+    def test_dismiss_requires_a_note(self):
+        self.client.force_authenticate(user=self.staff)
+        res = self.client.post(
+            f"/api/v1/deals/staff/disputes/{self.deal.id}/dismiss/",
+            {"note": "too short"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400)
+
+    def test_resolved_dispute_leaves_the_open_queue(self):
+        self.client.force_authenticate(user=self.staff)
+        self.client.post(f"/api/v1/deals/staff/disputes/{self.deal.id}/uphold/")
+        res = self.client.get("/api/v1/deals/staff/disputes/?status=open")
+        rows = res.data["results"] if isinstance(res.data, dict) else res.data
+        self.assertFalse(any(str(self.deal.id) == r["id"] for r in rows))
+        res2 = self.client.get("/api/v1/deals/staff/disputes/?status=upheld")
+        rows2 = res2.data["results"] if isinstance(res2.data, dict) else res2.data
+        self.assertTrue(any(str(self.deal.id) == r["id"] for r in rows2))
+
+
 class DealActionTest(DealEndpointTest):
     def test_seller_completes_deal_and_car_reads_sold(self):
         self.client.force_authenticate(user=self.owner)
