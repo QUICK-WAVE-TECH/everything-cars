@@ -23,6 +23,7 @@ export type Deal = {
   expires_at: string;
   completed_at: string | null;
   cancelled_at: string | null;
+  disputed_at: string | null;
   car: DealCar;
   seller: DealParty;
   buyer: DealParty;

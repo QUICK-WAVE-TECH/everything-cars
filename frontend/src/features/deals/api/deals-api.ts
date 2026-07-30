@@ -44,3 +44,14 @@ export function useCancelDeal(dealId: string) {
       queryClient.invalidateQueries({ queryKey: dealKeys.detail(dealId) }),
   });
 }
+
+export function useDisputeDeal(dealId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reason: string) =>
+      apiClient.post<Deal>(`/deals/${dealId}/dispute`, { reason }),
+    meta: { skipGlobalOverlay: true },
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: dealKeys.detail(dealId) }),
+  });
+}

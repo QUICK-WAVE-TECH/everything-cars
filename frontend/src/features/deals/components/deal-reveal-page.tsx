@@ -5,6 +5,7 @@ import Image from "next/image";
 import {
   CarIcon,
   CheckCircle2Icon,
+  FlagIcon,
   HandshakeIcon,
   Loader2Icon,
   MailIcon,
@@ -14,9 +15,23 @@ import {
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCancelDeal, useCompleteDeal, useDeal } from "@/features/deals/api";
+import {
+  useCancelDeal,
+  useCompleteDeal,
+  useDeal,
+  useDisputeDeal,
+} from "@/features/deals/api";
 import type { DealParty } from "@/features/deals/api";
+
+const DISPUTE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 function initials(p: DealParty) {
   return `${p.first_name?.[0] ?? ""}${p.last_name?.[0] ?? ""}`.toUpperCase() || "?";
@@ -81,8 +96,13 @@ export function DealRevealPage({ dealId }: { dealId: string }) {
   const { data: deal, isLoading } = useDeal(dealId);
   const complete = useCompleteDeal(dealId);
   const cancel = useCancelDeal(dealId);
+  const dispute = useDisputeDeal(dealId);
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [disputeOpen, setDisputeOpen] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
+  // Capture "now" once (render must stay pure — no Date.now() in the body).
+  const [now] = useState(() => Date.now());
 
   if (isLoading || !deal) {
     return (
@@ -100,6 +120,13 @@ export function DealRevealPage({ dealId }: { dealId: string }) {
   const you = isSeller ? deal.seller : deal.buyer;
   const other = isSeller ? deal.buyer : deal.seller;
   const isActive = deal.status === "active";
+  const isBuyer = deal.viewer_role === "buyer";
+  const canDispute =
+    deal.status === "completed" &&
+    isBuyer &&
+    !deal.disputed_at &&
+    deal.completed_at != null &&
+    now - new Date(deal.completed_at).getTime() < DISPUTE_WINDOW_MS;
 
   function handleComplete() {
     complete.mutate(undefined, {
@@ -117,6 +144,15 @@ export function DealRevealPage({ dealId }: { dealId: string }) {
         setConfirmCancel(false);
       },
       onError: () => toast.error("Couldn't cancel the deal. Please try again."),
+    });
+  }
+  function handleDispute() {
+    dispute.mutate(disputeReason.trim(), {
+      onSuccess: () => {
+        toast.success("Reported. Our team will review it.");
+        setDisputeOpen(false);
+      },
+      onError: () => toast.error("Couldn't submit the report. Please try again."),
     });
   }
 
@@ -207,6 +243,27 @@ export function DealRevealPage({ dealId }: { dealId: string }) {
             </button>
           </div>
         )}
+
+        {/* Buyer safety valve on a completed sale */}
+        {deal.status === "completed" && isBuyer && (
+          <div className="flex justify-center">
+            {deal.disputed_at ? (
+              <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                <FlagIcon className="size-3.5" aria-hidden="true" />
+                Reported — our team is reviewing this sale.
+              </p>
+            ) : canDispute ? (
+              <button
+                type="button"
+                onClick={() => setDisputeOpen(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-(--brc-text-muted) underline-offset-2 hover:underline [font-family:var(--brc-font-ui)]"
+              >
+                <FlagIcon className="size-3.5" aria-hidden="true" />
+                This didn&apos;t happen — report a problem
+              </button>
+            ) : null}
+          </div>
+        )}
       </div>
 
       <ConfirmDialog
@@ -228,6 +285,39 @@ export function DealRevealPage({ dealId }: { dealId: string }) {
         isPending={cancel.isPending}
         onConfirm={handleCancel}
       />
+
+      <Dialog open={disputeOpen} onOpenChange={setDisputeOpen}>
+        <DialogContent
+          className="flex w-full max-w-[calc(100%-2rem)] flex-col gap-4 p-5 sm:max-w-105"
+          aria-describedby={undefined}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-lg font-extrabold [font-family:var(--brc-font-display)]">
+              Report a problem
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm leading-relaxed text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+            Tell us what happened — for example, the seller marked this sold but the
+            purchase never went through. Our team will review and can put the car back
+            on the market.
+          </p>
+          <textarea
+            value={disputeReason}
+            onChange={(e) => setDisputeReason(e.target.value.slice(0, 400))}
+            rows={3}
+            placeholder="What went wrong?"
+            className="resize-none rounded-(--brc-radius-md) border border-(--brc-border) bg-white px-3.5 py-2.5 text-sm text-(--brc-text) outline-none [font-family:var(--brc-font-ui)]"
+          />
+          <Button
+            type="button"
+            onClick={handleDispute}
+            disabled={dispute.isPending}
+            className="h-11 bg-(--brc-primary) font-bold text-white hover:bg-(--brc-primary-hover)"
+          >
+            {dispute.isPending ? "Submitting…" : "Submit report"}
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
