@@ -74,10 +74,17 @@ class CarOwnerSummarySerializer(serializers.Serializer):
     phone = serializers.CharField()
     date_joined = serializers.DateTimeField()
     is_verified = serializers.SerializerMethodField()
+    business_name = serializers.SerializerMethodField()
 
     def get_is_verified(self, obj):
         owner_profile = getattr(obj, "owner_profile", None)
         return owner_profile.is_verified if owner_profile else False
+
+    def get_business_name(self, obj):
+        owner_profile = getattr(obj, "owner_profile", None)
+        if owner_profile and owner_profile.owner_type == "fleet":
+            return owner_profile.fleet_name
+        return ""
 
 
 class CarOwnerSerializer(CarOwnerSummarySerializer):
