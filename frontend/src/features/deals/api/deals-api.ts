@@ -1,12 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api-client";
+import type { PaginatedResponse } from "@/shared/types/api";
 import type { Deal } from "./types";
 
 export const dealKeys = {
   all: ["deals"] as const,
+  list: () => [...dealKeys.all, "list"] as const,
   detail: (id: string) => [...dealKeys.all, id] as const,
 };
+
+export function useMyDeals() {
+  return useQuery({
+    queryKey: dealKeys.list(),
+    queryFn: () => apiClient.get<PaginatedResponse<Deal>>("/deals/"),
+  });
+}
 
 export function useDeal(dealId: string) {
   return useQuery({

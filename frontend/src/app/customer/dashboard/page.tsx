@@ -57,6 +57,14 @@ const QUICK_LINKS: QuickLink[] = [
     fg: "var(--brc-accent)",
   },
   {
+    label: "Deals",
+    description: "Accepted purchases and seller contacts.",
+    icon: "check",
+    href: "/customer/deals",
+    bg: "var(--brc-success-bg)",
+    fg: "var(--brc-success)",
+  },
+  {
     label: "Transactions",
     description: "Review receipts, payments, and history.",
     icon: "banknote",

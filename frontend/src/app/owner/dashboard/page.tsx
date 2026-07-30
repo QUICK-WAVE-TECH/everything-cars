@@ -41,6 +41,7 @@ const OWNER_QUICK_LINKS: QuickLink[] = [
   { label: "My Cars", description: "Manage listings, pricing, and availability.", icon: "car", href: "/owner/my-cars", bg: "var(--brc-primary-tint)", fg: "var(--brc-primary)" },
   { label: "Requests", description: "Review and approve rental requests.", icon: "clock", href: "/owner/requests", bg: "var(--brc-bg-muted)", fg: "var(--brc-text-secondary)" },
   { label: "Offers", description: "Review and respond to purchase offers.", icon: "handshake", href: "/owner/offers", bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)" },
+  { label: "Deals", description: "Accepted purchases and buyer contacts.", icon: "check", href: "/owner/deals", bg: "var(--brc-success-bg)", fg: "var(--brc-success)" },
   { label: "Transactions", description: "Track earnings and payment history.", icon: "banknote", href: "/owner/transactions", bg: "var(--brc-success-bg)", fg: "var(--brc-success)" },
   { label: "Rewards", description: "Loyalty points and owner perks.", icon: "gift", href: "/owner/loyalty", bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)" },
 ];
