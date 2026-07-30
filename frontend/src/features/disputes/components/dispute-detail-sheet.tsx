@@ -64,7 +64,9 @@ export function DisputeDetailSheet({
       <SheetContent
         side="right"
         showCloseButton
-        className="w-full gap-0 bg-(--brc-bg) p-0 sm:max-w-[720px] lg:max-w-[820px]"
+        // The Sheet base caps a right drawer at `data-[side=right]:sm:max-w-sm`
+        // (384px); override the *same* variant selector so this actually wins.
+        className="w-full gap-0 bg-(--brc-bg) p-0 data-[side=right]:sm:w-[92vw] data-[side=right]:sm:max-w-[720px]"
       >
         {deal && pill ? (
           <div className="flex h-full flex-col">
