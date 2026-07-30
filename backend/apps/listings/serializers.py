@@ -3,6 +3,7 @@ import re
 from rest_framework import serializers
 from django.utils import timezone
 
+from apps.sales.models import DealStatus
 from .models import (
     Car,
     CarImage,
@@ -150,10 +151,7 @@ class CarListSerializer(serializers.ModelSerializer):
             # archive (withdraw) a listing that was never sold.
             is_sold = getattr(obj, "_is_sold", None)
             if is_sold is None:
-                is_sold = obj.requests.filter(
-                    request_type=ListingType.BUY,
-                    status=RequestStatus.COMPLETED,
-                ).exists()
+                is_sold = obj.deals.filter(status=DealStatus.COMPLETED).exists()
             return "sold" if is_sold else "archived"
 
         has_buy_in_progress = getattr(obj, "_has_buy_in_progress", None)
@@ -168,9 +166,13 @@ class CarListSerializer(serializers.ModelSerializer):
                 return "reserved"
             return "available"
 
+        if obj.deals.filter(status=DealStatus.ACTIVE).exists():
+            return "reserved"
+
         in_progress = getattr(obj, "_in_progress_requests", None)
         if in_progress is None:
             in_progress = obj.requests.filter(
+                request_type=ListingType.RENT,
                 status__in=[
                     RequestStatus.APPROVED,
                     RequestStatus.PAYMENT_SUBMITTED,
@@ -181,9 +183,6 @@ class CarListSerializer(serializers.ModelSerializer):
 
         today = date.today()
         for req in in_progress:
-            # Buy request in progress → reserved (car is off the market)
-            if req.request_type == "buy":
-                return "reserved"
             # Active rental currently in period → rented
             if (
                 req.status == RequestStatus.ACTIVE
@@ -194,7 +193,6 @@ class CarListSerializer(serializers.ModelSerializer):
                 if req.start_date <= today < end:
                     return "rented"
             # Future rental bookings → still "available" (other dates are open)
-            # The calendar shows blocked dates, overlap check prevents conflicts
 
         return "available"
 
@@ -292,10 +290,7 @@ class CarDetailSerializer(serializers.ModelSerializer):
             # archive (withdraw) a listing that was never sold.
             is_sold = getattr(obj, "_is_sold", None)
             if is_sold is None:
-                is_sold = obj.requests.filter(
-                    request_type=ListingType.BUY,
-                    status=RequestStatus.COMPLETED,
-                ).exists()
+                is_sold = obj.deals.filter(status=DealStatus.COMPLETED).exists()
             return "sold" if is_sold else "archived"
 
         has_buy_in_progress = getattr(obj, "_has_buy_in_progress", None)
@@ -310,19 +305,8 @@ class CarDetailSerializer(serializers.ModelSerializer):
                 return "reserved"
             return "available"
 
-        # Also check buy requests in progress
-        buy_in_progress = getattr(obj, "_buy_in_progress", None)
-        if buy_in_progress is None:
-            buy_in_progress = obj.requests.filter(
-                request_type="buy",
-                status__in=[
-                    RequestStatus.APPROVED,
-                    RequestStatus.PAYMENT_SUBMITTED,
-                    RequestStatus.PAID,
-                    RequestStatus.ACTIVE,
-                ],
-            ).exists()
-        if buy_in_progress:
+        # A buy sale in progress is an active Deal.
+        if obj.deals.filter(status=DealStatus.ACTIVE).exists():
             return "reserved"
 
         today = date.today()
