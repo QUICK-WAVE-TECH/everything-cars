@@ -528,6 +528,80 @@ def notify_inspection_cancelled(booking):
         )
 
 
+def notify_inspection_payment_submitted(booking):
+    """All staff get pinged when an owner submits an inspection payment."""
+    payment = booking.payment
+    review_url = _fe("/admin/inspections")
+    for staff in User.objects.filter(is_staff=True, is_active=True):
+        _create_notification(
+            recipient=staff,
+            notification_type=NotificationType.INSPECTION_PAYMENT_SUBMITTED,
+            title="Inspection payment needs verification",
+            message=(
+                f"{booking.booked_by.first_name} paid to inspect "
+                f"{booking.car.title}"
+            ),
+            data={
+                "booking_id": str(booking.id),
+                "car_title": booking.car.title,
+                "total": str(payment.total),
+                "currency": payment.currency,
+            },
+        )
+        send_email(
+            recipient=staff.email,
+            subject="Inspection payment needs verification",
+            template_key="inspection_payment_submitted",
+            context={
+                "car_title": booking.car.title,
+                "total": str(payment.total),
+                "currency": payment.currency,
+                "review_url": review_url,
+            },
+        )
+
+
+def notify_inspection_payment_confirmed(booking):
+    """The owner: their inspection payment cleared and the booking is active."""
+    owner = booking.booked_by
+    _create_notification(
+        recipient=owner,
+        notification_type=NotificationType.INSPECTION_PAYMENT_CONFIRMED,
+        title="Inspection payment confirmed",
+        message=f"Your inspection for {booking.car.title} is confirmed.",
+        data={"booking_id": str(booking.id), "car_title": booking.car.title},
+    )
+    send_email(
+        recipient=owner.email,
+        subject="Your inspection is confirmed",
+        template_key="inspection_payment_confirmed",
+        context={
+            "car_title": booking.car.title,
+            "slot_date": str(booking.slot.date),
+            "slot_time": str(booking.slot.start_time),
+        },
+    )
+
+
+def notify_inspection_payment_rejected(booking):
+    """The owner: staff could not verify the payment; the booking was cancelled."""
+    owner = booking.booked_by
+    reason = booking.payment.staff_note
+    _create_notification(
+        recipient=owner,
+        notification_type=NotificationType.INSPECTION_PAYMENT_REJECTED,
+        title="Inspection payment could not be verified",
+        message=f"Your payment for {booking.car.title} was not verified.",
+        data={"booking_id": str(booking.id), "reason": reason},
+    )
+    send_email(
+        recipient=owner.email,
+        subject="Inspection payment could not be verified",
+        template_key="inspection_payment_rejected",
+        context={"car_title": booking.car.title, "reason": reason},
+    )
+
+
 def notify_inspection_rescheduled(booking):
     """All staff get notified when owner reschedules inspection."""
     staff_users = User.objects.filter(is_staff=True, is_active=True)

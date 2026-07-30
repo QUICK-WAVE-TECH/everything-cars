@@ -30,6 +30,18 @@ class NotificationType(models.TextChoices):
     INSPECTION_NO_SHOW = "inspection_no_show", "Inspection no-show"
     INSPECTION_RESCHEDULED = "inspection_rescheduled", "Inspection rescheduled"
     INSPECTION_CANCELLED = "inspection_cancelled", "Inspection cancelled"
+    INSPECTION_PAYMENT_SUBMITTED = (
+        "inspection_payment_submitted",
+        "Inspection payment submitted",
+    )
+    INSPECTION_PAYMENT_CONFIRMED = (
+        "inspection_payment_confirmed",
+        "Inspection payment confirmed",
+    )
+    INSPECTION_PAYMENT_REJECTED = (
+        "inspection_payment_rejected",
+        "Inspection payment rejected",
+    )
     ASSISTANCE_REQUESTED = "assistance_requested", "Booking assistance requested"
 
     PAYMENT_SUBMITTED = "payment_submitted", "Payment submitted"
