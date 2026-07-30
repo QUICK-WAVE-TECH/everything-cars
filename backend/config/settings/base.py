@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "apps.notifications",
     "apps.reviews",
     "apps.offers",
+    "apps.sales",
 ]
 
 
