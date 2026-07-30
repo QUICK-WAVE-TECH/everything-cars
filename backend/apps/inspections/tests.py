@@ -1915,3 +1915,27 @@ class InspectionPaymentModelTest(TestCase):
         self.assertEqual(booking.payment, payment)  # reverse OneToOne
         self.assertEqual(payment.status, "submitted")  # default
         self.assertEqual(payment.total, Decimal("21500.00"))
+
+
+class FeeQuoteEndpointTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("fq-owner@t.com", "owner")
+        create_owner_profile(self.owner)
+        fee = FeeSetting.get_solo()
+        fee.inspection_fee = Decimal("15000.00")
+        fee.listing_fee = Decimal("5000.00")
+        fee.bank_name = "GTBank"
+        fee.bank_account_number = "0123456789"
+        fee.save()
+
+    def test_owner_gets_fee_breakdown(self):
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.get("/api/v1/inspections/bookings/fee-quote/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["total"], "21500.00")
+        self.assertEqual(res.data["vat_amount"], "1500.00")
+        self.assertEqual(res.data["bank_account_number"], "0123456789")
+
+    def test_anonymous_rejected(self):
+        res = self.client.get("/api/v1/inspections/bookings/fee-quote/")
+        self.assertIn(res.status_code, (401, 403))

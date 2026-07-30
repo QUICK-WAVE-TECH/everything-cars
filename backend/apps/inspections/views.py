@@ -38,8 +38,11 @@ from .models import (
     ActorRole,
     AttendeeType,
     BookingStatus,
+    FeeSetting,
     InspectionBooking,
     InspectionCenter,
+    InspectionPayment,
+    InspectionPaymentStatus,
     InspectionResult,
     InspectionSlot,
     PhysicalInspection,
@@ -50,6 +53,7 @@ from .services import generate_tracking_id, record_status_change
 from .serializers import (
     AvailableSlotSerializer,
     BookingCreateSerializer,
+    FeeQuoteSerializer,
     InspectionBookingDetailSerializer,
     InspectionBookingSerializer,
     InspectionCenterSerializer,
@@ -588,6 +592,20 @@ def _open_available_slots(request):
 
 
 # ── Owner Booking ──
+
+
+class FeeQuoteView(APIView):
+    permission_classes = [IsOwner]
+
+    def get(self, request):
+        fee = FeeSetting.get_solo()
+        data = fee.quote()
+        data.update(
+            bank_name=fee.bank_name,
+            bank_account_name=fee.bank_account_name,
+            bank_account_number=fee.bank_account_number,
+        )
+        return Response(FeeQuoteSerializer(data).data)
 
 
 class OwnerBookingCreateView(APIView):

@@ -268,6 +268,18 @@ class InspectionBookingDetailSerializer(InspectionBookingSerializer):
         return StaffInspectionReadSerializer(inspection, context=self.context).data
 
 
+class FeeQuoteSerializer(serializers.Serializer):
+    inspection_fee = serializers.DecimalField(max_digits=12, decimal_places=2)
+    listing_fee = serializers.DecimalField(max_digits=12, decimal_places=2)
+    subtotal = serializers.DecimalField(max_digits=12, decimal_places=2)
+    vat_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total = serializers.DecimalField(max_digits=12, decimal_places=2)
+    currency = serializers.CharField()
+    bank_name = serializers.CharField()
+    bank_account_name = serializers.CharField()
+    bank_account_number = serializers.CharField()
+
+
 class BookingCreateSerializer(serializers.Serializer):
     car_id = serializers.UUIDField()
     slot_id = serializers.UUIDField()

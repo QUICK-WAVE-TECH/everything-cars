@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     AvailableSlotsSummaryView,
     AvailableSlotsView,
+    FeeQuoteView,
     LocationsView,
     OwnerAssistanceCreateView,
     OwnerBookingCancelView,
@@ -50,6 +51,7 @@ urlpatterns = [
         name="available-slots-summary",
     ),
     # Owner booking
+    path("bookings/fee-quote/", FeeQuoteView.as_view(), name="fee-quote"),
     path("bookings/", OwnerBookingCreateView.as_view(), name="create-booking"),
     path("bookings/my/", OwnerBookingListView.as_view(), name="my-bookings"),
     path(
