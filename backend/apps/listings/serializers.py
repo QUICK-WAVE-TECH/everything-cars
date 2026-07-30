@@ -62,7 +62,7 @@ class ListingFeatureSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ListingFeature
-        fields = ["id", "name", "value", "sort_order"]
+        fields = ["id", "name", "description", "sort_order"]
         read_only_fields = ["id"]
 
 
@@ -74,10 +74,17 @@ class CarOwnerSummarySerializer(serializers.Serializer):
     phone = serializers.CharField()
     date_joined = serializers.DateTimeField()
     is_verified = serializers.SerializerMethodField()
+    business_name = serializers.SerializerMethodField()
 
     def get_is_verified(self, obj):
         owner_profile = getattr(obj, "owner_profile", None)
         return owner_profile.is_verified if owner_profile else False
+
+    def get_business_name(self, obj):
+        owner_profile = getattr(obj, "owner_profile", None)
+        if owner_profile and owner_profile.owner_type == "fleet":
+            return owner_profile.fleet_name
+        return ""
 
 
 class CarOwnerSerializer(CarOwnerSummarySerializer):
@@ -246,8 +253,6 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "is_verified",
             "vin",
             "plate_number",
-            "min_price",
-            "max_price",
             "verified_report",
             "availability_status",
         ]
@@ -256,7 +261,10 @@ class CarDetailSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         if self.context.get("public"):
-            for key in ("vin", "plate_number", "min_price", "max_price"):
+            for key in (
+                "vin",
+                "plate_number",
+            ):
                 data.pop(key, None)
         return data
 
@@ -472,8 +480,6 @@ class CarCreateSerializer(serializers.ModelSerializer):
             "vin",
             "plate_number",
             "is_negotiable",
-            "min_price",
-            "max_price",
             "country",
             "state",
             "city",
@@ -497,8 +503,6 @@ class CarCreateSerializer(serializers.ModelSerializer):
                 )
             data["sale_price"] = None
             data["is_negotiable"] = None
-            data["min_price"] = None
-            data["max_price"] = None
         elif lt == ListingType.BUY:
             if sale is None:
                 raise serializers.ValidationError(
@@ -510,22 +514,6 @@ class CarCreateSerializer(serializers.ModelSerializer):
                 )
 
             data["rent_price_per_day"] = None
-            mn = data.get("min_price", getattr(self.instance, "min_price", None))
-            mx = data.get("max_price", getattr(self.instance, "max_price", None))
-            if neg:
-                if mn is None or mx is None:
-                    raise serializers.ValidationError(
-                        {
-                            "min_price": "Set a private minimum and maximum for a negotiable listing."
-                        }
-                    )
-                if mn > mx:
-                    raise serializers.ValidationError(
-                        {"min_price": "Minimum cannot be greater than maximum."}
-                    )
-            else:
-                data["min_price"] = None
-                data["max_price"] = None
         return data
 
     def validate_year(self, value):
@@ -677,9 +665,7 @@ class RequestDetailSerializer(serializers.ModelSerializer):
             "id": str(offer.id),
             "amount": str(offer.amount),
             "counter_amount": (
-                str(offer.counter_amount)
-                if offer.counter_amount is not None
-                else None
+                str(offer.counter_amount) if offer.counter_amount is not None else None
             ),
             "created_at": offer.created_at.isoformat(),
         }

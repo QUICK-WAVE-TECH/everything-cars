@@ -122,12 +122,7 @@ class Car(models.Model):
         null=True,
         blank=True,
     )
-    min_price = models.DecimalField(
-        max_digits=14, decimal_places=2, null=True, blank=True
-    )
-    max_price = models.DecimalField(
-        max_digits=14, decimal_places=2, null=True, blank=True
-    )
+
     currency = models.CharField(
         max_length=3,
         blank=True,
@@ -223,7 +218,7 @@ class ListingFeature(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     car = models.ForeignKey(Car, on_delete=models.CASCADE, related_name="features")
     name = models.CharField(max_length=100)
-    value = models.CharField(max_length=200, blank=True)
+    description = models.CharField(max_length=200, blank=True)
     sort_order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:

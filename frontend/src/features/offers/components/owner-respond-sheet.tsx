@@ -20,7 +20,7 @@ import {
 import { toast } from "sonner";
 
 import type { OfferStatus, OwnerOffer } from "@/features/offers/api";
-import { useCarRange, useRespondToOffer } from "@/features/offers/api";
+import { useRespondToOffer } from "@/features/offers/api";
 import { agreedAmount, formatOfferAmount } from "@/features/offers/lib/offer-format";
 import { OfferStatusBadge } from "@/features/offers/components/offer-status-badge";
 import { OfferCountdown } from "@/features/offers/components/offer-countdown";
@@ -216,9 +216,6 @@ type OwnerRespondSheetProps = {
 
 export function OwnerRespondSheet({ offer, open, onOpenChange }: OwnerRespondSheetProps) {
   const respond = useRespondToOffer(offer?.id ?? "");
-  const { data: range } = useCarRange(offer?.car.id ?? "", {
-    enabled: open && Boolean(offer),
-  });
 
   const [mode, setMode] = useState<"form" | "success">("form");
   const [counterOpen, setCounterOpen] = useState(false);
@@ -433,20 +430,6 @@ export function OwnerRespondSheet({ offer, open, onOpenChange }: OwnerRespondShe
                     value={formatOfferAmount(offer.car.sale_price, offer.currency)}
                   />
                   <ComparisonRow label="Buyer's offer" value={formatOfferAmount(offer.amount, offer.currency)} />
-                  {range?.min_price ? (
-                    <ComparisonRow
-                      label="Private minimum"
-                      value={formatOfferAmount(range.min_price, range.currency)}
-                      privateValue
-                    />
-                  ) : null}
-                  {range?.max_price ? (
-                    <ComparisonRow
-                      label="Private maximum"
-                      value={formatOfferAmount(range.max_price, range.currency)}
-                      privateValue
-                    />
-                  ) : null}
                   <ComparisonRow
                     label="Proposed counter"
                     value={proposedCounter ? formatOfferAmount(proposedCounter, offer.currency) : "—"}
@@ -457,15 +440,6 @@ export function OwnerRespondSheet({ offer, open, onOpenChange }: OwnerRespondShe
                     emphasized
                   />
                 </section>
-
-                {range && (range.min_price || range.max_price) ? (
-                  <div className="flex items-start gap-2 rounded-[10px] bg-(--brc-primary-tint) px-3 py-2.5 text-xs font-semibold leading-relaxed text-(--brc-primary) [font-family:var(--brc-font-ui)]">
-                    <LockKeyholeIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                    Your acceptable range{" "}
-                    {formatOfferAmount(range.min_price, range.currency)} –{" "}
-                    {formatOfferAmount(range.max_price, range.currency)} is private. Buyers never see it.
-                  </div>
-                ) : null}
 
                 {status === "accepted" && (offer.customer.email || offer.customer.phone) ? (
                   <section className="rounded-[14px] border border-(--brc-border) p-4">
@@ -518,13 +492,6 @@ export function OwnerRespondSheet({ offer, open, onOpenChange }: OwnerRespondShe
                       >
                         Suggest {formatOfferAmount(midpoint(offer), offer.currency)}
                       </button>
-                      {range && (range.min_price || range.max_price) ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                          <LockKeyholeIcon className="size-3 text-(--brc-primary)" aria-hidden="true" />
-                          Range {formatOfferAmount(range.min_price, range.currency)} –{" "}
-                          {formatOfferAmount(range.max_price, range.currency)}
-                        </span>
-                      ) : null}
                     </div>
                     <div className="mt-2.5 flex items-start gap-2 rounded-lg bg-(--brc-warning-bg) px-3 py-2 text-xs font-semibold leading-relaxed text-(--brc-warning-ink,#8A6500) [font-family:var(--brc-font-ui)]">
                       <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />

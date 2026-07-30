@@ -171,18 +171,18 @@ function SelectField({ label, placeholder, value, options, onPick, className }: 
 }
 
 function FeaturesField({ features, onChange }: {
-  features: { name: string; value?: string }[];
-  onChange: (features: { name: string; value?: string }[]) => void;
+  features: { name: string; description?: string }[];
+  onChange: (features: { name: string; description?: string }[]) => void;
 }) {
   function addFeature() {
-    onChange([...features, { name: "", value: "" }]);
+    onChange([...features, { name: "", description: "" }]);
   }
 
   function removeFeature(index: number) {
     onChange(features.filter((_, i) => i !== index));
   }
 
-  function updateFeature(index: number, field: "name" | "value", val: string) {
+  function updateFeature(index: number, field: "name" | "description", val: string) {
     const updated = features.map((f, i) => (i === index ? { ...f, [field]: val } : f));
     onChange(updated);
   }
@@ -217,9 +217,9 @@ function FeaturesField({ features, onChange }: {
                 />
                 <span className="hidden text-xs text-(--brc-border) sm:block">|</span>
                 <input
-                  value={f.value ?? ""}
-                  placeholder="Value (optional)"
-                  onChange={(e) => updateFeature(i, "value", e.target.value)}
+                  value={f.description ?? ""}
+                  placeholder="Description (optional)"
+                  onChange={(e) => updateFeature(i, "description", e.target.value)}
                   className="hidden min-w-0 flex-1 border-none bg-transparent text-sm text-(--brc-text) outline-none placeholder:text-(--brc-text-muted) [font-family:var(--brc-font-ui)] sm:block"
                 />
               </div>
@@ -285,8 +285,6 @@ export default function ListCarPage() {
       rent_price_per_day: "",
       sale_price: "",
       is_negotiable: true,
-      min_price: "",
-      max_price: "",
       vin: "",
       plate_number: "",
       currency: "NGN",
@@ -314,11 +312,6 @@ export default function ListCarPage() {
   // Pricing is strictly exclusive: a car is listed to rent OR to buy.
   const showRentPrice = !isBuy;
   const showSalePrice = isBuy;
-  const isNegotiable = isBuy && w.is_negotiable === true;
-  const rangeError =
-    form.formState.errors.min_price?.message ??
-    form.formState.errors.max_price?.message ??
-    null;
 
   async function handleSubmit(values: CreateCarInput) {
     try {
@@ -350,14 +343,8 @@ export default function ListCarPage() {
       if (values.listing_type === "rent") {
         delete payload.sale_price;
         delete payload.is_negotiable;
-        delete payload.min_price;
-        delete payload.max_price;
       } else {
         delete payload.rent_price_per_day;
-        if (!values.is_negotiable) {
-          delete payload.min_price;
-          delete payload.max_price;
-        }
       }
 
       const car = await createCar.mutateAsync(payload);
@@ -529,11 +516,6 @@ export default function ListCarPage() {
                   <NegotiableField
                     isNegotiable={w.is_negotiable === true}
                     onToggle={(next) => form.setValue("is_negotiable", next)}
-                    minPrice={w.min_price ?? ""}
-                    maxPrice={w.max_price ?? ""}
-                    onMinPriceChange={(v) => form.setValue("min_price", v)}
-                    onMaxPriceChange={(v) => form.setValue("max_price", v)}
-                    error={isNegotiable ? rangeError : null}
                   />
                 )}
 
@@ -595,7 +577,7 @@ export default function ListCarPage() {
                 <TextAreaField label="Description" placeholder="Describe your car, its condition, and any special features" value={w.description ?? ""} onChange={(v) => form.setValue("description", v)} />
 
                 <FeaturesField
-                  features={(w.features ?? []) as { name: string; value?: string }[]}
+                  features={(w.features ?? []) as { name: string; description?: string }[]}
                   onChange={(features) => form.setValue("features", features)}
                 />
               </div>
@@ -650,9 +632,6 @@ export default function ListCarPage() {
               isBuy && w.sale_price ? { label: "Sale price", value: `${w.currency} ${w.sale_price}` } : null,
               !isBuy && w.rent_price_per_day ? { label: "Rent / day", value: `${w.currency} ${w.rent_price_per_day}` } : null,
               isBuy ? { label: "Pricing", value: w.is_negotiable ? "Negotiable" : "Non-negotiable" } : null,
-              isNegotiable && w.min_price && w.max_price
-                ? { label: "Private range", value: `${w.currency} ${w.min_price} – ${w.max_price}` }
-                : null,
               { label: "VIN", value: w.vin },
               { label: "Plate", value: w.plate_number },
               { label: "Location", value: [w.city, w.state].filter(Boolean).join(", ") },

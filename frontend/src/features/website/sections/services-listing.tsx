@@ -188,7 +188,7 @@ function ServiceCarCard({ car, mode, cta }: { car: CarListItem; mode: Mode; cta:
 
         {/* Availability badge overlay */}
         <div style={{ position: "absolute", top: 10, right: 10 }}>
-          <AvailabilityBadge status={car.availability_status} />
+          <AvailabilityBadge status={car.availability_status} listingType={car.listing_type} />
         </div>
       </div>
 

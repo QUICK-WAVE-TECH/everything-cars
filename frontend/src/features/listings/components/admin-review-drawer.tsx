@@ -44,7 +44,6 @@ import {
   formatAdminTime,
 } from "./admin-approval-ui";
 import { CarStatusTimeline } from "./car-status-timeline";
-import { PrivatePricingCard } from "./private-pricing-card";
 import { VehicleIdentityCard } from "./vehicle-identity-card";
 
 type ReviewPanel = "overview" | "inspection" | "history";
@@ -505,11 +504,6 @@ export function AdminReviewDrawer({
                           </div>
                         ) : null}
                       </div>
-                      <PrivatePricingCard
-                        minPrice={car.min_price}
-                        maxPrice={car.max_price}
-                        currency={car.currency}
-                      />
                     </ReviewSection>
 
                     <ReviewSection title="Vehicle specifications">
@@ -624,7 +618,7 @@ export function AdminReviewDrawer({
                               className="rounded-md border border-(--brc-border) bg-(--brc-bg-subtle) px-2.5 py-1.5 text-xs font-semibold"
                             >
                               {feature.name}
-                              {feature.value ? `: ${feature.value}` : ""}
+                              {feature.description ? `: ${feature.description}` : ""}
                             </span>
                           ))}
                         </div>

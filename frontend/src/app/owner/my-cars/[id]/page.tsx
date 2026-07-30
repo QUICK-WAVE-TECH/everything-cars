@@ -208,18 +208,18 @@ function FeaturesField({
   features,
   onChange,
 }: {
-  features: { name: string; value?: string }[];
-  onChange: (features: { name: string; value?: string }[]) => void;
+  features: { name: string; description?: string }[];
+  onChange: (features: { name: string; description?: string }[]) => void;
 }) {
   function addFeature() {
-    onChange([...features, { name: "", value: "" }]);
+    onChange([...features, { name: "", description: "" }]);
   }
 
   function removeFeature(index: number) {
     onChange(features.filter((_, i) => i !== index));
   }
 
-  function updateFeature(index: number, field: "name" | "value", val: string) {
+  function updateFeature(index: number, field: "name" | "description", val: string) {
     const updated = features.map((f, i) =>
       i === index ? { ...f, [field]: val } : f,
     );
@@ -261,9 +261,9 @@ function FeaturesField({
                   |
                 </span>
                 <input
-                  value={f.value ?? ""}
-                  placeholder="Value (optional)"
-                  onChange={(e) => updateFeature(i, "value", e.target.value)}
+                  value={f.description ?? ""}
+                  placeholder="Description (optional)"
+                  onChange={(e) => updateFeature(i, "description", e.target.value)}
                   className="hidden min-w-0 flex-1 border-none bg-transparent text-sm text-(--brc-text) outline-none placeholder:text-(--brc-text-muted) [font-family:var(--brc-font-ui)] sm:block"
                 />
               </div>
@@ -414,8 +414,6 @@ function populateForm(car: CarDetail): CreateCarFormValues {
     rent_price_per_day: car.rent_price_per_day ?? "",
     sale_price: car.sale_price ?? "",
     is_negotiable: car.is_negotiable ?? false,
-    min_price: car.min_price ?? "",
-    max_price: car.max_price ?? "",
     vin: car.vin ?? "",
     plate_number: car.plate_number ?? "",
     currency: car.currency || "NGN",
@@ -433,7 +431,7 @@ function populateForm(car: CarDetail): CreateCarFormValues {
     city: car.city ?? "",
     description: car.description ?? "",
     features:
-      car.features?.map((f) => ({ name: f.name, value: f.value ?? "" })) ?? [],
+      car.features?.map((f) => ({ name: f.name, description: f.description ?? "" })) ?? [],
   };
 }
 
@@ -527,7 +525,11 @@ export default function CarDetailPage() {
   }, [car, editing, form]);
 
   function startEditing() {
-    if (car) form.reset(populateForm(car));
+    // Editing is only permitted once staff request changes — mirrors the backend
+    // EDITABLE_CAR_STATUSES = [needs_changes]. Guard here so no affordance can
+    // open the edit form for a listed car.
+    if (car?.status !== "needs_changes") return;
+    form.reset(populateForm(car));
     setEditing(true);
   }
 
@@ -941,7 +943,7 @@ export default function CarDetailPage() {
 
                   <FeaturesField
                     features={
-                      (w.features ?? []) as { name: string; value?: string }[]
+                      (w.features ?? []) as { name: string; description?: string }[]
                     }
                     onChange={(features) => form.setValue("features", features)}
                   />

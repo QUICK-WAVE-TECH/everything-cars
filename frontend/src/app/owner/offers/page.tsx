@@ -15,14 +15,13 @@ import {
   CrownIcon,
   HourglassIcon,
   InboxIcon,
-  LockKeyholeIcon,
   MessageSquareTextIcon,
   RefreshCwIcon,
   SearchIcon,
   TimerIcon,
 } from "lucide-react";
 
-import { useCarRange, useOwnerOffers } from "@/features/offers/api";
+import { useOwnerOffers } from "@/features/offers/api";
 import type { OfferStatus, OwnerOffer } from "@/features/offers/api";
 import { agreedAmount, formatOfferAmount } from "@/features/offers/lib/offer-format";
 import { OfferStatusBadge } from "@/features/offers/components/offer-status-badge";
@@ -430,7 +429,6 @@ function VehicleRail({
 }
 
 function VehicleSummary({ group }: { group: VehicleGroup }) {
-  const { data: range } = useCarRange(group.car.id, { enabled: Boolean(group.car.id) });
   const asking = Number(group.car.sale_price);
   const delta = group.highestActive ? priceDelta(group.highestActive, asking) : null;
 
@@ -470,17 +468,6 @@ function VehicleSummary({ group }: { group: VehicleGroup }) {
           />
           <SummaryMetric label="Active offers" value={String(group.activeOffers.length)} />
         </div>
-
-        {range && (range.min_price || range.max_price) ? (
-          <div className="mt-4 inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-[10px] border border-(--brc-primary)/15 bg-(--brc-primary-tint) px-3 py-2 text-(--brc-primary)">
-            <LockKeyholeIcon className="size-3.5 shrink-0" aria-hidden="true" />
-            <span className="text-xs font-bold tabular-nums [font-family:var(--brc-font-ui)]">
-              {formatOfferAmount(range.min_price, range.currency)} –{" "}
-              {formatOfferAmount(range.max_price, range.currency)}
-            </span>
-            <span className="text-[11px] [font-family:var(--brc-font-ui)]">Private range, visible only to you</span>
-          </div>
-        ) : null}
       </div>
     </section>
   );

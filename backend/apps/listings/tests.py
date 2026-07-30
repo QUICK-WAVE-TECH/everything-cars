@@ -18,7 +18,9 @@ from apps.listings.models import (
     ListingType,
     Request,
     RequestStatus,
+    ListingFeature,
 )
+from apps.listings.serializers import ListingFeatureSerializer
 from apps.users.models import CustomerProfile, OwnerProfile, User
 from apps.listings.migration_helpers import delete_both_cars
 
@@ -86,31 +88,6 @@ def image_upload(name="car.jpg", size=(16, 16), image_format="JPEG"):
         buffer.getvalue(),
         content_type=f"image/{image_format.lower()}",
     )
-
-
-def test_direct_buy_request_rejected_on_negotiable_car(self):
-    """Negotiable listings transact through offers only."""
-    car = create_car(
-        self.owner,
-        listing_type=ListingType.BUY,
-        sale_price="18500000.00",
-        is_negotiable=True,
-        min_price="16000000.00",
-        max_price="18500000.00",
-    )
-    res = self._post(car, "buy", "18500000.00")
-    self.assertEqual(res.status_code, 400)
-    self.assertIn("offer", str(res.data).lower())
-
-
-def test_direct_buy_request_still_allowed_on_non_negotiable_car(self):
-    car = create_car(
-        self.owner,
-        listing_type=ListingType.BUY,
-        sale_price="18500000.00",
-        is_negotiable=False,
-    )
-    self.assertEqual(self._post(car, "buy", "18500000.00").status_code, 201)
 
 
 class CarStatusChoicesTest(APITestCase):
@@ -1074,52 +1051,6 @@ class XorPricingTest(APITestCase):
             self._post(listing_type="buy", sale_price="5000000.00").status_code, 400
         )
 
-    def test_negotiable_buy_requires_min_max_400(self):
-        self.assertEqual(
-            self._post(
-                listing_type="buy", sale_price="5000000.00", is_negotiable=True
-            ).status_code,
-            400,
-        )
-
-    def test_min_greater_than_max_400(self):
-        self.assertEqual(
-            self._post(
-                listing_type="buy",
-                sale_price="5000000.00",
-                is_negotiable=True,
-                min_price="6000000.00",
-                max_price="5000000.00",
-            ).status_code,
-            400,
-        )
-
-    def test_negotiable_buy_stores_range(self):
-        res = self._post(
-            listing_type="buy",
-            sale_price="5000000.00",
-            is_negotiable=True,
-            min_price="4000000.00",
-            max_price="5500000.00",
-        )
-        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(
-            str(Car.objects.get(id=res.data["id"]).min_price), "4000000.00"
-        )
-
-    def test_non_negotiable_buy_clears_min_max(self):
-        res = self._post(
-            listing_type="buy",
-            sale_price="5000000.00",
-            is_negotiable=False,
-            min_price="4000000.00",
-            max_price="5500000.00",
-        )
-        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        car = Car.objects.get(id=res.data["id"])
-        self.assertIsNone(car.min_price)
-        self.assertIsNone(car.max_price)
-
     def test_rent_forces_is_negotiable_null(self):
         res = self._post(
             listing_type="rent", rent_price_per_day="20000.00", is_negotiable=True
@@ -1133,6 +1064,20 @@ class XorPricingTest(APITestCase):
             400,
         )
 
+    def test_negotiable_buy_valid_without_range(self):
+        res = self._post(
+            listing_type="buy",
+            sale_price="5000000.00",
+            is_negotiable=True,
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(Car.objects.get(id=res.data["id"]).is_negotiable)
+
+    def test_car_model_has_no_min_max_fields(self):
+        field_names = {f.name for f in Car._meta.get_fields()}
+        self.assertNotIn("min_price", field_names)
+        self.assertNotIn("max_price", field_names)
+
 
 class VinPlatePrivacyTest(APITestCase):
     def setUp(self):
@@ -1143,11 +1088,21 @@ class VinPlatePrivacyTest(APITestCase):
             vin="1HGCM82633A004352",
             plate_number="ABC123DE",
             is_negotiable=True,
-            min_price="4000000.00",
-            max_price="5500000.00",
         )
 
-    PRIVATE = ("vin", "plate_number", "min_price", "max_price")
+    PRIVATE = ("vin", "plate_number")
+
+    def test_public_detail_exposes_fleet_business_name(self):
+        self.owner.owner_profile.owner_type = OwnerProfile.OwnerType.FLEET
+        self.owner.owner_profile.fleet_name = "SpeedyCars Ltd"
+        self.owner.owner_profile.save(update_fields=["owner_type", "fleet_name"])
+        res = self.client.get(f"/api/v1/listings/cars/{self.car.id}")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["owner"]["business_name"], "SpeedyCars Ltd")
+
+    def test_public_detail_business_name_blank_for_individual(self):
+        res = self.client.get(f"/api/v1/listings/cars/{self.car.id}")
+        self.assertEqual(res.data["owner"]["business_name"], "")
 
     def test_public_detail_omits_private_fields(self):
         res = self.client.get(f"/api/v1/listings/cars/{self.car.id}")
@@ -1161,7 +1116,6 @@ class VinPlatePrivacyTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data["vin"], "1HGCM82633A004352")
         self.assertEqual(res.data["plate_number"], "ABC123DE")
-        self.assertIn("min_price", res.data)
 
     def test_admin_detail_includes_private_fields(self):
         staff = create_user("priv-staff@test.com", "owner", is_staff=True)
@@ -1169,7 +1123,6 @@ class VinPlatePrivacyTest(APITestCase):
         res = self.client.get(f"/api/v1/listings/admin/cars/{self.car.id}")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn("vin", res.data)
-        self.assertIn("min_price", res.data)
 
     def test_is_negotiable_is_public(self):
         """The badge flag is public; only the range behind it is private."""
@@ -1226,6 +1179,27 @@ class RequestTypeMatchTest(APITestCase):
     def test_matching_buy_request_ok(self):
         self.assertEqual(self._post(self.buy_car, "buy", "5000000.00").status_code, 201)
 
+    def test_direct_buy_request_rejected_on_negotiable_car(self):
+        """Negotiable listings transact through offers only."""
+        car = create_car(
+            self.owner,
+            listing_type=ListingType.BUY,
+            sale_price="18500000.00",
+            is_negotiable=True,
+        )
+        res = self._post(car, "buy", "18500000.00")
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("offer", str(res.data).lower())
+
+    def test_direct_buy_request_still_allowed_on_non_negotiable_car(self):
+        car = create_car(
+            self.owner,
+            listing_type=ListingType.BUY,
+            sale_price="18500000.00",
+            is_negotiable=False,
+        )
+        self.assertEqual(self._post(car, "buy", "18500000.00").status_code, 201)
+
 
 class ReservedListingPauseTest(APITestCase):
     """A car reserved by an accepted offer (active buy request) can't be paused."""
@@ -1235,7 +1209,9 @@ class ReservedListingPauseTest(APITestCase):
         create_owner_profile(self.owner)
         self.customer = create_user("pause-buyer@test.com", "customer")
         self.car = create_car(
-            self.owner, listing_type=ListingType.BUY, sale_price="5000000.00",
+            self.owner,
+            listing_type=ListingType.BUY,
+            sale_price="5000000.00",
             status=CarStatus.PUBLISHED,
         )
         self.client.force_authenticate(user=self.owner)
@@ -1243,13 +1219,17 @@ class ReservedListingPauseTest(APITestCase):
     def _pause(self):
         return self.client.post(
             f"/api/v1/listings/my-cars/{self.car.id}/status",
-            {"status": "paused"}, format="json",
+            {"status": "paused"},
+            format="json",
         )
 
     def test_pause_blocked_when_reserved(self):
         Request.objects.create(
-            car=self.car, customer=self.customer, request_type=ListingType.BUY,
-            price_offered="5000000.00", status=RequestStatus.APPROVED,
+            car=self.car,
+            customer=self.customer,
+            request_type=ListingType.BUY,
+            price_offered="5000000.00",
+            status=RequestStatus.APPROVED,
         )
         res = self._pause()
         self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
@@ -1260,3 +1240,21 @@ class ReservedListingPauseTest(APITestCase):
         self.assertEqual(self._pause().status_code, status.HTTP_200_OK)
         self.car.refresh_from_db()
         self.assertEqual(self.car.status, CarStatus.PAUSED)
+
+
+class ListingFeatureFieldTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("feat-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner)
+
+    def test_listing_feature_uses_description_not_value(self):
+        field_names = {f.name for f in ListingFeature._meta.get_fields()}
+        self.assertIn("description", field_names)
+        self.assertNotIn("value", field_names)
+
+    def test_feature_serializer_exposes_description(self):
+        ListingFeature.objects.create(car=self.car, name="GPS", description="Built-in")
+        data = ListingFeatureSerializer(self.car.features.first()).data
+        self.assertEqual(data["description"], "Built-in")
+        self.assertNotIn("value", data)

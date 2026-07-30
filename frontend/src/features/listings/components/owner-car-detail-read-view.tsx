@@ -80,7 +80,9 @@ const STATUS_PRESENTATIONS: Record<string, StatusPresentation> = {
     icon: RefreshCcwIcon,
     title: "Awaiting review",
     body: "Our team is reviewing your listing. Nothing is required from you right now.",
-    more: ["edit", "archive"],
+    // Locked while under review — the backend only permits edits in needs_changes
+    // (EDITABLE_CAR_STATUSES = [needs_changes]).
+    more: ["archive"],
   },
   listing_approved: {
     label: "Approved",
@@ -500,7 +502,7 @@ export function OwnerCarDetailReadView({
                   >
                     <CheckIcon size={13} className="text-(--brc-success)" />
                     {feature.name}
-                    {feature.value ? `: ${feature.value}` : ""}
+                    {feature.description ? `: ${feature.description}` : ""}
                   </span>
                 ))}
               </div>
@@ -706,21 +708,6 @@ export function OwnerCarDetailReadView({
                 </span>
               )}
             </div>
-
-            {isBuy && car.is_negotiable && (car.min_price || car.max_price) && (
-              <div className="border-t border-dashed border-(--brc-border) py-3.5">
-                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.05em] text-(--brc-text-muted)">
-                  <LockIcon size={13} />
-                  Private range · you only
-                </div>
-                <p className="text-[17px] font-extrabold text-(--brc-text)">
-                  {formatMoney(car.min_price, car.currency)} – {formatMoney(car.max_price, car.currency)}
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-(--brc-text-muted)">
-                  Customers never see this range. It helps you evaluate offers.
-                </p>
-              </div>
-            )}
 
             <div className="border-t border-dashed border-(--brc-border) py-3.5">
               <div className="mb-2.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.05em] text-(--brc-text-muted)">
