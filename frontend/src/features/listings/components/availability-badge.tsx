@@ -3,6 +3,7 @@
 type AvailabilityBadgeProps = {
   status: "available" | "rented" | "reserved" | "sold" | "archived";
   availableFrom?: string | null;
+  listingType?: "rent" | "buy" | null;
 };
 
 function formatDate(dateStr: string): string {
@@ -33,14 +34,18 @@ const BADGE_LABELS: Record<AvailabilityBadgeProps["status"], string> = {
   archived: "Archived",
 };
 
-export function AvailabilityBadge({ status, availableFrom }: AvailabilityBadgeProps) {
+export function AvailabilityBadge({ status, availableFrom, listingType }: AvailabilityBadgeProps) {
   const cfg = BADGE_CONFIG[status];
   let label = BADGE_LABELS[status];
 
   if (status === "rented" && availableFrom) {
     label = `Rented until ${formatDate(availableFrom)}`;
   }
-  if (status === "reserved" && availableFrom) {
+  // A reserved buy listing is a sale negotiation in progress; a reserved rental
+  // keeps the "Reserved [until …]" wording.
+  if (status === "reserved" && listingType === "buy") {
+    label = "Ongoing negotiations";
+  } else if (status === "reserved" && availableFrom) {
     label = `Reserved until ${formatDate(availableFrom)}`;
   }
 

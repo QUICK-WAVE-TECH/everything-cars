@@ -282,6 +282,7 @@ export function CarDetailPage({ carId }: { carId: string }) {
             <AvailabilityBadge
               status={car.availability_status}
               availableFrom={car.available_from}
+              listingType={car.listing_type}
             />
           </div>
 
@@ -307,7 +308,7 @@ export function CarDetailPage({ carId }: { carId: string }) {
             </span>
             <div>
               <span style={{ fontSize: 14, fontWeight: 700, color: "var(--brc-text)" }}>
-                {car.owner.first_name} {car.owner.last_name}
+                {car.owner.business_name || `${car.owner.first_name} ${car.owner.last_name}`}
               </span>
               {car.owner.is_verified && (
                 <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: "var(--brc-success)", background: "var(--brc-success-bg)", padding: "2px 8px", borderRadius: "var(--brc-radius-pill)" }}>Verified</span>
@@ -577,7 +578,7 @@ export function CarDetailPage({ carId }: { carId: string }) {
                             <Icon name="check" size={12} stroke="var(--brc-success)" strokeWidth={2.5} />
                           </span>
                           <span style={{ fontSize: 14, color: "var(--brc-text-secondary)", lineHeight: 1.6 }}>
-                            <strong style={{ color: "var(--brc-text)" }}>{f.name}</strong>{f.value ? `: ${f.value}` : ""}
+                            <strong style={{ color: "var(--brc-text)" }}>{f.name}</strong>{f.description ? `: ${f.description}` : ""}
                           </span>
                         </li>
                       ))}

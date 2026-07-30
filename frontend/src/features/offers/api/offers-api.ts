@@ -5,7 +5,6 @@ import type { PaginatedResponse } from "@/shared/types/api";
 import type {
   Offer,
   OfferRespondPayload,
-  OwnerCarRange,
   OwnerOffer,
   OwnerOfferFilters,
   PlaceOfferPayload,
@@ -16,7 +15,6 @@ export const offerKeys = {
   mine: () => [...offerKeys.all, "mine"] as const,
   owner: (filters?: OwnerOfferFilters) =>
     [...offerKeys.all, "owner", filters ?? {}] as const,
-  range: (carId: string) => [...offerKeys.all, "range", carId] as const,
 };
 
 /** Customer places an offer on a negotiable buy car. */
@@ -72,20 +70,6 @@ export function useRespondToOffer(offerId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: offerKeys.all });
     },
-  });
-}
-
-/**
- * The owner's private acceptable range for a car — fetched lazily (pass
- * `enabled: open`) when a respond sheet opens, so it's never pulled for cars the
- * owner isn't actively acting on. Owner-only; 404 for anyone else.
- */
-export function useCarRange(carId: string, options?: { enabled?: boolean }) {
-  return useQuery({
-    queryKey: offerKeys.range(carId),
-    queryFn: () => apiClient.get<OwnerCarRange>(`/offers/cars/${carId}/range`),
-    enabled: !!carId && (options?.enabled ?? true),
-    staleTime: 5 * 60 * 1000,
   });
 }
 

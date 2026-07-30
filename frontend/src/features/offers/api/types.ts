@@ -75,15 +75,3 @@ export type OwnerOfferFilters = {
   status?: OfferStatus;
   car?: string;
 };
-
-/**
- * The owner's private acceptable range for one of their cars. Fetched lazily by
- * the respond sheet — never part of any offer list payload, so a buyer can't
- * see it.
- */
-export type OwnerCarRange = {
-  min_price: string | null;
-  max_price: string | null;
-  sale_price: string | null;
-  currency: string;
-};

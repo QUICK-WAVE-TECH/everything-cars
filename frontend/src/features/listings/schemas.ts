@@ -23,11 +23,9 @@ const createCarBase = z.object({
   }),
   rent_price_per_day: decimalString("Price must be a valid number (e.g. 35000 or 35000.50)"),
   sale_price: decimalString("Price must be a valid number (e.g. 24000000 or 24000000.00)"),
-  // Buy listings only. When negotiable, the owner sets a private min/max range
-  // that customers never see.
+  // Buy listings only. Negotiable means buyers can make an offer of any positive
+  // amount; there is no private range.
   is_negotiable: z.boolean().optional(),
-  min_price: decimalString("Enter a valid amount"),
-  max_price: decimalString("Enter a valid amount"),
   // Normalized here; the format/length rules are asserted in the superRefine
   // below so the message can name the exact problem.
   vin: z.string().trim().transform(normalizeVin),
@@ -62,7 +60,7 @@ const createCarBase = z.object({
     .array(
       z.object({
         name: z.string().trim().min(1, "Feature name required"),
-        value: z.string().trim().optional(),
+        description: z.string().trim().optional(),
       }),
     )
     .optional(),
@@ -95,24 +93,6 @@ export const createCarSchema = createCarBase.superRefine((data, ctx) => {
       code: "custom",
       message: "Sale price is required for this listing type",
       path: ["sale_price"],
-    });
-  }
-  if (data.is_negotiable !== true) return;
-
-  // Negotiable buy listings must declare a private, ordered range.
-  if (!data.min_price || !data.max_price) {
-    ctx.addIssue({
-      code: "custom",
-      message: "Enter both a minimum and a maximum",
-      path: ["min_price"],
-    });
-    return;
-  }
-  if (Number(data.min_price) > Number(data.max_price)) {
-    ctx.addIssue({
-      code: "custom",
-      message: "Minimum must be less than or equal to maximum",
-      path: ["min_price"],
     });
   }
 });

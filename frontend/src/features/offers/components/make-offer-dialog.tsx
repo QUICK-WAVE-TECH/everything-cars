@@ -242,11 +242,11 @@ export function MakeOfferDialog({
           <div className="mb-4 flex items-start gap-2 rounded-(--brc-radius-sm) bg-(--brc-bg-subtle) px-3.5 py-2.5">
             <HourglassIcon className="mt-0.5 size-4 shrink-0 text-(--brc-text-muted)" aria-hidden="true" />
             <span className="text-xs leading-snug text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
-              Your offer is valid for 48 hours. You can make up to 3 offers on this vehicle.
+              Your offer is valid for 48 hours. You can make up to 2 offers on this vehicle.
               {typeof remainingOffers === "number" && (
                 <>
                   {" "}
-                  <span className="font-bold">{remainingOffers} of 3 remaining.</span>
+                  <span className="font-bold">{remainingOffers} of 2 remaining.</span>
                 </>
               )}
             </span>

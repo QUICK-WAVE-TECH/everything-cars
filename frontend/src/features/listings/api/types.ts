@@ -16,6 +16,7 @@ export type CarOwner = {
   date_joined: string;
   is_verified: boolean;
   listing_count: number;
+  business_name: string;
 };
 
 export type CarImage = {
@@ -30,7 +31,7 @@ export type CarImage = {
 export type ListingFeature = {
   id?: string;
   name: string;
-  value: string;
+  description: string;
   sort_order?: number;
 };
 
@@ -107,6 +108,4 @@ export type CarDetail = CarListItem & {
    * optional: never assume they exist on a publicly-fetched car. */
   vin?: string | null;
   plate_number?: string | null;
-  min_price?: string | null;
-  max_price?: string | null;
 };

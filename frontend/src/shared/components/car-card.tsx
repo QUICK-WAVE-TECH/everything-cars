@@ -53,6 +53,7 @@ export function ApiCarCard({ car, displayMode }: ApiCarCardProps) {
   const isSold = car.availability_status === "sold";
   const isReserved = car.availability_status === "reserved";
   const isUnavailable = isSold || isReserved;
+  const isBuy = car.listing_type === "buy";
 
   return (
     <Link
@@ -121,7 +122,7 @@ export function ApiCarCard({ car, displayMode }: ApiCarCardProps) {
             right: 12,
           }}
         >
-          <AvailabilityBadge status={car.availability_status} />
+          <AvailabilityBadge status={car.availability_status} listingType={car.listing_type} />
         </div>
       </div>
 
@@ -207,7 +208,7 @@ export function ApiCarCard({ car, displayMode }: ApiCarCardProps) {
             alignItems: "center",
           }}
         >
-          {isSold ? "Sold" : isReserved ? "Reserved" : "View Details"}
+          {isSold ? "Sold" : isReserved ? (isBuy ? "Ongoing negotiations" : "Reserved") : "View Details"}
         </span>
       </div>
     </Link>
