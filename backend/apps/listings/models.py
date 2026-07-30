@@ -122,12 +122,7 @@ class Car(models.Model):
         null=True,
         blank=True,
     )
-    min_price = models.DecimalField(
-        max_digits=14, decimal_places=2, null=True, blank=True
-    )
-    max_price = models.DecimalField(
-        max_digits=14, decimal_places=2, null=True, blank=True
-    )
+
     currency = models.CharField(
         max_length=3,
         blank=True,

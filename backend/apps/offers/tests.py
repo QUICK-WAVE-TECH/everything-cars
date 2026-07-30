@@ -115,8 +115,6 @@ class PlaceOfferTest(APITestCase):
             sale_price=None,
             rent_price_per_day="45000.00",
             is_negotiable=None,
-            min_price=None,
-            max_price=None,
         )
         self.assertEqual(self._post(car=rent).status_code, 400)
 
@@ -124,8 +122,6 @@ class PlaceOfferTest(APITestCase):
         fixed = create_negotiable_car(
             self.owner,
             is_negotiable=False,
-            min_price=None,
-            max_price=None,
         )
         self.assertEqual(self._post(car=fixed).status_code, 400)
 
