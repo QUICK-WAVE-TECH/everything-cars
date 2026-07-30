@@ -63,16 +63,13 @@ now = timezone.now()
 attached = 0
 for (title, brand, model, year, body, state, city, lt, rent, sale, mileage, img) in CARS:
     # Enforce the rent-XOR-buy rules the model now expects. Buy cars are seeded
-    # negotiable with a private range so the offers flow has data to work with.
+    # negotiable (any positive offer) so the offers flow has data to work with.
     if lt == "buy":
         rent = None
         is_negotiable = True
-        min_price = int(sale * 0.9)
-        max_price = sale
     else:  # rent
         sale = None
         is_negotiable = None
-        min_price = max_price = None
 
     car, made = Car.objects.get_or_create(
         owner=owner,
@@ -81,7 +78,7 @@ for (title, brand, model, year, body, state, city, lt, rent, sale, mileage, img)
             listing_type=lt, brand=brand, model=model, year=year, body_type=body,
             state=state, city=city, country="NG", currency=Currency.NGN,
             rent_price_per_day=rent, sale_price=sale, mileage=mileage, seats=5,
-            is_negotiable=is_negotiable, min_price=min_price, max_price=max_price,
+            is_negotiable=is_negotiable,
             description=f"A well-maintained {year} {brand} {model} in great condition.",
             status=CarStatus.PUBLISHED, published_at=now,
         ),
@@ -91,13 +88,11 @@ for (title, brand, model, year, body, state, city, lt, rent, sale, mileage, img)
         car.rent_price_per_day = rent
         car.sale_price = sale
         car.is_negotiable = is_negotiable
-        car.min_price = min_price
-        car.max_price = max_price
         car.status = CarStatus.PUBLISHED
         car.published_at = now
         car.save(update_fields=[
             "listing_type", "rent_price_per_day", "sale_price",
-            "is_negotiable", "min_price", "max_price", "status", "published_at",
+            "is_negotiable", "status", "published_at",
         ])
 
     # Replace any existing image (e.g. previous web placeholders)
