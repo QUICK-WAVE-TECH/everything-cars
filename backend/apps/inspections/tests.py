@@ -2108,3 +2108,30 @@ class StaffPaymentActionTest(APITestCase):
             f"/api/v1/inspections/admin/bookings/{self.booking.id}/confirm-payment/"
         )
         self.assertEqual(res.status_code, 403)
+
+
+class BookingDetailPaymentTest(APITestCase):
+    def test_staff_detail_includes_payment_summary(self):
+        from apps.inspections.models import InspectionPayment
+
+        ctx = make_booking_ctx()
+        staff = create_user("det-pay-staff@t.com", "owner", is_staff=True)
+        booking = InspectionBooking.objects.create(
+            car=ctx["car"],
+            slot=ctx["slot"],
+            booked_by=ctx["owner"],
+            status=BookingStatus.AWAITING_PAYMENT,
+        )
+        InspectionPayment.objects.create(
+            booking=booking,
+            inspection_fee=Decimal("15000"),
+            listing_fee=Decimal("5000"),
+            vat_amount=Decimal("1500"),
+            total=Decimal("21500"),
+            receipt="x.pdf",
+        )
+        self.client.force_authenticate(user=staff)
+        res = self.client.get(f"/api/v1/inspections/admin/bookings/{booking.id}/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["payment"]["total"], "21500.00")
+        self.assertEqual(res.data["payment"]["status"], "submitted")

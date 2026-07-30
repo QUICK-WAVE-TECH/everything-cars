@@ -140,6 +140,7 @@ def booking_detail_queryset():
         "inspection",
         "inspection__inspector",
         "inspection__documents",
+        "payment",
     ).prefetch_related("car__images", "car__features")
 
 
