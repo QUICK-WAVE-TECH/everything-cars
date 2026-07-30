@@ -12,14 +12,6 @@ from .models import (
     OfferStatus,
 )
 
-# One fixed sentence for every rejected-too-low offer. Never interpolate the
-# actual minimum, and never vary the wording by how far off the amount is —
-# either would let a buyer binary-search the owner's private floor.
-BELOW_RANGE_MESSAGE = (
-    "Your offer is below the acceptable range for this vehicle. "
-    "Please submit a higher amount to continue."
-)
-
 
 class OfferCreateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -65,9 +57,6 @@ class OfferCreateSerializer(serializers.ModelSerializer):
                     )
                 }
             )
-
-        if car.min_price is not None and data["amount"] < car.min_price:
-            raise serializers.ValidationError({"amount": BELOW_RANGE_MESSAGE})
         return data
 
     def create(self, validated_data):

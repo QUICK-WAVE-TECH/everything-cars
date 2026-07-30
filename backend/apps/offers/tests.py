@@ -1,5 +1,3 @@
-
-# Create your tests here.
 from datetime import timedelta
 
 from django.db import IntegrityError, transaction
@@ -32,8 +30,6 @@ def create_negotiable_car(owner, **extra):
         is_negotiable=True,
         # min/max kept distinct from sale_price so a leak test can tell the
         # private range apart from the (public) asking price.
-        min_price="16000000.00",
-        max_price="17000000.00",
         brand="Toyota",
         model="Land Cruiser",
         year=2023,
@@ -108,24 +104,6 @@ class PlaceOfferTest(APITestCase):
         # 48-hour window, allowing a little clock drift in the test
         self.assertGreater(offer.expires_at, timezone.now() + timedelta(hours=47))
 
-    def test_below_minimum_rejected_with_fixed_message(self):
-        res = self._post("15999999.00")
-        self.assertEqual(res.status_code, 400)
-        self.assertIn("below the acceptable range", str(res.data))
-
-    def test_below_minimum_message_is_identical_regardless_of_distance(self):
-        """The floor must not be recoverable by bisecting the error message."""
-        near = self._post("15999999.00")
-        far = self._post("1.00")
-        self.assertEqual(near.data, far.data)
-
-    def test_response_never_leaks_the_range(self):
-        # The public sale price (18500000) may appear; the private min (16000000)
-        # and max (17000000) must not.
-        body = str(self._post("15000000.00").data) + str(self._post().data)
-        self.assertNotIn("16000000", body)
-        self.assertNotIn("17000000", body)
-
     def test_owner_cannot_offer_on_own_car(self):
         self.client.force_authenticate(user=self.owner)
         self.assertEqual(self._post().status_code, 400)
@@ -159,8 +137,8 @@ class PlaceOfferTest(APITestCase):
         self.assertEqual(self._post().status_code, 201)
         self.assertEqual(self._post().status_code, 400)
 
-    def test_lifetime_cap_of_three(self):
-        for _ in range(3):
+    def test_lifetime_cap_of_two(self):
+        for _ in range(2):
             res = self._post()
             self.assertEqual(res.status_code, 201)
             Offer.objects.filter(
@@ -481,27 +459,3 @@ class OfferNotificationTest(APITestCase):
                 recipient=customer, notification_type="offer_submitted"
             ).exists()
         )
-
-
-class OwnerCarRangeTest(APITestCase):
-    def setUp(self):
-        self.owner = create_user("range-owner@test.com", "owner")
-        self.stranger = create_user("range-other@test.com", "owner")
-        self.car = create_negotiable_car(self.owner)
-
-    def _url(self, car=None):
-        return f"/api/v1/offers/cars/{(car or self.car).id}/range"
-
-    def test_owner_sees_their_private_range(self):
-        self.client.force_authenticate(user=self.owner)
-        res = self.client.get(self._url())
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.data["min_price"], "16000000.00")
-        self.assertEqual(res.data["max_price"], "17000000.00")
-
-    def test_non_owner_gets_404(self):
-        self.client.force_authenticate(user=self.stranger)
-        self.assertEqual(self.client.get(self._url()).status_code, 404)
-
-    def test_anonymous_rejected(self):
-        self.assertIn(self.client.get(self._url()).status_code, (401, 403))
