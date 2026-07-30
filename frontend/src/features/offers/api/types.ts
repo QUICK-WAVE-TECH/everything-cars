@@ -47,6 +47,7 @@ type OfferBase = {
   expires_at: string;
   responded_at: string | null;
   resulting_request: string | null;
+  resulting_deal: string | null;
   is_expired: boolean;
   created_at: string;
 };

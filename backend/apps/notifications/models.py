@@ -47,6 +47,11 @@ class NotificationType(models.TextChoices):
     COUNTER_REJECTED = "counter_rejected", "Counter-offer declined"
     OFFER_EXPIRED = "offer_expired", "Offer expired"
     CAR_NO_LONGER_AVAILABLE = "car_no_longer_available", "Vehicle no longer available"
+    DEAL_REACHED = "deal_reached", "Deal reached"
+    DEAL_COMPLETED = "deal_completed", "Deal completed"
+    DEAL_CANCELLED = "deal_cancelled", "Deal cancelled"
+    CAR_AVAILABLE_AGAIN = "car_available_again", "Vehicle available again"
+    DEAL_DISPUTED = "deal_disputed", "Deal completion disputed"
     SYSTEM = "system", "System announcement"
 
 

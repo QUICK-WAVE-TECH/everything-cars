@@ -797,3 +797,119 @@ def notify_car_no_longer_available(offer):
             "action_url": _fe("/cars"),
         },
     )
+
+
+def _deal_data(deal):
+    return {
+        "deal_id": str(deal.id),
+        "car_id": str(deal.car_id),
+        "car_title": deal.car.title,
+    }
+
+
+def notify_deal_reached(deal):
+    """Both parties: contacts unlocked; coordinate the sale off-platform."""
+    url = _fe(f"/deals/{deal.id}")
+    amount = _money(deal.agreed_amount, deal.currency)
+    for recipient, other in ((deal.buyer, "seller"), (deal.seller, "buyer")):
+        _create_notification(
+            recipient=recipient,
+            notification_type=NotificationType.DEAL_REACHED,
+            title="Deal reached — contacts unlocked",
+            message=(
+                f"You've agreed on {deal.car.title} at {amount}. "
+                f"Open the deal to see the {other}'s contact details."
+            ),
+            data=_deal_data(deal),
+        )
+        send_email(
+            recipient=recipient.email,
+            subject="Deal reached — contacts unlocked",
+            template_key="deal_reached",
+            context={"car_title": deal.car.title, "amount": amount, "action_url": url},
+        )
+
+
+def notify_deal_completed(deal):
+    """Both parties: the sale is marked complete."""
+    url = _fe(f"/deals/{deal.id}")
+    for recipient in (deal.buyer, deal.seller):
+        _create_notification(
+            recipient=recipient,
+            notification_type=NotificationType.DEAL_COMPLETED,
+            title="Sale completed",
+            message=f"The sale of {deal.car.title} is marked complete.",
+            data=_deal_data(deal),
+        )
+        send_email(
+            recipient=recipient.email,
+            subject="Sale completed",
+            template_key="deal_completed",
+            context={"car_title": deal.car.title, "action_url": url},
+        )
+
+
+def notify_deal_cancelled(deal, recipient):
+    """The party who did NOT cancel: the deal fell through."""
+    _create_notification(
+        recipient=recipient,
+        notification_type=NotificationType.DEAL_CANCELLED,
+        title="Deal cancelled",
+        message=f"The deal on {deal.car.title} was cancelled.",
+        data=_deal_data(deal),
+    )
+    send_email(
+        recipient=recipient.email,
+        subject="Deal cancelled",
+        template_key="deal_cancelled",
+        context={"car_title": deal.car.title},
+    )
+
+
+def notify_deal_disputed(deal):
+    """Alert staff that a buyer says a completed sale never actually happened."""
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    review_url = _fe("/admin/sales/deal")
+    buyer_name = deal.buyer.get_full_name() or deal.buyer.email
+    for staff in staff_users:
+        _create_notification(
+            recipient=staff,
+            notification_type=NotificationType.DEAL_DISPUTED,
+            title="Deal completion disputed",
+            message=(
+                f"{buyer_name} disputes the completed sale of {deal.car.title}. "
+                "Review and reverse it if the sale didn't happen."
+            ),
+            data=_deal_data(deal),
+        )
+        send_email(
+            recipient=staff.email,
+            subject="A completed deal was disputed",
+            template_key="staff_deal_disputed",
+            context={
+                "car_title": deal.car.title,
+                "buyer_name": buyer_name,
+                "reason": deal.dispute_reason,
+                "review_url": review_url,
+            },
+        )
+
+
+def notify_car_available_again(offer):
+    """A prior bidder: the car they bid on is back on the market."""
+    _create_notification(
+        recipient=offer.customer,
+        notification_type=NotificationType.CAR_AVAILABLE_AGAIN,
+        title="Vehicle available again",
+        message=(
+            f"{offer.car.title} is back on the market. "
+            "Make a new offer if you're still interested."
+        ),
+        data=_offer_data(offer),
+    )
+    send_email(
+        recipient=offer.customer.email,
+        subject="A vehicle you bid on is available again",
+        template_key="car_available_again",
+        context={"car_title": offer.car.title, "action_url": _fe(f"/cars/{offer.car_id}")},
+    )

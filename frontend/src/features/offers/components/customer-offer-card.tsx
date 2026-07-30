@@ -138,12 +138,12 @@ export function CustomerOfferCard({ offer }: { offer: Offer }) {
                 </Link>
               )}
 
-              {offer.status === "accepted" && offer.resulting_request && (
+              {offer.status === "accepted" && offer.resulting_deal && (
                 <Link
-                  href={`/customer/requests/${offer.resulting_request}`}
+                  href={`/deals/${offer.resulting_deal}`}
                   className="group inline-flex w-max items-center gap-1.5 text-sm font-bold text-(--brc-primary) no-underline [font-family:var(--brc-font-ui)]"
                 >
-                  View your purchase
+                  View the deal &amp; contacts
                   <ArrowRightIcon
                     className="size-3.5 transition-transform group-hover:translate-x-0.5"
                     aria-hidden="true"

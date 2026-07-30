@@ -3,7 +3,7 @@
 import { Suspense, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRightIcon,
   ArrowUpRightIcon,
@@ -628,6 +628,7 @@ function OffersWorkspaceSkeleton() {
 
 function OwnerOffersContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const requestedCarId = searchParams.get("car");
   const { data, isLoading, isError, refetch } = useOwnerOffers();
   const offers = useMemo(() => data?.results ?? [], [data?.results]);
@@ -840,7 +841,11 @@ function OwnerOffersContent() {
                           key={offer.id}
                           offer={offer}
                           highest={offer.id === selectedGroup.bestOfferId && isActive(offer)}
-                          onOpen={() => openOffer(offer)}
+                          onOpen={() =>
+                            offer.status === "accepted" && offer.resulting_deal
+                              ? router.push(`/deals/${offer.resulting_deal}`)
+                              : openOffer(offer)
+                          }
                         />
                       ))}
                     </div>

@@ -103,6 +103,7 @@ class CarStatusChoicesTest(APITestCase):
     def test_pending_review_removed(self):
         """PENDING_REVIEW is no longer a valid status."""
         status_values = [choice[0] for choice in CarStatus.choices]
+
         self.assertNotIn("pending_review", status_values)
 
 
@@ -672,13 +673,19 @@ class PublicArchivedVisibilityTest(APITestCase):
         self.assertNotIn("Withdrawn Car", titles)
 
     def test_sold_car_shows_publicly_as_sold(self):
+        from apps.offers.models import Offer, OfferStatus
+        from apps.sales.models import Deal, DealStatus
         car = create_car(self.owner, title="Sold Car", status=CarStatus.ARCHIVED)
-        Request.objects.create(
-            car=car,
-            customer=self.customer,
-            request_type=ListingType.BUY,
-            price_offered="15000000.00",
-            status=RequestStatus.COMPLETED,
+        offer = Offer.objects.create(
+            car=car, customer=self.customer, amount="15000000.00",
+            currency=car.currency, status=OfferStatus.ACCEPTED,
+            expires_at=timezone.now(),
+        )
+        Deal.objects.create(
+            car=car, buyer=self.customer, seller=self.owner, offer=offer,
+            agreed_amount="15000000.00", currency=car.currency,
+            status=DealStatus.COMPLETED, expires_at=timezone.now(),
+            completed_at=timezone.now(),
         )
         res = self.client.get("/api/v1/listings/cars")
         sold = next((c for c in res.data["results"] if c["title"] == "Sold Car"), None)
@@ -1224,12 +1231,17 @@ class ReservedListingPauseTest(APITestCase):
         )
 
     def test_pause_blocked_when_reserved(self):
-        Request.objects.create(
-            car=self.car,
-            customer=self.customer,
-            request_type=ListingType.BUY,
-            price_offered="5000000.00",
-            status=RequestStatus.APPROVED,
+        from apps.offers.models import Offer, OfferStatus
+        from apps.sales.models import Deal, DEAL_TTL_DAYS
+        offer = Offer.objects.create(
+            car=self.car, customer=self.customer, amount="5000000.00",
+            currency=self.car.currency, status=OfferStatus.ACCEPTED,
+            expires_at=timezone.now(),
+        )
+        Deal.objects.create(
+            car=self.car, buyer=self.customer, seller=self.owner, offer=offer,
+            agreed_amount="5000000.00", currency=self.car.currency,
+            expires_at=timezone.now() + timedelta(days=DEAL_TTL_DAYS),
         )
         res = self._pause()
         self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)

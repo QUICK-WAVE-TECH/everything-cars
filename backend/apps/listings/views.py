@@ -81,6 +81,7 @@ from apps.inspections.serializers import (
     StaffCarStatusHistorySerializer,
 )
 from apps.inspections.services import record_status_change
+from apps.sales.models import Deal, DealStatus
 
 
 REQUIRED_CAR_IMAGE_TYPES = [
@@ -143,10 +144,9 @@ def request_end_date_expression():
 
 def availability_annotations():
     today = timezone.localdate()
-    buy_in_progress = Request.objects.filter(
+    buy_in_progress = Deal.objects.filter(
         car_id=OuterRef("id"),
-        request_type=ListingType.BUY,
-        status__in=REQUEST_APPROVAL_BLOCKING_STATUSES,
+        status=DealStatus.ACTIVE,
     )
     active_current_rental = (
         Request.objects.filter(
@@ -159,7 +159,7 @@ def availability_annotations():
         .filter(end_date__gt=today)
     )
     # No reserved status for rentals — they show as "available" with
-    # blocked dates on the calendar. Only buy requests reserve the car.
+    # blocked dates on the calendar. Only an active Deal reserves the car.
     reserved_future_rental = Request.objects.none()
     return {
         "_has_buy_in_progress": Exists(buy_in_progress),
@@ -169,15 +169,11 @@ def availability_annotations():
 
 
 def sold_annotation():
-    """True when the car was genuinely sold (a buy request completed).
+    """True when a Deal on the car completed (the car was genuinely sold).
     Archived-without-sale means the owner withdrew the listing — those
     cars must not appear publicly as 'sold'."""
     return Exists(
-        Request.objects.filter(
-            car_id=OuterRef("id"),
-            request_type=ListingType.BUY,
-            status=RequestStatus.COMPLETED,
-        )
+        Deal.objects.filter(car_id=OuterRef("id"), status=DealStatus.COMPLETED)
     )
 
 
@@ -189,14 +185,9 @@ def car_has_active_requests(car_id):
 
 
 def car_is_reserved(car_id):
-    """True when a buy purchase is in progress (e.g. an accepted offer) — the
-    car reads as 'reserved'. Such a listing can't be paused or archived while the
-    sale is live."""
-    return Request.objects.filter(
-        car_id=car_id,
-        request_type=ListingType.BUY,
-        status__in=REQUEST_APPROVAL_BLOCKING_STATUSES,
-    ).exists()
+    """True when an active Deal holds the car (an accepted offer in progress) —
+    the car reads as 'reserved' and can't be paused or archived mid-sale."""
+    return Deal.objects.filter(car_id=car_id, status=DealStatus.ACTIVE).exists()
 
 
 def active_request_archive_response():
@@ -428,7 +419,7 @@ class MyCarDetailView(APIView):
                     {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
                 )
 
-            if car_has_active_requests(car.id):
+            if car_has_active_requests(car.id) or car_is_reserved(car.id):
                 return active_request_archive_response()
 
             # Archiving mid-inspection would orphan the booking (it keeps
@@ -780,7 +771,9 @@ class MyCarStatusView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            if new_status == CarStatus.ARCHIVED and car_has_active_requests(car.id):
+            if new_status == CarStatus.ARCHIVED and (
+                car_has_active_requests(car.id) or car_is_reserved(car.id)
+            ):
                 return active_request_archive_response()
 
             # A reserved car (accepted offer / purchase in progress) can't be
