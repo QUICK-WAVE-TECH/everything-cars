@@ -26,6 +26,8 @@ from .views import (
     StaffSlotDetailView,
     StaffSlotListCreateView,
     StaffBookForOwnerView,
+    StaffConfirmInspectionPaymentView,
+    StaffRejectInspectionPaymentView,
 )
 
 urlpatterns = [
@@ -75,6 +77,16 @@ urlpatterns = [
         "admin/bookings/<uuid:booking_id>/",
         StaffBookingDetailView.as_view(),
         name="staff-booking-detail",
+    ),
+    path(
+        "admin/bookings/<uuid:booking_id>/confirm-payment/",
+        StaffConfirmInspectionPaymentView.as_view(),
+        name="confirm-inspection-payment",
+    ),
+    path(
+        "admin/bookings/<uuid:booking_id>/reject-payment/",
+        StaffRejectInspectionPaymentView.as_view(),
+        name="reject-inspection-payment",
     ),
     path(
         "admin/bookings/<uuid:booking_id>/start/",

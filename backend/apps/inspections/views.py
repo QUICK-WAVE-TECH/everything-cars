@@ -26,11 +26,14 @@ from apps.notifications.service import (
     notify_inspection_rescheduled,
     notify_inspection_cancelled,
     notify_inspection_payment_submitted,
+    notify_inspection_payment_confirmed,
+    notify_inspection_payment_rejected,
     notify_assistance_requested,
 )
 from apps.notifications.email_service import (
     send_assistance_booked,
     send_assistance_received,
+    send_booking_confirmation,
 )
 from .models import (
     ACTIVE_BOOKING_STATUSES,
@@ -720,6 +723,95 @@ class OwnerBookingCreateView(APIView):
             InspectionBookingSerializer(detail).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class StaffConfirmInspectionPaymentView(APIView):
+    permission_classes = [IsStaff]
+
+    def post(self, request, booking_id):
+        with transaction.atomic():
+            try:
+                booking = InspectionBooking.objects.select_for_update().get(
+                    id=booking_id
+                )
+            except InspectionBooking.DoesNotExist:
+                return Response(
+                    {"detail": "Booking not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if booking.status != BookingStatus.AWAITING_PAYMENT:
+                return Response(
+                    {"detail": f"Cannot confirm — booking is '{booking.status}'."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            payment = booking.payment
+            payment.status = InspectionPaymentStatus.CONFIRMED
+            payment.confirmed_at = timezone.now()
+            payment.confirmed_by = request.user
+            payment.save(update_fields=["status", "confirmed_at", "confirmed_by"])
+
+            booking.status = BookingStatus.PENDING
+            booking.save(update_fields=["status", "updated_at"])
+
+        # Payment cleared → the appointment is real; tell the owner (both the
+        # payment-confirmed note and the bring-your-ID appointment email).
+        schedule_notification(
+            notify_inspection_payment_confirmed,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
+        schedule_notification(
+            send_booking_confirmation,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
+        detail = booking_detail_queryset().get(id=booking.id)
+        return Response(InspectionBookingSerializer(detail).data)
+
+
+class StaffRejectInspectionPaymentView(APIView):
+    permission_classes = [IsStaff]
+
+    def post(self, request, booking_id):
+        reason = (request.data or {}).get("reason", "")
+        with transaction.atomic():
+            try:
+                booking = InspectionBooking.objects.select_for_update().get(
+                    id=booking_id
+                )
+            except InspectionBooking.DoesNotExist:
+                return Response(
+                    {"detail": "Booking not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if booking.status != BookingStatus.AWAITING_PAYMENT:
+                return Response(
+                    {"detail": f"Cannot reject — booking is '{booking.status}'."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            payment = booking.payment
+            payment.status = InspectionPaymentStatus.REJECTED
+            payment.staff_note = reason
+            payment.save(update_fields=["status", "staff_note"])
+
+            booking.status = BookingStatus.CANCELLED
+            booking.save(update_fields=["status", "updated_at"])
+
+            car = Car.objects.select_for_update().get(id=booking.car_id)
+            if car.status == CarStatus.INSPECTION_PENDING:
+                record_status_change(
+                    car,
+                    CarStatus.LISTING_APPROVED,
+                    actor=request.user,
+                    actor_role=ActorRole.STAFF,
+                    note="Inspection payment rejected.",
+                    request=request,
+                )
+
+        schedule_notification(
+            notify_inspection_payment_rejected,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
+        detail = booking_detail_queryset().get(id=booking.id)
+        return Response(InspectionBookingSerializer(detail).data)
 
 
 class OwnerBookingListView(APIView):
