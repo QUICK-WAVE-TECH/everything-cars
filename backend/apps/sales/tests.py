@@ -191,3 +191,21 @@ class DealActionTest(DealEndpointTest):
         # Should not raise; prior-bidder notification fires on commit.
         res = self.client.post(f"/api/v1/deals/{self.deal.id}/cancel")
         self.assertEqual(res.status_code, 200)
+
+
+class ExpireDealsCommandTest(DealEndpointTest):
+    def test_command_cancels_stale_active_deals(self):
+        from django.core.management import call_command
+        from apps.sales.models import DealCancelledBy
+        self.deal.expires_at = timezone.now() - timedelta(minutes=1)
+        self.deal.save(update_fields=["expires_at"])
+        call_command("expire_deals")
+        self.deal.refresh_from_db()
+        self.assertEqual(self.deal.status, DealStatus.CANCELLED)
+        self.assertEqual(self.deal.cancelled_by, DealCancelledBy.SYSTEM)
+
+    def test_command_leaves_live_deals_alone(self):
+        from django.core.management import call_command
+        call_command("expire_deals")
+        self.deal.refresh_from_db()
+        self.assertEqual(self.deal.status, DealStatus.ACTIVE)
