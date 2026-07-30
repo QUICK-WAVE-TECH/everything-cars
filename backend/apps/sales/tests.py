@@ -156,6 +156,59 @@ class DealEndpointTest(APITestCase):
         self.assertTrue(any(str(self.deal.id) == r["id"] for r in rows))
 
 
+class DealDisputeTest(DealEndpointTest):
+    def _complete(self):
+        self.client.force_authenticate(user=self.owner)
+        self.client.post(f"/api/v1/deals/{self.deal.id}/complete")
+        self.deal.refresh_from_db()
+
+    def test_buyer_disputes_a_completed_deal(self):
+        self._complete()
+        self.client.force_authenticate(user=self.buyer)
+        res = self.client.post(
+            f"/api/v1/deals/{self.deal.id}/dispute",
+            {"reason": "I never bought this car."},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200)
+        self.deal.refresh_from_db()
+        self.assertIsNotNone(self.deal.disputed_at)
+        self.assertEqual(self.deal.dispute_reason, "I never bought this car.")
+
+    def test_cannot_dispute_an_active_deal(self):
+        self.client.force_authenticate(user=self.buyer)
+        res = self.client.post(f"/api/v1/deals/{self.deal.id}/dispute")
+        self.assertEqual(res.status_code, 400)
+
+    def test_seller_cannot_dispute(self):
+        self._complete()
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.post(f"/api/v1/deals/{self.deal.id}/dispute")
+        self.assertEqual(res.status_code, 403)
+
+    def test_dispute_window_closes(self):
+        self._complete()
+        self.deal.completed_at = timezone.now() - timedelta(days=8)
+        self.deal.save(update_fields=["completed_at"])
+        self.client.force_authenticate(user=self.buyer)
+        res = self.client.post(f"/api/v1/deals/{self.deal.id}/dispute")
+        self.assertEqual(res.status_code, 400)
+
+    def test_staff_reverse_relists_the_car(self):
+        from apps.listings.models import CarStatus
+        from apps.sales.services import reverse_deal
+        self._complete()
+        self.car.refresh_from_db()
+        self.assertEqual(self.car.status, CarStatus.ARCHIVED)
+        reverse_deal(self.deal)
+        self.deal.refresh_from_db()
+        self.car.refresh_from_db()
+        self.assertEqual(self.deal.status, DealStatus.CANCELLED)
+        self.assertEqual(self.car.status, CarStatus.PUBLISHED)
+        detail = self.client.get(f"/api/v1/listings/cars/{self.car.id}")
+        self.assertEqual(detail.data["availability_status"], "available")
+
+
 class DealActionTest(DealEndpointTest):
     def test_seller_completes_deal_and_car_reads_sold(self):
         self.client.force_authenticate(user=self.owner)

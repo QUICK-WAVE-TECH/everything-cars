@@ -866,6 +866,35 @@ def notify_deal_cancelled(deal, recipient):
     )
 
 
+def notify_deal_disputed(deal):
+    """Alert staff that a buyer says a completed sale never actually happened."""
+    staff_users = User.objects.filter(is_staff=True, is_active=True)
+    review_url = _fe("/admin/sales/deal")
+    buyer_name = deal.buyer.get_full_name() or deal.buyer.email
+    for staff in staff_users:
+        _create_notification(
+            recipient=staff,
+            notification_type=NotificationType.DEAL_DISPUTED,
+            title="Deal completion disputed",
+            message=(
+                f"{buyer_name} disputes the completed sale of {deal.car.title}. "
+                "Review and reverse it if the sale didn't happen."
+            ),
+            data=_deal_data(deal),
+        )
+        send_email(
+            recipient=staff.email,
+            subject="A completed deal was disputed",
+            template_key="staff_deal_disputed",
+            context={
+                "car_title": deal.car.title,
+                "buyer_name": buyer_name,
+                "reason": deal.dispute_reason,
+                "review_url": review_url,
+            },
+        )
+
+
 def notify_car_available_again(offer):
     """A prior bidder: the car they bid on is back on the market."""
     _create_notification(

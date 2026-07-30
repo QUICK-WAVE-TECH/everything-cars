@@ -7,6 +7,8 @@ from apps.offers.models import Offer
 from apps.users.models import User
 
 DEAL_TTL_DAYS = 7
+# How long after completion a buyer may dispute a "sold" they say never happened.
+DEAL_DISPUTE_WINDOW_DAYS = 7
 
 
 class DealStatus(models.TextChoices):
@@ -49,6 +51,9 @@ class Deal(models.Model):
         max_length=10, choices=DealCancelledBy.choices, blank=True
     )
     cancel_reason = models.CharField(max_length=200, blank=True)
+    # A buyer can flag a completion they say never happened; staff then review.
+    disputed_at = models.DateTimeField(null=True, blank=True)
+    dispute_reason = models.CharField(max_length=400, blank=True)
 
     class Meta:
         ordering = ["-created_at"]

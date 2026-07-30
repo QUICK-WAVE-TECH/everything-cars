@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 from .models import Deal, DealCancelledBy
 from .serializers import DealSerializer
-from .services import cancel_deal, complete_deal
+from .services import cancel_deal, complete_deal, dispute_deal
 
 
 def _deal_queryset():
@@ -81,6 +81,26 @@ class DealCancelView(APIView):
         )
         try:
             cancel_deal(deal, cancelled_by=by)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(DealSerializer(deal, context={"request": request}).data)
+
+
+class DealDisputeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, deal_id):
+        deal = _participant_deal_or_404(request.user, deal_id)
+        if deal is None:
+            return Response({"detail": "Deal not found."}, status=status.HTTP_404_NOT_FOUND)
+        if deal.buyer_id != request.user.id:
+            return Response(
+                {"detail": "Only the buyer can dispute a completed sale."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        reason = (request.data or {}).get("reason", "")
+        try:
+            dispute_deal(deal, reason=reason)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         return Response(DealSerializer(deal, context={"request": request}).data)

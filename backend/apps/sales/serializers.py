@@ -43,6 +43,7 @@ class DealSerializer(serializers.ModelSerializer):
         fields = [
             "id", "status", "agreed_amount", "currency",
             "created_at", "expires_at", "completed_at", "cancelled_at",
+            "disputed_at",
             "car", "seller", "buyer", "viewer_role",
         ]
         read_only_fields = fields
