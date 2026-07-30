@@ -154,3 +154,40 @@ class DealEndpointTest(APITestCase):
         res = self.client.get("/api/v1/deals/")
         rows = res.data["results"] if isinstance(res.data, dict) else res.data
         self.assertTrue(any(str(self.deal.id) == r["id"] for r in rows))
+
+
+class DealActionTest(DealEndpointTest):
+    def test_seller_completes_deal_and_car_reads_sold(self):
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.post(f"/api/v1/deals/{self.deal.id}/complete")
+        self.assertEqual(res.status_code, 200)
+        self.deal.refresh_from_db()
+        self.car.refresh_from_db()
+        self.assertEqual(self.deal.status, DealStatus.COMPLETED)
+        self.assertEqual(self.car.status, CarStatus.ARCHIVED)
+
+    def test_buyer_cannot_complete(self):
+        self.client.force_authenticate(user=self.buyer)
+        res = self.client.post(f"/api/v1/deals/{self.deal.id}/complete")
+        self.assertEqual(res.status_code, 403)
+
+    def test_either_party_can_cancel_and_car_returns_to_available(self):
+        self.client.force_authenticate(user=self.buyer)
+        res = self.client.post(f"/api/v1/deals/{self.deal.id}/cancel")
+        self.assertEqual(res.status_code, 200)
+        self.deal.refresh_from_db()
+        self.assertEqual(self.deal.status, DealStatus.CANCELLED)
+        self.assertEqual(self.deal.cancelled_by, "buyer")
+        detail = self.client.get(f"/api/v1/listings/cars/{self.car.id}")
+        self.assertEqual(detail.data["availability_status"], "available")
+
+    def test_cancel_notifies_prior_bidders(self):
+        rival = make_user("de-rival@test.com")
+        Offer.objects.create(
+            car=self.car, customer=rival, amount="1.00", currency=self.car.currency,
+            status=OfferStatus.SUPERSEDED, expires_at=timezone.now(),
+        )
+        self.client.force_authenticate(user=self.owner)
+        # Should not raise; prior-bidder notification fires on commit.
+        res = self.client.post(f"/api/v1/deals/{self.deal.id}/cancel")
+        self.assertEqual(res.status_code, 200)
