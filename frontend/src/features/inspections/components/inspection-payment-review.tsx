@@ -36,8 +36,11 @@ function errorMessage(error: unknown): string {
  * `awaiting_payment`. */
 export function InspectionPaymentReview({
   booking,
+  onResolved,
 }: {
   booking: InspectionBookingDetail;
+  /** Called after a successful confirm/reject — e.g. to close a parent drawer. */
+  onResolved?: () => void;
 }) {
   const payment = booking.payment;
   const confirm = useConfirmInspectionPayment();
@@ -56,6 +59,7 @@ export function InspectionPaymentReview({
       onSuccess: () => {
         toast.success("Payment confirmed — the inspection is now booked.");
         setDialog(null);
+        onResolved?.();
       },
       onError: (e) =>
         toast.error("Couldn't confirm the payment", { description: errorMessage(e) }),
@@ -72,6 +76,7 @@ export function InspectionPaymentReview({
           setDialog(null);
           setReason("");
           setTouched(false);
+          onResolved?.();
         },
         onError: (e) =>
           toast.error("Couldn't reject the payment", {

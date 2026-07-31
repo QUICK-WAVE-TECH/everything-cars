@@ -16,6 +16,7 @@ import { useAdminRequests } from "@/features/listings/api/admin-api";
 import type { RequestListItem } from "@/features/requests/api/types";
 import { PaymentSummaryBand, type PaymentCounts } from "@/features/payments/components/payment-summary-band";
 import { PaymentDrawer } from "@/features/payments/components/payment-drawer";
+import { InspectionPaymentQueue } from "@/features/inspections/components/inspection-payment-queue";
 
 // ── Helpers ──
 function formatDate(iso: string) {
@@ -262,6 +263,9 @@ export default function AdminPaymentsPage() {
       <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-4 py-8 sm:px-6 lg:px-(--brc-space-10,40px)">
         {/* Summary band */}
         <PaymentSummaryBand counts={counts} />
+
+        {/* Owner inspection payments (pay-to-book) */}
+        <InspectionPaymentQueue />
 
         {/* Queue card */}
         <div className="flex flex-col gap-0 overflow-hidden rounded-2xl border border-(--brc-border) bg-(--brc-bg) shadow-[var(--brc-shadow-xs)]">

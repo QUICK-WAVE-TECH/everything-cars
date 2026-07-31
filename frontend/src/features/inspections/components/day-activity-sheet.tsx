@@ -119,12 +119,9 @@ function AttendeeRow({ booking }: { booking: InspectionBooking }) {
       )}
 
       {booking.status === "awaiting_payment" && (
-        <Link
-          href={`/admin/inspections/${booking.id}/inspect`}
-          className="mt-3 flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-(--brc-border-strong) bg-white text-[13px] font-bold text-(--brc-text) transition-all hover:bg-(--brc-bg-subtle) [font-family:var(--brc-font-ui)]"
-        >
-          Review payment <ArrowRightIcon size={14} />
-        </Link>
+        <p className="mt-3 text-center text-[12px] font-semibold text-(--brc-accent) [font-family:var(--brc-font-ui)]">
+          Payment verification pending — review it on the Payments desk.
+        </p>
       )}
     </div>
   );
