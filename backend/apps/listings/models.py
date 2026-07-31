@@ -283,6 +283,7 @@ class Request(models.Model):
 class TransactionType(models.TextChoices):
     RENTAL = "rental", "Rental"
     PURCHASE = "purchase", "Purchase"
+    INSPECTION = "inspection", "Inspection fee"
     REFUND = "refund", "Refund"
 
 
@@ -303,14 +304,32 @@ class TransactionStatus(models.TextChoices):
 
 class Transaction(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # Nullable: platform fees (e.g. an inspection fee) have no rental/buy request.
     request = models.ForeignKey(
-        Request, on_delete=models.CASCADE, related_name="transactions"
+        Request,
+        on_delete=models.CASCADE,
+        related_name="transactions",
+        null=True,
+        blank=True,
+    )
+    # Set for inspection-fee transactions so the car/owner can be shown.
+    inspection_booking = models.ForeignKey(
+        "inspections.InspectionBooking",
+        on_delete=models.SET_NULL,
+        related_name="transactions",
+        null=True,
+        blank=True,
     )
     payer = models.ForeignKey(
         "users.User", on_delete=models.CASCADE, related_name="payments_made"
     )
+    # Nullable: a platform fee is paid to EverythingCars, not another user.
     receiver = models.ForeignKey(
-        "users.User", on_delete=models.CASCADE, related_name="payments_received"
+        "users.User",
+        on_delete=models.CASCADE,
+        related_name="payments_received",
+        null=True,
+        blank=True,
     )
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(

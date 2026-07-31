@@ -2079,6 +2079,24 @@ class StaffPaymentActionTest(APITestCase):
         self.assertEqual(self.booking.status, BookingStatus.PENDING)
         self.assertEqual(self.booking.payment.status, "confirmed")
 
+    def test_confirm_records_an_inspection_transaction(self):
+        from apps.listings.models import Transaction
+
+        self.client.force_authenticate(user=self.staff)
+        self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/confirm-payment/"
+        )
+        txn = Transaction.objects.get(inspection_booking=self.booking)
+        self.assertEqual(txn.transaction_type, "inspection")
+        self.assertEqual(txn.payer_id, self.ctx["owner"].id)
+        self.assertIsNone(txn.request_id)
+        self.assertIsNone(txn.receiver_id)
+        # It shows up in the owner's transactions list.
+        self.client.force_authenticate(user=self.ctx["owner"])
+        res = self.client.get("/api/v1/listings/transactions")
+        rows = res.data["results"] if isinstance(res.data, dict) else res.data
+        self.assertTrue(any(r["transaction_type"] == "inspection" for r in rows))
+
     def test_reject_cancels_booking_and_frees_slot(self):
         self.client.force_authenticate(user=self.staff)
         res = self.client.post(

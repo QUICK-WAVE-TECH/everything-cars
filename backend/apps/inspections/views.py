@@ -12,7 +12,13 @@ from rest_framework.views import APIView
 
 from common.pagination import StandardPagination
 from common.permissions import IsOwner, IsStaff
-from apps.listings.models import Car, CarStatus
+from apps.listings.models import (
+    Car,
+    CarStatus,
+    Transaction,
+    TransactionStatus,
+    TransactionType,
+)
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from apps.notifications.service import (
@@ -753,6 +759,18 @@ class StaffConfirmInspectionPaymentView(APIView):
 
             booking.status = BookingStatus.PENDING
             booking.save(update_fields=["status", "updated_at"])
+
+            # Record the fee in the transactions ledger (owner pays the platform).
+            Transaction.objects.create(
+                inspection_booking=booking,
+                payer=booking.booked_by,
+                amount=payment.total,
+                currency=payment.currency,
+                transaction_type=TransactionType.INSPECTION,
+                payment_method=payment.payment_method,
+                status=TransactionStatus.COMPLETED,
+                reference=f"INSP-{booking.id.hex[:12].upper()}",
+            )
 
         # Payment cleared → the appointment is real; tell the owner (both the
         # payment-confirmed note and the bring-your-ID appointment email).

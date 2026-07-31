@@ -1294,13 +1294,19 @@ class TransactionListView(APIView):
     def get(self, request):
         # Get the queryset
         qs = Transaction.objects.select_related(
-            "request", "request__car", "payer", "receiver"
+            "request",
+            "request__car",
+            "inspection_booking",
+            "inspection_booking__car",
+            "payer",
+            "receiver",
         )
         if not request.user.is_staff:
             if request.user.role == "customer":
                 qs = qs.filter(payer=request.user)
             elif request.user.role == "owner":
-                qs = qs.filter(receiver=request.user)
+                # Owners receive rental/sale money and pay inspection fees.
+                qs = qs.filter(Q(receiver=request.user) | Q(payer=request.user))
 
             else:
                 return Response(

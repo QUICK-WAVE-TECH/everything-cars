@@ -24,6 +24,7 @@ const FILTER_FIELDS: FilterField[] = [
     options: [
       { value: "rental", label: "Rental" },
       { value: "purchase", label: "Purchase" },
+      { value: "inspection", label: "Inspection fee" },
       { value: "refund", label: "Refund" },
     ],
   },
@@ -60,6 +61,10 @@ const tdStyle: React.CSSProperties = {
 
 function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
+}
+
+function typeLabel(t: string) {
+  return t === "inspection" ? "Inspection fee" : capitalize(t);
 }
 
 function formatDate(iso: string) {
@@ -222,7 +227,7 @@ export function TransactionsTable() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <span className="min-w-0 text-sm font-semibold text-(--brc-text)">
-                    {capitalize(t.transaction_type)} — {t.car_detail}
+                    {typeLabel(t.transaction_type)} — {t.car_detail}
                   </span>
                   <span
                     className="shrink-0 text-sm font-bold"
@@ -276,10 +281,10 @@ export function TransactionsTable() {
                   >
                     <td style={tdStyle}>
                       <span className="font-semibold transition-colors duration-300 group-hover/row:text-(--brc-primary)">
-                        {capitalize(t.transaction_type)} — {t.car_detail}
+                        {typeLabel(t.transaction_type)} — {t.car_detail}
                       </span>
                     </td>
-                    <td style={tdStyle}>{capitalize(t.transaction_type)}</td>
+                    <td style={tdStyle}>{typeLabel(t.transaction_type)}</td>
                     <td style={{ ...tdStyle, color: "var(--brc-text-secondary)" }}>{formatDate(t.created_at)}</td>
                     <td style={tdStyle}>{capitalize(t.payment_method)}</td>
                     <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: t.transaction_type === "refund" ? "var(--brc-success)" : "var(--brc-text)" }}>
