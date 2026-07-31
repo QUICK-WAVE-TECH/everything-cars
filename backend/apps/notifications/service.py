@@ -531,7 +531,7 @@ def notify_inspection_cancelled(booking):
 def notify_inspection_payment_submitted(booking):
     """All staff get pinged when an owner submits an inspection payment."""
     payment = booking.payment
-    review_url = _fe("/admin/inspections")
+    review_url = _fe("/admin/payments")
     for staff in User.objects.filter(is_staff=True, is_active=True):
         _create_notification(
             recipient=staff,
@@ -543,6 +543,7 @@ def notify_inspection_payment_submitted(booking):
             ),
             data={
                 "booking_id": str(booking.id),
+                "car_id": str(booking.car_id),
                 "car_title": booking.car.title,
                 "total": str(payment.total),
                 "currency": payment.currency,
@@ -569,7 +570,11 @@ def notify_inspection_payment_confirmed(booking):
         notification_type=NotificationType.INSPECTION_PAYMENT_CONFIRMED,
         title="Inspection payment confirmed",
         message=f"Your inspection for {booking.car.title} is confirmed.",
-        data={"booking_id": str(booking.id), "car_title": booking.car.title},
+        data={
+            "booking_id": str(booking.id),
+            "car_id": str(booking.car_id),
+            "car_title": booking.car.title,
+        },
     )
     send_email(
         recipient=owner.email,
@@ -592,7 +597,11 @@ def notify_inspection_payment_rejected(booking):
         notification_type=NotificationType.INSPECTION_PAYMENT_REJECTED,
         title="Inspection payment could not be verified",
         message=f"Your payment for {booking.car.title} was not verified.",
-        data={"booking_id": str(booking.id), "reason": reason},
+        data={
+            "booking_id": str(booking.id),
+            "car_id": str(booking.car_id),
+            "reason": reason,
+        },
     )
     send_email(
         recipient=owner.email,
