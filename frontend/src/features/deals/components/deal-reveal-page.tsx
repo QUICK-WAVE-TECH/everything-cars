@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   CarIcon,
   CheckCircle2Icon,
@@ -241,6 +242,20 @@ export function DealRevealPage({ dealId }: { dealId: string }) {
             >
               Deal fell through?
             </button>
+          </div>
+        )}
+
+        {/* The buyer now owns the vehicle — they can relist it (fresh listing,
+            same VIN). Backend authorises via the completed deal. */}
+        {deal.status === "completed" && isBuyer && deal.car.vin && (
+          <div className="flex justify-center">
+            <Link
+              href={`/owner/my-cars/new?vin=${encodeURIComponent(deal.car.vin)}`}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-(--brc-primary) px-5 text-sm font-bold text-white transition-all hover:brightness-95 [font-family:var(--brc-font-ui)]"
+            >
+              <CarIcon className="size-4" aria-hidden="true" />
+              Relist this vehicle
+            </Link>
           </div>
         )}
 

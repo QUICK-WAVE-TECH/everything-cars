@@ -347,7 +347,9 @@ class MyCarListCreateView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        serializer = CarCreateSerializer(data=request.data)
+        serializer = CarCreateSerializer(
+            data=request.data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
             car = serializer.save(owner=request.user)
@@ -404,7 +406,9 @@ class MyCarDetailView(APIView):
                     {"detail": "Car details cannot be edited in this status."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
-            serializer = CarCreateSerializer(car, data=request.data, partial=True)
+            serializer = CarCreateSerializer(
+                car, data=request.data, partial=True, context={"request": request}
+            )
             serializer.is_valid(raise_exception=True)
             car = serializer.save()
 

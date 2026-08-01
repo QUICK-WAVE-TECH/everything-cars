@@ -16,10 +16,25 @@ from apps.notifications.service import (
 from apps.offers.models import Offer, OfferStatus
 from .models import (
     DEAL_DISPUTE_WINDOW_DAYS,
+    Deal,
     DealCancelledBy,
     DealStatus,
     DisputeResolution,
 )
+
+
+def latest_completed_deal_for_vin(vin):
+    """The most recent COMPLETED deal for a car with this VIN, or None. This is
+    the ownership proof for relisting: its buyer is the vehicle's current owner.
+    COMPLETED excludes reversed disputes (they become CANCELLED)."""
+    if not vin:
+        return None
+    return (
+        Deal.objects.filter(car__vin=vin, status=DealStatus.COMPLETED)
+        .select_related("buyer")
+        .order_by("-completed_at")
+        .first()
+    )
 
 
 def complete_deal(deal):

@@ -439,14 +439,30 @@ class CarCreateSerializer(serializers.ModelSerializer):
         v = value.strip().upper()
         if not self.VIN_RE.match(v):
             raise serializers.ValidationError("Enter a valid 17-character VIN.")
-        qs = Car.objects.filter(vin=v)
+
+        others = Car.objects.filter(vin=v)
         if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
+            others = others.exclude(pk=self.instance.pk)
+        if not others.exists():
+            return v  # brand-new VIN
+
+        # A live (non-archived) listing already holds it → hard reject.
+        if others.exclude(status=CarStatus.ARCHIVED).exists():
             raise serializers.ValidationError(
                 "This vehicle is already registered on the platform."
             )
-        return v
+
+        # All matches are archived (sold) → only the proven buyer may relist.
+        from apps.sales.services import latest_completed_deal_for_vin
+
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        deal = latest_completed_deal_for_vin(v)
+        if deal is not None and user is not None and deal.buyer_id == user.id:
+            return v
+        raise serializers.ValidationError(
+            "You can only relist a vehicle you bought through the platform."
+        )
 
     def validate_plate_number(self, value):
         if value in (None, ""):
@@ -456,10 +472,12 @@ class CarCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Enter a valid plate number (5–12 letters/numbers)."
             )
-        qs = Car.objects.filter(plate_number=p)
+        others = Car.objects.filter(plate_number=p)
         if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
+            others = others.exclude(pk=self.instance.pk)
+        # Only a live listing blocks the plate — relist authorization is carried
+        # entirely by validate_vin (same physical car).
+        if others.exclude(status=CarStatus.ARCHIVED).exists():
             raise serializers.ValidationError(
                 "This vehicle is already registered on the platform."
             )

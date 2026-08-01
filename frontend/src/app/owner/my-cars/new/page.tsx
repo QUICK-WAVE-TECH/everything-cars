@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, type FormEvent } from "react";
+import { useState, useRef, useEffect, Suspense, type FormEvent } from "react";
 import Link from "next/link";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -34,7 +34,7 @@ import {
 import { ListingTypeToggle } from "@/features/listings/components/listing-type-toggle";
 import { NegotiableField } from "@/features/listings/components/negotiable-field";
 import { VehicleIdentityFields } from "@/features/listings/components/vehicle-identity-fields";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   createCarSchema,
   type CreateCarFormValues,
@@ -267,8 +267,11 @@ const REQUIRED_IMAGE_TYPES: CarImageType[] = [
   "right_side",
 ];
 
-export default function ListCarPage() {
+function ListCarPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Relisting a bought vehicle links here with ?vin=… to prefill.
+  const prefillVin = searchParams.get("vin") ?? "";
   const createCar = useCreateCar();
   const brandsQuery = useBrands();
   const uploadImages = useUploadCarImages();
@@ -287,7 +290,7 @@ export default function ListCarPage() {
       rent_price_per_day: "",
       sale_price: "",
       is_negotiable: true,
-      vin: "",
+      vin: prefillVin,
       plate_number: "",
       currency: "NGN",
       brand: "",
@@ -682,5 +685,13 @@ export default function ListCarPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function ListCarPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[70vh] bg-(--brc-bg-subtle)" />}>
+      <ListCarPageInner />
+    </Suspense>
   );
 }
