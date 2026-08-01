@@ -30,6 +30,7 @@ from common.pagination import StandardPagination
 from common.permissions import IsOwner, IsCustomer, IsStaff
 from .models import (
     ACTIVE_REQUEST_STATUSES,
+    Brand,
     Car,
     CarImage,
     CarImageType,
@@ -41,6 +42,7 @@ from .models import (
     Transaction,
 )
 from .serializers import (
+    BrandSerializer,
     CarListSerializer,
     CarDetailSerializer,
     CarCreateSerializer,
@@ -635,6 +637,18 @@ class PublicCarListView(APIView):
         page = paginator.paginate_queryset(cars, request)
         serializer = CarListSerializer(page, many=True, context={"request": request})
         return paginator.get_paginated_response(serializer.data)
+
+
+@method_decorator(cache_page(60 * 30), name="dispatch")
+class BrandListView(APIView):
+    """The canonical, active brand list — powers the listing-form picker and the
+    buyer brand filter."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        brands = Brand.objects.filter(is_active=True)
+        return Response(BrandSerializer(brands, many=True).data)
 
 
 @method_decorator(cache_page(60 * 5), name="dispatch")

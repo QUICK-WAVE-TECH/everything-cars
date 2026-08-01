@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from apps.sales.models import DealStatus
 from .models import (
+    Brand,
     Car,
     CarImage,
     CarStatus,
@@ -16,6 +17,12 @@ from .models import (
     RequestStatusEvent,
     Transaction,
 )
+
+
+class BrandSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Brand
+        fields = ["id", "name", "slug"]
 
 
 def _latest_passed_inspection(car):

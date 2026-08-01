@@ -1366,3 +1366,17 @@ class BrandValidationTest(APITestCase):
         res = self._post(brand="Definitely Not A Brand")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("brand", res.data)
+
+
+class BrandListEndpointTest(APITestCase):
+    def setUp(self):
+        # Brands are seeded via migration; hide one to prove is_active filtering.
+        Brand.objects.filter(name="Datsun").update(is_active=False)
+
+    def test_lists_active_brands_ordered(self):
+        res = self.client.get("/api/v1/listings/cars/brands")
+        self.assertEqual(res.status_code, 200)
+        names = [b["name"] for b in res.data]
+        self.assertIn("Toyota", names)
+        self.assertNotIn("Datsun", names)  # inactive hidden
+        self.assertEqual(names[0], "Toyota")  # lowest display_order first
