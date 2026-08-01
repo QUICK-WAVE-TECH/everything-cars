@@ -382,3 +382,30 @@ class BackfillDealsCommandTest(APITestCase):
         call_command("backfill_deals")
         call_command("backfill_deals")
         self.assertEqual(Deal.objects.filter(offer=self.offer).count(), 1)
+
+
+class LatestCompletedDealForVinTest(APITestCase):
+    def test_returns_latest_completed_deal_buyer_for_a_vin(self):
+        from apps.sales.services import latest_completed_deal_for_vin
+
+        owner = make_owner("lcd-owner@test.com")
+        buyer = make_user("lcd-buyer@test.com")
+        car = make_negotiable_car(owner)
+        car.vin = "1HGCM82633A004352"
+        car.save(update_fields=["vin"])
+        offer = make_accepted_offer(car, buyer)
+        deal = Deal.objects.create(
+            car=car, buyer=buyer, seller=owner, offer=offer,
+            agreed_amount="14000000.00", currency=car.currency,
+            expires_at=timezone.now() + timedelta(days=DEAL_TTL_DAYS),
+            status=DealStatus.COMPLETED, completed_at=timezone.now(),
+        )
+        found = latest_completed_deal_for_vin("1HGCM82633A004352")
+        self.assertEqual(found.id, deal.id)
+        self.assertEqual(found.buyer_id, buyer.id)
+
+    def test_ignores_non_completed_and_unknown_vins(self):
+        from apps.sales.services import latest_completed_deal_for_vin
+
+        self.assertIsNone(latest_completed_deal_for_vin("1HGCM82633A004352"))
+        self.assertIsNone(latest_completed_deal_for_vin(""))
