@@ -106,7 +106,7 @@ summary shows ₦0 and no bank info).
 
 ---
 
-## Spec 4 — Canonical brand list  ·  🔨 on `feat/spec4-canonical-brands`
+## Spec 4 — Canonical brand list  ·  ✅ on `main`
 
 **Goal:** Replace the free-text brand field with a **canonical, staff-managed
 brand list** so listings are consistent and buyer filtering is clean. Model stays
@@ -124,6 +124,27 @@ free-text; unrecognised brands go to an "Other" path flagged for staff.
   cd backend && uv run python manage.py shell -c "from apps.listings.brands_data import match_brand; print(match_brand('benz'), match_brand('vw'), match_brand('range rover'), match_brand('toyata'))"
   # → Mercedes-Benz Volkswagen Land Rover Toyota
   ```
+
+---
+
+## Spec 5 — VIN transfer & relist a sold VIN  ·  ✅ on `main`
+
+**Goal:** Let the buyer of a completed peer-to-peer sale relist that same physical
+vehicle (same VIN) later. There's no new model — a **completed `Deal` is the proof
+of ownership**; the sold car stays archived, and the proven buyer lists fresh.
+
+**Setup:** you need a **completed** buy deal. Owner lists a buy car → customer
+makes an offer → owner accepts (creates the Deal) → seller opens `/deals/[id]` and
+clicks **"Mark as sold"** (car → archived). The **buyer must be a verified owner**
+to relist (customers go through the normal owner onboarding first).
+
+**Manual checklist**
+- [ ] As the **buyer** of a **completed** deal, open `/deals/[id]` → a **"Relist this vehicle"** button is shown (only for the buyer, only when the deal is completed).
+- [ ] Click it → the **Add-car** form opens with the **VIN prefilled** (`/owner/my-cars/new?vin=…`). If you're not yet a verified owner, you hit the existing owner gate.
+- [ ] Finish the listing (fresh photos, and it goes through inspection again like any new listing) → it **saves successfully** with the same VIN. The old sold car stays archived under the original seller.
+- [ ] **A different owner** entering that same VIN in Add-car is **rejected** with *"You can only relist a vehicle you bought through the platform."*
+- [ ] A VIN that's on a **live (non-archived)** listing is rejected with *"already registered."*
+- [ ] *(Resale chain)* If the buyer later sells the relisted car to someone else, only that newest buyer can relist it next — the previous owner is blocked.
 
 ---
 
