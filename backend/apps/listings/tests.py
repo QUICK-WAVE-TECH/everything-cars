@@ -1285,3 +1285,18 @@ class BrandModelTest(TestCase):
         Brand.objects.create(name="Acura", display_order=1000)
         names = list(Brand.objects.values_list("name", flat=True))
         self.assertEqual(names, ["Toyota", "Acura", "Zonda"])
+
+
+class SeedBrandsCommandTest(TestCase):
+    def test_seed_is_idempotent_and_includes_local_brands(self):
+        from django.core.management import call_command
+
+        call_command("seed_brands")
+        first = Brand.objects.count()
+        self.assertGreaterEqual(first, 100)
+        self.assertTrue(Brand.objects.filter(name="Innoson").exists())
+        self.assertTrue(Brand.objects.filter(name="Toyota").exists())
+        self.assertLess(Brand.objects.get(name="Toyota").display_order, 100)
+
+        call_command("seed_brands")  # idempotent
+        self.assertEqual(Brand.objects.count(), first)
