@@ -14,7 +14,11 @@ import {
 } from "@/shared/components";
 import { useTransactions } from "@/features/payments/api";
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 8;
+// Load a generous window so search/filter/pagination all operate over the full
+// ledger (not just the first server page). Server-side paging is the follow-up
+// once a single account can exceed this many transactions.
+const FETCH_SIZE = 100;
 const COLUMNS = ["Description", "Type", "Date", "Method", "Amount", "Status"];
 
 const FILTER_FIELDS: FilterField[] = [
@@ -123,7 +127,7 @@ function getDetailPath(pathname: string, txnId: string) {
 export function TransactionsTable() {
   const router = useRouter();
   const pathname = usePathname();
-  const { data: paginatedData, isLoading } = useTransactions();
+  const { data: paginatedData, isLoading } = useTransactions({ page_size: FETCH_SIZE });
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<FilterValues>({});
