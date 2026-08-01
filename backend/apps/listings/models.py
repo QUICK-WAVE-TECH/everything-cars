@@ -1,8 +1,31 @@
 from django.db import models
+from django.utils.text import slugify
 import uuid
 
 
 from apps.users.models import User
+
+
+class Brand(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=120, unique=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    # Lower sorts first — Nigeria-common brands get a low value so they float to
+    # the top of the picker; ties break alphabetically.
+    display_order = models.PositiveSmallIntegerField(default=1000)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["display_order", "name"]
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
 
 
 class ListingType(models.TextChoices):
@@ -129,12 +152,21 @@ class Car(models.Model):
         choices=Currency.choices,
         default=Currency.NGN,
     )
-    brand = models.CharField(
-        max_length=100,
+    # Canonical brand (source of truth = Brand table). Null only for an "Other"
+    # brand pending staff review — see brand_other.
+    brand = models.ForeignKey(
+        Brand,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="cars",
     )
     model = models.CharField(
         max_length=100,
     )
+    # The owner's typed brand when it isn't on the canonical list. Non-empty ⇒
+    # needs staff review (folded into the Brand table during approval).
+    brand_other = models.CharField(max_length=100, blank=True, default="")
     color = models.CharField(max_length=50, blank=True)
     year = models.PositiveIntegerField()
     body_type = models.CharField(max_length=20, choices=BodyType.choices, blank=True)
@@ -170,7 +202,12 @@ class Car(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.year} {self.brand} {self.model} — {self.title}"
+        brand = self.brand.name if self.brand_id else (self.brand_other or "—")
+        return f"{self.year} {brand} {self.model} — {self.title}"
+
+    @property
+    def needs_brand_review(self):
+        return bool(self.brand_other)
 
 
 def car_image_path(instance, filename):

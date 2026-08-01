@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    BrandListView,
     CustomerPaymentSubmitView,
     MyCarListCreateView,
     MyCarDetailView,
@@ -47,6 +48,7 @@ urlpatterns = [
     ),
     # Public car endpoints
     path("cars", PublicCarListView.as_view(), name="public-cars-list"),
+    path("cars/brands", BrandListView.as_view(), name="car-brands"),
     path("cars/filter-options", PublicCarFilterOptionsView.as_view(), name="public-car-filter-options"),
     path("cars/<uuid:car_id>", PublicCarDetailView.as_view(), name="public-car-detail"),
     # Customer request endpoints

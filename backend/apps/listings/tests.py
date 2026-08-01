@@ -3,7 +3,7 @@ import tempfile
 from io import BytesIO
 import json
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import override_settings
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from datetime import time, date, timedelta
 from PIL import Image
@@ -11,6 +11,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.listings.models import (
+    Brand,
     Car,
     CarImage,
     CarImageType,
@@ -68,6 +69,12 @@ def create_car(owner, **extra):
         "status": CarStatus.PUBLISHED,
     }
     defaults.update(extra)
+    # brand is a FK — accept a Brand, a canonical name string, or "" (Other).
+    brand_val = defaults.get("brand")
+    if isinstance(brand_val, str):
+        defaults["brand"] = (
+            Brand.objects.filter(name=brand_val).first() if brand_val else None
+        )
     return Car.objects.create(**defaults)
 
 
@@ -918,7 +925,7 @@ class DeleteBothCarsMigrationTest(APITestCase):
             listing_type="both",
             rent_price_per_day=10,
             sale_price=20,
-            brand="Toyota",
+            brand=Brand.objects.get(name="Toyota"),
             model="Camry",
             year=2020,
             state="Lagos",
@@ -928,7 +935,7 @@ class DeleteBothCarsMigrationTest(APITestCase):
             title="Rent Car",
             listing_type="rent",
             rent_price_per_day=10,
-            brand="Toyota",
+            brand=Brand.objects.get(name="Toyota"),
             model="Camry",
             year=2020,
             state="Lagos",
@@ -1270,3 +1277,135 @@ class ListingFeatureFieldTest(APITestCase):
         data = ListingFeatureSerializer(self.car.features.first()).data
         self.assertEqual(data["description"], "Built-in")
         self.assertNotIn("value", data)
+
+
+class BrandModelTest(TestCase):
+    # NB: a data migration seeds the canonical list into every test DB, so use
+    # made-up names here to stay isolated from the seeded brands.
+    def test_slug_is_derived_from_name(self):
+        b = Brand.objects.create(name="Testomatic Motors")
+        self.assertEqual(b.slug, "testomatic-motors")
+        self.assertTrue(b.is_active)
+
+    def test_ordering_is_display_order_then_name(self):
+        Brand.objects.create(name="Zeta Test Cars", display_order=5000)
+        Brand.objects.create(name="Alpha Test Cars", display_order=5000)
+        Brand.objects.create(name="Mid Test Cars", display_order=10)
+        names = list(
+            Brand.objects.filter(name__endswith=" Test Cars").values_list(
+                "name", flat=True
+            )
+        )
+        # display_order first (Mid=10), then alphabetical for the 5000 tie.
+        self.assertEqual(names, ["Mid Test Cars", "Alpha Test Cars", "Zeta Test Cars"])
+
+
+class SeedBrandsCommandTest(TestCase):
+    def test_seed_is_idempotent_and_includes_local_brands(self):
+        from django.core.management import call_command
+
+        call_command("seed_brands")
+        first = Brand.objects.count()
+        self.assertGreaterEqual(first, 100)
+        self.assertTrue(Brand.objects.filter(name="Innoson").exists())
+        self.assertTrue(Brand.objects.filter(name="Toyota").exists())
+        self.assertLess(Brand.objects.get(name="Toyota").display_order, 100)
+
+        call_command("seed_brands")  # idempotent
+        self.assertEqual(Brand.objects.count(), first)
+
+
+class BrandOtherFieldTest(TestCase):
+    def test_needs_brand_review_reflects_brand_other(self):
+        owner = create_user("brandother-owner@t.com", "owner")
+        car = create_car(owner, brand="", brand_other="Koenigsegg")
+        self.assertTrue(car.needs_brand_review)
+        car2 = create_car(owner, brand="Toyota", brand_other="")
+        self.assertFalse(car2.needs_brand_review)
+
+
+class BrandValidationTest(APITestCase):
+    def setUp(self):
+        from django.core.management import call_command
+
+        call_command("seed_brands")
+        self.owner = create_user("brand-val-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.client.force_authenticate(user=self.owner)
+
+    def _payload(self, **over):
+        data = {
+            "title": "Test Car",
+            "listing_type": "rent",
+            "rent_price_per_day": "20000.00",
+            "brand": "Toyota",
+            "model": "Corolla",
+            "year": 2021,
+            "state": "Lagos",
+            "city": "Ikeja",
+            "vin": "1HGCM82633A004352",
+            "plate_number": "ABC123DE",
+        }
+        data.update(over)
+        return data
+
+    def _post(self, **over):
+        return self.client.post(
+            "/api/v1/listings/my-cars", self._payload(**over), format="json"
+        )
+
+    def test_known_brand_stored_canonical(self):
+        res = self._post(brand="toyota")  # lowercase → canonical
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        car = Car.objects.get(id=res.data["id"])
+        self.assertEqual(car.brand.name, "Toyota")  # resolved to the Brand FK
+        self.assertEqual(car.brand_other, "")
+        self.assertEqual(res.data["brand"], "Toyota")  # API contract: name string
+
+    def test_other_brand_goes_to_brand_other(self):
+        res = self._post(brand="", brand_other="Koenigsegg")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        car = Car.objects.get(id=res.data["id"])
+        self.assertIsNone(car.brand_id)  # FK nulled for "Other"
+        self.assertEqual(car.brand_other, "Koenigsegg")
+        self.assertEqual(res.data["brand"], "")
+
+    def test_unknown_brand_without_other_is_rejected(self):
+        res = self._post(brand="Definitely Not A Brand")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("brand", res.data)
+
+
+class BrandListEndpointTest(APITestCase):
+    def setUp(self):
+        # Brands are seeded via migration; hide one to prove is_active filtering.
+        Brand.objects.filter(name="Datsun").update(is_active=False)
+
+    def test_lists_active_brands_ordered(self):
+        res = self.client.get("/api/v1/listings/cars/brands")
+        self.assertEqual(res.status_code, 200)
+        names = [b["name"] for b in res.data]
+        self.assertIn("Toyota", names)
+        self.assertNotIn("Datsun", names)  # inactive hidden
+        self.assertEqual(names[0], "Toyota")  # lowest display_order first
+
+
+class FilterOptionsBrandsTest(APITestCase):
+    def test_brands_facet_is_canonical(self):
+        res = self.client.get("/api/v1/listings/cars/filter-options")
+        self.assertEqual(res.status_code, 200)
+        brands = res.data["brands"]
+        self.assertIn("Toyota", brands)
+        self.assertIn("Mercedes-Benz", brands)
+
+
+class BrandBackfillHelperTest(TestCase):
+    def test_backfill_canonicalizes_and_flags(self):
+        from apps.listings.brands_data import canonicalize_car_brand
+
+        self.assertEqual(canonicalize_car_brand("benz"), ("Mercedes-Benz", ""))
+        self.assertEqual(canonicalize_car_brand("Mercedes Benz"), ("Mercedes-Benz", ""))
+        self.assertEqual(canonicalize_car_brand("toyota"), ("Toyota", ""))
+        # Unmatched → moved to brand_other, brand blanked.
+        self.assertEqual(canonicalize_car_brand("Kiaa"), ("", "Kiaa"))
+        self.assertEqual(canonicalize_car_brand(""), ("", ""))

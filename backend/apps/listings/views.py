@@ -30,6 +30,7 @@ from common.pagination import StandardPagination
 from common.permissions import IsOwner, IsCustomer, IsStaff
 from .models import (
     ACTIVE_REQUEST_STATUSES,
+    Brand,
     Car,
     CarImage,
     CarImageType,
@@ -41,6 +42,7 @@ from .models import (
     Transaction,
 )
 from .serializers import (
+    BrandSerializer,
     CarListSerializer,
     CarDetailSerializer,
     CarCreateSerializer,
@@ -319,7 +321,7 @@ class MyCarListCreateView(APIView):
     def get(self, request):
         obj = (
             Car.objects.filter(owner=request.user)
-            .select_related("owner__owner_profile")
+            .select_related("owner__owner_profile", "brand")
             .prefetch_related("images")
             # Annotate availability so the serializer doesn't run per-car request
             # queries (N+1) computing each card's status.
@@ -351,13 +353,13 @@ class MyCarListCreateView(APIView):
             car = serializer.save(owner=request.user)
             schedule_notification(
                 notify_listing_submitted,
-                lambda car_id=car.id: Car.objects.select_related("owner").get(
+                lambda car_id=car.id: Car.objects.select_related("owner", "brand").get(
                     id=car_id
                 ),
             )
 
         car = (
-            Car.objects.select_related("owner__owner_profile")
+            Car.objects.select_related("owner__owner_profile", "brand")
             .prefetch_related("images", "features")
             .get(id=car.id)
         )
@@ -373,7 +375,7 @@ class MyCarDetailView(APIView):
     def _get_car(self, car_id, user):
         try:
             return (
-                Car.objects.select_related("owner__owner_profile")
+                Car.objects.select_related("owner__owner_profile", "brand")
                 .prefetch_related("images", "features")
                 .get(id=car_id, owner=user)
             )
@@ -585,7 +587,7 @@ class PublicCarListView(APIView):
             .annotate(_is_sold=sold_annotation())
             # Archived cars appear publicly only when actually sold
             .filter(Q(status=CarStatus.PUBLISHED) | Q(_is_sold=True))
-            .select_related("owner__owner_profile")
+            .select_related("owner__owner_profile", "brand")
             .prefetch_related("images")
             .annotate(**availability_annotations())
         )
@@ -615,7 +617,7 @@ class PublicCarListView(APIView):
 
         brand = request.query_params.get("brand")
         if brand:
-            cars = cars.filter(brand__icontains=brand)
+            cars = cars.filter(brand__name__icontains=brand)
 
         body_type = request.query_params.get("body_type")
         if body_type:
@@ -625,7 +627,7 @@ class PublicCarListView(APIView):
         if search:
             cars = cars.filter(
                 Q(title__icontains=search)
-                | Q(brand__icontains=search)
+                | Q(brand__name__icontains=search)
                 | Q(model__icontains=search)
                 | Q(state__icontains=search)
                 | Q(city__icontains=search)
@@ -635,6 +637,18 @@ class PublicCarListView(APIView):
         page = paginator.paginate_queryset(cars, request)
         serializer = CarListSerializer(page, many=True, context={"request": request})
         return paginator.get_paginated_response(serializer.data)
+
+
+@method_decorator(cache_page(60 * 30), name="dispatch")
+class BrandListView(APIView):
+    """The canonical, active brand list — powers the listing-form picker and the
+    buyer brand filter."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        brands = Brand.objects.filter(is_active=True)
+        return Response(BrandSerializer(brands, many=True).data)
 
 
 @method_decorator(cache_page(60 * 5), name="dispatch")
@@ -659,7 +673,13 @@ class PublicCarFilterOptionsView(APIView):
                 "states": distinct_values("state"),
                 "cities": distinct_values("city"),
                 "body_types": distinct_values("body_type"),
-                "brands": distinct_values("brand"),
+                # Canonical brands (not distinct free-text) so facets never
+                # fragment into "Benz" vs "Mercedes-Benz".
+                "brands": list(
+                    Brand.objects.filter(is_active=True).values_list(
+                        "name", flat=True
+                    )
+                ),
             }
         )
 
@@ -691,7 +711,7 @@ class PublicCarDetailView(APIView):
 
         try:
             car = (
-                Car.objects.select_related("owner__owner_profile")
+                Car.objects.select_related("owner__owner_profile", "brand")
                 .prefetch_related(
                     "images", "features", booked_prefetch, passed_prefetch
                 )
@@ -807,14 +827,14 @@ class MyCarStatusView(APIView):
                     lambda resubmitted_car: notify_listing_submitted(
                         resubmitted_car, resubmitted=True
                     ),
-                    lambda car_id=car.id: Car.objects.select_related("owner").get(
+                    lambda car_id=car.id: Car.objects.select_related("owner", "brand").get(
                         id=car_id
                     ),
                 )
 
         return Response(
             CarDetailSerializer(
-                Car.objects.select_related("owner__owner_profile")
+                Car.objects.select_related("owner__owner_profile", "brand")
                 .prefetch_related("images", "features")
                 .get(id=car.id),
                 context={"request": request},
@@ -1125,7 +1145,7 @@ class AdminCarListView(APIView):
 
     def get(self, request):
         cars = (
-            Car.objects.select_related("owner__owner_profile")
+            Car.objects.select_related("owner__owner_profile", "brand")
             .prefetch_related("images")
             # Annotate availability so the serializer doesn't run per-car request
             # queries (N+1) computing each card's status.
@@ -1140,7 +1160,7 @@ class AdminCarListView(APIView):
         if search:
             cars = cars.filter(
                 Q(title__icontains=search)
-                | Q(brand__icontains=search)
+                | Q(brand__name__icontains=search)
                 | Q(model__icontains=search)
                 | Q(owner__first_name__icontains=search)
                 | Q(owner__last_name__icontains=search)
@@ -1174,7 +1194,7 @@ class AdminCarDetailView(APIView):
     def get(self, request, car_id):
         try:
             car = (
-                Car.objects.select_related("owner__owner_profile")
+                Car.objects.select_related("owner__owner_profile", "brand")
                 .prefetch_related("images", "features")
                 .get(id=car_id)
             )
@@ -1275,13 +1295,13 @@ class AdminCarStatusView(APIView):
             if notify_func:
                 schedule_notification(
                     notify_func,
-                    lambda car_id=car.id: Car.objects.select_related("owner").get(
+                    lambda car_id=car.id: Car.objects.select_related("owner", "brand").get(
                         id=car_id
                     ),
                 )
 
         car = (
-            Car.objects.select_related("owner__owner_profile")
+            Car.objects.select_related("owner__owner_profile", "brand")
             .prefetch_related("images", "features")
             .get(id=car_id)
         )
@@ -1642,10 +1662,10 @@ class AdminApproveListingView(APIView):
 
         schedule_notification(
             notify_listing_approved,
-            lambda car_id=car.id: Car.objects.select_related("owner").get(id=car_id),
+            lambda car_id=car.id: Car.objects.select_related("owner", "brand").get(id=car_id),
         )
         car = (
-            Car.objects.select_related("owner__owner_profile")
+            Car.objects.select_related("owner__owner_profile", "brand")
             .prefetch_related("images", "features")
             .get(id=car_id)
         )

@@ -26,8 +26,10 @@ import {
   useDeleteCar,
   useUploadCarImages,
   useCarStatus,
+  useBrands,
 } from "@/features/listings/api";
 import type { CarDetail } from "@/features/listings/api";
+import { BrandField } from "@/features/listings/components/brand-field";
 import type { CarImageFiles } from "@/features/listings/api/types";
 import { CarPhotoSlotsField } from "@/features/listings/components/car-photo-slots-field";
 import { OwnerCarDetailReadView } from "@/features/listings/components/owner-car-detail-read-view";
@@ -418,6 +420,7 @@ function populateForm(car: CarDetail): CreateCarFormValues {
     plate_number: car.plate_number ?? "",
     currency: car.currency || "NGN",
     brand: car.brand,
+    brand_other: car.brand_other ?? "",
     model: car.model,
     color: car.color ?? "",
     year: String(car.year),
@@ -443,6 +446,7 @@ export default function CarDetailPage() {
 
   const { data: car, isLoading } = useMyCarDetail(carId);
   const updateCar = useUpdateCar(carId);
+  const brandsQuery = useBrands();
   const deleteCar = useDeleteCar();
   const uploadImages = useUploadCarImages();
   const carStatus = useCarStatus();
@@ -818,13 +822,17 @@ export default function CarDetailPage() {
                     />
                   )}
 
-                  <TextField
-                    label="Brand"
-                    placeholder="Brand"
+                  <BrandField
+                    brands={(brandsQuery.data ?? []).map((b) => b.name)}
+                    loading={brandsQuery.isLoading}
                     value={w.brand ?? ""}
-                    onChange={(v) =>
-                      form.setValue("brand", capitalizeFirstLetter(v))
-                    }
+                    otherValue={w.brand_other ?? ""}
+                    onSelectBrand={(name) => {
+                      form.setValue("brand", name);
+                      form.setValue("brand_other", "");
+                    }}
+                    onSelectOther={() => form.setValue("brand", "")}
+                    onOtherChange={(v) => form.setValue("brand_other", v)}
                   />
                   <TextField
                     label="Model"

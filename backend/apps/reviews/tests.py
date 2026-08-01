@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.listings.models import Car, CarStatus, ListingType, Request, RequestStatus
+from apps.listings.models import Brand, Car, CarStatus, ListingType, Request, RequestStatus
 from apps.reviews.models import Review
 from apps.reviews.migration_helpers import delete_non_rent_reviews
 from apps.users.models import CustomerProfile, OwnerProfile, User
@@ -39,7 +39,7 @@ def create_car(owner):
         title="Mercedes GLK 350",
         listing_type=ListingType.RENT,
         rent_price_per_day="40000.00",
-        brand="Mercedes",
+        brand=Brand.objects.get(name="Mercedes-Benz"),
         model="GLK 350",
         year=2021,
         state="Lagos",
@@ -170,7 +170,7 @@ class RentOnlyReviewTest(APITestCase):
             listing_type=ListingType.BUY,
             sale_price="5000000.00",
             is_negotiable=False,
-            brand="Toyota",
+            brand=Brand.objects.get(name="Toyota"),
             model="Camry",
             year=2021,
             state="Lagos",
@@ -243,7 +243,7 @@ class DeleteNonRentReviewsMigrationTest(APITestCase):
         rent_car = create_car(owner)
         buy_car = Car.objects.create(
             owner=owner, title="Buy Car", listing_type=ListingType.BUY,
-            sale_price="5000000.00", brand="Toyota", model="Land Cruiser",
+            sale_price="5000000.00", brand=Brand.objects.get(name="Toyota"), model="Land Cruiser",
             year=2023, state="Lagos", city="Ikeja", status=CarStatus.PUBLISHED,
         )
 

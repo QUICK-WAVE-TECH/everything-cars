@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from apps.sales.models import DealStatus
 from .models import (
+    Brand,
     Car,
     CarImage,
     CarStatus,
@@ -16,6 +17,12 @@ from .models import (
     RequestStatusEvent,
     Transaction,
 )
+
+
+class BrandSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Brand
+        fields = ["id", "name", "slug"]
 
 
 def _latest_passed_inspection(car):
@@ -100,6 +107,12 @@ class CarListSerializer(serializers.ModelSerializer):
     owner = CarOwnerSummarySerializer(read_only=True)
     availability_status = serializers.SerializerMethodField()
     is_verified = serializers.SerializerMethodField()
+    # brand is a FK internally; the API contract keeps it as the canonical name
+    # string ("" for an "Other" brand pending review).
+    brand = serializers.SerializerMethodField()
+
+    def get_brand(self, obj):
+        return obj.brand.name if obj.brand_id else ""
 
     class Meta:
         model = Car
@@ -203,6 +216,10 @@ class CarDetailSerializer(serializers.ModelSerializer):
     images = CarImageSerializer(many=True, read_only=True)
     features = ListingFeatureSerializer(many=True, read_only=True)
     availability_status = serializers.SerializerMethodField()
+    brand = serializers.SerializerMethodField()
+
+    def get_brand(self, obj):
+        return obj.brand.name if obj.brand_id else ""
     booked_periods = serializers.SerializerMethodField()
     available_from = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
@@ -222,6 +239,7 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "is_negotiable",
             "currency",
             "brand",
+            "brand_other",
             "model",
             "color",
             "year",
@@ -408,6 +426,9 @@ class CarDetailSerializer(serializers.ModelSerializer):
 
 class CarCreateSerializer(serializers.ModelSerializer):
     features = ListingFeatureSerializer(many=True, required=False)
+    # Accept the brand as a name string (the picker sends the canonical name, or
+    # nothing when "Other" is chosen). validate() resolves it to the Brand FK.
+    brand = serializers.CharField(required=False, allow_blank=True)
     MIN_MODEL_YEAR = 1900
     MAX_SEATS = 60
     VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
@@ -453,6 +474,7 @@ class CarCreateSerializer(serializers.ModelSerializer):
             "sale_price",
             "currency",
             "brand",
+            "brand_other",
             "model",
             "color",
             "year",
@@ -470,9 +492,37 @@ class CarCreateSerializer(serializers.ModelSerializer):
             "description",
             "features",
         ]
-        extra_kwargs = {"vin": {"validators": []}, "plate_number": {"validators": []}}
+        extra_kwargs = {
+            "vin": {"validators": []},
+            "plate_number": {"validators": []},
+            "brand_other": {"required": False, "allow_blank": True},
+        }
 
     def validate(self, data):
+        # Resolve the brand name to the canonical Brand FK. If "Other" is chosen
+        # the typed value goes to brand_other (flagged) and the FK is nulled;
+        # an unrecognised brand with no "Other" is rejected.
+        from apps.listings.brands_data import match_brand
+
+        brand_other = (data.get("brand_other") or "").strip()
+        brand_name = (data.get("brand") or "").strip()
+        if brand_other:
+            data["brand"] = None
+            data["brand_other"] = brand_other
+        elif brand_name:
+            canonical = match_brand(brand_name)
+            if canonical is None:
+                raise serializers.ValidationError(
+                    {"brand": "Pick a brand from the list, or choose 'Other'."}
+                )
+            data["brand"] = Brand.objects.get(name=canonical)
+            data["brand_other"] = ""
+        elif not self.instance:
+            raise serializers.ValidationError({"brand": "Brand is required."})
+        else:
+            # Edit with neither field touched — leave the existing brand as-is.
+            data.pop("brand", None)
+
         lt = data.get("listing_type", getattr(self.instance, "listing_type", None))
         rent = data.get(
             "rent_price_per_day", getattr(self.instance, "rent_price_per_day", None)
@@ -555,10 +605,14 @@ class CarImageUploadSerializer(serializers.Serializer):
 class RequestCarSummarySerializer(serializers.ModelSerializer):
     primary_image = serializers.SerializerMethodField()
     owner = CarOwnerSummarySerializer(read_only=True)
+    brand = serializers.SerializerMethodField()
 
     class Meta:
         model = Car
         fields = ["id", "title", "brand", "model", "year", "primary_image", "owner"]
+
+    def get_brand(self, obj):
+        return obj.brand.name if obj.brand_id else ""
 
     def get_primary_image(self, obj):
         images = obj.images.all()

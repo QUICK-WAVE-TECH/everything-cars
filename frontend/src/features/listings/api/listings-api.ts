@@ -26,7 +26,19 @@ export const listingKeys = {
   publicList: (params?: PublicCarsParams) => ["cars", "public", params ?? {}] as const,
   publicDetail: (carId: string) => ["cars", "public", "detail", carId] as const,
   filterOptions: ["cars", "filter-options"] as const,
+  brands: ["cars", "brands"] as const,
 };
+
+export type Brand = { id: string; name: string; slug: string };
+
+/** The canonical, active brand list — for the listing-form picker + buyer filter. */
+export function useBrands() {
+  return useQuery({
+    queryKey: listingKeys.brands,
+    queryFn: () => apiClient.get<Brand[]>("/listings/cars/brands"),
+    staleTime: 30 * 60 * 1000,
+  });
+}
 
 function buildQuery(params?: Record<string, string | number | undefined>) {
   const query = new URLSearchParams();

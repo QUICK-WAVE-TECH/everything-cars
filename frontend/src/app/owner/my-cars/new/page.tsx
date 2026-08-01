@@ -24,7 +24,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { useCreateCar, useUploadCarImages } from "@/features/listings/api";
+import { useBrands, useCreateCar, useUploadCarImages } from "@/features/listings/api";
+import { BrandField } from "@/features/listings/components/brand-field";
 import type { CarImageFiles, CarImageType } from "@/features/listings/api/types";
 import {
   CarPhotoSlotsField,
@@ -269,6 +270,7 @@ const REQUIRED_IMAGE_TYPES: CarImageType[] = [
 export default function ListCarPage() {
   const router = useRouter();
   const createCar = useCreateCar();
+  const brandsQuery = useBrands();
   const uploadImages = useUploadCarImages();
   const [files, setFiles] = useState<CarImageFiles>({});
   const [done, setDone] = useState(false);
@@ -289,6 +291,7 @@ export default function ListCarPage() {
       plate_number: "",
       currency: "NGN",
       brand: "",
+      brand_other: "",
       model: "",
       color: "",
       year: "",
@@ -533,7 +536,18 @@ export default function ListCarPage() {
                   serverError={vehicleServerError}
                 />
 
-                <TextField label="Brand" placeholder="Enter brand name" value={w.brand ?? ""} onChange={(v) => form.setValue("brand", capitalizeFirstLetter(v))} />
+                <BrandField
+                  brands={(brandsQuery.data ?? []).map((b) => b.name)}
+                  loading={brandsQuery.isLoading}
+                  value={w.brand ?? ""}
+                  otherValue={w.brand_other ?? ""}
+                  onSelectBrand={(name) => {
+                    form.setValue("brand", name);
+                    form.setValue("brand_other", "");
+                  }}
+                  onSelectOther={() => form.setValue("brand", "")}
+                  onOtherChange={(v) => form.setValue("brand_other", v)}
+                />
                 <TextField label="Model" placeholder="Enter model" value={w.model ?? ""} onChange={(v) => form.setValue("model", capitalizeFirstLetter(v))} />
                 <TextField label="Color" placeholder="Enter color" value={w.color ?? ""} onChange={(v) => form.setValue("color", capitalizeFirstLetter(v))} />
 
