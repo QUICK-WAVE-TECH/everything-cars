@@ -72,3 +72,15 @@ def match_brand(raw):
         or Brand.objects.filter(slug=slugify(key)).first()
     )
     return brand.name if brand else None
+
+
+def canonicalize_car_brand(raw):
+    """Map an existing free-text car brand to (brand, brand_other): a canonical
+    match → (canonical, ""); no match → ("", raw); empty → ("", "")."""
+    raw = (raw or "").strip()
+    if not raw:
+        return "", ""
+    canonical = match_brand(raw)
+    if canonical:
+        return canonical, ""
+    return "", raw

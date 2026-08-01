@@ -1389,3 +1389,15 @@ class FilterOptionsBrandsTest(APITestCase):
         brands = res.data["brands"]
         self.assertIn("Toyota", brands)
         self.assertIn("Mercedes-Benz", brands)
+
+
+class BrandBackfillHelperTest(TestCase):
+    def test_backfill_canonicalizes_and_flags(self):
+        from apps.listings.brands_data import canonicalize_car_brand
+
+        self.assertEqual(canonicalize_car_brand("benz"), ("Mercedes-Benz", ""))
+        self.assertEqual(canonicalize_car_brand("Mercedes Benz"), ("Mercedes-Benz", ""))
+        self.assertEqual(canonicalize_car_brand("toyota"), ("Toyota", ""))
+        # Unmatched → moved to brand_other, brand blanked.
+        self.assertEqual(canonicalize_car_brand("Kiaa"), ("", "Kiaa"))
+        self.assertEqual(canonicalize_car_brand(""), ("", ""))
