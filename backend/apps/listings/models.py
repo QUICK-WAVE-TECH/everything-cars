@@ -152,8 +152,14 @@ class Car(models.Model):
         choices=Currency.choices,
         default=Currency.NGN,
     )
-    brand = models.CharField(
-        max_length=100,
+    # Canonical brand (source of truth = Brand table). Null only for an "Other"
+    # brand pending staff review — see brand_other.
+    brand = models.ForeignKey(
+        Brand,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="cars",
     )
     model = models.CharField(
         max_length=100,
@@ -196,7 +202,8 @@ class Car(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.year} {self.brand} {self.model} — {self.title}"
+        brand = self.brand.name if self.brand_id else (self.brand_other or "—")
+        return f"{self.year} {brand} {self.model} — {self.title}"
 
     @property
     def needs_brand_review(self):

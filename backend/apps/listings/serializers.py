@@ -107,6 +107,12 @@ class CarListSerializer(serializers.ModelSerializer):
     owner = CarOwnerSummarySerializer(read_only=True)
     availability_status = serializers.SerializerMethodField()
     is_verified = serializers.SerializerMethodField()
+    # brand is a FK internally; the API contract keeps it as the canonical name
+    # string ("" for an "Other" brand pending review).
+    brand = serializers.SerializerMethodField()
+
+    def get_brand(self, obj):
+        return obj.brand.name if obj.brand_id else ""
 
     class Meta:
         model = Car
@@ -210,6 +216,10 @@ class CarDetailSerializer(serializers.ModelSerializer):
     images = CarImageSerializer(many=True, read_only=True)
     features = ListingFeatureSerializer(many=True, read_only=True)
     availability_status = serializers.SerializerMethodField()
+    brand = serializers.SerializerMethodField()
+
+    def get_brand(self, obj):
+        return obj.brand.name if obj.brand_id else ""
     booked_periods = serializers.SerializerMethodField()
     available_from = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
@@ -416,6 +426,9 @@ class CarDetailSerializer(serializers.ModelSerializer):
 
 class CarCreateSerializer(serializers.ModelSerializer):
     features = ListingFeatureSerializer(many=True, required=False)
+    # Accept the brand as a name string (the picker sends the canonical name, or
+    # nothing when "Other" is chosen). validate() resolves it to the Brand FK.
+    brand = serializers.CharField(required=False, allow_blank=True)
     MIN_MODEL_YEAR = 1900
     MAX_SEATS = 60
     VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
@@ -482,31 +495,33 @@ class CarCreateSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             "vin": {"validators": []},
             "plate_number": {"validators": []},
-            "brand": {"required": False, "allow_blank": True},
             "brand_other": {"required": False, "allow_blank": True},
         }
 
     def validate(self, data):
-        # Brand must be a canonical Brand.name (case-insensitive → stored
-        # canonical), else the owner picked "Other" and typed it into
-        # brand_other (flagged for staff), else it's rejected.
+        # Resolve the brand name to the canonical Brand FK. If "Other" is chosen
+        # the typed value goes to brand_other (flagged) and the FK is nulled;
+        # an unrecognised brand with no "Other" is rejected.
         from apps.listings.brands_data import match_brand
 
         brand_other = (data.get("brand_other") or "").strip()
-        brand = (data.get("brand") or "").strip()
+        brand_name = (data.get("brand") or "").strip()
         if brand_other:
-            data["brand"] = ""
+            data["brand"] = None
             data["brand_other"] = brand_other
-        elif brand:
-            canonical = match_brand(brand)
+        elif brand_name:
+            canonical = match_brand(brand_name)
             if canonical is None:
                 raise serializers.ValidationError(
                     {"brand": "Pick a brand from the list, or choose 'Other'."}
                 )
-            data["brand"] = canonical
+            data["brand"] = Brand.objects.get(name=canonical)
             data["brand_other"] = ""
         elif not self.instance:
             raise serializers.ValidationError({"brand": "Brand is required."})
+        else:
+            # Edit with neither field touched — leave the existing brand as-is.
+            data.pop("brand", None)
 
         lt = data.get("listing_type", getattr(self.instance, "listing_type", None))
         rent = data.get(
@@ -590,10 +605,14 @@ class CarImageUploadSerializer(serializers.Serializer):
 class RequestCarSummarySerializer(serializers.ModelSerializer):
     primary_image = serializers.SerializerMethodField()
     owner = CarOwnerSummarySerializer(read_only=True)
+    brand = serializers.SerializerMethodField()
 
     class Meta:
         model = Car
         fields = ["id", "title", "brand", "model", "year", "primary_image", "owner"]
+
+    def get_brand(self, obj):
+        return obj.brand.name if obj.brand_id else ""
 
     def get_primary_image(self, obj):
         images = obj.images.all()

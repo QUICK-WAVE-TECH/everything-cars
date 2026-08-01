@@ -4,7 +4,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from apps.listings.models import Car, CarStatus, ListingType
+from apps.listings.models import Brand, Car, CarStatus, ListingType
 from apps.offers.models import Offer, OfferStatus
 from apps.users.models import User
 
@@ -30,7 +30,7 @@ def create_negotiable_car(owner, **extra):
         is_negotiable=True,
         # min/max kept distinct from sale_price so a leak test can tell the
         # private range apart from the (public) asking price.
-        brand="Toyota",
+        brand=Brand.objects.get(name="Toyota"),
         model="Land Cruiser",
         year=2023,
         state="Lagos",

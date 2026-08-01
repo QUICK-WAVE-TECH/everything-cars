@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from apps.listings.models import Car, CarStatus, ListingType
+from apps.listings.models import Brand, Car, CarStatus, ListingType
 from apps.offers.models import Offer, OfferStatus
 from apps.sales.models import Deal, DealStatus, DEAL_TTL_DAYS
 from apps.users.models import OwnerProfile, User
@@ -40,7 +40,7 @@ def make_negotiable_car(owner):
         listing_type=ListingType.BUY,
         sale_price="15000000.00",
         is_negotiable=True,
-        brand="Lexus",
+        brand=Brand.objects.get(name="Lexus"),
         model="RX",
         year=2022,
         state="Lagos",

@@ -69,6 +69,12 @@ def create_car(owner, **extra):
         "status": CarStatus.PUBLISHED,
     }
     defaults.update(extra)
+    # brand is a FK — accept a Brand, a canonical name string, or "" (Other).
+    brand_val = defaults.get("brand")
+    if isinstance(brand_val, str):
+        defaults["brand"] = (
+            Brand.objects.filter(name=brand_val).first() if brand_val else None
+        )
     return Car.objects.create(**defaults)
 
 
@@ -919,7 +925,7 @@ class DeleteBothCarsMigrationTest(APITestCase):
             listing_type="both",
             rent_price_per_day=10,
             sale_price=20,
-            brand="Toyota",
+            brand=Brand.objects.get(name="Toyota"),
             model="Camry",
             year=2020,
             state="Lagos",
@@ -929,7 +935,7 @@ class DeleteBothCarsMigrationTest(APITestCase):
             title="Rent Car",
             listing_type="rent",
             rent_price_per_day=10,
-            brand="Toyota",
+            brand=Brand.objects.get(name="Toyota"),
             model="Camry",
             year=2020,
             state="Lagos",
@@ -1352,15 +1358,17 @@ class BrandValidationTest(APITestCase):
         res = self._post(brand="toyota")  # lowercase → canonical
         self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
         car = Car.objects.get(id=res.data["id"])
-        self.assertEqual(car.brand, "Toyota")
+        self.assertEqual(car.brand.name, "Toyota")  # resolved to the Brand FK
         self.assertEqual(car.brand_other, "")
+        self.assertEqual(res.data["brand"], "Toyota")  # API contract: name string
 
     def test_other_brand_goes_to_brand_other(self):
         res = self._post(brand="", brand_other="Koenigsegg")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
         car = Car.objects.get(id=res.data["id"])
-        self.assertEqual(car.brand, "")
+        self.assertIsNone(car.brand_id)  # FK nulled for "Other"
         self.assertEqual(car.brand_other, "Koenigsegg")
+        self.assertEqual(res.data["brand"], "")
 
     def test_unknown_brand_without_other_is_rejected(self):
         res = self._post(brand="Definitely Not A Brand")
