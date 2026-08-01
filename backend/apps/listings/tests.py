@@ -1425,3 +1425,68 @@ class VinPartialUniqueTest(TestCase):
         with self.assertRaises(IntegrityError):
             create_car(owner, vin="1HGCM82633A004352", plate_number="NEW333CC",
                        status=CarStatus.PUBLISHED)
+
+
+class RelistVinTest(APITestCase):
+    VIN = "1HGCM82633A004352"
+
+    def _make_sold_car(self, seller, buyer):
+        from apps.offers.models import Offer, OfferStatus
+        from apps.sales.models import DEAL_TTL_DAYS, Deal, DealStatus
+
+        car = create_car(seller, vin=self.VIN, plate_number="SOLD11AA",
+                         status=CarStatus.ARCHIVED, listing_type=ListingType.BUY,
+                         is_negotiable=True)
+        offer = Offer.objects.create(
+            car=car, customer=buyer, amount="14000000.00", currency=car.currency,
+            status=OfferStatus.ACCEPTED, expires_at=timezone.now(),
+        )
+        Deal.objects.create(
+            car=car, buyer=buyer, seller=seller, offer=offer,
+            agreed_amount="14000000.00", currency=car.currency,
+            expires_at=timezone.now() + timedelta(days=DEAL_TTL_DAYS),
+            status=DealStatus.COMPLETED, completed_at=timezone.now(),
+        )
+        return car
+
+    def _payload(self, **over):
+        data = {
+            "title": "Relisted ride", "listing_type": "buy",
+            "sale_price": "9000000.00", "is_negotiable": False,
+            "brand": "Toyota", "model": "Corolla",
+            "year": 2019, "state": "Lagos", "city": "Ikeja",
+            "vin": self.VIN, "plate_number": "NEW22BB",
+        }
+        data.update(over)
+        return data
+
+    def test_buyer_can_relist_a_sold_vin(self):
+        seller = create_user("relist-seller@test.com", "owner")
+        buyer = create_user("relist-buyer@test.com", "owner")
+        create_owner_profile(buyer)
+        self._make_sold_car(seller, buyer)
+        self.client.force_authenticate(user=buyer)
+        res = self.client.post("/api/v1/listings/my-cars", self._payload(), format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        self.assertEqual(Car.objects.get(id=res.data["id"]).vin, self.VIN)
+
+    def test_non_buyer_cannot_relist_a_sold_vin(self):
+        seller = create_user("relist-seller2@test.com", "owner")
+        buyer = create_user("relist-buyer2@test.com", "owner")
+        stranger = create_user("relist-stranger@test.com", "owner")
+        create_owner_profile(stranger)
+        self._make_sold_car(seller, buyer)
+        self.client.force_authenticate(user=stranger)
+        res = self.client.post("/api/v1/listings/my-cars", self._payload(), format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("relist a vehicle you bought", str(res.data).lower())
+
+    def test_live_listing_blocks_the_vin(self):
+        owner = create_user("relist-live@test.com", "owner")
+        create_owner_profile(owner)
+        create_car(owner, vin=self.VIN, plate_number="LIVE11AA",
+                   status=CarStatus.PUBLISHED)
+        self.client.force_authenticate(user=owner)
+        res = self.client.post("/api/v1/listings/my-cars", self._payload(), format="json")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already registered", str(res.data).lower())
