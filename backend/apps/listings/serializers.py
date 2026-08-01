@@ -453,6 +453,7 @@ class CarCreateSerializer(serializers.ModelSerializer):
             "sale_price",
             "currency",
             "brand",
+            "brand_other",
             "model",
             "color",
             "year",
@@ -470,9 +471,35 @@ class CarCreateSerializer(serializers.ModelSerializer):
             "description",
             "features",
         ]
-        extra_kwargs = {"vin": {"validators": []}, "plate_number": {"validators": []}}
+        extra_kwargs = {
+            "vin": {"validators": []},
+            "plate_number": {"validators": []},
+            "brand": {"required": False, "allow_blank": True},
+            "brand_other": {"required": False, "allow_blank": True},
+        }
 
     def validate(self, data):
+        # Brand must be a canonical Brand.name (case-insensitive → stored
+        # canonical), else the owner picked "Other" and typed it into
+        # brand_other (flagged for staff), else it's rejected.
+        from apps.listings.brands_data import match_brand
+
+        brand_other = (data.get("brand_other") or "").strip()
+        brand = (data.get("brand") or "").strip()
+        if brand_other:
+            data["brand"] = ""
+            data["brand_other"] = brand_other
+        elif brand:
+            canonical = match_brand(brand)
+            if canonical is None:
+                raise serializers.ValidationError(
+                    {"brand": "Pick a brand from the list, or choose 'Other'."}
+                )
+            data["brand"] = canonical
+            data["brand_other"] = ""
+        elif not self.instance:
+            raise serializers.ValidationError({"brand": "Brand is required."})
+
         lt = data.get("listing_type", getattr(self.instance, "listing_type", None))
         rent = data.get(
             "rent_price_per_day", getattr(self.instance, "rent_price_per_day", None)
