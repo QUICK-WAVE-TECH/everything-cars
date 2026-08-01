@@ -1300,3 +1300,12 @@ class SeedBrandsCommandTest(TestCase):
 
         call_command("seed_brands")  # idempotent
         self.assertEqual(Brand.objects.count(), first)
+
+
+class BrandOtherFieldTest(TestCase):
+    def test_needs_brand_review_reflects_brand_other(self):
+        owner = create_user("brandother-owner@t.com", "owner")
+        car = create_car(owner, brand="", brand_other="Koenigsegg")
+        self.assertTrue(car.needs_brand_review)
+        car2 = create_car(owner, brand="Toyota", brand_other="")
+        self.assertFalse(car2.needs_brand_review)

@@ -158,6 +158,9 @@ class Car(models.Model):
     model = models.CharField(
         max_length=100,
     )
+    # The owner's typed brand when it isn't on the canonical list. Non-empty ⇒
+    # needs staff review (folded into the Brand table during approval).
+    brand_other = models.CharField(max_length=100, blank=True, default="")
     color = models.CharField(max_length=50, blank=True)
     year = models.PositiveIntegerField()
     body_type = models.CharField(max_length=20, choices=BodyType.choices, blank=True)
@@ -194,6 +197,10 @@ class Car(models.Model):
 
     def __str__(self):
         return f"{self.year} {self.brand} {self.model} — {self.title}"
+
+    @property
+    def needs_brand_review(self):
+        return bool(self.brand_other)
 
 
 def car_image_path(instance, filename):
