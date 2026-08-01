@@ -673,7 +673,13 @@ class PublicCarFilterOptionsView(APIView):
                 "states": distinct_values("state"),
                 "cities": distinct_values("city"),
                 "body_types": distinct_values("body_type"),
-                "brands": distinct_values("brand"),
+                # Canonical brands (not distinct free-text) so facets never
+                # fragment into "Benz" vs "Mercedes-Benz".
+                "brands": list(
+                    Brand.objects.filter(is_active=True).values_list(
+                        "name", flat=True
+                    )
+                ),
             }
         )
 

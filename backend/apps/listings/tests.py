@@ -1380,3 +1380,12 @@ class BrandListEndpointTest(APITestCase):
         self.assertIn("Toyota", names)
         self.assertNotIn("Datsun", names)  # inactive hidden
         self.assertEqual(names[0], "Toyota")  # lowest display_order first
+
+
+class FilterOptionsBrandsTest(APITestCase):
+    def test_brands_facet_is_canonical(self):
+        res = self.client.get("/api/v1/listings/cars/filter-options")
+        self.assertEqual(res.status_code, 200)
+        brands = res.data["brands"]
+        self.assertIn("Toyota", brands)
+        self.assertIn("Mercedes-Benz", brands)
