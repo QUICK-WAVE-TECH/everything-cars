@@ -9,9 +9,10 @@ export {
   usePublicCars,
   usePublicCarDetail,
   useFilterOptions,
+  useBrands,
 } from "./listings-api";
 
-export type { PublicCarsParams, FilterOptions } from "./listings-api";
+export type { PublicCarsParams, FilterOptions, Brand } from "./listings-api";
 
 export type {
   CarListItem,

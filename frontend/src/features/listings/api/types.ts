@@ -55,6 +55,7 @@ export type CarListItem = {
   is_negotiable: boolean | null;
   currency: string;
   brand: string;
+  brand_other?: string;
   model: string;
   year: number;
   body_type: string;

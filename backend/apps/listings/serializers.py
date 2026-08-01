@@ -229,6 +229,7 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "is_negotiable",
             "currency",
             "brand",
+            "brand_other",
             "model",
             "color",
             "year",

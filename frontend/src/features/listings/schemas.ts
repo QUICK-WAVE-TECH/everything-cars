@@ -31,7 +31,10 @@ const createCarBase = z.object({
   vin: z.string().trim().transform(normalizeVin),
   plate_number: z.string().trim().transform(normalizePlate),
   currency: z.string().default("NGN"),
-  brand: z.string().trim().min(1, "Brand is required"),
+  // Brand comes from the canonical list; if the owner picks "Other" it's blank
+  // and brand_other holds the typed value. The superRefine requires one of them.
+  brand: z.string().trim().optional(),
+  brand_other: z.string().trim().optional(),
   model: z.string().trim().min(1, "Model is required"),
   color: z.string().trim().optional(),
   year: z
@@ -67,6 +70,14 @@ const createCarBase = z.object({
 });
 
 export const createCarSchema = createCarBase.superRefine((data, ctx) => {
+  if (!data.brand && !data.brand_other) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Brand is required",
+      path: ["brand"],
+    });
+  }
+
   const vinError = validateVin(data.vin);
   if (vinError) {
     ctx.addIssue({ code: "custom", message: vinError, path: ["vin"] });
