@@ -26,7 +26,53 @@ WORLD_MAKES = [
     "Nord", "Holden", "Hummer", "Pontiac", "Saturn", "Scion", "Fisker",
     "Rimac", "Zotye", "Brilliance", "Lifan", "Roewe", "Datsun", "Morgan",
     "Caterham", "TVR", "Noble", "Spyker", "Ariel", "Rezvani",
+    # Electric / newer Chinese
+    "Ora", "Zeekr", "Leapmotor", "Aiways", "Seres", "Maxus", "LDV", "Wey",
+    "Lynk & Co", "Jetour", "Bestune", "Venucia", "Denza", "Voyah", "Neta",
+    "Aion", "Tank", "Skywell", "IM Motors", "Livan", "Kaiyi", "Soueast",
+    "Landwind", "Weltmeister", "Karry",
+    # Boutique / performance
+    "Hennessey", "SSC", "Saleen", "Callaway", "Roush", "Panoz", "Mosler",
+    "Karma", "Bollinger", "Canoo", "Faraday Future", "Czinger", "Drako",
+    "Aptera", "Zenvo", "Donkervoort", "De Tomaso", "Wiesmann", "Apollo",
+    "Artega", "Isdera", "Alpina", "Brabus", "Ruf", "Gemballa", "Bristol",
+    "Marcos", "Jensen", "AC Cars", "Ginetta", "Westfield", "Radical", "BAC",
+    "David Brown", "W Motors", "Hispano-Suiza", "Automobili Pininfarina",
+    "Praga",
+    # Russia / CIS
+    "Lada", "UAZ", "GAZ", "Aurus", "Moskvich",
+    # India
+    "Force Motors", "Ashok Leyland", "Hindustan Motors", "Premier",
+    # Africa
+    "Kiira", "Mobius", "Wallyscar", "Kantanka",
+    # Iran / SE Asia
+    "Iran Khodro", "SAIPA", "Bufori",
+    # Discontinued but still on the road
+    "Plymouth", "Oldsmobile", "Mercury", "Eagle", "Geo", "Austin", "Rover",
+    "Triumph", "Riley", "Sunbeam", "Hillman", "Simca", "Talbot", "Borgward",
+    "DAF", "Trabant", "Wartburg", "Yugo", "Zastava", "Autobianchi",
+    "Innocenti", "Facel Vega", "Monteverdi", "Bizzarrini", "Iso", "Cizeta",
 ]
+
+
+def seed_brand_rows(brand_model):
+    """Idempotently upsert the canonical brand list into the given Brand model.
+    Accepts the real model (command) or a historical one (migration)."""
+    from django.utils.text import slugify
+
+    popular = {name: i * 10 for i, name in enumerate(POPULAR_NG, start=1)}
+    seen = set()
+    created = 0
+    for name in WORLD_MAKES:
+        if name in seen:
+            continue
+        seen.add(name)
+        _, was_created = brand_model.objects.get_or_create(
+            slug=slugify(name),
+            defaults={"name": name, "display_order": popular.get(name, 1000)},
+        )
+        created += int(was_created)
+    return created
 
 BRAND_ALIASES = {
     "benz": "Mercedes-Benz",
