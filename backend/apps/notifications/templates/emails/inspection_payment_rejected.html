@@ -1,0 +1,7 @@
+<!doctype html>
+<html><body style="font-family:Arial,sans-serif;color:#111">
+<h2>Payment could not be verified</h2>
+<p>We could not verify your payment for <strong>{{ car_title }}</strong>.</p>
+{% if reason %}<p>Reason: {{ reason }}</p>{% endif %}
+<p>Please re-book and submit a valid receipt to try again.</p>
+</body></html>

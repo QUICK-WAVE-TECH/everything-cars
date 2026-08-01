@@ -2,12 +2,37 @@ from django.contrib import admin
 
 from .models import (
     CarStatusHistory,
+    FeeSetting,
     InspectionBooking,
     InspectionCenter,
     InspectionDocument,
+    InspectionPayment,
     InspectionSlot,
     PhysicalInspection,
 )
+
+
+@admin.register(InspectionPayment)
+class InspectionPaymentAdmin(admin.ModelAdmin):
+    list_display = ("booking", "total", "currency", "status", "submitted_at")
+    list_filter = ("status", "payment_method")
+    readonly_fields = (
+        "booking", "inspection_fee", "listing_fee", "vat_amount", "total",
+        "currency", "receipt", "payment_method", "submitted_at", "confirmed_at",
+        "confirmed_by",
+    )
+
+
+@admin.register(FeeSetting)
+class FeeSettingAdmin(admin.ModelAdmin):
+    list_display = ("inspection_fee", "listing_fee", "vat_rate", "updated_at")
+
+    def has_add_permission(self, request):
+        # Singleton — edit the one row, never add more.
+        return not FeeSetting.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(InspectionCenter)

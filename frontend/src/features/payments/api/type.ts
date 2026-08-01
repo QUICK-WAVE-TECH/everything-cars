@@ -8,7 +8,7 @@ export type TransactionListItem = {
   request_type: string;
   amount: string;
   currency: string;
-  transaction_type: "rental" | "purchase" | "refund";
+  transaction_type: "rental" | "purchase" | "inspection" | "refund";
   payment_method: string;
   status: "pending" | "completed" | "failed" | "refunded";
   reference: string;

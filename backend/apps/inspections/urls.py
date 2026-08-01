@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     AvailableSlotsSummaryView,
     AvailableSlotsView,
+    FeeQuoteView,
     LocationsView,
     OwnerAssistanceCreateView,
     OwnerBookingCancelView,
@@ -25,6 +26,8 @@ from .views import (
     StaffSlotDetailView,
     StaffSlotListCreateView,
     StaffBookForOwnerView,
+    StaffConfirmInspectionPaymentView,
+    StaffRejectInspectionPaymentView,
 )
 
 urlpatterns = [
@@ -50,6 +53,7 @@ urlpatterns = [
         name="available-slots-summary",
     ),
     # Owner booking
+    path("bookings/fee-quote/", FeeQuoteView.as_view(), name="fee-quote"),
     path("bookings/", OwnerBookingCreateView.as_view(), name="create-booking"),
     path("bookings/my/", OwnerBookingListView.as_view(), name="my-bookings"),
     path(
@@ -73,6 +77,16 @@ urlpatterns = [
         "admin/bookings/<uuid:booking_id>/",
         StaffBookingDetailView.as_view(),
         name="staff-booking-detail",
+    ),
+    path(
+        "admin/bookings/<uuid:booking_id>/confirm-payment/",
+        StaffConfirmInspectionPaymentView.as_view(),
+        name="confirm-inspection-payment",
+    ),
+    path(
+        "admin/bookings/<uuid:booking_id>/reject-payment/",
+        StaffRejectInspectionPaymentView.as_view(),
+        name="reject-inspection-payment",
     ),
     path(
         "admin/bookings/<uuid:booking_id>/start/",

@@ -40,12 +40,15 @@ import {
   useCreateAssistanceRequest,
   useMyAssistanceRequests,
   useCreateBooking,
+  useFeeQuote,
   useLocations,
   useRescheduleBooking,
 } from "@/features/inspections/api/inspections-api";
 import type { AvailableSlot, InspectionCenter } from "@/features/inspections/api/types";
 import { useMe } from "@/features/auth/api";
 import { IdTypeSelect } from "@/features/auth/components";
+import { UploadField } from "@/features/auth/components/upload-field";
+import { formatOfferAmount } from "@/features/offers/lib/offer-format";
 import { ApiError } from "@/lib/api-client";
 
 // Placeholder authorization text — replace with legal-approved copy.
@@ -385,6 +388,7 @@ export function BookingModal({
   const [repIdType, setRepIdType] = useState("");
   const [repIdNumber, setRepIdNumber] = useState("");
   const [consent, setConsent] = useState(false);
+  const [receipt, setReceipt] = useState<File | null>(null);
 
   // Assistance (no centers in state)
   const [assistanceMessage, setAssistanceMessage] = useState("");
@@ -426,6 +430,7 @@ export function BookingModal({
   const createBooking = useCreateBooking();
   const rescheduleBooking = useRescheduleBooking();
   const isReschedule = mode === "reschedule";
+  const feeQuote = useFeeQuote({ enabled: open && mode !== "reschedule" });
   // A representative booking's authorization must be re-accepted for the new date.
   const needsRescheduleConsent =
     isReschedule && rescheduleAttendeeType === "representative";
@@ -528,10 +533,13 @@ export function BookingModal({
         });
         toast.success("Inspection rescheduled. Attend your inspection at the selected center.");
       } else {
+        if (!receipt) return;
         await createBooking.mutateAsync({
           car_id: carId,
           slot_id: selectedSlot.id,
           attendee_type: attendeeType,
+          payment_method: "transfer",
+          receipt,
           ...(attendeeType === "representative"
             ? {
                 rep_name: repName.trim(),
@@ -541,7 +549,7 @@ export function BookingModal({
               }
             : {}),
         });
-        toast.success("Inspection booked! Attend your inspection at the selected center.");
+        toast.success("Payment submitted — we'll confirm your inspection shortly.");
       }
       onSuccess();
       handleReset();
@@ -568,6 +576,7 @@ export function BookingModal({
     setRepIdType("");
     setRepIdNumber("");
     setConsent(false);
+    setReceipt(null);
     setAssistanceMessage("");
     setAssistanceSent(false);
   }
@@ -591,7 +600,8 @@ export function BookingModal({
     ? !needsRescheduleConsent || consent
     : attendeeType === "self" ||
       (!!repName.trim() && !!repIdType && !!repIdNumber.trim() && consent);
-  const canConfirm = !!selectedSlot && !isConfirming && attendeeValid;
+  const canConfirm =
+    !!selectedSlot && !isConfirming && attendeeValid && (isReschedule || !!receipt);
 
   async function handleRequestAssistance() {
     try {
@@ -1132,6 +1142,85 @@ export function BookingModal({
                       </div>
                     )}
                   </div>
+                  )}
+
+                  {/* Pay-to-book — owner pays inspection + listing + VAT up front,
+                      then uploads the transfer receipt. Book mode only. */}
+                  {!isReschedule && (
+                    <div className="rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle) p-5">
+                      <span className="block text-[11px] font-bold uppercase tracking-wide text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                        Pay to book — inspection &amp; listing fee
+                      </span>
+
+                      <div className="mt-3 flex flex-col gap-2 rounded-lg border border-(--brc-border) bg-white p-4 text-sm [font-family:var(--brc-font-ui)]">
+                        {feeQuote.isLoading ? (
+                          <span className="text-(--brc-text-muted)">Loading fees…</span>
+                        ) : feeQuote.data ? (
+                          <>
+                            {(
+                              [
+                                ["Inspection fee", feeQuote.data.inspection_fee],
+                                ["Listing fee", feeQuote.data.listing_fee],
+                                ["VAT", feeQuote.data.vat_amount],
+                              ] as const
+                            ).map(([label, value]) => (
+                              <div
+                                key={label}
+                                className="flex items-center justify-between text-(--brc-text-secondary)"
+                              >
+                                <span>{label}</span>
+                                <span className="tabular-nums text-(--brc-text)">
+                                  {formatOfferAmount(value, feeQuote.data!.currency)}
+                                </span>
+                              </div>
+                            ))}
+                            <div className="mt-1 flex items-center justify-between border-t border-(--brc-border) pt-2 font-extrabold text-(--brc-text)">
+                              <span>Total</span>
+                              <span className="tabular-nums">
+                                {formatOfferAmount(feeQuote.data.total, feeQuote.data.currency)}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-(--brc-danger)">
+                            Couldn&apos;t load the fees — try reopening this step.
+                          </span>
+                        )}
+                      </div>
+
+                      {feeQuote.data?.bank_account_number && (
+                        <div className="mt-3 rounded-lg border border-(--brc-border) bg-white p-4 text-sm [font-family:var(--brc-font-ui)]">
+                          <span className="block text-[11px] font-bold uppercase tracking-wide text-(--brc-text-muted)">
+                            Transfer to
+                          </span>
+                          <div className="mt-1 flex flex-col gap-0.5 text-(--brc-text)">
+                            <span className="font-bold">
+                              {feeQuote.data.bank_account_name || "—"}
+                            </span>
+                            <span className="tabular-nums">
+                              {feeQuote.data.bank_account_number}
+                            </span>
+                            <span className="text-(--brc-text-muted)">
+                              {feeQuote.data.bank_name}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="mt-3">
+                        <UploadField
+                          label="Upload your payment receipt"
+                          hint="PDF, PNG, JPG or WebP — up to 5MB"
+                          accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
+                          value={receipt?.name}
+                          onPick={(file) => setReceipt(file)}
+                        />
+                        <p className="mt-2 text-xs leading-5 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                          We&apos;ll verify your transfer and confirm the appointment.
+                          Fees are non-refundable.
+                        </p>
+                      </div>
+                    </div>
                   )}
 
                   {/* Reschedule of a representative booking — re-accept consent. */}

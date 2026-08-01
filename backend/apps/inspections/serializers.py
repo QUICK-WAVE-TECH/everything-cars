@@ -9,6 +9,7 @@ from .models import (
     InspectionBooking,
     InspectionCenter,
     InspectionDocument,
+    InspectionPayment,
     InspectionResult,
     InspectionSlot,
     PhysicalInspection,
@@ -233,11 +234,42 @@ class InspectionBookingSerializer(serializers.ModelSerializer):
         return f"{obj.booked_by.first_name} {obj.booked_by.last_name}"
 
 
+class InspectionPaymentSerializer(serializers.ModelSerializer):
+    receipt_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InspectionPayment
+        fields = [
+            "inspection_fee",
+            "listing_fee",
+            "vat_amount",
+            "total",
+            "currency",
+            "payment_method",
+            "status",
+            "staff_note",
+            "submitted_at",
+            "confirmed_at",
+            "receipt_url",
+        ]
+
+    def get_receipt_url(self, obj):
+        if not obj.receipt:
+            return None
+        request = self.context.get("request")
+        return (
+            request.build_absolute_uri(obj.receipt.url)
+            if request
+            else obj.receipt.url
+        )
+
+
 class InspectionBookingDetailSerializer(InspectionBookingSerializer):
     """Includes full car detail for staff review."""
 
     car = CarDetailSerializer(read_only=True)
     inspection = serializers.SerializerMethodField()
+    payment = serializers.SerializerMethodField()
 
     class Meta(InspectionBookingSerializer.Meta):
         # Staff-only detail — rep_id_type/number are exposed here (never on the
@@ -255,6 +287,7 @@ class InspectionBookingDetailSerializer(InspectionBookingSerializer):
             "rep_id_type",
             "rep_id_number",
             "inspection",
+            "payment",
             "created_at",
             "updated_at",
         ]
@@ -266,6 +299,24 @@ class InspectionBookingDetailSerializer(InspectionBookingSerializer):
         except PhysicalInspection.DoesNotExist:
             return None
         return StaffInspectionReadSerializer(inspection, context=self.context).data
+
+    def get_payment(self, obj):
+        payment = getattr(obj, "payment", None)
+        if payment is None:
+            return None
+        return InspectionPaymentSerializer(payment, context=self.context).data
+
+
+class FeeQuoteSerializer(serializers.Serializer):
+    inspection_fee = serializers.DecimalField(max_digits=12, decimal_places=2)
+    listing_fee = serializers.DecimalField(max_digits=12, decimal_places=2)
+    subtotal = serializers.DecimalField(max_digits=12, decimal_places=2)
+    vat_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total = serializers.DecimalField(max_digits=12, decimal_places=2)
+    currency = serializers.CharField()
+    bank_name = serializers.CharField()
+    bank_account_name = serializers.CharField()
+    bank_account_number = serializers.CharField()
 
 
 class BookingCreateSerializer(serializers.Serializer):

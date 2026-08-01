@@ -38,6 +38,9 @@ const TYPE_ICON: Record<NotificationType, IconName> = {
   inspection_no_show: "clock",
   inspection_rescheduled: "clock",
   inspection_cancelled: "clock",
+  inspection_payment_submitted: "file",
+  inspection_payment_confirmed: "check",
+  inspection_payment_rejected: "banknote",
   payment_submitted: "banknote",
   payment_confirmed: "banknote",
   rental_active: "car",
@@ -79,6 +82,9 @@ const TONE_MAP: Record<NotificationType, Tone> = {
   inspection_no_show: "danger",
   inspection_rescheduled: "neutral",
   inspection_cancelled: "warning",
+  inspection_payment_submitted: "neutral",
+  inspection_payment_confirmed: "success",
+  inspection_payment_rejected: "danger",
   payment_submitted: "neutral",
   payment_confirmed: "success",
   rental_active: "neutral",
@@ -115,6 +121,7 @@ function resolveHref(notification: NotificationItem, role: ViewerRole): string {
     case "requests_auto_rejected":
       return data.request_id ? `/customer/requests/${data.request_id}` : home;
     case "payment_submitted":
+    case "inspection_payment_submitted":
       return "/admin/payments";
     case "payment_confirmed":
     case "rental_active":
@@ -130,6 +137,8 @@ function resolveHref(notification: NotificationItem, role: ViewerRole): string {
     case "inspection_passed":
     case "inspection_failed":
     case "inspection_no_show":
+    case "inspection_payment_confirmed":
+    case "inspection_payment_rejected":
       return data.car_id ? `/owner/my-cars/${data.car_id}` : `/owner/my-cars`;
 
     case "inspection_booked":

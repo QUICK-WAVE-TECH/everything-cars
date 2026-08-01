@@ -448,9 +448,15 @@ function AppointmentCell({
         <span className="block truncate text-[12px] font-semibold leading-5 text-(--brc-text-secondary)">
           {formatSlotTime(booking.slot.start_time)} - {formatSlotTime(booking.slot.end_time)}
         </span>
-        <span className="mt-1 inline-flex w-fit rounded-full bg-(--brc-success-bg) px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-(--brc-success)">
-          Confirmed
-        </span>
+        {booking.status === "awaiting_payment" ? (
+          <span className="mt-1 inline-flex w-fit rounded-full bg-(--brc-warning-bg) px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-(--brc-accent)">
+            Verifying payment
+          </span>
+        ) : (
+          <span className="mt-1 inline-flex w-fit rounded-full bg-(--brc-success-bg) px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-(--brc-success)">
+            Confirmed
+          </span>
+        )}
       </div>
     );
   }

@@ -63,19 +63,57 @@ export type IdType = "intl_passport" | "nin" | "voters_card" | "drivers_licence"
 
 export type AttendeeType = "self" | "representative";
 
+export type BookingStatus =
+  | "awaiting_payment"
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "completed"
+  | "no_show"
+  | "cancelled";
+
 export type InspectionBooking = {
   id: string;
   car_id: string;
   car_title: string;
   slot: InspectionSlot;
   booked_by_name: string;
-  status: "pending" | "approved" | "rejected" | "completed" | "no_show" | "cancelled";
+  status: BookingStatus;
   reschedule_count: number;
   staff_note: string;
   attendee_type: AttendeeType;
   rep_name: string;
   created_at: string;
   updated_at: string;
+};
+
+/** The owner's up-front fee breakdown (inspection + listing + VAT) plus the
+ * platform bank details shown on the payment step. */
+export type FeeQuote = {
+  inspection_fee: string;
+  listing_fee: string;
+  subtotal: string;
+  vat_amount: string;
+  total: string;
+  currency: string;
+  bank_name: string;
+  bank_account_name: string;
+  bank_account_number: string;
+};
+
+/** Snapshotted payment tied to a booking — staff-facing detail. */
+export type InspectionPayment = {
+  inspection_fee: string;
+  listing_fee: string;
+  vat_amount: string;
+  total: string;
+  currency: string;
+  payment_method: "transfer" | "card";
+  status: "submitted" | "confirmed" | "rejected";
+  staff_note: string;
+  submitted_at: string;
+  confirmed_at: string | null;
+  receipt_url: string | null;
 };
 
 /** Files + fields the inspector recorded — staff-only. */
@@ -109,6 +147,7 @@ export type InspectionBookingDetail = Omit<InspectionBooking, "car_id" | "car_ti
   rep_id_type: IdType | "";
   rep_id_number: string;
   inspection: StaffInspectionRecord | null;
+  payment: InspectionPayment | null;
 };
 
 /** Attendee declaration sent when creating a booking. `attendee_type` defaults

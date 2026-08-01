@@ -1,12 +1,15 @@
 import json
+import uuid
 from datetime import time, timedelta
 
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.utils import IntegrityError
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 from django.test import TestCase
 from .models import (
+    ACTIVE_BOOKING_STATUSES,
     BookingStatus,
     InspectionBooking,
     InspectionSlot,
@@ -22,6 +25,9 @@ from .services import generate_tracking_id, record_status_change
 
 from apps.listings.models import CarStatus
 from apps.listings.tests import create_car, create_owner_profile, create_user
+from decimal import Decimal
+
+from apps.inspections.models import FeeSetting
 
 
 def create_slot(staff, days_ahead=7, **overrides):
@@ -54,9 +60,7 @@ class StaffHistoryNamesTest(APITestCase):
 
     def test_staff_history_shows_name_owner_does_not(self):
         self.client.force_authenticate(user=self.staff)
-        self.client.post(
-            f"/api/v1/listings/admin/cars/{self.car.id}/approve-listing"
-        )
+        self.client.post(f"/api/v1/listings/admin/cars/{self.car.id}/approve-listing")
         staff_res = self.client.get(
             f"/api/v1/listings/admin/cars/{self.car.id}/history"
         )
@@ -64,9 +68,7 @@ class StaffHistoryNamesTest(APITestCase):
         self.assertEqual(staff_res.data[0]["actor_name"], "Jane Doe")
 
         self.client.force_authenticate(user=self.owner)
-        owner_res = self.client.get(
-            f"/api/v1/listings/my-cars/{self.car.id}/history"
-        )
+        owner_res = self.client.get(f"/api/v1/listings/my-cars/{self.car.id}/history")
         self.assertEqual(owner_res.status_code, status.HTTP_200_OK)
         self.assertNotIn("actor_name", owner_res.data[0])
 
@@ -324,8 +326,9 @@ class OwnerBookingTest(APITestCase):
             {
                 "car_id": str(self.car.id),
                 "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
             },
-            format="json",
+            format="multipart",
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.car.refresh_from_db()
@@ -342,8 +345,9 @@ class OwnerBookingTest(APITestCase):
                 "rep_name": "Jane Doe",
                 "rep_id_type": "nin",
                 "rep_id_number": "22334455667",
+                "receipt": _receipt(),
             },
-            format="json",
+            format="multipart",
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("consent_accepted", res.data)
@@ -356,8 +360,9 @@ class OwnerBookingTest(APITestCase):
                 "slot_id": str(self.slot.id),
                 "attendee_type": "representative",
                 "consent_accepted": True,
+                "receipt": _receipt(),
             },
-            format="json",
+            format="multipart",
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("rep_name", res.data)
@@ -375,8 +380,9 @@ class OwnerBookingTest(APITestCase):
                 "rep_id_type": "nin",
                 "rep_id_number": "22334455667",
                 "consent_accepted": True,
+                "receipt": _receipt(),
             },
-            format="json",
+            format="multipart",
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         booking = InspectionBooking.objects.get(car=self.car)
@@ -399,8 +405,12 @@ class OwnerBookingTest(APITestCase):
         self.client.force_authenticate(user=owner)
         res = self.client.post(
             "/api/v1/inspections/bookings/",
-            {"car_id": str(car.id), "slot_id": str(self.slot.id)},
-            format="json",
+            {
+                "car_id": str(car.id),
+                "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
+            },
+            format="multipart",
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("ID verification", res.data["detail"])
@@ -413,8 +423,9 @@ class OwnerBookingTest(APITestCase):
             {
                 "car_id": str(self.car.id),
                 "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
             },
-            format="json",
+            format="multipart",
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -426,16 +437,21 @@ class OwnerBookingTest(APITestCase):
             {
                 "car_id": str(self.car.id),
                 "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
             },
-            format="json",
+            format="multipart",
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
 
     def test_rebooking_keeps_tracking_id(self):
         self.client.post(
             "/api/v1/inspections/bookings/",
-            {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
-            format="json",
+            {
+                "car_id": str(self.car.id),
+                "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
+            },
+            format="multipart",
         )
         self.car.refresh_from_db()
         original_tracking_id = self.car.tracking_id
@@ -444,8 +460,12 @@ class OwnerBookingTest(APITestCase):
         slot2 = create_slot(self.staff, days_ahead=9, center=self.center)
         self.client.post(
             "/api/v1/inspections/bookings/",
-            {"car_id": str(self.car.id), "slot_id": str(slot2.id)},
-            format="json",
+            {
+                "car_id": str(self.car.id),
+                "slot_id": str(slot2.id),
+                "receipt": _receipt(),
+            },
+            format="multipart",
         )
         self.car.refresh_from_db()
         self.assertEqual(self.car.tracking_id, original_tracking_id)
@@ -455,8 +475,12 @@ class OwnerBookingTest(APITestCase):
         self.center.save(update_fields=["max_reschedules"])
         self.client.post(
             "/api/v1/inspections/bookings/",
-            {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
-            format="json",
+            {
+                "car_id": str(self.car.id),
+                "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
+            },
+            format="multipart",
         )
         booking = InspectionBooking.objects.get(car=self.car)
         new_slot = create_slot(self.staff, days_ahead=10, center=self.center)
@@ -470,8 +494,12 @@ class OwnerBookingTest(APITestCase):
     def test_booking_writes_history(self):
         self.client.post(
             "/api/v1/inspections/bookings/",
-            {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
-            format="json",
+            {
+                "car_id": str(self.car.id),
+                "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
+            },
+            format="multipart",
         )
         entry = CarStatusHistory.objects.get(car=self.car)
         self.assertEqual(entry.from_status, CarStatus.LISTING_APPROVED)
@@ -487,8 +515,9 @@ class OwnerBookingTest(APITestCase):
             {
                 "car_id": str(self.car.id),
                 "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
             },
-            format="json",
+            format="multipart",
         )
         slot2 = create_slot(self.staff, days_ahead=8)
         res = self.client.post(
@@ -496,8 +525,9 @@ class OwnerBookingTest(APITestCase):
             {
                 "car_id": str(self.car.id),
                 "slot_id": str(slot2.id),
+                "receipt": _receipt(),
             },
-            format="json",
+            format="multipart",
         )
         # Car is INSPECTION_PENDING → not a bookable status → 400
         self.assertIn(
@@ -519,8 +549,9 @@ class OwnerBookingTest(APITestCase):
             {
                 "car_id": str(self.car.id),
                 "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
             },
-            format="json",
+            format="multipart",
         )
         self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
 
@@ -530,9 +561,11 @@ class OwnerBookingTest(APITestCase):
             {
                 "car_id": str(self.car.id),
                 "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
             },
-            format="json",
+            format="multipart",
         )
+        _mark_paid(self.car)
         booking = InspectionBooking.objects.get(car=self.car)
         res = self.client.post(f"/api/v1/inspections/bookings/{booking.id}/cancel/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
@@ -552,9 +585,7 @@ class OwnerBookingTest(APITestCase):
         self.car.status = CarStatus.INSPECTION_PENDING
         self.car.save(update_fields=["status"])
         with self.captureOnCommitCallbacks(execute=True):
-            res = self.client.post(
-                f"/api/v1/inspections/bookings/{booking.id}/cancel/"
-            )
+            res = self.client.post(f"/api/v1/inspections/bookings/{booking.id}/cancel/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertTrue(
             Notification.objects.filter(
@@ -568,9 +599,11 @@ class OwnerBookingTest(APITestCase):
             {
                 "car_id": str(self.car.id),
                 "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
             },
-            format="json",
+            format="multipart",
         )
+        _mark_paid(self.car)
         booking = InspectionBooking.objects.get(
             car=self.car, status=BookingStatus.PENDING
         )
@@ -623,9 +656,11 @@ class OwnerBookingTest(APITestCase):
             {
                 "car_id": str(self.car.id),
                 "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
             },
-            format="json",
+            format="multipart",
         )
+        _mark_paid(self.car)
         booking = InspectionBooking.objects.get(
             car=self.car, status=BookingStatus.PENDING
         )
@@ -647,8 +682,9 @@ class OwnerBookingTest(APITestCase):
             {
                 "car_id": str(self.car.id),
                 "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
             },
-            format="json",
+            format="multipart",
         )
         res = self.client.get("/api/v1/inspections/bookings/my/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
@@ -666,15 +702,11 @@ class OwnerBookingTest(APITestCase):
         self.assertNotIn(str(self.slot.id), slot_ids)
 
     def test_available_slots_rejects_malformed_center(self):
-        res = self.client.get(
-            "/api/v1/inspections/available-slots/?center=not-a-uuid"
-        )
+        res = self.client.get("/api/v1/inspections/available-slots/?center=not-a-uuid")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_available_slots_rejects_malformed_date(self):
-        res = self.client.get(
-            "/api/v1/inspections/available-slots/?date=13/07/2026"
-        )
+        res = self.client.get("/api/v1/inspections/available-slots/?date=13/07/2026")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_available_slots_date_range_filter(self):
@@ -803,9 +835,7 @@ class OwnerBookingTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("consent_accepted", res.data)
         # The original booking is untouched — no new booking created.
-        self.assertFalse(
-            InspectionBooking.objects.filter(slot=new_slot).exists()
-        )
+        self.assertFalse(InspectionBooking.objects.filter(slot=new_slot).exists())
 
     def test_reschedule_self_booking_needs_no_consent(self):
         # A self booking reschedules without any consent field.
@@ -1054,15 +1084,11 @@ class StaffInspectionFlowTest(APITestCase):
     def test_booking_detail_exposes_inspection_record(self):
         self._start()
         self._submit_with_documents(result="passed")
-        res = self.client.get(
-            f"/api/v1/inspections/admin/bookings/{self.booking.id}/"
-        )
+        res = self.client.get(f"/api/v1/inspections/admin/bookings/{self.booking.id}/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIsNotNone(res.data["inspection"])
         self.assertEqual(res.data["inspection"]["presented_attendee"], "owner")
-        self.assertEqual(
-            res.data["inspection"]["presented_id_number"], "22334455667"
-        )
+        self.assertEqual(res.data["inspection"]["presented_id_number"], "22334455667")
         # Sale-car documents are surfaced for staff review.
         self.assertIsNotNone(res.data["inspection"]["documents"])
         self.assertTrue(res.data["inspection"]["documents"]["car_documents"])
@@ -1437,8 +1463,12 @@ class ReviewFixesTest(APITestCase):
         slot2 = create_slot(self.staff, days_ahead=9, center=self.center)
         res = self.client.post(
             "/api/v1/inspections/bookings/",
-            {"car_id": str(self.car.id), "slot_id": str(slot2.id)},
-            format="json",
+            {
+                "car_id": str(self.car.id),
+                "slot_id": str(slot2.id),
+                "receipt": _receipt(),
+            },
+            format="multipart",
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -1579,10 +1609,11 @@ class CycleCountResetTest(APITestCase):
         self.client.force_authenticate(user=owner)
         res = self.client.post(
             "/api/v1/inspections/bookings/",
-            {"car_id": str(car.id), "slot_id": str(new_slot.id)},
-            format="json",
+            {"car_id": str(car.id), "slot_id": str(new_slot.id), "receipt": _receipt()},
+            format="multipart",
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        _mark_paid(car)
         booking = InspectionBooking.objects.get(car=car, status=BookingStatus.PENDING)
         self.assertEqual(booking.reschedule_count, 0)
 
@@ -1684,27 +1715,25 @@ class BookingEmailTest(APITestCase):
     def test_booking_sends_confirmation_and_logs(self):
         from django.core import mail
 
-        from apps.notifications.models import EmailLog
-
         with self.captureOnCommitCallbacks(execute=True):
             res = self.client.post(
                 "/api/v1/inspections/bookings/",
-                {"car_id": str(self.car.id), "slot_id": str(self.slot.id)},
-                format="json",
+                {
+                    "car_id": str(self.car.id),
+                    "slot_id": str(self.slot.id),
+                    "receipt": _receipt(),
+                },
+                format="multipart",
             )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        # One email, addressed to the owner, telling them to bring ID.
+        # New flow: the booking is parked awaiting payment, and staff are emailed
+        # to verify it. The owner's appointment confirmation now fires once staff
+        # confirm the payment (see the confirm-payment flow).
+        booking = InspectionBooking.objects.get(car=self.car)
+        self.assertEqual(booking.status, BookingStatus.AWAITING_PAYMENT)
         self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(mail.outbox[0].to, ["owner-em@test.com"])
-        self.assertIn("bring a valid", mail.outbox[0].body.lower())
-        # The HTML alternative carries the real booking data (car title).
-        html_body = mail.outbox[0].alternatives[0][0]
-        self.assertIn(self.car.title, html_body)
-        # Logged as a successful send tied to the booking.
-        log = EmailLog.objects.get(recipient="owner-em@test.com")
-        self.assertTrue(log.success)
-        self.assertEqual(log.template_key, "inspection_booking_confirmed")
-        self.assertIsNotNone(log.booking_id)
+        self.assertEqual(mail.outbox[0].to, ["staff-em@test.com"])
+        self.assertIn("verif", mail.outbox[0].subject.lower())
 
 
 class AssistanceRequestTest(APITestCase):
@@ -1838,3 +1867,289 @@ class StaffBookForOwnerTest(APITestCase):
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class FeeSettingTest(TestCase):
+    def test_get_solo_creates_one_row_with_default(self):
+        fee = FeeSetting.get_solo()
+        self.assertEqual(fee.pk, 1)
+        self.assertEqual(FeeSetting.get_solo().pk, 1)  # idempotent
+        self.assertEqual(FeeSetting.objects.count(), 1)
+        self.assertEqual(fee.vat_rate, Decimal("0.0750"))
+
+    def test_quote_computes_vat_and_total(self):
+        fee = FeeSetting.get_solo()
+        fee.inspection_fee = Decimal("15000.00")
+
+        fee.listing_fee = Decimal("5000.00")
+        fee.vat_rate = Decimal("0.0750")
+        fee.save()
+        q = fee.quote()
+        self.assertEqual(q["subtotal"], Decimal("20000.00"))
+        self.assertEqual(q["vat_amount"], Decimal("1500.00"))
+        self.assertEqual(q["total"], Decimal("21500.00"))
+        self.assertEqual(q["currency"], "NGN")
+
+    def test_quote_rounds_vat_half_up_to_two_dp(self):
+        fee = FeeSetting.get_solo()
+        fee.inspection_fee = Decimal("10000.00")
+        fee.listing_fee = Decimal("3333.33")
+        fee.vat_rate = Decimal("0.0750")
+        fee.save()
+        # subtotal 13333.33 * 0.075 = 999.99975 -> 1000.00
+        self.assertEqual(fee.quote()["vat_amount"], Decimal("1000.00"))
+
+
+def make_booking_ctx():
+    """Owner (ID on file) + bookable car + active future slot, for payment tests."""
+    uid = uuid.uuid4().hex[:8]
+    staff = create_user(f"bkstaff-{uid}@t.com", "owner", is_staff=True)
+    owner = create_user(f"bkowner-{uid}@t.com", "owner")
+    create_owner_profile(owner)
+    car = create_car(owner, status=CarStatus.LISTING_APPROVED)
+    center = create_center(staff)
+    slot = create_slot(staff, center=center)
+    return {"staff": staff, "owner": owner, "car": car, "center": center, "slot": slot}
+
+
+class AwaitingPaymentStatusTest(TestCase):
+    def test_awaiting_payment_is_an_active_status(self):
+        self.assertIn(BookingStatus.AWAITING_PAYMENT, ACTIVE_BOOKING_STATUSES)
+
+    def test_awaiting_payment_holds_the_slot_uniquely_per_car(self):
+        ctx = make_booking_ctx()
+        InspectionBooking.objects.create(
+            car=ctx["car"],
+            slot=ctx["slot"],
+            booked_by=ctx["owner"],
+            status=BookingStatus.AWAITING_PAYMENT,
+        )
+        with self.assertRaises(IntegrityError):
+            InspectionBooking.objects.create(
+                car=ctx["car"],
+                slot=ctx["slot"],
+                booked_by=ctx["owner"],
+                status=BookingStatus.AWAITING_PAYMENT,
+            )
+
+
+class InspectionPaymentModelTest(TestCase):
+    def test_payment_snapshots_amounts_and_links_one_to_one(self):
+        from apps.inspections.models import InspectionPayment
+
+        ctx = make_booking_ctx()
+        booking = InspectionBooking.objects.create(
+            car=ctx["car"],
+            slot=ctx["slot"],
+            booked_by=ctx["owner"],
+            status=BookingStatus.AWAITING_PAYMENT,
+        )
+        payment = InspectionPayment.objects.create(
+            booking=booking,
+            inspection_fee=Decimal("15000.00"),
+            listing_fee=Decimal("5000.00"),
+            vat_amount=Decimal("1500.00"),
+            total=Decimal("21500.00"),
+            currency="NGN",
+            receipt="inspection_payments/r.pdf",
+            payment_method="transfer",
+        )
+        self.assertEqual(booking.payment, payment)  # reverse OneToOne
+        self.assertEqual(payment.status, "submitted")  # default
+        self.assertEqual(payment.total, Decimal("21500.00"))
+
+
+class FeeQuoteEndpointTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("fq-owner@t.com", "owner")
+        create_owner_profile(self.owner)
+        fee = FeeSetting.get_solo()
+        fee.inspection_fee = Decimal("15000.00")
+        fee.listing_fee = Decimal("5000.00")
+        fee.bank_name = "GTBank"
+        fee.bank_account_number = "0123456789"
+        fee.save()
+
+    def test_owner_gets_fee_breakdown(self):
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.get("/api/v1/inspections/bookings/fee-quote/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["total"], "21500.00")
+        self.assertEqual(res.data["vat_amount"], "1500.00")
+        self.assertEqual(res.data["bank_account_number"], "0123456789")
+
+    def test_anonymous_rejected(self):
+        res = self.client.get("/api/v1/inspections/bookings/fee-quote/")
+        self.assertIn(res.status_code, (401, 403))
+
+
+def _receipt(name="r.pdf", content=b"%PDF-1.4 test", ctype="application/pdf"):
+    return SimpleUploadedFile(name, content, content_type=ctype)
+
+
+def _mark_paid(car):
+    """Simulate staff confirming the inspection payment → booking becomes PENDING."""
+    booking = InspectionBooking.objects.filter(car=car).order_by("-created_at").first()
+    booking.status = BookingStatus.PENDING
+    booking.save(update_fields=["status"])
+    return booking
+
+
+class OwnerBookingPaymentCreateTest(APITestCase):
+    def setUp(self):
+        self.ctx = make_booking_ctx()
+        self.owner = self.ctx["owner"]
+        fee = FeeSetting.get_solo()
+        fee.inspection_fee = Decimal("15000.00")
+        fee.listing_fee = Decimal("5000.00")
+        fee.save()
+        self.client.force_authenticate(user=self.owner)
+
+    def _payload(self, **over):
+        data = {
+            "car_id": str(self.ctx["car"].id),
+            "slot_id": str(self.ctx["slot"].id),
+            "attendee_type": "self",
+            "payment_method": "transfer",
+            "receipt": _receipt(),
+        }
+        data.update(over)
+        return data
+
+    def test_booking_without_receipt_is_rejected(self):
+        payload = self._payload()
+        payload.pop("receipt")
+        res = self.client.post(
+            "/api/v1/inspections/bookings/", payload, format="multipart"
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(InspectionBooking.objects.count(), 0)
+
+    def test_booking_with_receipt_awaits_payment_and_snapshots(self):
+        res = self.client.post(
+            "/api/v1/inspections/bookings/", self._payload(), format="multipart"
+        )
+        self.assertEqual(res.status_code, 201, res.data)
+        booking = InspectionBooking.objects.get()
+        self.assertEqual(booking.status, BookingStatus.AWAITING_PAYMENT)
+        self.assertEqual(booking.payment.status, "submitted")
+        self.assertEqual(booking.payment.total, Decimal("21500.00"))
+
+    def test_bad_receipt_type_rejected(self):
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            self._payload(receipt=_receipt("r.txt", b"x", "text/plain")),
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(InspectionBooking.objects.count(), 0)
+
+
+class StaffPaymentActionTest(APITestCase):
+    def setUp(self):
+        from apps.inspections.models import InspectionPayment
+
+        self.ctx = make_booking_ctx()
+        self.staff = create_user("pay-act-staff@t.com", "owner", is_staff=True)
+        self.booking = InspectionBooking.objects.create(
+            car=self.ctx["car"],
+            slot=self.ctx["slot"],
+            booked_by=self.ctx["owner"],
+            status=BookingStatus.AWAITING_PAYMENT,
+        )
+        InspectionPayment.objects.create(
+            booking=self.booking,
+            inspection_fee=Decimal("1"),
+            listing_fee=Decimal("1"),
+            vat_amount=Decimal("0"),
+            total=Decimal("2"),
+            receipt="x.pdf",
+        )
+        # Booking-create would have moved the car to INSPECTION_PENDING.
+        self.ctx["car"].status = CarStatus.INSPECTION_PENDING
+        self.ctx["car"].save(update_fields=["status"])
+
+    def test_confirm_moves_booking_to_pending(self):
+        self.client.force_authenticate(user=self.staff)
+        res = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/confirm-payment/"
+        )
+        self.assertEqual(res.status_code, 200, res.data)
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, BookingStatus.PENDING)
+        self.assertEqual(self.booking.payment.status, "confirmed")
+
+    def test_confirm_records_an_inspection_transaction(self):
+        from apps.listings.models import Transaction
+
+        self.client.force_authenticate(user=self.staff)
+        self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/confirm-payment/"
+        )
+        txn = Transaction.objects.get(inspection_booking=self.booking)
+        self.assertEqual(txn.transaction_type, "inspection")
+        self.assertEqual(txn.payer_id, self.ctx["owner"].id)
+        self.assertIsNone(txn.request_id)
+        self.assertIsNone(txn.receiver_id)
+        # It shows up in the owner's transactions list.
+        self.client.force_authenticate(user=self.ctx["owner"])
+        res = self.client.get("/api/v1/listings/transactions")
+        rows = res.data["results"] if isinstance(res.data, dict) else res.data
+        self.assertTrue(any(r["transaction_type"] == "inspection" for r in rows))
+
+    def test_reject_cancels_booking_and_frees_slot(self):
+        self.client.force_authenticate(user=self.staff)
+        res = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/reject-payment/",
+            {"reason": "Receipt unreadable."},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 200, res.data)
+        self.booking.refresh_from_db()
+        self.ctx["car"].refresh_from_db()
+        self.assertEqual(self.booking.status, BookingStatus.CANCELLED)
+        self.assertEqual(self.booking.payment.status, "rejected")
+        self.assertEqual(self.ctx["car"].status, CarStatus.LISTING_APPROVED)
+
+    def test_confirm_requires_awaiting_payment(self):
+        self.booking.status = BookingStatus.PENDING
+        self.booking.save(update_fields=["status"])
+        self.client.force_authenticate(user=self.staff)
+        res = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/confirm-payment/"
+        )
+        self.assertEqual(res.status_code, 400)
+
+    def test_non_staff_forbidden(self):
+        self.client.force_authenticate(user=self.ctx["owner"])
+        res = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/confirm-payment/"
+        )
+        self.assertEqual(res.status_code, 403)
+
+
+class BookingDetailPaymentTest(APITestCase):
+    def test_staff_detail_includes_payment_summary(self):
+        from apps.inspections.models import InspectionPayment
+
+        ctx = make_booking_ctx()
+        staff = create_user("det-pay-staff@t.com", "owner", is_staff=True)
+        booking = InspectionBooking.objects.create(
+            car=ctx["car"],
+            slot=ctx["slot"],
+            booked_by=ctx["owner"],
+            status=BookingStatus.AWAITING_PAYMENT,
+        )
+        InspectionPayment.objects.create(
+            booking=booking,
+            inspection_fee=Decimal("15000"),
+            listing_fee=Decimal("5000"),
+            vat_amount=Decimal("1500"),
+            total=Decimal("21500"),
+            receipt="x.pdf",
+        )
+        self.client.force_authenticate(user=staff)
+        res = self.client.get(f"/api/v1/inspections/admin/bookings/{booking.id}/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["payment"]["total"], "21500.00")
+        self.assertEqual(res.data["payment"]["status"], "submitted")

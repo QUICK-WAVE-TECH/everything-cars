@@ -823,8 +823,11 @@ class TransactionListSerializer(serializers.ModelSerializer):
         ]
 
     def get_car_detail(self, obj):
-
-        return obj.request.car.title
+        if obj.request_id:
+            return obj.request.car.title
+        if obj.inspection_booking_id:
+            return obj.inspection_booking.car.title
+        return "—"
 
     def get_payer_name(self, obj: Transaction):
         first_name = obj.payer.first_name
@@ -832,13 +835,16 @@ class TransactionListSerializer(serializers.ModelSerializer):
         return f"{first_name} {last_name}"
 
     def get_receiver_name(self, obj: Transaction):
+        if not obj.receiver_id:
+            return "EverythingCars"
         first_name = obj.receiver.first_name
         last_name = obj.receiver.last_name
         return f" {first_name} {last_name}"
 
     def get_request_type(self, obj: Transaction):
-
-        return obj.request.request_type
+        if obj.request_id:
+            return obj.request.request_type
+        return obj.transaction_type
 
 
 class TransactionDetailSerializer(serializers.ModelSerializer):
@@ -867,7 +873,11 @@ class TransactionDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_car_detail(self, obj):
-        return obj.request.car.title
+        if obj.request_id:
+            return obj.request.car.title
+        if obj.inspection_booking_id:
+            return obj.inspection_booking.car.title
+        return "—"
 
     def get_payer_name(self, obj: Transaction):
         first_name = obj.payer.first_name
@@ -875,10 +885,13 @@ class TransactionDetailSerializer(serializers.ModelSerializer):
         return f" {first_name} {last_name}"
 
     def get_receiver_name(self, obj: Transaction):
+        if not obj.receiver_id:
+            return "EverythingCars"
         first_name = obj.receiver.first_name
         last_name = obj.receiver.last_name
         return f"{first_name} {last_name}"
 
     def get_request_type(self, obj: Transaction):
-
-        return obj.request.request_type
+        if obj.request_id:
+            return obj.request.request_type
+        return obj.transaction_type

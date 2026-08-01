@@ -7,6 +7,7 @@ import type {
   AvailabilitySummaryEntry,
   AvailableSlot,
   CarStatusHistoryEntry,
+  FeeQuote,
   InspectionBooking,
   InspectionBookingDetail,
   InspectionCenter,
@@ -85,6 +86,7 @@ export const inspectionKeys = {
   adminCenters: ["inspections", "admin-centers"] as const,
   adminCentersList: (params?: Record<string, string | number | undefined>) =>
     ["inspections", "admin-centers", params ?? {}] as const,
+  feeQuote: ["inspections", "fee-quote"] as const,
   bookings: ["inspections", "bookings"] as const,
   myBookings: (params?: Record<string, string | number | undefined>) =>
     ["inspections", "bookings", "my", params ?? {}] as const,
@@ -271,15 +273,73 @@ export function useAvailabilitySummary(
 
 // ── Owner Bookings ──
 
+/** The owner's up-front fee breakdown + platform bank details for the payment
+ * step. */
+export function useFeeQuote(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: inspectionKeys.feeQuote,
+    queryFn: () => apiClient.get<FeeQuote>("/inspections/bookings/fee-quote/"),
+    enabled: options?.enabled ?? true,
+    staleTime: 60_000,
+  });
+}
+
+export type CreateBookingInput = { car_id: string; slot_id: string } & AttendeePayload & {
+  payment_method: "transfer" | "card";
+  receipt: File;
+};
+
 export function useCreateBooking() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { car_id: string; slot_id: string } & AttendeePayload) =>
-      apiClient.post<InspectionBooking>("/inspections/bookings/", data),
+    mutationFn: (data: CreateBookingInput) => {
+      const fd = new FormData();
+      fd.append("car_id", data.car_id);
+      fd.append("slot_id", data.slot_id);
+      fd.append("payment_method", data.payment_method);
+      fd.append("receipt", data.receipt);
+      if (data.attendee_type) fd.append("attendee_type", data.attendee_type);
+      if (data.rep_name) fd.append("rep_name", data.rep_name);
+      if (data.rep_id_type) fd.append("rep_id_type", data.rep_id_type);
+      if (data.rep_id_number) fd.append("rep_id_number", data.rep_id_number);
+      if (data.consent_accepted) fd.append("consent_accepted", "true");
+      return apiClient.post<InspectionBooking>("/inspections/bookings/", fd);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: inspectionKeys.bookings });
       queryClient.invalidateQueries({ queryKey: ["inspections", "available-slots"] });
       queryClient.invalidateQueries({ queryKey: listingKeys.owner });
+    },
+  });
+}
+
+// ── Staff inspection-payment review ──
+
+export function useConfirmInspectionPayment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (bookingId: string) =>
+      apiClient.post<InspectionBookingDetail>(
+        `/inspections/admin/bookings/${bookingId}/confirm-payment/`,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: inspectionKeys.adminBookings });
+      queryClient.invalidateQueries({ queryKey: ["inspections", "available-slots"] });
+    },
+  });
+}
+
+export function useRejectInspectionPayment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bookingId, reason }: { bookingId: string; reason: string }) =>
+      apiClient.post<InspectionBookingDetail>(
+        `/inspections/admin/bookings/${bookingId}/reject-payment/`,
+        { reason },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: inspectionKeys.adminBookings });
+      queryClient.invalidateQueries({ queryKey: ["inspections", "available-slots"] });
     },
   });
 }

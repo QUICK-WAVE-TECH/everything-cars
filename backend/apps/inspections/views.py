@@ -12,7 +12,13 @@ from rest_framework.views import APIView
 
 from common.pagination import StandardPagination
 from common.permissions import IsOwner, IsStaff
-from apps.listings.models import Car, CarStatus
+from apps.listings.models import (
+    Car,
+    CarStatus,
+    Transaction,
+    TransactionStatus,
+    TransactionType,
+)
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from apps.notifications.service import (
@@ -25,6 +31,9 @@ from apps.notifications.service import (
     notify_inspection_no_show,
     notify_inspection_rescheduled,
     notify_inspection_cancelled,
+    notify_inspection_payment_submitted,
+    notify_inspection_payment_confirmed,
+    notify_inspection_payment_rejected,
     notify_assistance_requested,
 )
 from apps.notifications.email_service import (
@@ -38,8 +47,11 @@ from .models import (
     ActorRole,
     AttendeeType,
     BookingStatus,
+    FeeSetting,
     InspectionBooking,
     InspectionCenter,
+    InspectionPayment,
+    InspectionPaymentStatus,
     InspectionResult,
     InspectionSlot,
     PhysicalInspection,
@@ -50,6 +62,7 @@ from .services import generate_tracking_id, record_status_change
 from .serializers import (
     AvailableSlotSerializer,
     BookingCreateSerializer,
+    FeeQuoteSerializer,
     InspectionBookingDetailSerializer,
     InspectionBookingSerializer,
     InspectionCenterSerializer,
@@ -133,11 +146,13 @@ def booking_detail_queryset():
         "inspection",
         "inspection__inspector",
         "inspection__documents",
+        "payment",
     ).prefetch_related("car__images", "car__features")
 
 
 def create_booking_core(
-    *, car, slot, booked_by, attendee, actor, actor_role, request=None
+    *, car, slot, booked_by, attendee, actor, actor_role, request=None,
+    initial_status=BookingStatus.PENDING,
 ):
     """Shared booking rules for owner-self-booking and staff-books-for-owner.
 
@@ -194,6 +209,7 @@ def create_booking_core(
             car=car,
             slot=slot,
             booked_by=booked_by,
+            status=initial_status,
             reschedule_count=reschedule_count,
             attendee_type=attendee["attendee_type"],
             rep_name=attendee.get("rep_name", ""),
@@ -590,8 +606,30 @@ def _open_available_slots(request):
 # ── Owner Booking ──
 
 
+class FeeQuoteView(APIView):
+    permission_classes = [IsOwner]
+
+    def get(self, request):
+        fee = FeeSetting.get_solo()
+        data = fee.quote()
+        data.update(
+            bank_name=fee.bank_name,
+            bank_account_name=fee.bank_account_name,
+            bank_account_number=fee.bank_account_number,
+        )
+        return Response(FeeQuoteSerializer(data).data)
+
+
 class OwnerBookingCreateView(APIView):
     permission_classes = [IsOwner]
+    parser_classes = [MultiPartParser, FormParser]
+
+    ALLOWED_RECEIPT_TYPES = [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "application/pdf",
+    ]
 
     def post(self, request):
         serializer = BookingCreateSerializer(data=request.data)
@@ -609,6 +647,30 @@ class OwnerBookingCreateView(APIView):
                         "before booking."
                     )
                 },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Payment gate — the owner pays (inspection + listing + VAT) up front.
+        method = request.data.get("payment_method", "transfer")
+        if method not in ("transfer", "card"):
+            return Response(
+                {"detail": "Invalid payment method. Must be 'transfer' or 'card'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        receipt = request.FILES.get("receipt")
+        if not receipt:
+            return Response(
+                {"detail": "Payment receipt is required to book an inspection."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if receipt.content_type not in self.ALLOWED_RECEIPT_TYPES:
+            return Response(
+                {"detail": "Receipt must be a JPG, PNG, WebP, or PDF file."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if receipt.size > 5 * 1024 * 1024:
+            return Response(
+                {"detail": "Receipt file must be 5MB or smaller."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -641,16 +703,26 @@ class OwnerBookingCreateView(APIView):
                 actor=request.user,
                 actor_role=ActorRole.OWNER,
                 request=request,
+                initial_status=BookingStatus.AWAITING_PAYMENT,
             )
             if error:
                 return error
 
+            quote = FeeSetting.get_solo().quote()
+            InspectionPayment.objects.create(
+                booking=booking,
+                inspection_fee=quote["inspection_fee"],
+                listing_fee=quote["listing_fee"],
+                vat_amount=quote["vat_amount"],
+                total=quote["total"],
+                currency=quote["currency"],
+                receipt=receipt,
+                payment_method=method,
+                status=InspectionPaymentStatus.SUBMITTED,
+            )
+
         schedule_notification(
-            notify_inspection_booked,
-            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
-        )
-        schedule_notification(
-            send_booking_confirmation,
+            notify_inspection_payment_submitted,
             lambda bid=booking.id: booking_detail_queryset().get(id=bid),
         )
         detail = booking_detail_queryset().get(id=booking.id)
@@ -658,6 +730,107 @@ class OwnerBookingCreateView(APIView):
             InspectionBookingSerializer(detail).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class StaffConfirmInspectionPaymentView(APIView):
+    permission_classes = [IsStaff]
+
+    def post(self, request, booking_id):
+        with transaction.atomic():
+            try:
+                booking = InspectionBooking.objects.select_for_update().get(
+                    id=booking_id
+                )
+            except InspectionBooking.DoesNotExist:
+                return Response(
+                    {"detail": "Booking not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if booking.status != BookingStatus.AWAITING_PAYMENT:
+                return Response(
+                    {"detail": f"Cannot confirm — booking is '{booking.status}'."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            payment = booking.payment
+            payment.status = InspectionPaymentStatus.CONFIRMED
+            payment.confirmed_at = timezone.now()
+            payment.confirmed_by = request.user
+            payment.save(update_fields=["status", "confirmed_at", "confirmed_by"])
+
+            booking.status = BookingStatus.PENDING
+            booking.save(update_fields=["status", "updated_at"])
+
+            # Record the fee in the transactions ledger (owner pays the platform).
+            Transaction.objects.create(
+                inspection_booking=booking,
+                payer=booking.booked_by,
+                amount=payment.total,
+                currency=payment.currency,
+                transaction_type=TransactionType.INSPECTION,
+                payment_method=payment.payment_method,
+                status=TransactionStatus.COMPLETED,
+                reference=f"INSP-{booking.id.hex[:12].upper()}",
+            )
+
+        # Payment cleared → the appointment is real; tell the owner (both the
+        # payment-confirmed note and the bring-your-ID appointment email).
+        schedule_notification(
+            notify_inspection_payment_confirmed,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
+        schedule_notification(
+            send_booking_confirmation,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
+        detail = booking_detail_queryset().get(id=booking.id)
+        return Response(InspectionBookingSerializer(detail).data)
+
+
+class StaffRejectInspectionPaymentView(APIView):
+    permission_classes = [IsStaff]
+
+    def post(self, request, booking_id):
+        reason = (request.data or {}).get("reason", "")
+        with transaction.atomic():
+            try:
+                booking = InspectionBooking.objects.select_for_update().get(
+                    id=booking_id
+                )
+            except InspectionBooking.DoesNotExist:
+                return Response(
+                    {"detail": "Booking not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if booking.status != BookingStatus.AWAITING_PAYMENT:
+                return Response(
+                    {"detail": f"Cannot reject — booking is '{booking.status}'."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            payment = booking.payment
+            payment.status = InspectionPaymentStatus.REJECTED
+            payment.staff_note = reason
+            payment.save(update_fields=["status", "staff_note"])
+
+            booking.status = BookingStatus.CANCELLED
+            booking.save(update_fields=["status", "updated_at"])
+
+            car = Car.objects.select_for_update().get(id=booking.car_id)
+            if car.status == CarStatus.INSPECTION_PENDING:
+                record_status_change(
+                    car,
+                    CarStatus.LISTING_APPROVED,
+                    actor=request.user,
+                    actor_role=ActorRole.STAFF,
+                    note="Inspection payment rejected.",
+                    request=request,
+                )
+
+        schedule_notification(
+            notify_inspection_payment_rejected,
+            lambda bid=booking.id: booking_detail_queryset().get(id=bid),
+        )
+        detail = booking_detail_queryset().get(id=booking.id)
+        return Response(InspectionBookingSerializer(detail).data)
 
 
 class OwnerBookingListView(APIView):

@@ -48,6 +48,7 @@ const STATUS_STYLE: Record<
   InspectionBooking["status"],
   { label: string; bg: string; color: string }
 > = {
+  awaiting_payment: { label: "Awaiting payment", bg: "var(--brc-warning-bg, #fff3cd)", color: "var(--brc-accent)" },
   pending: { label: "Awaiting inspection", bg: "var(--brc-warning-bg, #fff3cd)", color: "#9a7400" },
   approved: { label: "Approved", bg: "var(--brc-primary-tint, #e8f0ff)", color: "var(--brc-primary)" },
   completed: { label: "Completed", bg: "var(--brc-success-bg, #d4edda)", color: "var(--brc-success)" },
@@ -115,6 +116,12 @@ function AttendeeRow({ booking }: { booking: InspectionBooking }) {
         >
           Start inspection <ArrowRightIcon size={14} />
         </Link>
+      )}
+
+      {booking.status === "awaiting_payment" && (
+        <p className="mt-3 text-center text-[12px] font-semibold text-(--brc-accent) [font-family:var(--brc-font-ui)]">
+          Payment verification pending — review it on the Payments desk.
+        </p>
       )}
     </div>
   );

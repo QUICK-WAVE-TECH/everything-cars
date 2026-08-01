@@ -394,6 +394,26 @@ export default function StaffInspectionFormPage() {
 
       <div className="mx-auto grid w-full max-w-[1180px] grid-cols-1 gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-5">
+        {booking.status === "awaiting_payment" ? (
+          <section className="flex flex-col items-start gap-3 rounded-3xl border border-(--brc-warning) bg-(--brc-warning-bg) p-6 [font-family:var(--brc-font-ui)]">
+            <span className="text-[13px] font-extrabold uppercase tracking-wide text-(--brc-accent)">
+              Payment pending verification
+            </span>
+            <p className="m-0 max-w-[46ch] text-sm leading-relaxed text-(--brc-text-secondary)">
+              This inspection can&apos;t be started until the owner&apos;s payment is
+              verified. Review and confirm it on the Payments desk, then come back to
+              run the inspection.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/admin/payments")}
+              className="flex h-10 items-center gap-1.5 rounded-xl bg-(--brc-primary) px-4 text-[13px] font-bold text-white transition-all hover:brightness-95"
+            >
+              Go to Payments desk
+            </button>
+          </section>
+        ) : (
+        <>
         {/* Vehicle */}
         <FormSection title="Vehicle" icon={CarFrontIcon} subtitle="Confirm the vehicle's core attributes as physically inspected.">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -805,6 +825,8 @@ export default function StaffInspectionFormPage() {
             Submit Inspection
           </button>
         </div>
+        </>
+        )}
         </div>
 
         <aside className="lg:sticky lg:top-6 lg:self-start">

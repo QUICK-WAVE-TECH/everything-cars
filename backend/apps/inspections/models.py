@@ -1,10 +1,58 @@
 import uuid
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import models
 
 from apps.listings.models import Car
 from apps.users.models import User, IDType
 from django_countries.fields import CountryField
+
+
+class FeeSetting(models.Model):
+    """Admin-editable singleton (pk pinned to 1) holding the owner listing/inspection
+    fees. `get_solo()` returns the single row, creating it with defaults on first
+    read."""
+
+    inspection_fee = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    listing_fee = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00")
+    )
+    vat_rate = models.DecimalField(
+        max_digits=5, decimal_places=4, default=Decimal("0.0750")
+    )
+    # Platform bank details shown on the payment Summary.
+    bank_name = models.CharField(max_length=100, blank=True, default="")
+    bank_account_name = models.CharField(max_length=200, blank=True, default="")
+    bank_account_number = models.CharField(max_length=20, blank=True, default="")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Fee Setting"
+        verbose_name_plural = "Fee Settings"
+
+    def __str__(self):
+        return f"Fees: inspection {self.inspection_fee}, listing {self.listing_fee}"
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def quote(self):
+        subtotal = self.inspection_fee + self.listing_fee
+        vat_amount = (subtotal * self.vat_rate).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        return {
+            "inspection_fee": self.inspection_fee,
+            "listing_fee": self.listing_fee,
+            "subtotal": subtotal,
+            "vat_amount": vat_amount,
+            "total": subtotal + vat_amount,
+            "currency": "NGN",
+        }
 
 
 class InspectionCenter(models.Model):
@@ -78,6 +126,7 @@ class InspectionSlot(models.Model):
 
 
 class BookingStatus(models.TextChoices):
+    AWAITING_PAYMENT = "awaiting_payment", "Awaiting payment"
     PENDING = "pending", "Pending"
     APPROVED = "approved", "Approved"
     REJECTED = "rejected", "Rejected"
@@ -91,12 +140,17 @@ class AssistanceStatus(models.TextChoices):
     HANDLED = "handled", "Handled"
 
 
-ACTIVE_BOOKING_STATUSES = [BookingStatus.PENDING, BookingStatus.APPROVED]
+ACTIVE_BOOKING_STATUSES = [
+    BookingStatus.AWAITING_PAYMENT,
+    BookingStatus.PENDING,
+    BookingStatus.APPROVED,
+]
 
 # Bookings that actually took the slot — used for the staff calendar's display
 # count so a completed/no-show inspection still reads as "booked" (it happened),
 # matching the day-activity view. Only cancelled/rejected free the slot.
 OCCUPIED_BOOKING_STATUSES = [
+    BookingStatus.AWAITING_PAYMENT,
     BookingStatus.PENDING,
     BookingStatus.APPROVED,
     BookingStatus.COMPLETED,
@@ -160,6 +214,51 @@ class InspectionBooking(models.Model):
 
     def __str__(self):
         return f"Booking {self.car} → {self.slot} ({self.status})"
+
+
+class InspectionPaymentStatus(models.TextChoices):
+    SUBMITTED = "submitted", "Submitted"
+    CONFIRMED = "confirmed", "Confirmed"
+    REJECTED = "rejected", "Rejected"
+
+
+class InspectionPayment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    booking = models.OneToOneField(
+        InspectionBooking, on_delete=models.CASCADE, related_name="payment"
+    )
+    # Amounts are snapshotted at submit time so later FeeSetting edits never
+    # rewrite an existing payment record.
+    inspection_fee = models.DecimalField(max_digits=12, decimal_places=2)
+    listing_fee = models.DecimalField(max_digits=12, decimal_places=2)
+    vat_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    total = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=3, default="NGN")
+
+    receipt = models.FileField(upload_to="inspection_payments/")
+    payment_method = models.CharField(
+        max_length=20,
+        choices=[("transfer", "Bank Transfer"), ("card", "Card")],
+        default="transfer",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=InspectionPaymentStatus.choices,
+        default=InspectionPaymentStatus.SUBMITTED,
+        db_index=True,
+    )
+    staff_note = models.CharField(max_length=400, blank=True, default="")
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    confirmed_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+
+    class Meta:
+        ordering = ["-submitted_at"]
+
+    def __str__(self):
+        return f"Payment {self.total} {self.currency} ({self.status})"
 
 
 class VehicleUsedCondition(models.TextChoices):
