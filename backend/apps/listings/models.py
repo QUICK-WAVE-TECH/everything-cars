@@ -136,10 +136,8 @@ class Car(models.Model):
         blank=True,
         decimal_places=2,
     )
-    vin = models.CharField(max_length=17, blank=True, null=True, unique=True)
-    plate_number = models.CharField(
-        max_length=12, blank=True, null=True, unique=True
-    )  # ✓
+    vin = models.CharField(max_length=17, blank=True, null=True)
+    plate_number = models.CharField(max_length=12, blank=True, null=True)
 
     is_negotiable = models.BooleanField(
         null=True,
@@ -199,6 +197,22 @@ class Car(models.Model):
             models.Index(fields=["listing_type", "status"]),
             models.Index(fields=["owner", "status"]),
             models.Index(fields=["state", "city"]),
+        ]
+        constraints = [
+            # At most one live (non-archived) listing per VIN / plate. A sold car
+            # is ARCHIVED, which frees its VIN/plate for the new owner to relist.
+            models.UniqueConstraint(
+                fields=["vin"],
+                condition=models.Q(vin__isnull=False)
+                & ~models.Q(status=CarStatus.ARCHIVED),
+                name="one_active_listing_per_vin",
+            ),
+            models.UniqueConstraint(
+                fields=["plate_number"],
+                condition=models.Q(plate_number__isnull=False)
+                & ~models.Q(status=CarStatus.ARCHIVED),
+                name="one_active_listing_per_plate",
+            ),
         ]
 
     def __str__(self):

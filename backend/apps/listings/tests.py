@@ -3,6 +3,7 @@ import tempfile
 from io import BytesIO
 import json
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.utils import IntegrityError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from datetime import time, date, timedelta
@@ -1409,3 +1410,18 @@ class BrandBackfillHelperTest(TestCase):
         # Unmatched → moved to brand_other, brand blanked.
         self.assertEqual(canonicalize_car_brand("Kiaa"), ("", "Kiaa"))
         self.assertEqual(canonicalize_car_brand(""), ("", ""))
+
+
+class VinPartialUniqueTest(TestCase):
+    def test_archived_car_frees_the_vin_but_one_live_only(self):
+        owner = create_user("vinpu-owner@test.com", "owner")
+        # An archived (sold) car keeps its VIN.
+        create_car(owner, vin="1HGCM82633A004352", plate_number="OLD111AA",
+                   status=CarStatus.ARCHIVED)
+        # A new live listing may reuse that VIN.
+        create_car(owner, vin="1HGCM82633A004352", plate_number="NEW222BB",
+                   status=CarStatus.PUBLISHED)
+        # But a SECOND live car with the same VIN violates the partial unique.
+        with self.assertRaises(IntegrityError):
+            create_car(owner, vin="1HGCM82633A004352", plate_number="NEW333CC",
+                       status=CarStatus.PUBLISHED)
