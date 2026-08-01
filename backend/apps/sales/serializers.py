@@ -20,6 +20,7 @@ class DealPartySerializer(serializers.Serializer):
 class DealCarSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     title = serializers.CharField()
+    vin = serializers.CharField(allow_null=True)
     primary_image = serializers.SerializerMethodField()
 
     def get_primary_image(self, car):

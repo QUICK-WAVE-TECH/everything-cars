@@ -409,3 +409,13 @@ class LatestCompletedDealForVinTest(APITestCase):
 
         self.assertIsNone(latest_completed_deal_for_vin("1HGCM82633A004352"))
         self.assertIsNone(latest_completed_deal_for_vin(""))
+
+
+class DealCarVinTest(DealEndpointTest):
+    def test_deal_detail_exposes_car_vin_to_participant(self):
+        self.car.vin = "1HGCM82633A004352"
+        self.car.save(update_fields=["vin"])
+        self.client.force_authenticate(user=self.buyer)
+        res = self.client.get(f"/api/v1/deals/{self.deal.id}")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["car"]["vin"], "1HGCM82633A004352")
