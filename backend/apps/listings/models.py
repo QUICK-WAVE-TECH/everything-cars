@@ -1,8 +1,31 @@
 from django.db import models
+from django.utils.text import slugify
 import uuid
 
 
 from apps.users.models import User
+
+
+class Brand(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=120, unique=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    # Lower sorts first — Nigeria-common brands get a low value so they float to
+    # the top of the picker; ties break alphabetically.
+    display_order = models.PositiveSmallIntegerField(default=1000)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["display_order", "name"]
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
 
 
 class ListingType(models.TextChoices):

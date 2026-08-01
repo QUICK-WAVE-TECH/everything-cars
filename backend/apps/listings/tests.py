@@ -3,7 +3,7 @@ import tempfile
 from io import BytesIO
 import json
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import override_settings
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from datetime import time, date, timedelta
 from PIL import Image
@@ -11,6 +11,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.listings.models import (
+    Brand,
     Car,
     CarImage,
     CarImageType,
@@ -1270,3 +1271,17 @@ class ListingFeatureFieldTest(APITestCase):
         data = ListingFeatureSerializer(self.car.features.first()).data
         self.assertEqual(data["description"], "Built-in")
         self.assertNotIn("value", data)
+
+
+class BrandModelTest(TestCase):
+    def test_slug_is_derived_from_name(self):
+        b = Brand.objects.create(name="Mercedes-Benz")
+        self.assertEqual(b.slug, "mercedes-benz")
+        self.assertTrue(b.is_active)
+
+    def test_ordering_is_display_order_then_name(self):
+        Brand.objects.create(name="Zonda", display_order=1000)
+        Brand.objects.create(name="Toyota", display_order=10)
+        Brand.objects.create(name="Acura", display_order=1000)
+        names = list(Brand.objects.values_list("name", flat=True))
+        self.assertEqual(names, ["Toyota", "Acura", "Zonda"])

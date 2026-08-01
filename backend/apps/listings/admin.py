@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import (
+    Brand,
     Car,
     CarImage,
     ListingFeature,
@@ -7,6 +8,14 @@ from .models import (
     RequestStatusEvent,
     Transaction,
 )
+
+
+@admin.register(Brand)
+class BrandAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "is_active", "display_order")
+    list_editable = ("is_active", "display_order")
+    search_fields = ("name", "slug")
+    ordering = ("display_order", "name")
 
 
 class CarImageInline(admin.TabularInline):
