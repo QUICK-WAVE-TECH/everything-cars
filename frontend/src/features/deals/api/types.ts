@@ -11,6 +11,7 @@ export type DealParty = {
 export type DealCar = {
   id: string;
   title: string;
+  vin: string | null;
   primary_image: string | null;
 };
 
