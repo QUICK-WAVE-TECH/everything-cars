@@ -1,5 +1,6 @@
 from django.urls import path
 
+from apps.users.scope_views import MyScopeView
 from apps.users.team_views import (
     TeamDeactivateView,
     TeamDetailView,
@@ -8,6 +9,7 @@ from apps.users.team_views import (
 )
 
 urlpatterns = [
+    path("me/scope", MyScopeView.as_view(), name="owner-me-scope"),
     path("team/", TeamListCreateView.as_view(), name="owner-team"),
     path(
         "team/<uuid:member_id>/",

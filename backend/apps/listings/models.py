@@ -4,7 +4,6 @@ import uuid
 
 
 from apps.users.models import User, OwnerProfile
-from apps.users.models import TeamMembership
 
 
 class Brand(models.Model):

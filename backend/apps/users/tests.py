@@ -9,7 +9,6 @@ from apps.listings.tests import (
     create_user,
     create_fleet_owner_profile,
     create_owner_profile,
-    create_car,
 )
 from apps.listings.models import Branch
 from apps.users.models import TeamMembership
@@ -702,9 +701,11 @@ class TeamLifecycleApiTest(APITestCase):
     def test_deactivate_then_reactivate(self):
         self.client.force_authenticate(self.owner)
         assert self.client.post(f"/api/v1/owner/team/{self.m.id}/deactivate/").status_code == 200
-        self.m.refresh_from_db(); assert self.m.is_active is False
+        self.m.refresh_from_db()
+        assert self.m.is_active is False
         assert self.client.post(f"/api/v1/owner/team/{self.m.id}/reactivate/").status_code == 200
-        self.m.refresh_from_db(); assert self.m.is_active is True
+        self.m.refresh_from_db()
+        assert self.m.is_active is True
 
     def test_team_member_cannot_manage_team(self):
         member, _ = make_team_member("tl-intruder@test.com", self.profile, [self.b1])
@@ -713,6 +714,51 @@ class TeamLifecycleApiTest(APITestCase):
 
     def test_cross_business_member_is_404(self):
         other = create_user_owner("tl-other@test.com")
-        other_profile = create_fleet_owner_profile(other, fleet_name="Rivals")
+        create_fleet_owner_profile(other, fleet_name="Rivals")
         self.client.force_authenticate(other)
         assert self.client.get(f"/api/v1/owner/team/{self.m.id}/").status_code == 404
+
+
+class BranchRetireUnassignsTest(APITestCase):
+    def test_retiring_branch_unassigns_members(self):
+        owner = create_user_owner("ru-owner@test.com")
+        profile = create_fleet_owner_profile(owner)
+        b1 = Branch.objects.create(business=profile, name="A", state="Lagos", city="Ikeja",
+            street_address="1", phone="+2340000000000", email="a@x.ng")
+        b2 = Branch.objects.create(business=profile, name="B", state="Oyo", city="Ibadan",
+            street_address="2", phone="+2340000000002", email="b@x.ng")
+        _, m = make_team_member("ru-tm@test.com", profile, [b1, b2])
+        self.client.force_authenticate(owner)
+        r = self.client.post(f"/api/v1/owner/branches/{b1.id}/deactivate/")
+        assert r.status_code == 200
+        assert list(m.branches.values_list("id", flat=True)) == [b2.id]
+
+
+class MyScopeApiTest(APITestCase):
+    def setUp(self):
+        from apps.users.models import TeamMembership
+        self.owner = create_user_owner("scope-api-owner@test.com")
+        self.profile = create_fleet_owner_profile(self.owner)
+        self.b1 = Branch.objects.create(business=self.profile, name="A", state="Lagos",
+            city="Ikeja", street_address="1", phone="+2340000000000", email="a@x.ng")
+        self.b2 = Branch.objects.create(business=self.profile, name="B", state="Oyo",
+            city="Ibadan", street_address="2", phone="+2340000000002", email="b@x.ng")
+        self.member = create_user("scope-api-tm@test.com", "team_member")
+        m = TeamMembership.objects.create(user=self.member, business=self.profile)
+        m.branches.set([self.b1])
+
+    def test_owner_scope(self):
+        self.client.force_authenticate(self.owner)
+        r = self.client.get("/api/v1/owner/me/scope")
+        assert r.status_code == 200
+        assert r.data["is_team_member"] is False
+        assert r.data["can_manage_team"] is True
+        assert {b["name"] for b in r.data["branches"]} == {"A", "B"}
+
+    def test_member_scope(self):
+        self.client.force_authenticate(self.member)
+        r = self.client.get("/api/v1/owner/me/scope")
+        assert r.status_code == 200
+        assert r.data["is_team_member"] is True
+        assert r.data["can_manage_team"] is False
+        assert [b["name"] for b in r.data["branches"]] == ["A"]

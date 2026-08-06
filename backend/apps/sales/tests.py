@@ -448,8 +448,12 @@ class DealScopeTest(APITestCase):
         self.b2 = Branch.objects.create(business=self.profile, name="B", state="Oyo",
             city="Ibadan", street_address="2", phone="+2340000000002", email="b@x.ng")
         self.buyer = make_user("ds-buyer@test.com")
-        self.car1 = make_negotiable_car(self.owner); self.car1.branch = self.b1; self.car1.save()
-        self.car2 = make_negotiable_car(self.owner); self.car2.branch = self.b2; self.car2.save()
+        self.car1 = make_negotiable_car(self.owner)
+        self.car1.branch = self.b1
+        self.car1.save()
+        self.car2 = make_negotiable_car(self.owner)
+        self.car2.branch = self.b2
+        self.car2.save()
         self.deal1 = Deal.objects.create(car=self.car1, buyer=self.buyer, seller=self.owner,
             offer=make_accepted_offer(self.car1, self.buyer), agreed_amount=Decimal("14000000.00"),
             currency=self.car1.currency, expires_at=timezone.now() + timedelta(days=DEAL_TTL_DAYS))
