@@ -400,7 +400,7 @@ class OfferListTest(APITestCase):
     def setUp(self):
         self.owner = create_user("t9-owner@test.com", "owner")
         self.buyer = create_user("t9-buyer@test.com")
-        self.stranger = create_user("t9-other@test.com")
+        self.stranger = create_user("t9-other@test.com", "owner")
         self.car = create_negotiable_car(self.owner)
         self.offer = Offer.objects.create(
             car=self.car,
@@ -471,3 +471,46 @@ class OfferNotificationTest(APITestCase):
                 recipient=customer, notification_type="offer_submitted"
             ).exists()
         )
+
+
+class OwnerOfferScopeTest(APITestCase):
+    def setUp(self):
+        from apps.listings.tests import create_fleet_owner_profile
+        from apps.listings.models import Branch
+        from apps.users.models import TeamMembership
+        self.owner = create_user("off-owner@test.com", "owner")
+        self.profile = create_fleet_owner_profile(self.owner)
+        self.b1 = Branch.objects.create(business=self.profile, name="A", state="Lagos",
+            city="Ikeja", street_address="1", phone="+2340000000000", email="a@x.ng")
+        self.b2 = Branch.objects.create(business=self.profile, name="B", state="Oyo",
+            city="Ibadan", street_address="2", phone="+2340000000002", email="b@x.ng")
+        self.car1 = create_negotiable_car(self.owner, branch=self.b1)
+        self.car2 = create_negotiable_car(self.owner, branch=self.b2, vin="", plate_number="")
+        self.customer = create_user("off-cust@test.com")
+        self.offer1 = Offer.objects.create(car=self.car1, customer=self.customer,
+            amount="16000000.00", currency="NGN", expires_at=timezone.now() + timedelta(hours=48))
+        self.offer2 = Offer.objects.create(car=self.car2, customer=self.customer,
+            amount="16000000.00", currency="NGN", expires_at=timezone.now() + timedelta(hours=48))
+        self.member = create_user("off-tm@test.com", "team_member")
+        m = TeamMembership.objects.create(user=self.member, business=self.profile)
+        m.branches.set([self.b1])
+
+    def test_member_offer_list_scoped(self):
+        self.client.force_authenticate(self.member)
+        r = self.client.get("/api/v1/offers/owner-offers")
+        ids = [o["id"] for o in r.data["results"]]
+        assert str(self.offer1.id) in ids and str(self.offer2.id) not in ids
+
+    def test_member_can_accept_in_branch(self):
+        self.client.force_authenticate(self.member)
+        r = self.client.post(f"/api/v1/offers/offers/{self.offer1.id}/respond",
+            {"action": "accept"}, format="json")
+        assert r.status_code == 200, r.data
+        self.offer1.refresh_from_db()
+        assert self.offer1.status == OfferStatus.ACCEPTED
+
+    def test_member_cannot_respond_other_branch(self):
+        self.client.force_authenticate(self.member)
+        r = self.client.post(f"/api/v1/offers/offers/{self.offer2.id}/respond",
+            {"action": "accept"}, format="json")
+        assert r.status_code == 404
