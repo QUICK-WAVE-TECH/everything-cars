@@ -620,3 +620,99 @@ class RbacPermissionTest(APITestCase):
         assert perm.has_permission(Req(owner), None) is True
         assert perm.has_permission(Req(member), None) is True
         assert perm.has_permission(Req(cust), None) is False
+
+
+class TeamListCreateApiTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user_owner("team-owner@test.com")
+        self.profile = create_fleet_owner_profile(self.owner)
+        self.b1 = Branch.objects.create(business=self.profile, name="A", state="Lagos",
+            city="Ikeja", street_address="1", phone="+2340000000000", email="a@x.ng")
+        self.other_owner = create_user_owner("team-other@test.com")
+        self.other_profile = create_fleet_owner_profile(self.other_owner, fleet_name="Rivals")
+        self.other_branch = Branch.objects.create(business=self.other_profile, name="X",
+            state="Oyo", city="Ibadan", street_address="9", phone="+2340000000009", email="x@x.ng")
+        self.individual = create_user_owner("team-indiv@test.com")
+        create_owner_profile(self.individual)
+
+    def _payload(self, **over):
+        data = {"email": "newtm@test.com", "first_name": "New", "last_name": "Rep",
+                "title": "Sales", "branch_ids": [str(self.b1.id)]}
+        data.update(over)
+        return data
+
+    def test_verified_fleet_owner_creates_member(self):
+        self.client.force_authenticate(self.owner)
+        r = self.client.post("/api/v1/owner/team/", self._payload(), format="json")
+        assert r.status_code == 201, r.data
+        u = User.objects.get(email="newtm@test.com")
+        assert u.role == "team_member" and u.is_active is True
+        assert list(u.team_membership.branches.values_list("id", flat=True)) == [self.b1.id]
+
+    def test_duplicate_email_rejected(self):
+        self.client.force_authenticate(self.owner)
+        r = self.client.post("/api/v1/owner/team/", self._payload(email=self.owner.email), format="json")
+        assert r.status_code == 400
+
+    def test_cross_business_branch_rejected(self):
+        self.client.force_authenticate(self.owner)
+        r = self.client.post("/api/v1/owner/team/",
+            self._payload(branch_ids=[str(self.other_branch.id)]), format="json")
+        assert r.status_code == 400
+
+    def test_no_branch_rejected(self):
+        self.client.force_authenticate(self.owner)
+        r = self.client.post("/api/v1/owner/team/", self._payload(branch_ids=[]), format="json")
+        assert r.status_code == 400
+
+    def test_individual_owner_forbidden(self):
+        self.client.force_authenticate(self.individual)
+        r = self.client.post("/api/v1/owner/team/", self._payload(), format="json")
+        assert r.status_code == 403
+
+    def test_list_scoped_to_business(self):
+        make_team_member("mine@test.com", self.profile, [self.b1])
+        make_team_member("theirs@test.com", self.other_profile, [self.other_branch])
+        self.client.force_authenticate(self.owner)
+        r = self.client.get("/api/v1/owner/team/")
+        rows = r.data["results"] if "results" in r.data else r.data
+        emails = [m["email"] for m in rows]
+        assert "mine@test.com" in emails and "theirs@test.com" not in emails
+
+
+class TeamLifecycleApiTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user_owner("tl-owner@test.com")
+        self.profile = create_fleet_owner_profile(self.owner)
+        self.b1 = Branch.objects.create(business=self.profile, name="A", state="Lagos",
+            city="Ikeja", street_address="1", phone="+2340000000000", email="a@x.ng")
+        self.b2 = Branch.objects.create(business=self.profile, name="B", state="Oyo",
+            city="Ibadan", street_address="2", phone="+2340000000001", email="b@x.ng")
+        _, self.m = make_team_member("tl-tm@test.com", self.profile, [self.b1])
+
+    def test_patch_reassigns_branches_and_title(self):
+        self.client.force_authenticate(self.owner)
+        r = self.client.patch(f"/api/v1/owner/team/{self.m.id}/",
+            {"title": "Manager", "branch_ids": [str(self.b2.id)]}, format="json")
+        assert r.status_code == 200, r.data
+        self.m.refresh_from_db()
+        assert self.m.title == "Manager"
+        assert list(self.m.branches.values_list("id", flat=True)) == [self.b2.id]
+
+    def test_deactivate_then_reactivate(self):
+        self.client.force_authenticate(self.owner)
+        assert self.client.post(f"/api/v1/owner/team/{self.m.id}/deactivate/").status_code == 200
+        self.m.refresh_from_db(); assert self.m.is_active is False
+        assert self.client.post(f"/api/v1/owner/team/{self.m.id}/reactivate/").status_code == 200
+        self.m.refresh_from_db(); assert self.m.is_active is True
+
+    def test_team_member_cannot_manage_team(self):
+        member, _ = make_team_member("tl-intruder@test.com", self.profile, [self.b1])
+        self.client.force_authenticate(member)
+        assert self.client.get("/api/v1/owner/team/").status_code == 403
+
+    def test_cross_business_member_is_404(self):
+        other = create_user_owner("tl-other@test.com")
+        other_profile = create_fleet_owner_profile(other, fleet_name="Rivals")
+        self.client.force_authenticate(other)
+        assert self.client.get(f"/api/v1/owner/team/{self.m.id}/").status_code == 404
