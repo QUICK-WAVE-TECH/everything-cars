@@ -16,6 +16,7 @@ from .models import (
     RequestStatus,
     RequestStatusEvent,
     Transaction,
+    Branch,
 )
 
 
@@ -220,6 +221,7 @@ class CarDetailSerializer(serializers.ModelSerializer):
 
     def get_brand(self, obj):
         return obj.brand.name if obj.brand_id else ""
+
     booked_periods = serializers.SerializerMethodField()
     available_from = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
@@ -453,13 +455,21 @@ class CarCreateSerializer(serializers.ModelSerializer):
             )
 
         # All matches are archived (sold) → only the proven buyer may relist.
-        from apps.sales.services import latest_completed_deal_for_vin
+        from apps.sales.services import (
+            completed_deal_is_final,
+            latest_completed_deal_for_vin,
+        )
 
         request = self.context.get("request")
         user = getattr(request, "user", None)
         deal = latest_completed_deal_for_vin(v)
         if deal is not None and user is not None and deal.buyer_id == user.id:
-            return v
+            if completed_deal_is_final(deal):
+                return v
+            raise serializers.ValidationError(
+                "This sale is still within its dispute review period. You can "
+                "relist the vehicle after the transfer is finalized."
+            )
         raise serializers.ValidationError(
             "You can only relist a vehicle you bought through the platform."
         )
@@ -967,3 +977,23 @@ class TransactionDetailSerializer(serializers.ModelSerializer):
         if obj.request_id:
             return obj.request.request_type
         return obj.transaction_type
+
+
+class BranchSerializer(serializers.ModelSerializer):
+    business_name = serializers.CharField(source="business.fleet_name", read_only=True)
+
+    class Meta:
+        model = Branch
+        fields = [
+            "id",
+            "name",
+            "business_name",
+            "state",
+            "city",
+            "street_address",
+            "phone",
+            "email",
+            "is_active",
+            "created_at",
+        ]
+        read_only_fields = ["id", "is_active", "created_at"]

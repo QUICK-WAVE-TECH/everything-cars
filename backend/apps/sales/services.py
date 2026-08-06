@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from apps.listings.models import CarStatus
+from apps.listings.models import Car, CarStatus
 from apps.notifications.notifications import schedule_notification
 from apps.notifications.service import (
     notify_car_available_again,
@@ -37,12 +37,41 @@ def latest_completed_deal_for_vin(vin):
     )
 
 
+def completed_deal_is_final(deal, now=None):
+    """Whether a completed transfer can be used as proof for a relisting.
+
+    A completion remains reversible during the buyer's dispute window. A
+    dismissed dispute finalizes the transfer immediately; an open dispute never
+    does. Keeping this rule beside the deal state machine prevents relisting and
+    dispute resolution from disagreeing about who owns the VIN.
+    """
+    if deal.status != DealStatus.COMPLETED:
+        return False
+    if deal.dispute_resolution == DisputeResolution.DISMISSED:
+        return True
+    if deal.disputed_at is not None:
+        return False
+    completed_at = deal.completed_at or deal.created_at
+    return (now or timezone.now()) >= completed_at + timedelta(
+        days=DEAL_DISPUTE_WINDOW_DAYS
+    )
+
+
+def _locked_deal(deal):
+    return (
+        Deal.objects.select_for_update()
+        .select_related("car", "buyer", "seller", "offer")
+        .get(pk=deal.pk)
+    )
+
+
 def complete_deal(deal):
     """Seller confirms the sale: close the deal and take the car off the market."""
-    if deal.status != DealStatus.ACTIVE:
-        raise ValidationError("This deal is already closed.")
     with transaction.atomic():
-        car = deal.car
+        deal = _locked_deal(deal)
+        if deal.status != DealStatus.ACTIVE:
+            raise ValidationError("This deal is already closed.")
+        car = Car.objects.select_for_update().get(pk=deal.car_id)
         deal.status = DealStatus.COMPLETED
         deal.completed_at = timezone.now()
         deal.save(update_fields=["status", "completed_at"])
@@ -55,9 +84,10 @@ def complete_deal(deal):
 def cancel_deal(deal, cancelled_by):
     """Either party (or the system, on timeout) ends the deal; the car returns to
     the market and prior bidders are invited back."""
-    if deal.status != DealStatus.ACTIVE:
-        raise ValidationError("This deal is already closed.")
     with transaction.atomic():
+        deal = _locked_deal(deal)
+        if deal.status != DealStatus.ACTIVE:
+            raise ValidationError("This deal is already closed.")
         deal.status = DealStatus.CANCELLED
         deal.cancelled_at = timezone.now()
         deal.cancelled_by = cancelled_by
@@ -80,19 +110,21 @@ def cancel_deal(deal, cancelled_by):
 
 def dispute_deal(deal, reason=""):
     """The buyer flags a completed sale they say never happened. Staff review it."""
-    if deal.status != DealStatus.COMPLETED:
-        raise ValidationError("Only a completed deal can be disputed.")
-    if deal.disputed_at is not None:
-        raise ValidationError("This deal has already been disputed.")
-    window_ends = (deal.completed_at or deal.created_at) + timedelta(
-        days=DEAL_DISPUTE_WINDOW_DAYS
-    )
-    if timezone.now() > window_ends:
-        raise ValidationError("The window to dispute this sale has closed.")
+    with transaction.atomic():
+        deal = _locked_deal(deal)
+        if deal.status != DealStatus.COMPLETED:
+            raise ValidationError("Only a completed deal can be disputed.")
+        if deal.disputed_at is not None:
+            raise ValidationError("This deal has already been disputed.")
+        window_ends = (deal.completed_at or deal.created_at) + timedelta(
+            days=DEAL_DISPUTE_WINDOW_DAYS
+        )
+        if timezone.now() > window_ends:
+            raise ValidationError("The window to dispute this sale has closed.")
 
-    deal.disputed_at = timezone.now()
-    deal.dispute_reason = reason or ""
-    deal.save(update_fields=["disputed_at", "dispute_reason"])
+        deal.disputed_at = timezone.now()
+        deal.dispute_reason = reason or ""
+        deal.save(update_fields=["disputed_at", "dispute_reason"])
     schedule_notification(notify_deal_disputed, lambda d=deal: d)
     return deal
 
@@ -101,10 +133,22 @@ def reverse_deal(deal, by=None):
     """Staff uphold a dispute: undo a completed sale, the car goes back on the
     market, and both parties + prior bidders are notified. `by` is the staff user
     resolving it (recorded on the case)."""
-    if deal.status != DealStatus.COMPLETED:
-        raise ValidationError("Only a completed deal can be reversed.")
     with transaction.atomic():
-        car = deal.car
+        deal = _locked_deal(deal)
+        if deal.status != DealStatus.COMPLETED:
+            raise ValidationError("Only a completed deal can be reversed.")
+        car = Car.objects.select_for_update().get(pk=deal.car_id)
+        if (
+            car.vin
+            and Car.objects.filter(vin=car.vin)
+            .exclude(pk=car.pk)
+            .exclude(status=CarStatus.ARCHIVED)
+            .exists()
+        ):
+            raise ValidationError(
+                "This deal cannot be reversed while another active listing uses "
+                "the same VIN. Archive that listing and try again."
+            )
         deal.status = DealStatus.CANCELLED
         deal.cancelled_at = timezone.now()
         deal.cancelled_by = DealCancelledBy.SYSTEM
@@ -150,25 +194,27 @@ def reverse_deal(deal, by=None):
 def dismiss_dispute(deal, note, by=None):
     """Staff dismiss a dispute: the sale stands. The buyer is notified of the
     outcome and the note is recorded on the case for audit. `note` is required."""
-    if deal.disputed_at is None:
-        raise ValidationError("This deal has not been disputed.")
-    if deal.dispute_resolution:
-        raise ValidationError("This dispute has already been resolved.")
     note = (note or "").strip()
     if len(note) < 15:
         raise ValidationError("Add a note of at least 15 characters.")
+    with transaction.atomic():
+        deal = _locked_deal(deal)
+        if deal.disputed_at is None:
+            raise ValidationError("This deal has not been disputed.")
+        if deal.dispute_resolution:
+            raise ValidationError("This dispute has already been resolved.")
 
-    deal.dispute_resolution = DisputeResolution.DISMISSED
-    deal.dispute_resolved_at = timezone.now()
-    deal.dispute_resolved_by = by
-    deal.dispute_resolution_note = note
-    deal.save(
-        update_fields=[
-            "dispute_resolution",
-            "dispute_resolved_at",
-            "dispute_resolved_by",
-            "dispute_resolution_note",
-        ]
-    )
+        deal.dispute_resolution = DisputeResolution.DISMISSED
+        deal.dispute_resolved_at = timezone.now()
+        deal.dispute_resolved_by = by
+        deal.dispute_resolution_note = note
+        deal.save(
+            update_fields=[
+                "dispute_resolution",
+                "dispute_resolved_at",
+                "dispute_resolved_by",
+                "dispute_resolution_note",
+            ]
+        )
     schedule_notification(notify_dispute_dismissed, lambda d=deal: d)
     return deal

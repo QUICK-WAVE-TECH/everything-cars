@@ -1,6 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -339,6 +340,20 @@ class DealActionTest(DealEndpointTest):
         # Should not raise; prior-bidder notification fires on commit.
         res = self.client.post(f"/api/v1/deals/{self.deal.id}/cancel")
         self.assertEqual(res.status_code, 200)
+
+    def test_stale_cancel_cannot_overwrite_a_completed_deal(self):
+        from apps.sales.services import cancel_deal, complete_deal
+
+        stale = Deal.objects.get(pk=self.deal.pk)
+        complete_deal(self.deal)
+
+        with self.assertRaises(ValidationError):
+            cancel_deal(stale, cancelled_by="buyer")
+
+        self.deal.refresh_from_db()
+        self.car.refresh_from_db()
+        self.assertEqual(self.deal.status, DealStatus.COMPLETED)
+        self.assertEqual(self.car.status, CarStatus.ARCHIVED)
 
 
 class ExpireDealsCommandTest(DealEndpointTest):

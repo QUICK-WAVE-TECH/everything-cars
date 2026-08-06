@@ -12,6 +12,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.listings.models import (
+    Branch,
     Brand,
     Car,
     CarImage,
@@ -46,6 +47,20 @@ def create_owner_profile(user):
         bank_account="1234567890",
         bank_name="Test Bank",
         is_verified=True,
+        national_id="12345678901",
+        id_type="nin",
+        id_document=create_test_image("id.jpg"),
+    )
+
+
+def create_fleet_owner_profile(user, fleet_name="AutoKings Motors", is_verified=True):
+    return OwnerProfile.objects.create(
+        user=user,
+        owner_type=OwnerProfile.OwnerType.FLEET,
+        fleet_name=fleet_name,
+        bank_account="1234567890",
+        bank_name="Test Bank",
+        is_verified=is_verified,
         national_id="12345678901",
         id_type="nin",
         id_document=create_test_image("id.jpg"),
@@ -667,6 +682,84 @@ class AdminCarOrderingTest(APITestCase):
         )
 
 
+class AdminRequestFilteringTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user(
+            "request-filter-staff@test.com", "owner", is_staff=True
+        )
+        owner = create_user("request-filter-owner@test.com", "owner")
+        customer = create_user("request-filter-customer@test.com", "customer")
+        create_owner_profile(owner)
+        create_customer_profile(customer)
+
+        old_car = create_car(owner, title="Old buy")
+        new_car = create_car(owner, title="New buy")
+        rent_car = create_car(
+            owner,
+            title="Rental",
+            listing_type=ListingType.RENT,
+            sale_price=None,
+            rent_price_per_day="20000.00",
+        )
+        self.old_buy = Request.objects.create(
+            car=old_car,
+            customer=customer,
+            request_type=ListingType.BUY,
+            price_offered="100.00",
+            status=RequestStatus.PAYMENT_SUBMITTED,
+        )
+        self.new_buy = Request.objects.create(
+            car=new_car,
+            customer=customer,
+            request_type=ListingType.BUY,
+            price_offered="300.00",
+            status=RequestStatus.PAYMENT_SUBMITTED,
+        )
+        self.rental = Request.objects.create(
+            car=rent_car,
+            customer=customer,
+            request_type=ListingType.RENT,
+            price_offered="200.00",
+            duration_days=3,
+            start_date=timezone.localdate() + timedelta(days=2),
+            status=RequestStatus.PAYMENT_SUBMITTED,
+        )
+        Request.objects.filter(pk=self.old_buy.pk).update(
+            created_at=timezone.now() - timedelta(days=2)
+        )
+        self.client.force_authenticate(user=self.staff)
+
+    def test_ordering_is_applied_before_pagination(self):
+        oldest = self.client.get(
+            "/api/v1/listings/admin/requests?status=payment_submitted&ordering=created_at"
+        )
+        highest = self.client.get(
+            "/api/v1/listings/admin/requests?status=payment_submitted&ordering=-price_offered"
+        )
+
+        self.assertEqual(oldest.data["results"][0]["id"], str(self.old_buy.id))
+        self.assertEqual(highest.data["results"][0]["id"], str(self.new_buy.id))
+
+    def test_request_type_filter_updates_results_and_count(self):
+        res = self.client.get(
+            "/api/v1/listings/admin/requests?status=payment_submitted&request_type=rent"
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["count"], 1)
+        self.assertEqual(res.data["results"][0]["id"], str(self.rental.id))
+
+    def test_invalid_request_type_is_rejected(self):
+        res = self.client.get("/api/v1/listings/admin/requests?request_type=lease")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_status_counts_use_all_matching_rows(self):
+        res = self.client.get("/api/v1/listings/admin/requests/status-counts")
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data[RequestStatus.PAYMENT_SUBMITTED], 3)
+
+
 class PublicArchivedVisibilityTest(APITestCase):
     def setUp(self):
         self.owner = create_user("owner-arch@test.com", "owner")
@@ -683,16 +776,25 @@ class PublicArchivedVisibilityTest(APITestCase):
     def test_sold_car_shows_publicly_as_sold(self):
         from apps.offers.models import Offer, OfferStatus
         from apps.sales.models import Deal, DealStatus
+
         car = create_car(self.owner, title="Sold Car", status=CarStatus.ARCHIVED)
         offer = Offer.objects.create(
-            car=car, customer=self.customer, amount="15000000.00",
-            currency=car.currency, status=OfferStatus.ACCEPTED,
+            car=car,
+            customer=self.customer,
+            amount="15000000.00",
+            currency=car.currency,
+            status=OfferStatus.ACCEPTED,
             expires_at=timezone.now(),
         )
         Deal.objects.create(
-            car=car, buyer=self.customer, seller=self.owner, offer=offer,
-            agreed_amount="15000000.00", currency=car.currency,
-            status=DealStatus.COMPLETED, expires_at=timezone.now(),
+            car=car,
+            buyer=self.customer,
+            seller=self.owner,
+            offer=offer,
+            agreed_amount="15000000.00",
+            currency=car.currency,
+            status=DealStatus.COMPLETED,
+            expires_at=timezone.now(),
             completed_at=timezone.now(),
         )
         res = self.client.get("/api/v1/listings/cars")
@@ -1241,14 +1343,22 @@ class ReservedListingPauseTest(APITestCase):
     def test_pause_blocked_when_reserved(self):
         from apps.offers.models import Offer, OfferStatus
         from apps.sales.models import Deal, DEAL_TTL_DAYS
+
         offer = Offer.objects.create(
-            car=self.car, customer=self.customer, amount="5000000.00",
-            currency=self.car.currency, status=OfferStatus.ACCEPTED,
+            car=self.car,
+            customer=self.customer,
+            amount="5000000.00",
+            currency=self.car.currency,
+            status=OfferStatus.ACCEPTED,
             expires_at=timezone.now(),
         )
         Deal.objects.create(
-            car=self.car, buyer=self.customer, seller=self.owner, offer=offer,
-            agreed_amount="5000000.00", currency=self.car.currency,
+            car=self.car,
+            buyer=self.customer,
+            seller=self.owner,
+            offer=offer,
+            agreed_amount="5000000.00",
+            currency=self.car.currency,
             expires_at=timezone.now() + timedelta(days=DEAL_TTL_DAYS),
         )
         res = self._pause()
@@ -1407,6 +1517,7 @@ class BrandBackfillHelperTest(TestCase):
         self.assertEqual(canonicalize_car_brand("benz"), ("Mercedes-Benz", ""))
         self.assertEqual(canonicalize_car_brand("Mercedes Benz"), ("Mercedes-Benz", ""))
         self.assertEqual(canonicalize_car_brand("toyota"), ("Toyota", ""))
+        self.assertEqual(canonicalize_car_brand("Range Rover"), ("Range Rover", ""))
         # Unmatched → moved to brand_other, brand blanked.
         self.assertEqual(canonicalize_car_brand("Kiaa"), ("", "Kiaa"))
         self.assertEqual(canonicalize_car_brand(""), ("", ""))
@@ -1416,46 +1527,78 @@ class VinPartialUniqueTest(TestCase):
     def test_archived_car_frees_the_vin_but_one_live_only(self):
         owner = create_user("vinpu-owner@test.com", "owner")
         # An archived (sold) car keeps its VIN.
-        create_car(owner, vin="1HGCM82633A004352", plate_number="OLD111AA",
-                   status=CarStatus.ARCHIVED)
+        create_car(
+            owner,
+            vin="1HGCM82633A004352",
+            plate_number="OLD111AA",
+            status=CarStatus.ARCHIVED,
+        )
         # A new live listing may reuse that VIN.
-        create_car(owner, vin="1HGCM82633A004352", plate_number="NEW222BB",
-                   status=CarStatus.PUBLISHED)
+        create_car(
+            owner,
+            vin="1HGCM82633A004352",
+            plate_number="NEW222BB",
+            status=CarStatus.PUBLISHED,
+        )
         # But a SECOND live car with the same VIN violates the partial unique.
         with self.assertRaises(IntegrityError):
-            create_car(owner, vin="1HGCM82633A004352", plate_number="NEW333CC",
-                       status=CarStatus.PUBLISHED)
+            create_car(
+                owner,
+                vin="1HGCM82633A004352",
+                plate_number="NEW333CC",
+                status=CarStatus.PUBLISHED,
+            )
 
 
 class RelistVinTest(APITestCase):
     VIN = "1HGCM82633A004352"
 
-    def _make_sold_car(self, seller, buyer):
+    def _make_sold_car(self, seller, buyer, completed_at=None):
         from apps.offers.models import Offer, OfferStatus
         from apps.sales.models import DEAL_TTL_DAYS, Deal, DealStatus
 
-        car = create_car(seller, vin=self.VIN, plate_number="SOLD11AA",
-                         status=CarStatus.ARCHIVED, listing_type=ListingType.BUY,
-                         is_negotiable=True)
+        car = create_car(
+            seller,
+            vin=self.VIN,
+            plate_number="SOLD11AA",
+            status=CarStatus.ARCHIVED,
+            listing_type=ListingType.BUY,
+            is_negotiable=True,
+        )
         offer = Offer.objects.create(
-            car=car, customer=buyer, amount="14000000.00", currency=car.currency,
-            status=OfferStatus.ACCEPTED, expires_at=timezone.now(),
+            car=car,
+            customer=buyer,
+            amount="14000000.00",
+            currency=car.currency,
+            status=OfferStatus.ACCEPTED,
+            expires_at=timezone.now(),
         )
         Deal.objects.create(
-            car=car, buyer=buyer, seller=seller, offer=offer,
-            agreed_amount="14000000.00", currency=car.currency,
+            car=car,
+            buyer=buyer,
+            seller=seller,
+            offer=offer,
+            agreed_amount="14000000.00",
+            currency=car.currency,
             expires_at=timezone.now() + timedelta(days=DEAL_TTL_DAYS),
-            status=DealStatus.COMPLETED, completed_at=timezone.now(),
+            status=DealStatus.COMPLETED,
+            completed_at=completed_at or timezone.now(),
         )
         return car
 
     def _payload(self, **over):
         data = {
-            "title": "Relisted ride", "listing_type": "buy",
-            "sale_price": "9000000.00", "is_negotiable": False,
-            "brand": "Toyota", "model": "Corolla",
-            "year": 2019, "state": "Lagos", "city": "Ikeja",
-            "vin": self.VIN, "plate_number": "NEW22BB",
+            "title": "Relisted ride",
+            "listing_type": "buy",
+            "sale_price": "9000000.00",
+            "is_negotiable": False,
+            "brand": "Toyota",
+            "model": "Corolla",
+            "year": 2019,
+            "state": "Lagos",
+            "city": "Ikeja",
+            "vin": self.VIN,
+            "plate_number": "NEW22BB",
         }
         data.update(over)
         return data
@@ -1464,11 +1607,50 @@ class RelistVinTest(APITestCase):
         seller = create_user("relist-seller@test.com", "owner")
         buyer = create_user("relist-buyer@test.com", "owner")
         create_owner_profile(buyer)
-        self._make_sold_car(seller, buyer)
+        self._make_sold_car(
+            seller,
+            buyer,
+            completed_at=timezone.now() - timedelta(days=8),
+        )
         self.client.force_authenticate(user=buyer)
-        res = self.client.post("/api/v1/listings/my-cars", self._payload(), format="json")
+        res = self.client.post(
+            "/api/v1/listings/my-cars", self._payload(), format="json"
+        )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
         self.assertEqual(Car.objects.get(id=res.data["id"]).vin, self.VIN)
+
+    def test_buyer_cannot_relist_during_dispute_window(self):
+        seller = create_user("relist-window-seller@test.com", "owner")
+        buyer = create_user("relist-window-buyer@test.com", "owner")
+        create_owner_profile(buyer)
+        self._make_sold_car(seller, buyer)
+        self.client.force_authenticate(user=buyer)
+
+        res = self.client.post(
+            "/api/v1/listings/my-cars", self._payload(), format="json"
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("dispute review period", str(res.data).lower())
+
+    def test_dismissed_dispute_finalizes_relist_immediately(self):
+        from apps.sales.models import Deal, DisputeResolution
+
+        seller = create_user("relist-dismissed-seller@test.com", "owner")
+        buyer = create_user("relist-dismissed-buyer@test.com", "owner")
+        create_owner_profile(buyer)
+        self._make_sold_car(seller, buyer)
+        Deal.objects.filter(car__vin=self.VIN).update(
+            disputed_at=timezone.now(),
+            dispute_resolution=DisputeResolution.DISMISSED,
+        )
+        self.client.force_authenticate(user=buyer)
+
+        res = self.client.post(
+            "/api/v1/listings/my-cars", self._payload(), format="json"
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
 
     def test_non_buyer_cannot_relist_a_sold_vin(self):
         seller = create_user("relist-seller2@test.com", "owner")
@@ -1477,16 +1659,296 @@ class RelistVinTest(APITestCase):
         create_owner_profile(stranger)
         self._make_sold_car(seller, buyer)
         self.client.force_authenticate(user=stranger)
-        res = self.client.post("/api/v1/listings/my-cars", self._payload(), format="json")
+        res = self.client.post(
+            "/api/v1/listings/my-cars", self._payload(), format="json"
+        )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("relist a vehicle you bought", str(res.data).lower())
 
     def test_live_listing_blocks_the_vin(self):
         owner = create_user("relist-live@test.com", "owner")
         create_owner_profile(owner)
-        create_car(owner, vin=self.VIN, plate_number="LIVE11AA",
-                   status=CarStatus.PUBLISHED)
+        create_car(
+            owner, vin=self.VIN, plate_number="LIVE11AA", status=CarStatus.PUBLISHED
+        )
         self.client.force_authenticate(user=owner)
-        res = self.client.post("/api/v1/listings/my-cars", self._payload(), format="json")
+        res = self.client.post(
+            "/api/v1/listings/my-cars", self._payload(), format="json"
+        )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("already registered", str(res.data).lower())
+
+
+class BranchModelTest(TestCase):
+    def setUp(self):
+        self.user = create_user("branch-owner@test.com", "owner")
+        self.profile = create_fleet_owner_profile(self.user)
+
+    def test_create_branch(self):
+        branch = Branch.objects.create(
+            business=self.profile,
+            name="Lagos — Amuwo Odofin Branch",
+            state="Lagos",
+            city="Amuwo Odofin",
+            street_address="12 Trade Fair Rd",
+            phone="+2348012345678",
+            email="lagos@autokings.ng",
+        )
+        assert branch.is_active is True
+        assert branch.business.fleet_name == "AutoKings Motors"
+
+    def test_branch_name_unique_per_business(self):
+        Branch.objects.create(
+            business=self.profile,
+            name="HQ",
+            state="Lagos",
+            city="Ikeja",
+            street_address="12 Trade Fair Rd",
+            phone="+2348012345678",
+            email="lagos@autokings.ng",
+        )
+        with self.assertRaises(IntegrityError):
+            Branch.objects.create(
+                business=self.profile,
+                name="HQ",
+                state="Lagos",
+                city="Ikeja",
+                street_address="12 Trade Fair Rd",
+                phone="+2348012345678",
+                email="lagos@autokings.ng",
+            )
+
+
+class BranchSerializerTest(TestCase):
+    def setUp(self):
+        self.user = create_user("fleet2@test.com", "owner")
+        self.profile = create_fleet_owner_profile(
+            self.user, fleet_name="AutoKings Motors"
+        )
+
+    def test_serializes_business_name_readonly(self):
+        from apps.listings.serializers import BranchSerializer
+
+        branch = Branch.objects.create(
+            business=self.profile,
+            name="HQ",
+            state="Lagos",
+            city="Ikeja",
+            street_address="1 A",
+            phone="+2348010000000",
+            email="a@x.ng",
+        )
+        data = BranchSerializer(branch).data
+        assert data["business_name"] == "AutoKings Motors"
+        assert data["name"] == "HQ"
+        assert data["is_active"] is True
+
+    def test_rejects_bad_email(self):
+        from apps.listings.serializers import BranchSerializer
+
+        s = BranchSerializer(
+            data={
+                "name": "HQ",
+                "state": "Lagos",
+                "city": "Ikeja",
+                "street_address": "1 A",
+                "phone": "+234801",
+                "email": "not-an-email",
+            }
+        )
+        assert not s.is_valid()
+        assert "email" in s.errors
+
+    def test_ignores_business_name_on_write(self):
+        from apps.listings.serializers import BranchSerializer
+
+        s = BranchSerializer(
+            data={
+                "name": "HQ",
+                "state": "Lagos",
+                "city": "Ikeja",
+                "street_address": "1 A",
+                "phone": "+2348010000000",
+                "email": "a@x.ng",
+                "business_name": "HACKED",
+            }
+        )
+        assert s.is_valid(), s.errors
+        assert "business_name" not in s.validated_data
+
+
+class BranchListCreateApiTest(APITestCase):
+    def setUp(self):
+        self.fleet_user = create_user("fleetapi@test.com", "owner")
+        self.fleet_profile = create_fleet_owner_profile(self.fleet_user)
+
+        self.individual_user = create_user("indiv@test.com", "owner")
+        create_owner_profile(self.individual_user)  # individual, verified
+
+        self.unverified_user = create_user("unver@test.com", "owner")
+        create_fleet_owner_profile(
+            self.unverified_user, fleet_name="Later Ltd", is_verified=False
+        )
+
+        self.customer = create_user("cust@test.com", "customer")
+
+    def _payload(self, **over):
+        data = {
+            "name": "Lagos Branch",
+            "state": "Lagos",
+            "city": "Ikeja",
+            "street_address": "1 A",
+            "phone": "+2348010000000",
+            "email": "a@x.ng",
+        }
+        data.update(over)
+        return data
+
+    def test_customer_forbidden(self):
+        self.client.force_authenticate(self.customer)
+        r = self.client.post("/api/v1/owner/branches/", self._payload())
+        assert r.status_code == 403
+
+    def test_individual_owner_forbidden(self):
+        self.client.force_authenticate(self.individual_user)
+        r = self.client.post("/api/v1/owner/branches/", self._payload())
+        assert r.status_code == 403
+
+    def test_unverified_fleet_forbidden(self):
+        self.client.force_authenticate(self.unverified_user)
+        r = self.client.post("/api/v1/owner/branches/", self._payload())
+        assert r.status_code == 403
+
+    def test_verified_fleet_creates_and_lists(self):
+        self.client.force_authenticate(self.fleet_user)
+        r = self.client.post("/api/v1/owner/branches/", self._payload())
+        assert r.status_code == 201, r.data
+        assert r.data["business_name"] == "AutoKings Motors"
+
+        r2 = self.client.get("/api/v1/owner/branches/")
+        assert r2.status_code == 200
+        results = r2.data["results"] if "results" in r2.data else r2.data
+        assert len(results) == 1
+
+    def test_duplicate_name_rejected(self):
+        self.client.force_authenticate(self.fleet_user)
+        self.client.post("/api/v1/owner/branches/", self._payload(name="HQ"))
+        r = self.client.post("/api/v1/owner/branches/", self._payload(name="HQ"))
+        assert r.status_code == 400
+
+    def test_list_scoped_to_own_business(self):
+        other = create_user("other@test.com", "owner")
+        other_profile = create_fleet_owner_profile(other, fleet_name="Other Motors")
+        Branch.objects.create(
+            business=other_profile,
+            name="Theirs",
+            state="Oyo",
+            city="Ibadan",
+            street_address="9 Z",
+            phone="+2348099999999",
+            email="z@x.ng",
+        )
+        self.client.force_authenticate(self.fleet_user)
+        r = self.client.get("/api/v1/owner/branches/")
+        results = r.data["results"] if "results" in r.data else r.data
+        assert all(b["name"] != "Theirs" for b in results)
+
+
+class BranchDetailApiTest(APITestCase):
+    def setUp(self):
+        self.user = create_user("fleetd@test.com", "owner")
+        self.profile = create_fleet_owner_profile(self.user)
+        self.branch = Branch.objects.create(
+            business=self.profile, name="HQ", state="Lagos", city="Ikeja",
+            street_address="1 A", phone="+2348010000000", email="a@x.ng",
+        )
+        self.other = create_user("otherd@test.com", "owner")
+        self.other_profile = create_fleet_owner_profile(self.other, fleet_name="Rivals")
+        self.other_branch = Branch.objects.create(
+            business=self.other_profile, name="Theirs", state="Oyo", city="Ibadan",
+            street_address="9 Z", phone="+2348099999999", email="z@x.ng",
+        )
+
+    def test_patch_updates_fields(self):
+        self.client.force_authenticate(self.user)
+        r = self.client.patch(
+            f"/api/v1/owner/branches/{self.branch.id}/", {"city": "Lekki"}
+        )
+        assert r.status_code == 200, r.data
+        assert r.data["city"] == "Lekki"
+
+    def test_business_name_not_writable(self):
+        self.client.force_authenticate(self.user)
+        r = self.client.patch(
+            f"/api/v1/owner/branches/{self.branch.id}/", {"business_name": "HACKED"}
+        )
+        assert r.status_code == 200
+        self.profile.refresh_from_db()
+        assert self.profile.fleet_name == "AutoKings Motors"
+
+    def test_cross_business_is_404(self):
+        self.client.force_authenticate(self.user)
+        r = self.client.get(f"/api/v1/owner/branches/{self.other_branch.id}/")
+        assert r.status_code == 404
+        r2 = self.client.patch(
+            f"/api/v1/owner/branches/{self.other_branch.id}/", {"city": "X"}
+        )
+        assert r2.status_code == 404
+
+
+class BranchLifecycleApiTest(APITestCase):
+    def setUp(self):
+        self.user = create_user("fleetl@test.com", "owner")
+        self.profile = create_fleet_owner_profile(self.user)
+        self.branch = Branch.objects.create(
+            business=self.profile, name="HQ", state="Lagos", city="Ikeja",
+            street_address="1 A", phone="+2348010000000", email="a@x.ng",
+        )
+
+    def test_deactivate_then_reactivate(self):
+        self.client.force_authenticate(self.user)
+        r = self.client.post(f"/api/v1/owner/branches/{self.branch.id}/deactivate/")
+        assert r.status_code == 200, r.data
+        self.branch.refresh_from_db()
+        assert self.branch.is_active is False
+
+        r2 = self.client.post(f"/api/v1/owner/branches/{self.branch.id}/reactivate/")
+        assert r2.status_code == 200
+        self.branch.refresh_from_db()
+        assert self.branch.is_active is True
+
+    def test_deactivate_is_idempotent(self):
+        self.client.force_authenticate(self.user)
+        self.client.post(f"/api/v1/owner/branches/{self.branch.id}/deactivate/")
+        r = self.client.post(f"/api/v1/owner/branches/{self.branch.id}/deactivate/")
+        assert r.status_code == 200
+        self.branch.refresh_from_db()
+        assert self.branch.is_active is False
+
+
+class ListingBranchGateTest(APITestCase):
+    def setUp(self):
+        self.fleet_user = create_user("gatefleet@test.com", "owner")
+        self.fleet_profile = create_fleet_owner_profile(self.fleet_user)
+        self.indiv_user = create_user("gateindiv@test.com", "owner")
+        create_owner_profile(self.indiv_user)
+
+    def test_fleet_owner_without_branch_blocked(self):
+        self.client.force_authenticate(self.fleet_user)
+        r = self.client.post("/api/v1/listings/my-cars", {}, format="json")
+        assert r.status_code == 400
+        assert "branch" in str(r.data).lower()
+
+    def test_fleet_owner_with_branch_passes_gate(self):
+        Branch.objects.create(
+            business=self.fleet_profile, name="HQ", state="Lagos", city="Ikeja",
+            street_address="1 A", phone="+2348010000000", email="a@x.ng",
+        )
+        self.client.force_authenticate(self.fleet_user)
+        r = self.client.post("/api/v1/listings/my-cars", {}, format="json")
+        assert "Create a branch before listing" not in str(r.data)
+
+    def test_individual_owner_not_gated(self):
+        self.client.force_authenticate(self.indiv_user)
+        r = self.client.post("/api/v1/listings/my-cars", {}, format="json")
+        assert "Create a branch before listing" not in str(r.data)

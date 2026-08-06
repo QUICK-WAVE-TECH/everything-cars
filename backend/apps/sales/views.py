@@ -73,7 +73,7 @@ class DealCompleteView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
         try:
-            complete_deal(deal)
+            deal = complete_deal(deal)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         return Response(DealSerializer(deal, context={"request": request}).data)
@@ -92,7 +92,7 @@ class DealCancelView(APIView):
             else DealCancelledBy.BUYER
         )
         try:
-            cancel_deal(deal, cancelled_by=by)
+            deal = cancel_deal(deal, cancelled_by=by)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         return Response(DealSerializer(deal, context={"request": request}).data)
@@ -112,7 +112,7 @@ class DealDisputeView(APIView):
             )
         reason = (request.data or {}).get("reason", "")
         try:
-            dispute_deal(deal, reason=reason)
+            deal = dispute_deal(deal, reason=reason)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         return Response(DealSerializer(deal, context={"request": request}).data)
@@ -172,7 +172,7 @@ class StaffDisputeUpholdView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
         try:
-            reverse_deal(deal, by=request.user)
+            deal = reverse_deal(deal, by=request.user)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         return Response(
@@ -192,7 +192,7 @@ class StaffDisputeDismissView(APIView):
             )
         note = (request.data or {}).get("note", "")
         try:
-            dismiss_dispute(deal, note=note, by=request.user)
+            deal = dismiss_dispute(deal, note=note, by=request.user)
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=status.HTTP_400_BAD_REQUEST)
         return Response(

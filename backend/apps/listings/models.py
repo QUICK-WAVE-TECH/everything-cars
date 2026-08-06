@@ -3,7 +3,7 @@ from django.utils.text import slugify
 import uuid
 
 
-from apps.users.models import User
+from apps.users.models import User, OwnerProfile
 
 
 class Brand(models.Model):
@@ -429,3 +429,31 @@ class RequestStatusEvent(models.Model):
     class Meta:
 
         ordering = ["created_at"]  # Correct — oldest first, shows the timeline in order
+
+
+class Branch(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    business = models.ForeignKey(
+        OwnerProfile, on_delete=models.CASCADE, related_name="branches"
+    )
+    name = models.CharField(max_length=255)
+    state = models.CharField(max_length=255)
+    city = models.CharField(max_length=255)
+    street_address = models.CharField(max_length=255)
+    phone = models.CharField(max_length=20)
+    email = models.EmailField(max_length=255)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "branches"
+        ordering = ["-is_active", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["business", "name"], name="unique_branch_name_per_business"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.business.fleet_name} - {self.name}"

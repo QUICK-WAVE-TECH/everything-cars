@@ -8,9 +8,10 @@ import { listingKeys } from "./listings-api";
 type AdminListParams = {
   status?: string;
   search?: string;
+  request_type?: "rent" | "buy";
   page?: number;
   page_size?: number;
-  ordering?: "created_at" | "-created_at";
+  ordering?: "created_at" | "-created_at" | "price_offered" | "-price_offered";
 };
 
 export const adminListingKeys = {
@@ -19,6 +20,7 @@ export const adminListingKeys = {
   carsList: (params?: AdminListParams) => ["cars", "admin", params ?? {}] as const,
   carDetail: (carId: string | null) => ["cars", "admin", "detail", carId] as const,
   requests: ["requests", "admin"] as const,
+  requestCounts: ["requests", "admin", "status-counts"] as const,
   requestsList: (params?: AdminListParams) =>
     ["requests", "admin", params ?? {}] as const,
   requestDetail: (requestId: string | null) =>
@@ -89,6 +91,17 @@ export function useAdminRequests(params?: AdminListParams) {
     queryFn: () =>
       apiClient.get<PaginatedResponse<RequestListItem>>(
         `/listings/admin/requests${query ? `?${query}` : ""}`,
+      ),
+    staleTime: 15 * 1000,
+  });
+}
+
+export function useAdminRequestCounts() {
+  return useQuery({
+    queryKey: adminListingKeys.requestCounts,
+    queryFn: () =>
+      apiClient.get<Record<string, number>>(
+        "/listings/admin/requests/status-counts",
       ),
     staleTime: 15 * 1000,
   });

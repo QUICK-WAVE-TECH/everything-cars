@@ -2111,6 +2111,19 @@ class StaffPaymentActionTest(APITestCase):
         self.assertEqual(self.booking.payment.status, "rejected")
         self.assertEqual(self.ctx["car"].status, CarStatus.LISTING_APPROVED)
 
+    def test_reject_requires_a_meaningful_reason(self):
+        self.client.force_authenticate(user=self.staff)
+        res = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{self.booking.id}/reject-payment/",
+            {"reason": "Too short"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 400)
+        self.booking.refresh_from_db()
+        self.booking.payment.refresh_from_db()
+        self.assertEqual(self.booking.status, BookingStatus.AWAITING_PAYMENT)
+        self.assertEqual(self.booking.payment.status, "submitted")
+
     def test_confirm_requires_awaiting_payment(self):
         self.booking.status = BookingStatus.PENDING
         self.booking.save(update_fields=["status"])

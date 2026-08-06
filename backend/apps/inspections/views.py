@@ -67,6 +67,7 @@ from .serializers import (
     InspectionBookingSerializer,
     InspectionCenterSerializer,
     InspectionDocumentSerializer,
+    InspectionPaymentRejectSerializer,
     InspectionSlotCreateSerializer,
     InspectionSlotSerializer,
     PhysicalInspectionSerializer,
@@ -790,7 +791,9 @@ class StaffRejectInspectionPaymentView(APIView):
     permission_classes = [IsStaff]
 
     def post(self, request, booking_id):
-        reason = (request.data or {}).get("reason", "")
+        serializer = InspectionPaymentRejectSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        reason = serializer.validated_data["reason"]
         with transaction.atomic():
             try:
                 booking = InspectionBooking.objects.select_for_update().get(

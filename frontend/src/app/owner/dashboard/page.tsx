@@ -46,6 +46,16 @@ const OWNER_QUICK_LINKS: QuickLink[] = [
   { label: "Rewards", description: "Loyalty points and owner perks.", icon: "gift", href: "/owner/loyalty", bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)" },
 ];
 
+// Fleet/business owners can run multiple branch locations; shown only to them.
+const BRANCHES_QUICK_LINK: QuickLink = {
+  label: "Branches",
+  description: "Manage your dealership locations.",
+  icon: "building",
+  href: "/owner/branches",
+  bg: "var(--brc-primary-tint)",
+  fg: "var(--brc-primary)",
+};
+
 type RequestStatus = "approved" | "pending" | "rejected" | "cancelled" | "paid" | "active" | "completed";
 
 type IncomingRequest = {
@@ -482,7 +492,12 @@ export default function OwnerDashboard() {
             <section className="flex flex-col gap-4">
               <SectionHeader eyebrow="Shortcuts" title="Quick Actions" />
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                {OWNER_QUICK_LINKS.map((link, index) => (
+                {(user?.owner_profile?.owner_type === "fleet"
+                  ? OWNER_QUICK_LINKS.flatMap((link, i) =>
+                      i === 0 ? [link, BRANCHES_QUICK_LINK] : [link],
+                    )
+                  : OWNER_QUICK_LINKS
+                ).map((link, index) => (
                   <QuickActionTile key={link.label} link={link} delay={220 + index * 70} />
                 ))}
               </div>

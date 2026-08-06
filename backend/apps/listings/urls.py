@@ -23,6 +23,7 @@ from .views import (
     AdminCarDetailView,
     AdminCarStatusView,
     AdminRequestListView,
+    AdminRequestStatusCountsView,
     AdminRequestDetailView,
     StaffConfirmPaymentView,
     TransactionDetailView,
@@ -88,6 +89,11 @@ urlpatterns = [
     ),
     # Admin endpoints
     path("admin/requests", AdminRequestListView.as_view(), name="admin-requests"),
+    path(
+        "admin/requests/status-counts",
+        AdminRequestStatusCountsView.as_view(),
+        name="admin-request-status-counts",
+    ),
     path(
         "admin/requests/<uuid:request_id>",
         AdminRequestDetailView.as_view(),

@@ -319,6 +319,14 @@ class FeeQuoteSerializer(serializers.Serializer):
     bank_account_number = serializers.CharField()
 
 
+class InspectionPaymentRejectSerializer(serializers.Serializer):
+    reason = serializers.CharField(
+        min_length=10,
+        max_length=400,
+        trim_whitespace=True,
+    )
+
+
 class BookingCreateSerializer(serializers.Serializer):
     car_id = serializers.UUIDField()
     slot_id = serializers.UUIDField()

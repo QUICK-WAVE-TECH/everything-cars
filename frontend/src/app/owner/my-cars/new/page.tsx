@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import { CountrySelect, StateSelect, CityCombobox } from "@/features/auth/components";
+import { useMe } from "@/features/auth/api";
+import { useMyBranches } from "@/features/branches/api";
 import { COUNTRIES } from "@/features/auth/data/countries";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -275,6 +277,8 @@ function ListCarPageInner() {
   const createCar = useCreateCar();
   const brandsQuery = useBrands();
   const uploadImages = useUploadCarImages();
+  const { data: me } = useMe();
+  const branchesQuery = useMyBranches();
   const [files, setFiles] = useState<CarImageFiles>({});
   const [done, setDone] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -430,6 +434,39 @@ function ListCarPageInner() {
   const brand = w.brand ?? "";
   const isSubmitting =
     form.formState.isSubmitting || createCar.isPending || uploadImages.isPending;
+
+  // Fleet (business) owners must have at least one active branch before they can
+  // list a vehicle — mirrors the backend gate. Individual owners are unaffected.
+  const isFleetOwner =
+    me?.role === "owner" && me?.owner_profile?.owner_type === "fleet";
+  const branchesReady = branchesQuery.isSuccess;
+  const hasActiveBranch = (branchesQuery.data?.results ?? []).some(
+    (b) => b.is_active,
+  );
+
+  useEffect(() => {
+    if (isFleetOwner && branchesReady && !hasActiveBranch) {
+      router.replace("/owner/branches");
+    }
+  }, [isFleetOwner, branchesReady, hasActiveBranch, router]);
+
+  if (isFleetOwner && (!branchesReady || !hasActiveBranch)) {
+    return (
+      <div className="bg-(--brc-bg-subtle)">
+        <div className="mx-auto flex w-full max-w-[560px] flex-col items-center gap-3 px-4 py-20 text-center [font-family:var(--brc-font-ui)]">
+          <p className="text-sm text-(--brc-text-muted)">
+            Set up a branch before listing a vehicle — taking you to Branches…
+          </p>
+          <Link
+            href="/owner/branches"
+            className="inline-flex h-11 items-center gap-2 rounded-lg bg-(--brc-primary) px-5 text-sm font-bold text-(--brc-text-on-primary) no-underline transition-colors hover:bg-(--brc-primary-hover)"
+          >
+            Go to Branches
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   // Success state
   if (done) {

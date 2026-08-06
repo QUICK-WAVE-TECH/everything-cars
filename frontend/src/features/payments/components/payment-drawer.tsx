@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import {
@@ -19,6 +19,19 @@ import {
 } from "lucide-react";
 import { Icon } from "@/features/auth/components/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { StatusBadge } from "@/features/requests/components/status-badge";
 import { cn } from "@/lib/utils";
 import { useAdminRequestDetail } from "@/features/listings/api/admin-api";
@@ -41,8 +54,9 @@ type ReceiptKind = "image" | "pdf" | "other" | "none";
 
 function receiptKind(url: string | null): ReceiptKind {
   if (!url) return "none";
-  if (/\.(jpe?g|png|webp|gif|avif)$/i.test(url)) return "image";
-  if (/\.pdf$/i.test(url)) return "pdf";
+  const path = url.split(/[?#]/, 1)[0] ?? url;
+  if (/\.(jpe?g|png|webp|gif|avif)$/i.test(path)) return "image";
+  if (/\.pdf$/i.test(path)) return "pdf";
   return "other";
 }
 
@@ -173,27 +187,25 @@ export function PaymentDrawer({
   open: boolean;
   onClose: () => void;
 }) {
-  const { data: req } = useAdminRequestDetail(open ? requestId : null);
+  const {
+    data: req,
+    isLoading,
+    isError,
+    refetch,
+  } = useAdminRequestDetail(open ? requestId : null);
   const confirmPayment = useStaffConfirmPayment();
-  const [justConfirmed, setJustConfirmed] = useState(false);
+  const [confirmedRequestId, setConfirmedRequestId] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (lightboxOpen) setLightboxOpen(false);
-      else onClose();
-    };
-    document.addEventListener("keydown", h);
-    return () => document.removeEventListener("keydown", h);
-  }, [onClose, lightboxOpen]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const justConfirmed = confirmedRequestId === requestId;
 
   async function handleConfirm() {
     if (!requestId) return;
     try {
       await confirmPayment.mutateAsync(requestId);
       toast.success("Payment confirmed — transaction created");
-      setJustConfirmed(true);
+      setConfirmedRequestId(requestId);
+      setConfirmOpen(false);
     } catch {
       toast.error("Failed to confirm payment");
     }
@@ -211,23 +223,47 @@ export function PaymentDrawer({
 
   return (
     <>
-      <div aria-hidden={!open} className={cn("fixed inset-0 z-[100]", open ? "pointer-events-auto" : "pointer-events-none")}>
-        <div
-          onClick={onClose}
-          className="absolute inset-0 transition-opacity duration-300 motion-reduce:transition-none"
-          style={{ background: "rgba(18,18,18,0.42)", opacity: open ? 1 : 0 }}
-        />
-        <aside
-          role="dialog"
-          aria-modal="true"
-          aria-label="Payment review"
-          className="absolute bottom-0 right-0 top-0 flex w-full flex-col bg-(--brc-bg) shadow-[var(--brc-shadow-lg)] sm:w-[min(600px,92vw)]"
-          style={{
-            transform: open ? "translateX(0)" : "translateX(102%)",
-            transition: "transform .34s cubic-bezier(.2,.8,.2,1)",
-          }}
+      <Sheet
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setLightboxOpen(false);
+            setConfirmOpen(false);
+            onClose();
+          }
+        }}
+      >
+        <SheetContent
+          side="right"
+          showCloseButton={false}
+          className="z-[100] w-full gap-0 overflow-hidden bg-(--brc-bg) p-0 shadow-[var(--brc-shadow-lg)] data-[side=right]:sm:max-w-[min(600px,92vw)]"
         >
-          {!req ? (
+          <SheetTitle className="sr-only">Payment review</SheetTitle>
+          <SheetDescription className="sr-only">
+            Review the submitted payment evidence and request details.
+          </SheetDescription>
+          {isError ? (
+            <div role="alert" className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+              <span className="flex size-12 items-center justify-center rounded-full bg-(--brc-warning-bg) text-(--brc-accent-deep)">
+                <AlertTriangleIcon size={22} aria-hidden="true" />
+              </span>
+              <div>
+                <p className="m-0 text-base font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
+                  Payment details could not be loaded
+                </p>
+                <p className="mt-1 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+                  Check your connection and try again.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void refetch()}
+                className="h-10 rounded-lg bg-(--brc-primary) px-4 text-sm font-bold text-white [font-family:var(--brc-font-ui)]"
+              >
+                Retry
+              </button>
+            </div>
+          ) : isLoading || !req ? (
             <div className="flex flex-1 flex-col gap-4 p-6">
               <Skeleton className="h-6 w-48" />
               <Skeleton className="h-[140px] w-full rounded-xl" />
@@ -446,7 +482,7 @@ export function PaymentDrawer({
                       <button
                         type="button"
                         disabled={confirmDisabled}
-                        onClick={handleConfirm}
+                        onClick={() => setConfirmOpen(true)}
                         className="flex h-12 flex-[2] cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-success) text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]"
                       >
                         {confirmPayment.isPending ? (
@@ -481,38 +517,39 @@ export function PaymentDrawer({
               </div>
             </>
           )}
-        </aside>
-      </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Receipt lightbox */}
       {req?.payment_receipt && receiptKind(req.payment_receipt) === "image" && (
-        <div
-          aria-hidden={!lightboxOpen}
-          className={cn(
-            "fixed inset-0 z-[110] flex items-center justify-center p-6",
-            lightboxOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
-          )}
-          style={{ transition: "opacity .2s ease" }}
-        >
-          <div onClick={() => setLightboxOpen(false)} className="absolute inset-0 bg-black/80" />
-          <button
-            type="button"
-            onClick={() => setLightboxOpen(false)}
-            aria-label="Close receipt zoom"
-            className="absolute right-5 top-5 flex size-11 cursor-pointer items-center justify-center rounded-full border-none bg-white/15 text-white"
+        <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
+          <DialogContent
+            overlayClassName="z-[110] bg-black/80 backdrop-blur-none"
+            className="z-[120] flex max-h-[92vh] max-w-[calc(100%-2rem)] items-center justify-center bg-black p-4 text-white sm:max-w-5xl"
           >
-            <XIcon size={20} />
-          </button>
-          {lightboxOpen && (
-            // eslint-disable-next-line @next/next/no-img-element -- lightbox needs the raw external URL
+            <DialogTitle className="sr-only">Payment receipt preview</DialogTitle>
+            <DialogDescription className="sr-only">
+              Enlarged preview of the customer&apos;s uploaded payment receipt.
+            </DialogDescription>
+            {/* eslint-disable-next-line @next/next/no-img-element -- lightbox needs the raw external URL */}
             <img
               src={req.payment_receipt}
               alt="Uploaded payment receipt, enlarged"
-              className="relative max-h-[85vh] max-w-full rounded-xl object-contain shadow-[var(--brc-shadow-lg)]"
+              className="max-h-[85vh] max-w-full rounded-lg object-contain shadow-[var(--brc-shadow-lg)]"
             />
-          )}
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Confirm this payment?"
+        description="This creates a transaction and marks the request as paid. Verify the submitted amount and receipt before continuing."
+        confirmLabel="Confirm payment"
+        isPending={confirmPayment.isPending}
+        onConfirm={handleConfirm}
+      />
     </>
   );
 }

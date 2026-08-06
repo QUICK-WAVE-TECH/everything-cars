@@ -12,7 +12,10 @@ import { Icon } from "@/features/auth/components/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/features/requests/components/status-badge";
 import { cn } from "@/lib/utils";
-import { useAdminRequests } from "@/features/listings/api/admin-api";
+import {
+  useAdminRequestCounts,
+  useAdminRequests,
+} from "@/features/listings/api/admin-api";
 import type { RequestListItem } from "@/features/requests/api/types";
 import { PaymentSummaryBand, type PaymentCounts } from "@/features/payments/components/payment-summary-band";
 import { PaymentDrawer } from "@/features/payments/components/payment-drawer";
@@ -45,6 +48,16 @@ function relativeTime(fromMs: number, nowMs: number) {
 type TabKey = "payment_submitted" | "paid" | "active" | "completed";
 type SortKey = "newest" | "oldest" | "highest" | "lowest";
 type TypeFilter = "all" | "rent" | "buy";
+
+const SORT_ORDERING: Record<
+  SortKey,
+  "created_at" | "-created_at" | "price_offered" | "-price_offered"
+> = {
+  newest: "-created_at",
+  oldest: "created_at",
+  highest: "-price_offered",
+  lowest: "price_offered",
+};
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "payment_submitted", label: "Awaiting Verification" },
@@ -162,11 +175,12 @@ export default function AdminPaymentsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const ordering = sort === "oldest" ? "created_at" : "-created_at";
+  const ordering = SORT_ORDERING[sort];
 
   const { data: paginatedData, isLoading, isFetching, dataUpdatedAt, refetch } = useAdminRequests({
     status: tab,
     search: debouncedSearch || undefined,
+    request_type: typeFilter === "all" ? undefined : typeFilter,
     page,
     ordering,
   });
@@ -176,30 +190,17 @@ export default function AdminPaymentsPage() {
   const totalCount = paginatedData?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
-  // Type filter and amount sort are applied client-side to the current page.
-  // TODO: the admin requests API has no `request_type` query param and only
-  // supports ordering by `created_at` — pushing these server-side (and
-  // getting an accurate total count back) needs backend support first.
-  const displayedRequests = useMemo(() => {
-    let rows = requests;
-    if (typeFilter !== "all") rows = rows.filter((r) => r.request_type === typeFilter);
-    if (sort === "highest") rows = [...rows].sort((a, b) => Number(b.price_offered) - Number(a.price_offered));
-    else if (sort === "lowest") rows = [...rows].sort((a, b) => Number(a.price_offered) - Number(b.price_offered));
-    return rows;
-  }, [requests, typeFilter, sort]);
+  const displayedRequests = requests;
 
   // Counts for KPIs
-  const { data: awaitingData } = useAdminRequests({ status: "payment_submitted" });
-  const { data: confirmedData } = useAdminRequests({ status: "paid" });
-  const { data: activeData } = useAdminRequests({ status: "active" });
-  const { data: completedData } = useAdminRequests({ status: "completed" });
+  const { data: requestCounts } = useAdminRequestCounts();
 
   const counts: PaymentCounts = useMemo(() => ({
-    payment_submitted: awaitingData?.count ?? 0,
-    paid: confirmedData?.count ?? 0,
-    active: activeData?.count ?? 0,
-    completed: completedData?.count ?? 0,
-  }), [awaitingData?.count, confirmedData?.count, activeData?.count, completedData?.count]);
+    payment_submitted: requestCounts?.payment_submitted ?? 0,
+    paid: requestCounts?.paid ?? 0,
+    active: requestCounts?.active ?? 0,
+    completed: requestCounts?.completed ?? 0,
+  }), [requestCounts]);
 
   const [drawerRequestId, setDrawerRequestId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -223,9 +224,7 @@ export default function AdminPaymentsPage() {
 
   const showingLabel = totalCount === 0
     ? "No requests"
-    : typeFilter !== "all"
-      ? `Showing ${displayedRequests.length} of ${requests.length} on this page`
-      : `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, totalCount)} of ${totalCount} requests`;
+    : `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, totalCount)} of ${totalCount} requests`;
 
   return (
     <>
@@ -315,7 +314,10 @@ export default function AdminPaymentsPage() {
             <div className="relative inline-flex">
               <select
                 value={sort}
-                onChange={(e) => setSort(e.target.value as SortKey)}
+                onChange={(e) => {
+                  setSort(e.target.value as SortKey);
+                  setPage(1);
+                }}
                 aria-label="Sort payments"
                 className="h-10 cursor-pointer appearance-none rounded-lg border border-(--brc-border) bg-(--brc-bg) py-0 pl-3 pr-8 text-[12.5px] font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]"
               >
@@ -330,7 +332,10 @@ export default function AdminPaymentsPage() {
             <div className="relative inline-flex">
               <select
                 value={typeFilter}
-                onChange={(e) => { setTypeFilter(e.target.value as TypeFilter); }}
+                onChange={(e) => {
+                  setTypeFilter(e.target.value as TypeFilter);
+                  setPage(1);
+                }}
                 aria-label="Filter by request type"
                 className="h-10 cursor-pointer appearance-none rounded-lg border border-(--brc-border) bg-(--brc-bg) py-0 pl-3 pr-8 text-[12.5px] font-semibold text-(--brc-text) [font-family:var(--brc-font-ui)]"
               >
