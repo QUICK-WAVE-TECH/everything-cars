@@ -1952,3 +1952,44 @@ class ListingBranchGateTest(APITestCase):
         self.client.force_authenticate(self.indiv_user)
         r = self.client.post("/api/v1/listings/my-cars", {}, format="json")
         assert "Create a branch before listing" not in str(r.data)
+
+
+class CarBranchCreateTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("cb-owner@test.com", "owner")
+        self.profile = create_fleet_owner_profile(self.owner)
+        self.b1 = Branch.objects.create(business=self.profile, name="A", state="Lagos",
+            city="Ikeja", street_address="1", phone="+2340000000000", email="a@x.ng")
+        self.indiv = create_user("cb-indiv@test.com", "owner")
+        create_owner_profile(self.indiv)
+
+    def _payload(self, **over):
+        data = {
+            "title": "Test Car", "listing_type": "rent", "rent_price_per_day": "20000.00",
+            "brand": "Toyota", "model": "Corolla", "year": 2021, "state": "Lagos",
+            "city": "Ikeja", "vin": "1HGCM82633A004352", "plate_number": "ABC123DE",
+        }
+        data.update(over)
+        return data
+
+    def test_fleet_owner_must_pick_branch(self):
+        self.client.force_authenticate(self.owner)
+        r = self.client.post("/api/v1/listings/my-cars", self._payload(), format="json")
+        assert r.status_code == 400
+        assert "branch" in str(r.data).lower()
+
+    def test_fleet_owner_lists_with_branch(self):
+        self.client.force_authenticate(self.owner)
+        r = self.client.post("/api/v1/listings/my-cars",
+            self._payload(branch=str(self.b1.id)), format="json")
+        assert r.status_code == 201, r.data
+        car = Car.objects.get(id=r.data["id"])
+        assert car.branch_id == self.b1.id
+        assert car.owner_id == self.owner.id
+
+    def test_individual_owner_needs_no_branch(self):
+        self.client.force_authenticate(self.indiv)
+        r = self.client.post("/api/v1/listings/my-cars",
+            self._payload(vin="1HGCM82633A004399", plate_number="IND123XY"), format="json")
+        assert r.status_code == 201, r.data
+        assert Car.objects.get(id=r.data["id"]).branch_id is None
