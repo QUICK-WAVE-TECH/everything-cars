@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 
 from common.pagination import StandardPagination
 from common.permissions import IsStaff
+from apps.users.models import User
+from apps.users.services import resolve_business_scope, NoBusinessAccess
 from .models import Deal, DealCancelledBy
 from .serializers import DealSerializer, DisputeDealSerializer
 from .services import cancel_deal, complete_deal, dismiss_dispute, dispute_deal, reverse_deal
@@ -29,13 +31,44 @@ def _dispute_queryset():
     ).prefetch_related("car__images").filter(disputed_at__isnull=False)
 
 
+def _visible_deal_filter(user):
+    """Deals a user may see: their own (buyer/seller) plus, for a team member,
+    the business's deals within their assigned branches."""
+    q = Q(buyer=user) | Q(seller=user)
+    if user.role == User.Role.TEAM_MEMBER:
+        try:
+            business_owner, branch_ids = resolve_business_scope(user)
+        except NoBusinessAccess:
+            return q
+        owner_side = Q(seller=business_owner)
+        if branch_ids is not None:
+            owner_side &= Q(car__branch_id__in=branch_ids)
+        q |= owner_side
+    return q
+
+
 def _participant_deal_or_404(user, deal_id):
     return (
         _deal_queryset()
-        .filter(Q(buyer=user) | Q(seller=user))
+        .filter(_visible_deal_filter(user))
         .filter(id=deal_id)
         .first()
     )
+
+
+def _can_act_as_seller(user, deal):
+    """The primary owner (seller) or a team member scoped to the deal's branch."""
+    if deal.seller_id == user.id:
+        return True
+    if user.role == User.Role.TEAM_MEMBER:
+        try:
+            business_owner, branch_ids = resolve_business_scope(user)
+        except NoBusinessAccess:
+            return False
+        if deal.seller_id != business_owner.id:
+            return False
+        return branch_ids is None or deal.car.branch_id in branch_ids
+    return False
 
 
 class DealDetailView(APIView):
@@ -54,7 +87,7 @@ class MyDealListView(ListAPIView):
 
     def get_queryset(self):
         u = self.request.user
-        return _deal_queryset().filter(Q(buyer=u) | Q(seller=u))
+        return _deal_queryset().filter(_visible_deal_filter(u))
 
     def get_serializer_context(self):
         return {"request": self.request}
@@ -67,7 +100,7 @@ class DealCompleteView(APIView):
         deal = _participant_deal_or_404(request.user, deal_id)
         if deal is None:
             return Response({"detail": "Deal not found."}, status=status.HTTP_404_NOT_FOUND)
-        if deal.seller_id != request.user.id:
+        if not _can_act_as_seller(request.user, deal):
             return Response(
                 {"detail": "Only the seller can mark the sale complete."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -88,7 +121,7 @@ class DealCancelView(APIView):
             return Response({"detail": "Deal not found."}, status=status.HTTP_404_NOT_FOUND)
         by = (
             DealCancelledBy.SELLER
-            if deal.seller_id == request.user.id
+            if _can_act_as_seller(request.user, deal)
             else DealCancelledBy.BUYER
         )
         try:

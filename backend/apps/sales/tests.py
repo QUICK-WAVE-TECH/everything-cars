@@ -434,3 +434,46 @@ class DealCarVinTest(DealEndpointTest):
         res = self.client.get(f"/api/v1/deals/{self.deal.id}")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["car"]["vin"], "1HGCM82633A004352")
+
+
+class DealScopeTest(APITestCase):
+    def setUp(self):
+        from apps.listings.tests import create_fleet_owner_profile
+        from apps.listings.models import Branch
+        from apps.users.models import TeamMembership
+        self.owner = make_user("ds-owner@test.com", "owner")
+        self.profile = create_fleet_owner_profile(self.owner)
+        self.b1 = Branch.objects.create(business=self.profile, name="A", state="Lagos",
+            city="Ikeja", street_address="1", phone="+2340000000000", email="a@x.ng")
+        self.b2 = Branch.objects.create(business=self.profile, name="B", state="Oyo",
+            city="Ibadan", street_address="2", phone="+2340000000002", email="b@x.ng")
+        self.buyer = make_user("ds-buyer@test.com")
+        self.car1 = make_negotiable_car(self.owner); self.car1.branch = self.b1; self.car1.save()
+        self.car2 = make_negotiable_car(self.owner); self.car2.branch = self.b2; self.car2.save()
+        self.deal1 = Deal.objects.create(car=self.car1, buyer=self.buyer, seller=self.owner,
+            offer=make_accepted_offer(self.car1, self.buyer), agreed_amount=Decimal("14000000.00"),
+            currency=self.car1.currency, expires_at=timezone.now() + timedelta(days=DEAL_TTL_DAYS))
+        self.deal2 = Deal.objects.create(car=self.car2, buyer=self.buyer, seller=self.owner,
+            offer=make_accepted_offer(self.car2, self.buyer), agreed_amount=Decimal("14000000.00"),
+            currency=self.car2.currency, expires_at=timezone.now() + timedelta(days=DEAL_TTL_DAYS))
+        self.member = make_user("ds-tm@test.com", "team_member")
+        m = TeamMembership.objects.create(user=self.member, business=self.profile)
+        m.branches.set([self.b1])
+
+    def test_member_deal_list_scoped(self):
+        self.client.force_authenticate(self.member)
+        r = self.client.get("/api/v1/deals/")
+        ids = [d["id"] for d in (r.data["results"] if "results" in r.data else r.data)]
+        assert str(self.deal1.id) in ids and str(self.deal2.id) not in ids
+
+    def test_member_can_complete_in_branch(self):
+        self.client.force_authenticate(self.member)
+        r = self.client.post(f"/api/v1/deals/{self.deal1.id}/complete")
+        assert r.status_code == 200, r.data
+        self.deal1.refresh_from_db()
+        assert self.deal1.status == DealStatus.COMPLETED
+
+    def test_member_cannot_touch_other_branch_deal(self):
+        self.client.force_authenticate(self.member)
+        assert self.client.get(f"/api/v1/deals/{self.deal2.id}").status_code == 404
+        assert self.client.post(f"/api/v1/deals/{self.deal2.id}/complete").status_code == 404
