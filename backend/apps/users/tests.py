@@ -5,6 +5,29 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APITestCase
 from apps.users.models import User, OwnerProfile
+from apps.listings.tests import (
+    create_user,
+    create_fleet_owner_profile,
+    create_owner_profile,
+    create_car,
+)
+from apps.listings.models import Branch
+from apps.users.models import TeamMembership
+
+
+def create_user_owner(email):
+    return create_user(email, "owner")
+
+
+def make_team_member(
+    email, business_profile, branches, is_active=True, title="Sales Rep"
+):
+    user = create_user(email, "team_member")
+    m = TeamMembership.objects.create(
+        user=user, business=business_profile, title=title, is_active=is_active
+    )
+    m.branches.set(branches)
+    return user, m
 
 
 @pytest.mark.django_db
@@ -160,16 +183,29 @@ class WiredEmailTemplatesTest(APITestCase):
 class AdminOwnerVerifyTest(APITestCase):
     def setUp(self):
         self.staff = User.objects.create_user(
-            email="staff-ov@test.com", first_name="S", last_name="T",
-            password="securepass123", role="owner", is_staff=True, is_active=True,
+            email="staff-ov@test.com",
+            first_name="S",
+            last_name="T",
+            password="securepass123",
+            role="owner",
+            is_staff=True,
+            is_active=True,
         )
         self.owner = User.objects.create_user(
-            email="owner-ov@test.com", first_name="Ada", last_name="B",
-            password="securepass123", role="owner", is_active=True,
+            email="owner-ov@test.com",
+            first_name="Ada",
+            last_name="B",
+            password="securepass123",
+            role="owner",
+            is_active=True,
         )
         self.profile = OwnerProfile.objects.create(
-            user=self.owner, owner_type="individual",
-            bank_account="1", bank_name="B", id_type="nin", national_id="123",
+            user=self.owner,
+            owner_type="individual",
+            bank_account="1",
+            bank_name="B",
+            id_type="nin",
+            national_id="123",
         )
 
     def test_staff_lists_and_verifies_owner(self):
@@ -182,9 +218,7 @@ class AdminOwnerVerifyTest(APITestCase):
         self.assertFalse(res.data["results"][0]["is_verified"])
 
         with self.captureOnCommitCallbacks(execute=True):
-            res = self.client.post(
-                f"/api/v1/users/admin/owners/{self.owner.id}/verify"
-            )
+            res = self.client.post(f"/api/v1/users/admin/owners/{self.owner.id}/verify")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.profile.refresh_from_db()
         self.assertTrue(self.profile.is_verified)
@@ -443,11 +477,16 @@ class ForgotPasswordEmailTest(APITestCase):
         from django.core import mail
 
         User.objects.create_user(
-            email="reset-me@test.com", first_name="Reset", last_name="Me",
-            password="securepass123", role="customer", is_active=True,
+            email="reset-me@test.com",
+            first_name="Reset",
+            last_name="Me",
+            password="securepass123",
+            role="customer",
+            is_active=True,
         )
         res = self.client.post(
-            "/api/v1/auth/forgot-password", {"email": "reset-me@test.com"},
+            "/api/v1/auth/forgot-password",
+            {"email": "reset-me@test.com"},
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_200_OK)
@@ -460,7 +499,8 @@ class ForgotPasswordEmailTest(APITestCase):
         from django.core import mail
 
         res = self.client.post(
-            "/api/v1/auth/forgot-password", {"email": "nobody@test.com"},
+            "/api/v1/auth/forgot-password",
+            {"email": "nobody@test.com"},
             format="json",
         )
         # Same generic response, but no email and no account leak.
@@ -478,8 +518,10 @@ class CustomerVerificationEmailTest(APITestCase):
             res = self.client.post(
                 "/api/v1/auth/sign-up",
                 {
-                    "email": "verify-me@test.com", "first_name": "Vee",
-                    "last_name": "Rify", "password": "securepass123",
+                    "email": "verify-me@test.com",
+                    "first_name": "Vee",
+                    "last_name": "Rify",
+                    "password": "securepass123",
                     "role": "customer",
                 },
                 format="multipart",
@@ -496,8 +538,12 @@ class CustomerVerificationEmailTest(APITestCase):
 
     def test_unverified_signin_is_blocked(self):
         User.objects.create_user(
-            email="pending@test.com", first_name="Pend", last_name="Ing",
-            password="securepass123", role="customer", is_active=False,
+            email="pending@test.com",
+            first_name="Pend",
+            last_name="Ing",
+            password="securepass123",
+            role="customer",
+            is_active=False,
         )
         res = self.client.post(
             "/api/v1/auth/sign-in",
@@ -506,3 +552,18 @@ class CustomerVerificationEmailTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
         self.assertTrue(res.data.get("requires_verification"))
+
+
+class TeamMembershipModelTest(APITestCase):
+    def test_membership_links_one_business_and_many_branches(self):
+        owner = create_user_owner("biz-model@test.com")
+        profile = create_fleet_owner_profile(owner)
+        b1 = Branch.objects.create(business=profile, name="A", state="Lagos", city="Ikeja",
+            street_address="1", phone="+2340000000000", email="a@x.ng")
+        b2 = Branch.objects.create(business=profile, name="B", state="Oyo", city="Ibadan",
+            street_address="2", phone="+2340000000001", email="b@x.ng")
+        member, m = make_team_member("tm-model@test.com", profile, [b1, b2])
+        assert m.business == profile          # FK, not M2M
+        assert m.branches.count() == 2
+        assert m.is_active is True
+        assert member.role == "team_member"

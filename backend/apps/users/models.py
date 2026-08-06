@@ -21,13 +21,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Role(models.TextChoices):
         CUSTOMER = "customer", "Customer"
         OWNER = "owner", "Owner"
+        TEAM_MEMBER = "team_member", "Team Member"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True, db_index=True)
     first_name = models.CharField(max_length=150, default="")
     last_name = models.CharField(max_length=150, default="")
     phone = models.CharField(max_length=20, blank=True, default="")
-    role = models.CharField(max_length=10, choices=Role.choices)
+    role = models.CharField(max_length=20, choices=Role.choices)
     is_active = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
@@ -238,3 +239,27 @@ class PasswordResetToken(models.Model):
         obj.is_used = True
         obj.save(update_fields=["is_used"])
         return obj
+
+
+class TeamMembership(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="team_membership"
+    )
+    business = models.ForeignKey(
+        OwnerProfile, on_delete=models.CASCADE, related_name="team"
+    )
+
+    branches = models.ManyToManyField(
+        "listings.Branch", related_name="team_memberships"
+    )
+    title = models.CharField(max_length=200, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "team_memberships"
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} @ {self.business.fleet_name}"

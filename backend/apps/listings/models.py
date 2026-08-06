@@ -4,6 +4,7 @@ import uuid
 
 
 from apps.users.models import User, OwnerProfile
+from apps.users.models import TeamMembership
 
 
 class Brand(models.Model):
@@ -124,6 +125,10 @@ class Car(models.Model):
     # Prices are conditionally required by listing_type (validated in the API
     # serializer). blank=True keeps a rent-only car (sale_price=None) editable
     # in the Django admin, which otherwise treats the field as required.
+    branch = models.ForeignKey(
+        "Branch", null=True, blank=True, on_delete=models.PROTECT, related_name="cars"
+    )
+
     rent_price_per_day = models.DecimalField(
         max_digits=14,
         null=True,
