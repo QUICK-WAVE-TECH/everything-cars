@@ -247,7 +247,7 @@ export function DealRevealPage({ dealId }: { dealId: string }) {
 
         {/* The buyer now owns the vehicle — they can relist it (fresh listing,
             same VIN). Backend authorises via the completed deal. */}
-        {deal.status === "completed" && isBuyer && deal.car.vin && (
+        {deal.status === "completed" && isBuyer && deal.car.vin && deal.can_relist && (
           <div className="flex justify-center">
             <Link
               href={`/owner/my-cars/new?vin=${encodeURIComponent(deal.car.vin)}`}
@@ -257,6 +257,12 @@ export function DealRevealPage({ dealId }: { dealId: string }) {
               Relist this vehicle
             </Link>
           </div>
+        )}
+
+        {deal.status === "completed" && isBuyer && deal.car.vin && !deal.can_relist && (
+          <p className="text-center text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+            Relisting becomes available after the sale&apos;s dispute review period is finalized.
+          </p>
         )}
 
         {/* Buyer safety valve on a completed sale */}

@@ -29,4 +29,5 @@ export type Deal = {
   seller: DealParty;
   buyer: DealParty;
   viewer_role: "buyer" | "seller";
+  can_relist: boolean;
 };
