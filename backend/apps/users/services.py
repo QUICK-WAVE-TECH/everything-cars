@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from django.conf import settings
 
-from .models import AccessCode, RefreshTokenBlacklist
+from .models import AccessCode, RefreshTokenBlacklist, TeamMembership, User
 
 
 def _require_jwt_keys() -> None:
@@ -122,3 +122,35 @@ def generate_and_send_code(email: str, purpose: str, user=None) -> AccessCode:
         print(f"\n[DEV] Access code for {email}: {code_obj.plain_code}\n")
 
     return code_obj
+
+
+class NoBusinessAccess(Exception):
+    """The user has no usable business/branch context (a customer, or a team
+    member with a disabled/absent membership)."""
+
+
+def resolve_business_scope(user):
+    """Return ``(business_owner_user, branch_ids)`` for an owner or team member.
+
+    - primary **owner** → ``(user, None)`` where ``None`` means "all branches".
+    - active **team member** → ``(membership.business.user, [assigned active branch ids])``.
+
+    Raises :class:`NoBusinessAccess` for a disabled/absent membership or any
+    other role. Callers filter owner-side querysets by ``owner=business_owner``
+    and, when ``branch_ids`` is not None, ``branch_id__in=branch_ids``.
+    """
+    if user.role == User.Role.OWNER:
+        return user, None
+    if user.role == User.Role.TEAM_MEMBER:
+        membership = (
+            TeamMembership.objects.filter(user=user, is_active=True)
+            .select_related("business__user")
+            .first()
+        )
+        if membership is None:
+            raise NoBusinessAccess()
+        branch_ids = list(
+            membership.branches.filter(is_active=True).values_list("id", flat=True)
+        )
+        return membership.business.user, branch_ids
+    raise NoBusinessAccess()

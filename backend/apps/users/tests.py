@@ -567,3 +567,38 @@ class TeamMembershipModelTest(APITestCase):
         assert m.branches.count() == 2
         assert m.is_active is True
         assert member.role == "team_member"
+
+
+class ResolveScopeTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user_owner("scope-owner@test.com")
+        self.profile = create_fleet_owner_profile(self.owner)
+        self.b1 = Branch.objects.create(business=self.profile, name="A", state="Lagos",
+            city="Ikeja", street_address="1", phone="+2340000000000", email="a@x.ng")
+        self.b2 = Branch.objects.create(business=self.profile, name="B", state="Oyo",
+            city="Ibadan", street_address="2", phone="+2340000000001", email="b@x.ng")
+
+    def test_owner_gets_all_branches(self):
+        from apps.users.services import resolve_business_scope
+        business_owner, branch_ids = resolve_business_scope(self.owner)
+        assert business_owner == self.owner
+        assert branch_ids is None
+
+    def test_team_member_gets_assigned_active_branches(self):
+        from apps.users.services import resolve_business_scope
+        member, _ = make_team_member("tm-scope@test.com", self.profile, [self.b1])
+        business_owner, branch_ids = resolve_business_scope(member)
+        assert business_owner == self.owner
+        assert branch_ids == [self.b1.id]
+
+    def test_inactive_membership_no_access(self):
+        from apps.users.services import resolve_business_scope, NoBusinessAccess
+        member, _ = make_team_member("tm-off@test.com", self.profile, [self.b1], is_active=False)
+        with self.assertRaises(NoBusinessAccess):
+            resolve_business_scope(member)
+
+    def test_customer_no_access(self):
+        from apps.users.services import resolve_business_scope, NoBusinessAccess
+        cust = create_user("scope-cust@test.com", "customer")
+        with self.assertRaises(NoBusinessAccess):
+            resolve_business_scope(cust)
