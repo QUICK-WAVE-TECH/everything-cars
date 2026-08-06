@@ -1993,3 +1993,63 @@ class CarBranchCreateTest(APITestCase):
             self._payload(vin="1HGCM82633A004399", plate_number="IND123XY"), format="json")
         assert r.status_code == 201, r.data
         assert Car.objects.get(id=r.data["id"]).branch_id is None
+
+
+class InventoryScopeTest(APITestCase):
+    def setUp(self):
+        from apps.users.models import TeamMembership
+        self.owner = create_user("inv-owner@test.com", "owner")
+        self.profile = create_fleet_owner_profile(self.owner)
+        self.b1 = Branch.objects.create(business=self.profile, name="A", state="Lagos",
+            city="Ikeja", street_address="1", phone="+2340000000000", email="a@x.ng")
+        self.b2 = Branch.objects.create(business=self.profile, name="B", state="Oyo",
+            city="Ibadan", street_address="2", phone="+2340000000002", email="b@x.ng")
+        self.car1 = create_car(self.owner, branch=self.b1)
+        self.car2 = create_car(self.owner, branch=self.b2)
+        # team member assigned to b1 only
+        self.member = create_user("inv-tm@test.com", "team_member")
+        m = TeamMembership.objects.create(user=self.member, business=self.profile)
+        m.branches.set([self.b1])
+
+    def test_member_lists_only_assigned_branch(self):
+        self.client.force_authenticate(self.member)
+        r = self.client.get("/api/v1/listings/my-cars")
+        ids = [c["id"] for c in r.data["results"]]
+        assert str(self.car1.id) in ids and str(self.car2.id) not in ids
+
+    def test_owner_lists_all(self):
+        self.client.force_authenticate(self.owner)
+        r = self.client.get("/api/v1/listings/my-cars")
+        ids = [c["id"] for c in r.data["results"]]
+        assert str(self.car1.id) in ids and str(self.car2.id) in ids
+
+    def test_member_cannot_open_other_branch_car(self):
+        self.client.force_authenticate(self.member)
+        assert self.client.get(f"/api/v1/listings/my-cars/{self.car2.id}").status_code == 404
+        assert self.client.get(f"/api/v1/listings/my-cars/{self.car1.id}").status_code == 200
+
+    def test_member_create_sets_business_owner_and_branch(self):
+        self.client.force_authenticate(self.member)
+        payload = {
+            "title": "Member Car", "listing_type": "rent", "rent_price_per_day": "20000.00",
+            "brand": "Toyota", "model": "Corolla", "year": 2021, "state": "Lagos",
+            "city": "Ikeja", "vin": "1HGCM82633A004352", "plate_number": "MEM123XY",
+            "branch": str(self.b1.id),
+        }
+        r = self.client.post("/api/v1/listings/my-cars", payload, format="json")
+        assert r.status_code == 201, r.data
+        car = Car.objects.get(id=r.data["id"])
+        assert car.owner_id == self.owner.id      # owned by the business, not the member
+        assert car.branch_id == self.b1.id
+
+    def test_member_cannot_create_in_unassigned_branch(self):
+        self.client.force_authenticate(self.member)
+        payload = {
+            "title": "Member Car", "listing_type": "rent", "rent_price_per_day": "20000.00",
+            "brand": "Toyota", "model": "Corolla", "year": 2021, "state": "Lagos",
+            "city": "Ikeja", "vin": "1HGCM82633A004352", "plate_number": "MEM124XY",
+            "branch": str(self.b2.id),
+        }
+        r = self.client.post("/api/v1/listings/my-cars", payload, format="json")
+        assert r.status_code == 400
+        assert "branch" in str(r.data).lower()

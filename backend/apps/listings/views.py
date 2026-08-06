@@ -27,7 +27,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser
 from common.pagination import StandardPagination
-from common.permissions import IsOwner, IsCustomer, IsStaff
+from common.permissions import IsOwner, IsCustomer, IsStaff, IsOwnerOrTeamMember
+from apps.users.services import resolve_business_scope, NoBusinessAccess
 from .models import (
     ACTIVE_REQUEST_STATUSES,
     Brand,
@@ -315,13 +316,34 @@ def request_detail_queryset():
 
 
 # Create your views here.
+def _scoped_cars(request):
+    """Cars visible to the caller (owner: all; team member: assigned branches).
+
+    Returns ``(queryset, business_owner, error_response)``. On no-access the
+    queryset/owner are None and error_response is a 403 to return directly.
+    """
+    try:
+        business_owner, branch_ids = resolve_business_scope(request.user)
+    except NoBusinessAccess:
+        return None, None, Response(
+            {"detail": "You don't have access to any branch."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    qs = Car.objects.filter(owner=business_owner)
+    if branch_ids is not None:
+        qs = qs.filter(branch_id__in=branch_ids)
+    return qs, business_owner, None
+
+
 class MyCarListCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsOwner]
+    permission_classes = [IsAuthenticated, IsOwnerOrTeamMember]
 
     def get(self, request):
+        scoped, _, err = _scoped_cars(request)
+        if err:
+            return err
         obj = (
-            Car.objects.filter(owner=request.user)
-            .select_related("owner__owner_profile", "brand")
+            scoped.select_related("owner__owner_profile", "brand")
             .prefetch_related("images")
             # Annotate availability so the serializer doesn't run per-car request
             # queries (N+1) computing each card's status.
@@ -340,27 +362,38 @@ class MyCarListCreateView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
     def post(self, request):
-        owner_profile = getattr(request.user, "owner_profile", None)
+        try:
+            business_owner, branch_ids = resolve_business_scope(request.user)
+        except NoBusinessAccess:
+            return Response(
+                {"detail": "You don't have access to any branch."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        owner_profile = getattr(business_owner, "owner_profile", None)
         if not owner_profile or not owner_profile.is_verified:
             return Response(
                 {"detail": "Account must be verified to list cars. "},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if owner_profile.owner_type == "fleet" and not owner_profile.branches.filter(
-            is_active=True
-        ).exists():
-            return Response(
-                {"detail": "Create a branch before listing a vehicle."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        # Fleet listers must have at least one usable active branch (for a team
+        # member, one of their assigned branches).
+        if owner_profile.owner_type == "fleet":
+            usable = owner_profile.branches.filter(is_active=True)
+            if branch_ids is not None:
+                usable = usable.filter(id__in=branch_ids)
+            if not usable.exists():
+                return Response(
+                    {"detail": "Create or get assigned to a branch before listing."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         serializer = CarCreateSerializer(
             data=request.data, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
-            car = serializer.save(owner=request.user)
+            car = serializer.save(owner=business_owner)
             schedule_notification(
                 notify_listing_submitted,
                 lambda car_id=car.id: Car.objects.select_related("owner", "brand").get(
@@ -380,20 +413,23 @@ class MyCarListCreateView(APIView):
 
 
 class MyCarDetailView(APIView):
-    permission_classes = [IsOwner]
+    permission_classes = [IsOwnerOrTeamMember]
 
-    def _get_car(self, car_id, user):
+    def _get_car(self, request, car_id):
+        scoped, _, err = _scoped_cars(request)
+        if err:
+            return None
         try:
             return (
-                Car.objects.select_related("owner__owner_profile", "brand")
+                scoped.select_related("owner__owner_profile", "brand")
                 .prefetch_related("images", "features")
-                .get(id=car_id, owner=user)
+                .get(id=car_id)
             )
         except Car.DoesNotExist:
             return None
 
     def get(self, request, car_id):
-        car = self._get_car(car_id, request.user)
+        car = self._get_car(request, car_id)
         if not car:
             return Response(
                 {"detail": "Car not found"}, status=status.HTTP_404_NOT_FOUND
@@ -402,8 +438,11 @@ class MyCarDetailView(APIView):
 
     def patch(self, request, car_id):
         with transaction.atomic():
+            scoped, _, err = _scoped_cars(request)
+            if err:
+                return err
             try:
-                car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
+                car = scoped.select_for_update().get(id=car_id)
             except Car.DoesNotExist:
                 return Response(
                     {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
@@ -421,13 +460,16 @@ class MyCarDetailView(APIView):
             car = serializer.save()
 
         car.refresh_from_db()
-        car = self._get_car(car_id, request.user)
+        car = self._get_car(request, car_id)
         return Response(CarDetailSerializer(car, context={"request": request}).data)
 
     def delete(self, request, car_id):
         with transaction.atomic():
+            scoped, _, err = _scoped_cars(request)
+            if err:
+                return err
             try:
-                car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
+                car = scoped.select_for_update().get(id=car_id)
             except Car.DoesNotExist:
                 return Response(
                     {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
@@ -470,15 +512,18 @@ class MyCarDetailView(APIView):
 
 
 class CarImageUploadView(APIView):
-    permission_classes = [IsOwner]
+    permission_classes = [IsOwnerOrTeamMember]
     parser_classes = [MultiPartParser]
 
     def post(self, request, car_id):
+        scoped, _, err = _scoped_cars(request)
+        if err:
+            return err
         # Check car ownership and edit lockdown before file validation so
         # we return 403/404 even when no files are sent.
         try:
             with transaction.atomic():
-                car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
+                car = scoped.select_for_update().get(id=car_id)
                 if car.status not in IMAGE_EDITABLE_CAR_STATUSES:
                     return Response(
                         {"detail": "Car images cannot be uploaded in this status."},
@@ -524,7 +569,7 @@ class CarImageUploadView(APIView):
 
         try:
             with transaction.atomic():
-                car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
+                car = scoped.select_for_update().get(id=car_id)
 
                 existing_types = set(
                     car.images.exclude(image_type="").values_list(
@@ -747,11 +792,14 @@ class MyCarHistoryView(APIView):
     """Owner-facing status timeline. The serializer excludes staff identity —
     owners see roles and notes, never who acted."""
 
-    permission_classes = [IsOwner]
+    permission_classes = [IsOwnerOrTeamMember]
 
     def get(self, request, car_id):
+        scoped, _, err = _scoped_cars(request)
+        if err:
+            return err
         try:
-            car = Car.objects.get(id=car_id, owner=request.user)
+            car = scoped.get(id=car_id)
         except Car.DoesNotExist:
             return Response(
                 {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
@@ -761,7 +809,7 @@ class MyCarHistoryView(APIView):
 
 
 class MyCarStatusView(APIView):
-    permission_classes = [IsOwner]
+    permission_classes = [IsOwnerOrTeamMember]
 
     OWNER_TRANSITIONS = {
         "draft": [],  # Admin approves listing → listing_approved
@@ -785,8 +833,11 @@ class MyCarStatusView(APIView):
                 {"detail": "Status is required."}, status=status.HTTP_400_BAD_REQUEST
             )
         with transaction.atomic():
+            scoped, _, err = _scoped_cars(request)
+            if err:
+                return err
             try:
-                car = Car.objects.select_for_update().get(id=car_id, owner=request.user)
+                car = scoped.select_for_update().get(id=car_id)
             except Car.DoesNotExist:
                 return Response(
                     {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
