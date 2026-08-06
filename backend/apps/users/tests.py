@@ -602,3 +602,21 @@ class ResolveScopeTest(APITestCase):
         cust = create_user("scope-cust@test.com", "customer")
         with self.assertRaises(NoBusinessAccess):
             resolve_business_scope(cust)
+
+
+class RbacPermissionTest(APITestCase):
+    def test_owner_or_team_member_allows_both(self):
+        from common.permissions import IsOwnerOrTeamMember
+
+        perm = IsOwnerOrTeamMember()
+
+        class Req:
+            def __init__(self, u):
+                self.user = u
+
+        owner = create_user_owner("perm-owner@test.com")
+        member = create_user("perm-tm@test.com", "team_member")
+        cust = create_user("perm-cust@test.com", "customer")
+        assert perm.has_permission(Req(owner), None) is True
+        assert perm.has_permission(Req(member), None) is True
+        assert perm.has_permission(Req(cust), None) is False
