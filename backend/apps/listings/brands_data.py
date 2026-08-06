@@ -110,13 +110,13 @@ def match_brand(raw):
     key = normalize(raw)
     if not key:
         return None
+    brand = Brand.objects.filter(name__iexact=key).first()
+    if brand:
+        return brand.name
     alias = BRAND_ALIASES.get(key)
     if alias:
         return alias
-    brand = (
-        Brand.objects.filter(name__iexact=key).first()
-        or Brand.objects.filter(slug=slugify(key)).first()
-    )
+    brand = Brand.objects.filter(slug=slugify(key)).first()
     return brand.name if brand else None
 
 

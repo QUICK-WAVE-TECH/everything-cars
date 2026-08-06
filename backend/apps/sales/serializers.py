@@ -38,6 +38,7 @@ class DealSerializer(serializers.ModelSerializer):
     seller = DealPartySerializer(read_only=True)
     buyer = DealPartySerializer(read_only=True)
     viewer_role = serializers.SerializerMethodField()
+    can_relist = serializers.SerializerMethodField()
 
     class Meta:
         model = Deal
@@ -45,13 +46,19 @@ class DealSerializer(serializers.ModelSerializer):
             "id", "status", "agreed_amount", "currency",
             "created_at", "expires_at", "completed_at", "cancelled_at",
             "disputed_at",
-            "car", "seller", "buyer", "viewer_role",
+            "car", "seller", "buyer", "viewer_role", "can_relist",
         ]
         read_only_fields = fields
 
     def get_viewer_role(self, deal):
         user = self.context["request"].user
         return "seller" if deal.seller_id == user.id else "buyer"
+
+    def get_can_relist(self, deal):
+        from .services import completed_deal_is_final
+
+        user = self.context["request"].user
+        return deal.buyer_id == user.id and completed_deal_is_final(deal)
 
 
 class DisputePartySerializer(serializers.Serializer):

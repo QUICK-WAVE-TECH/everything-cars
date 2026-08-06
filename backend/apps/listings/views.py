@@ -347,6 +347,14 @@ class MyCarListCreateView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        if owner_profile.owner_type == "fleet" and not owner_profile.branches.filter(
+            is_active=True
+        ).exists():
+            return Response(
+                {"detail": "Create a branch before listing a vehicle."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         serializer = CarCreateSerializer(
             data=request.data, context={"request": request}
         )
@@ -1488,6 +1496,15 @@ class AdminRequestListView(APIView):
         if status_filter:
             qs = qs.filter(status=status_filter)
 
+        request_type = request.query_params.get("request_type")
+        if request_type:
+            if request_type not in ListingType.values:
+                return Response(
+                    {"detail": "Invalid request_type."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            qs = qs.filter(request_type=request_type)
+
         search = request.query_params.get("search")
         if search:
             qs = qs.filter(
@@ -1498,12 +1515,32 @@ class AdminRequestListView(APIView):
                 | Q(car__owner__last_name__icontains=search)
             )
 
+        ordering = request.query_params.get("ordering", "-created_at")
+        if ordering not in {
+            "created_at",
+            "-created_at",
+            "price_offered",
+            "-price_offered",
+        }:
+            ordering = "-created_at"
+        qs = qs.order_by(ordering)
+
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
         serializer = RequestListSerializer(
             page, many=True, context={"request": request}
         )
         return paginator.get_paginated_response(serializer.data)
+
+
+class AdminRequestStatusCountsView(APIView):
+    """Aggregate request counts for the payment desk summary."""
+
+    permission_classes = [IsStaff]
+
+    def get(self, request):
+        rows = Request.objects.values("status").annotate(n=Count("id"))
+        return Response({row["status"]: row["n"] for row in rows})
 
 
 class AdminRequestDetailView(APIView):
