@@ -37,6 +37,7 @@ export const OFFER_STATUS_META: Record<OfferStatus, StatusMeta> = {
   rejected: { label: "Declined", tone: "muted" },
   withdrawn: { label: "Withdrawn", tone: "muted" },
   expired: { label: "Expired", tone: "muted" },
+  standby: { label: "On standby", tone: "amber" },
   superseded: { label: "Closed — vehicle sold", tone: "muted" },
 };
 

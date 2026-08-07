@@ -248,6 +248,36 @@ starts + submits a **Passed** result).
 
 ---
 
+## Spec D — Offer negotiation fallback · 🚧 on `feat/spec9-offer-fallback`
+
+**Goal:** When a seller accepts one offer, the **other** buyers' offers aren't
+discarded — they go **on standby**. If the deal **falls through**, those offers
+(and the accepted one) are **revived** so the seller can accept a fallback
+**without anyone re-submitting**, and every prior bidder is emailed.
+
+**Setup:** one **buy** car with **two+ customers** who each make an offer.
+
+**Manual checklist**
+
+- [ ] Two customers offer on the same car. As the owner, **accept** Buyer A → a
+  Deal opens; **Buyer B's offer shows "On standby"** (not rejected/closed). Buyer B
+  gets an "your offer is on standby" notification/email.
+- [ ] **Cancel** the deal ("Deal fell through"). Buyer B's offer is **back to
+  active/pending** with a **"Re-opened"** badge on the owner's offers list; both
+  buyers get the "available again — the seller is reviewing your offer" email.
+- [ ] The owner can **accept Buyer B directly** (no re-submission) → a new Deal
+  opens; any third standby offer goes back to **On standby**.
+- [ ] **Complete** a deal instead (mark as sold) → standby offers become
+  **"Closed — vehicle sold"** (terminal, not revived).
+- [ ] **Dispute upheld** (staff reverse a completed deal) → standby offers are
+  revived the same way as a cancel.
+- [ ] _(Buyer view)_ A **standby** offer reads "On standby" with an explanation,
+  not "declined."
+- [ ] _(Timing)_ A **standby** offer is **not** auto-expired while the deal runs;
+  on revival it gets a **fresh 48h** window.
+
+---
+
 ### How brands get populated (for reviewers)
 
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh

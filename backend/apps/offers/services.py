@@ -92,7 +92,7 @@ def accept_offer(offer, accepted_by="owner"):
             .select_related("car", "customer")
         )
         Offer.objects.filter(id__in=[r.id for r in rivals]).update(
-            status=OfferStatus.SUPERSEDED,
+            status=OfferStatus.STANDBY,
             responded_at=timezone.now(),
         )
 

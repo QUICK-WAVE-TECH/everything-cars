@@ -577,6 +577,14 @@ function OfferRow({
 
       <span className="col-span-2 flex items-center gap-3 border-t border-(--brc-border) pt-3 sm:col-span-1 sm:flex-col sm:items-end sm:border-0 sm:pt-0">
         <OfferStatusBadge status={status} />
+        {offer.revived_at && (status === "pending" || status === "countered") ? (
+          <span
+            title="The buyer's earlier deal fell through — this offer is back and you can accept it again."
+            className="inline-flex h-6 w-fit shrink-0 items-center gap-1 rounded-full bg-(--brc-accent-bg) px-2.5 text-xs font-bold text-(--brc-accent) [font-family:var(--brc-font-ui)]"
+          >
+            Re-opened
+          </span>
+        ) : null}
         {pending ? <OfferCountdown expiresAt={offer.expires_at} isExpired={offer.is_expired} /> : null}
       </span>
 

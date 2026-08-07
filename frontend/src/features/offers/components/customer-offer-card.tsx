@@ -18,6 +18,8 @@ import { cn } from "@/lib/utils";
 /** A muted explanation line shown on closed cards, beyond what the badge already says. */
 function closedExplanation(offer: Offer): string | null {
   switch (offer.status) {
+    case "standby":
+      return "Another sale is in progress. Your offer is on standby — if that deal falls through it comes back automatically.";
     case "superseded":
       return "Another buyer's offer was accepted.";
     case "rejected":

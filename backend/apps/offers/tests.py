@@ -272,10 +272,11 @@ class AcceptOfferTest(APITestCase):
         self.offer.refresh_from_db()
         self.assertEqual(str(self.offer.deal.agreed_amount), "17800000.00")
 
-    def test_rival_offers_superseded(self):
+    def test_rival_offers_go_on_standby(self):
+        # Spec D: rivals are preserved on standby (revivable), not terminally closed.
         self._accept()
         self.rival_offer.refresh_from_db()
-        self.assertEqual(self.rival_offer.status, OfferStatus.SUPERSEDED)
+        self.assertEqual(self.rival_offer.status, OfferStatus.STANDBY)
 
     def test_car_reads_reserved_after_acceptance(self):
         self._accept()
@@ -514,3 +515,84 @@ class OwnerOfferScopeTest(APITestCase):
         r = self.client.post(f"/api/v1/offers/offers/{self.offer2.id}/respond",
             {"action": "accept"}, format="json")
         assert r.status_code == 404
+
+
+class StandbyStatusTest(APITestCase):
+    def test_standby_status_and_revived_at_exist(self):
+        assert OfferStatus.STANDBY == "standby"
+        assert any(f.name == "revived_at" for f in Offer._meta.get_fields())
+
+
+class AcceptStandbyTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("as-owner@test.com", "owner")
+        self.car = create_negotiable_car(self.owner)
+        self.a = create_user("buyer-a@test.com")
+        self.b = create_user("buyer-b@test.com")
+        self.offer_a = Offer.objects.create(car=self.car, customer=self.a,
+            amount="14000000.00", currency="NGN", expires_at=timezone.now() + timedelta(hours=48))
+        self.offer_b = Offer.objects.create(car=self.car, customer=self.b,
+            amount="13000000.00", currency="NGN", expires_at=timezone.now() + timedelta(hours=48))
+
+    def test_accepting_puts_rivals_on_standby(self):
+        from apps.offers.services import accept_offer
+        accept_offer(self.offer_a)
+        self.offer_a.refresh_from_db()
+        self.offer_b.refresh_from_db()
+        assert self.offer_a.status == OfferStatus.ACCEPTED
+        assert self.offer_b.status == OfferStatus.STANDBY
+
+
+class FallbackAcceptTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("fb-owner@test.com", "owner")
+        self.car = create_negotiable_car(self.owner)
+        self.a = create_user("fb-a@test.com")
+        self.b = create_user("fb-b@test.com")
+        self.c = create_user("fb-c@test.com")
+        self.oa = Offer.objects.create(car=self.car, customer=self.a, amount="14000000.00",
+            currency="NGN", expires_at=timezone.now() + timedelta(hours=48))
+        self.ob = Offer.objects.create(car=self.car, customer=self.b, amount="13000000.00",
+            currency="NGN", expires_at=timezone.now() + timedelta(hours=48))
+        self.oc = Offer.objects.create(car=self.car, customer=self.c, amount="12000000.00",
+            currency="NGN", expires_at=timezone.now() + timedelta(hours=48))
+
+    def test_seller_accepts_a_revived_fallback_offer(self):
+        from apps.offers.services import accept_offer
+        from apps.sales.services import cancel_deal
+        from apps.sales.models import DealCancelledBy
+
+        accept_offer(self.oa)                                   # A wins; B,C standby
+        cancel_deal(self.oa.deal, cancelled_by=DealCancelledBy.SELLER)  # revive B,C
+        self.ob.refresh_from_db()
+        assert self.ob.status == OfferStatus.PENDING            # acceptable again
+        accept_offer(self.ob)                                   # accept fallback B
+        self.ob.refresh_from_db()
+        self.oc.refresh_from_db()
+        assert self.ob.status == OfferStatus.ACCEPTED
+        assert self.oc.status == OfferStatus.STANDBY            # C back on standby
+
+
+class StandbyNotExpiredTest(APITestCase):
+    def test_standby_offer_is_not_auto_expired(self):
+        from django.core.management import call_command
+        owner = create_user("sne-owner@test.com", "owner")
+        car = create_negotiable_car(owner)
+        buyer = create_user("sne-buyer@test.com")
+        offer = Offer.objects.create(car=car, customer=buyer, amount="1000000.00",
+            currency="NGN", status=OfferStatus.STANDBY,
+            expires_at=timezone.now() - timedelta(hours=1))  # already "past"
+        call_command("expire_offers")
+        offer.refresh_from_db()
+        assert offer.status == OfferStatus.STANDBY  # standby is never auto-expired
+
+
+class RevivedAtSerializedTest(APITestCase):
+    def test_serializer_exposes_revived_at(self):
+        from apps.offers.serializers import OfferSerializer
+        owner = create_user("ra-owner@test.com", "owner")
+        car = create_negotiable_car(owner)
+        buyer = create_user("ra-buyer@test.com")
+        offer = Offer.objects.create(car=car, customer=buyer, amount="1000000.00",
+            currency="NGN", expires_at=timezone.now() + timedelta(hours=48))
+        assert "revived_at" in OfferSerializer(offer).data

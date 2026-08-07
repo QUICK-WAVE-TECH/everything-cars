@@ -13,6 +13,7 @@ export type OfferStatus =
   | "rejected"
   | "withdrawn"
   | "expired"
+  | "standby"
   | "superseded";
 
 /** Offers still awaiting a decision from someone. */
@@ -46,6 +47,8 @@ type OfferBase = {
   countered_at: string | null;
   expires_at: string;
   responded_at: string | null;
+  /** Set when a standby offer was revived after its deal fell through (Spec D). */
+  revived_at: string | null;
   resulting_request: string | null;
   resulting_deal: string | null;
   is_expired: boolean;
