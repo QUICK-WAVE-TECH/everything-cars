@@ -13,7 +13,7 @@ from apps.notifications.service import (
     notify_deal_disputed,
     notify_dispute_dismissed,
 )
-from apps.offers.models import Offer, OfferStatus
+from apps.offers.models import OFFER_TTL_HOURS, Offer, OfferStatus
 from .models import (
     DEAL_DISPUTE_WINDOW_DAYS,
     Deal,
@@ -21,6 +21,25 @@ from .models import (
     DealStatus,
     DisputeResolution,
 )
+
+
+def _revive_standby_offers(car):
+    """A deal fell through — bring the car's standby offers back as acceptable
+    PENDING offers (fresh 48h TTL) so the seller can accept a fallback without
+    the buyer re-submitting. Returns the revived offers (for notifications).
+    Must run inside the caller's transaction."""
+    now = timezone.now()
+    revived = list(
+        Offer.objects.filter(car=car, status=OfferStatus.STANDBY).select_related(
+            "car", "customer"
+        )
+    )
+    Offer.objects.filter(id__in=[o.id for o in revived]).update(
+        status=OfferStatus.PENDING,
+        expires_at=now + timedelta(hours=OFFER_TTL_HOURS),
+        revived_at=now,
+    )
+    return revived
 
 
 def latest_completed_deal_for_vin(vin):
@@ -77,6 +96,10 @@ def complete_deal(deal):
         deal.save(update_fields=["status", "completed_at"])
         car.status = CarStatus.ARCHIVED
         car.save(update_fields=["status"])
+        # The car genuinely sold — standby offers are now terminally closed.
+        Offer.objects.filter(car=car, status=OfferStatus.STANDBY).update(
+            status=OfferStatus.SUPERSEDED, responded_at=timezone.now()
+        )
     schedule_notification(notify_deal_completed, lambda d=deal: d)
     return deal
 
@@ -92,11 +115,9 @@ def cancel_deal(deal, cancelled_by):
         deal.cancelled_at = timezone.now()
         deal.cancelled_by = cancelled_by
         deal.save(update_fields=["status", "cancelled_at", "cancelled_by"])
-        # Bidders who were superseded when this offer won — invite them back.
-        prior = list(
-            Offer.objects.filter(car=deal.car, status=OfferStatus.SUPERSEDED)
-            .select_related("car", "customer")
-        )
+        # Bidders on standby when this offer won — revive their offers so the
+        # seller can accept a fallback directly, and invite them back.
+        prior = _revive_standby_offers(deal.car)
 
     if cancelled_by in (DealCancelledBy.BUYER, DealCancelledBy.SELLER):
         other = deal.seller if cancelled_by == DealCancelledBy.BUYER else deal.buyer
@@ -177,10 +198,7 @@ def reverse_deal(deal, by=None):
         )
         car.status = CarStatus.PUBLISHED
         car.save(update_fields=["status"])
-        prior = list(
-            Offer.objects.filter(car=deal.car, status=OfferStatus.SUPERSEDED)
-            .select_related("car", "customer")
-        )
+        prior = _revive_standby_offers(car)
 
     for recipient in (deal.buyer, deal.seller):
         transaction.on_commit(

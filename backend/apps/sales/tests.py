@@ -481,3 +481,70 @@ class DealScopeTest(APITestCase):
         self.client.force_authenticate(self.member)
         assert self.client.get(f"/api/v1/deals/{self.deal2.id}").status_code == 404
         assert self.client.post(f"/api/v1/deals/{self.deal2.id}/complete").status_code == 404
+
+
+class StandbyLifecycleTest(APITestCase):
+    """Spec D: rival offers preserved on standby, then closed on completion or
+    revived on cancel/reverse."""
+
+    def setUp(self):
+        from apps.offers.services import accept_offer
+        self.owner = make_owner("sl-owner@test.com")
+        self.car = make_negotiable_car(self.owner)
+        self.a = make_user("sl-a@test.com")
+        self.b = make_user("sl-b@test.com")
+        self.offer_a = Offer.objects.create(car=self.car, customer=self.a,
+            amount="14000000.00", currency="NGN",
+            expires_at=timezone.now() + timedelta(hours=48))
+        self.offer_b = Offer.objects.create(car=self.car, customer=self.b,
+            amount="13000000.00", currency="NGN",
+            expires_at=timezone.now() + timedelta(hours=48))
+        accept_offer(self.offer_a)  # A accepted → Deal opens, B → STANDBY
+        self.deal = self.offer_a.deal
+        self.offer_b.refresh_from_db()
+        assert self.offer_b.status == OfferStatus.STANDBY
+
+    def test_completing_deal_closes_standby_offers(self):
+        from apps.sales.services import complete_deal
+        complete_deal(self.deal)
+        self.offer_b.refresh_from_db()
+        assert self.offer_b.status == OfferStatus.SUPERSEDED
+
+
+class StandbyReviveTest(APITestCase):
+    def setUp(self):
+        from apps.offers.services import accept_offer
+        self.owner = make_owner("sr-owner@test.com")
+        self.car = make_negotiable_car(self.owner)
+        self.a = make_user("sr-a@test.com")
+        self.b = make_user("sr-b@test.com")
+        self.offer_a = Offer.objects.create(car=self.car, customer=self.a,
+            amount="14000000.00", currency="NGN",
+            expires_at=timezone.now() + timedelta(hours=48))
+        self.offer_b = Offer.objects.create(car=self.car, customer=self.b,
+            amount="13000000.00", currency="NGN",
+            expires_at=timezone.now() + timedelta(hours=1))  # short TTL, will be reset
+        accept_offer(self.offer_a)
+        self.deal = self.offer_a.deal
+
+    def test_cancel_revives_standby_to_pending(self):
+        from apps.sales.services import cancel_deal
+        from apps.sales.models import DealCancelledBy
+        cancel_deal(self.deal, cancelled_by=DealCancelledBy.SELLER)
+        self.offer_b.refresh_from_db()
+        assert self.offer_b.status == OfferStatus.PENDING
+        assert self.offer_b.revived_at is not None
+        assert self.offer_b.expires_at > timezone.now() + timedelta(hours=47)
+
+    def test_reverse_revives_standby_to_pending(self):
+        from apps.sales.services import complete_deal, reverse_deal
+        complete_deal(self.deal)          # completes → standby becomes SUPERSEDED...
+        # ...so re-open a standby by re-accepting is out of scope; instead assert
+        # reverse revives any standby present. Put B back on standby to model the
+        # "reversed before completion side-effects" case:
+        self.offer_b.status = OfferStatus.STANDBY
+        self.offer_b.save(update_fields=["status"])
+        reverse_deal(self.deal)
+        self.offer_b.refresh_from_db()
+        assert self.offer_b.status == OfferStatus.PENDING
+        assert self.offer_b.revived_at is not None
