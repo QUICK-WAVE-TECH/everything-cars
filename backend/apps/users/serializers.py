@@ -226,6 +226,7 @@ class MeSerializer(serializers.ModelSerializer):
             "phone",
             "role",
             "is_staff",
+            "staff_role",
             "date_joined",
             "customer_profile",
             "owner_profile",

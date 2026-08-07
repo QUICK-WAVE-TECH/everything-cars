@@ -20,6 +20,11 @@ from .models import (
     InspectionCenter,
     PhysicalInspection,
     AssistanceRequest,
+    FuelType,
+    CarType,
+    VehicleUsedCondition,
+    ComponentCondition,
+    InspectionResult,
 )
 from .services import generate_tracking_id, record_status_change
 
@@ -941,13 +946,14 @@ class StaffInspectionFlowTest(APITestCase):
         res = self._submit()
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_submit_passed_publishes_car(self):
+    def test_submit_passed_moves_to_pending_publishing(self):
         self._start()
         res = self._submit_with_documents(result="passed")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.car.refresh_from_db()
-        self.assertEqual(self.car.status, CarStatus.PUBLISHED)
-        self.assertIsNotNone(self.car.published_at)
+        # Two-stage flow: a passed inspection awaits a publisher, not live yet.
+        self.assertEqual(self.car.status, CarStatus.PENDING_PUBLISHING)
+        self.assertIsNone(self.car.published_at)
         self.booking.refresh_from_db()
         self.assertEqual(self.booking.status, BookingStatus.COMPLETED)
         inspection = PhysicalInspection.objects.get(booking=self.booking)
@@ -998,7 +1004,7 @@ class StaffInspectionFlowTest(APITestCase):
         transitions = list(self.car.status_history.values_list("to_status", flat=True))
         self.assertEqual(
             transitions,
-            [CarStatus.INSPECTION_IN_PROGRESS, CarStatus.PUBLISHED],
+            [CarStatus.INSPECTION_IN_PROGRESS, CarStatus.PENDING_PUBLISHING],
         )
 
     def test_mark_no_show(self):
@@ -2166,3 +2172,106 @@ class BookingDetailPaymentTest(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["payment"]["total"], "21500.00")
         self.assertEqual(res.data["payment"]["status"], "submitted")
+
+
+class InspectionRoleGateTest(APITestCase):
+    """Only inspectors (or admins) may start/submit inspections; a publisher can't."""
+
+    def setUp(self):
+        self.publisher = create_user("insp-gate-pub@test.com", "owner",
+            is_staff=True, staff_role="publisher")
+
+    def test_publisher_cannot_start_inspection(self):
+        self.client.force_authenticate(self.publisher)
+        r = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{uuid.uuid4()}/start/"
+        )
+        assert r.status_code == 403
+
+
+def make_pending_publishing_car(owner, inspector, slot, title="Queued Car"):
+    car = create_car(owner, status=CarStatus.PENDING_PUBLISHING, title=title)
+    booking = InspectionBooking.objects.create(
+        car=car, slot=slot, booked_by=owner, status=BookingStatus.COMPLETED
+    )
+    PhysicalInspection.objects.create(
+        booking=booking, car=car, inspector=inspector,
+        condition=VehicleUsedCondition.values[0], mileage=45000,
+        fuel_type=FuelType.values[0], car_type=CarType.values[0], features=[],
+        engine_condition=ComponentCondition.values[0],
+        chassis_condition=ComponentCondition.values[0],
+        ac_condition=ComponentCondition.values[0],
+        result=InspectionResult.PASSED, staff_notes="Clean, minor wear on tyres.",
+        inspected_at=timezone.now(),
+    )
+    return car
+
+
+class PendingPublishingQueueTest(APITestCase):
+    def setUp(self):
+        self.publisher = create_user("q-pub@test.com", "owner", is_staff=True,
+            staff_role="publisher")
+        self.inspector = create_user("q-insp@test.com", "owner", is_staff=True,
+            staff_role="inspector")
+        self.owner = create_user("q-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.slot = create_slot(self.publisher)
+        self.car = make_pending_publishing_car(self.owner, self.inspector, self.slot)
+
+    def test_publisher_lists_pending(self):
+        self.client.force_authenticate(self.publisher)
+        r = self.client.get("/api/v1/inspections/staff/pending-publishing/")
+        assert r.status_code == 200, r.data
+        ids = [row["car_id"] for row in r.data["results"]]
+        assert str(self.car.id) in ids
+        assert "count" in r.data  # paginated
+
+    def test_inspector_forbidden(self):
+        self.client.force_authenticate(self.inspector)
+        r = self.client.get("/api/v1/inspections/staff/pending-publishing/")
+        assert r.status_code == 403
+
+    def test_detail_returns_inspection_report(self):
+        self.client.force_authenticate(self.publisher)
+        r = self.client.get(f"/api/v1/inspections/staff/pending-publishing/{self.car.id}/")
+        assert r.status_code == 200
+        assert r.data["inspection"]["staff_notes"] == "Clean, minor wear on tyres."
+        assert r.data["inspection"]["inspector_name"]
+
+    def test_publish_goes_live(self):
+        self.client.force_authenticate(self.publisher)
+        r = self.client.post(f"/api/v1/inspections/staff/pending-publishing/{self.car.id}/publish/")
+        assert r.status_code == 200, r.data
+        self.car.refresh_from_db()
+        assert self.car.status == CarStatus.PUBLISHED
+        assert self.car.published_at is not None
+
+    def test_publish_not_in_queue_404(self):
+        self.car.status = CarStatus.PUBLISHED
+        self.car.save(update_fields=["status"])
+        self.client.force_authenticate(self.publisher)
+        r = self.client.post(f"/api/v1/inspections/staff/pending-publishing/{self.car.id}/publish/")
+        assert r.status_code == 404
+
+    def test_inspector_cannot_publish(self):
+        self.client.force_authenticate(self.inspector)
+        r = self.client.post(f"/api/v1/inspections/staff/pending-publishing/{self.car.id}/publish/")
+        assert r.status_code == 403
+
+    def test_send_back_needs_changes(self):
+        self.client.force_authenticate(self.publisher)
+        r = self.client.post(
+            f"/api/v1/inspections/staff/pending-publishing/{self.car.id}/send-back/",
+            {"note": "Front photos are too dark — please re-shoot in daylight."},
+            format="json")
+        assert r.status_code == 200, r.data
+        self.car.refresh_from_db()
+        assert self.car.status == CarStatus.NEEDS_CHANGES
+        assert "too dark" in self.car.admin_note
+
+    def test_send_back_short_note_rejected(self):
+        self.client.force_authenticate(self.publisher)
+        r = self.client.post(
+            f"/api/v1/inspections/staff/pending-publishing/{self.car.id}/send-back/",
+            {"note": "no"}, format="json")
+        assert r.status_code == 400

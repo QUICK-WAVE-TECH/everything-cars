@@ -23,6 +23,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         OWNER = "owner", "Owner"
         TEAM_MEMBER = "team_member", "Team Member"
 
+    class StaffRole(models.TextChoices):
+        INSPECTOR = "inspector", "Inspector"
+        PUBLISHER = "publisher", "Publisher"
+        ADMIN = "admin", "Admin"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True, db_index=True)
     first_name = models.CharField(max_length=150, default="")
@@ -31,6 +36,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     role = models.CharField(max_length=20, choices=Role.choices)
     is_active = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
+    # Only meaningful when is_staff. Existing staff are backfilled to "admin".
+    staff_role = models.CharField(
+        max_length=20, choices=StaffRole.choices, blank=True, default=""
+    )
     date_joined = models.DateTimeField(default=timezone.now)
 
     objects = UserManager()

@@ -13,10 +13,19 @@ const NAV_LINKS = [
   { label: "Approvals", href: "/admin/approvals" },
   { label: "Owners", href: "/admin/owners" },
   { label: "Inspections", href: "/admin/inspections" },
+  { label: "Publishing", href: "/admin/publishing", staffRoles: ["publisher", "admin"] },
   { label: "Disputes", href: "/admin/disputes" },
   { label: "Payments", href: "/admin/payments" },
   { label: "Transactions", href: "/admin/transactions" },
 ];
+
+/** Nav links visible to this staff member — role-restricted ones (Publishing)
+ * only show for the matching staff_role. */
+function visibleLinks(staffRole: string | undefined) {
+  return NAV_LINKS.filter(
+    (link) => !link.staffRoles || link.staffRoles.includes(staffRole ?? ""),
+  );
+}
 
 /** Two-letter initials for the staff avatar, name first, email as a fallback. */
 function initials(user: { first_name?: string; last_name?: string; email?: string }): string {
@@ -62,7 +71,7 @@ function AdminNavbar() {
 
         <div className="flex items-center gap-4 sm:gap-10">
           <nav className="hidden items-center gap-7 sm:flex">
-            {NAV_LINKS.map((link) => {
+            {visibleLinks(user?.staff_role).map((link) => {
               const active = pathname.startsWith(link.href);
               return (
                 <Link
@@ -122,7 +131,7 @@ function AdminNavbar() {
 
       {menuOpen && (
         <nav className="flex flex-col gap-1 border-t border-(--brc-border) bg-white px-4 py-3 sm:hidden">
-          {NAV_LINKS.map((link) => {
+          {visibleLinks(user?.staff_role).map((link) => {
             const active = pathname.startsWith(link.href);
             return (
               <Link

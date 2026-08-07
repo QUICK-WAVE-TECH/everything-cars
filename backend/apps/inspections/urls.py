@@ -1,5 +1,11 @@
 from django.urls import path
 
+from .publishing_views import (
+    PendingPublishingDetailView,
+    PendingPublishingListView,
+    PublishCarView,
+    SendBackCarView,
+)
 from .views import (
     AvailableSlotsSummaryView,
     AvailableSlotsView,
@@ -126,5 +132,26 @@ urlpatterns = [
         "admin/bookings/book-for-owner/",
         StaffBookForOwnerView.as_view(),
         name="staff-book-for-owner",
+    ),
+    # Publisher "Pending Publishing" queue (Spec C)
+    path(
+        "staff/pending-publishing/",
+        PendingPublishingListView.as_view(),
+        name="pending-publishing",
+    ),
+    path(
+        "staff/pending-publishing/<uuid:car_id>/",
+        PendingPublishingDetailView.as_view(),
+        name="pending-publishing-detail",
+    ),
+    path(
+        "staff/pending-publishing/<uuid:car_id>/publish/",
+        PublishCarView.as_view(),
+        name="pending-publishing-publish",
+    ),
+    path(
+        "staff/pending-publishing/<uuid:car_id>/send-back/",
+        SendBackCarView.as_view(),
+        name="pending-publishing-send-back",
     ),
 ]

@@ -29,6 +29,10 @@ from apps.listings.migration_helpers import delete_both_cars
 
 
 def create_user(email, role, **extra):
+    # Mirror the production backfill: a staff test user is a full-access "admin"
+    # unless the test asks for a specific staff_role (inspector/publisher).
+    if extra.get("is_staff") and "staff_role" not in extra:
+        extra["staff_role"] = "admin"
     return User.objects.create_user(
         email=email,
         first_name=extra.pop("first_name", role.title()),
@@ -2053,3 +2057,45 @@ class InventoryScopeTest(APITestCase):
         r = self.client.post("/api/v1/listings/my-cars", payload, format="json")
         assert r.status_code == 400
         assert "branch" in str(r.data).lower()
+
+
+class DirectPublishRoleGateTest(APITestCase):
+    """AdminCarStatusView '→ published' is a Publisher/Admin action."""
+
+    def setUp(self):
+        from apps.inspections.services import record_status_change
+        self.owner = create_user("dp-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(self.owner, status=CarStatus.PUBLISHED)
+        # published → suspended, so reinstating resolves back to published
+        record_status_change(self.car, CarStatus.SUSPENDED)
+        self.car.refresh_from_db()
+
+    def _publish(self, actor):
+        self.client.force_authenticate(actor)
+        return self.client.post(
+            f"/api/v1/listings/admin/cars/{self.car.id}/status",
+            {"status": "published"}, format="json")
+
+    def test_inspector_cannot_publish(self):
+        insp = create_user("dp-insp@test.com", "owner", is_staff=True, staff_role="inspector")
+        assert self._publish(insp).status_code == 403
+
+    def test_publisher_can_publish(self):
+        pub = create_user("dp-pub@test.com", "owner", is_staff=True, staff_role="publisher")
+        r = self._publish(pub)
+        assert r.status_code == 200, r.data
+        self.car.refresh_from_db()
+        assert self.car.status == CarStatus.PUBLISHED
+
+
+class PendingPublishingNotPublicTest(APITestCase):
+    def test_pending_publishing_excluded_from_public_browse(self):
+        owner = create_user("pp-owner@test.com", "owner")
+        create_owner_profile(owner)
+        pending = create_car(owner, status=CarStatus.PENDING_PUBLISHING)
+        live = create_car(owner, status=CarStatus.PUBLISHED, vin="", plate_number="")
+        r = self.client.get("/api/v1/listings/cars")
+        ids = [c["id"] for c in r.data["results"]]
+        assert str(live.id) in ids
+        assert str(pending.id) not in ids

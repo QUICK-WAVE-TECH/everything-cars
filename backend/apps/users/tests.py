@@ -762,3 +762,57 @@ class MyScopeApiTest(APITestCase):
         assert r.data["is_team_member"] is True
         assert r.data["can_manage_team"] is False
         assert [b["name"] for b in r.data["branches"]] == ["A"]
+
+
+class StaffRoleModelTest(APITestCase):
+    def test_staff_role_choices_and_default(self):
+        u = User.objects.create_user(
+            email="sr@test.com", first_name="S", last_name="R",
+            password="x", role="customer", is_staff=True,
+        )
+        assert u.staff_role == ""
+        u.staff_role = User.StaffRole.INSPECTOR
+        u.save()
+        u.refresh_from_db()
+        assert u.staff_role == "inspector"
+
+
+class InspectPublishPermsTest(APITestCase):
+    def _req(self, u):
+        class R:
+            user = u
+        return R()
+
+    def test_permissions(self):
+        from common.permissions import IsInspector, IsPublisher
+
+        def staff(role):
+            return User.objects.create_user(email=f"{role or 'none'}-perm@t.com",
+                first_name="A", last_name="B", password="x", role="customer",
+                is_staff=True, staff_role=role)
+
+        insp = staff("inspector")
+        pub = staff("publisher")
+        adm = staff("admin")
+        none = staff("")
+        customer = User.objects.create_user(email="cperm@t.com", first_name="C",
+            last_name="D", password="x", role="customer")
+
+        assert IsInspector().has_permission(self._req(insp), None) is True
+        assert IsInspector().has_permission(self._req(adm), None) is True
+        assert IsInspector().has_permission(self._req(pub), None) is False
+        assert IsPublisher().has_permission(self._req(pub), None) is True
+        assert IsPublisher().has_permission(self._req(adm), None) is True
+        assert IsPublisher().has_permission(self._req(insp), None) is False
+        assert IsInspector().has_permission(self._req(customer), None) is False
+        assert IsPublisher().has_permission(self._req(none), None) is False
+
+
+class MeStaffRoleTest(APITestCase):
+    def test_me_includes_staff_role(self):
+        u = User.objects.create_user(email="me-sr@test.com", first_name="M", last_name="E",
+            password="x", role="customer", is_active=True, is_staff=True, staff_role="publisher")
+        self.client.force_authenticate(u)
+        r = self.client.get("/api/v1/users/me")
+        assert r.status_code == 200
+        assert r.data["staff_role"] == "publisher"
