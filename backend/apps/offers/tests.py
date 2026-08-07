@@ -514,3 +514,9 @@ class OwnerOfferScopeTest(APITestCase):
         r = self.client.post(f"/api/v1/offers/offers/{self.offer2.id}/respond",
             {"action": "accept"}, format="json")
         assert r.status_code == 404
+
+
+class StandbyStatusTest(APITestCase):
+    def test_standby_status_and_revived_at_exist(self):
+        assert OfferStatus.STANDBY == "standby"
+        assert any(f.name == "revived_at" for f in Offer._meta.get_fields())

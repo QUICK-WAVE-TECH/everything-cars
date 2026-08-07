@@ -11,6 +11,7 @@ class OfferStatus(models.TextChoices):
     REJECTED = "rejected", "Rejected"
     WITHDRAWN = "withdrawn", "Withdrawn"
     EXPIRED = "expired", "Expired"
+    STANDBY = "standby", "On standby — deal in progress"
     SUPERSEDED = "superseded", "Closed — vehicle sold"
 
 
@@ -47,6 +48,9 @@ class Offer(models.Model):
     countered_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateTimeField(db_index=True)
     responded_at = models.DateTimeField(null=True, blank=True)
+    # Set when a standby offer is revived after its deal fell through — drives
+    # the seller's "Re-opened" badge.
+    revived_at = models.DateTimeField(null=True, blank=True)
     # set when accepted - the buy request that carries the sale to completion
     resulting_request = models.ForeignKey(
         Request,
