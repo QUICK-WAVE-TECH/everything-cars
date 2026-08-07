@@ -58,6 +58,9 @@ const createCarBase = z.object({
   country: z.string().trim().optional(),
   state: z.string().trim().min(1, "State is required"),
   city: z.string().trim().optional(),
+  // The branch this car is at — required for fleet listers (enforced in the
+  // form + backend); omitted by individual owners.
+  branch: z.string().trim().optional(),
   description: z.string().trim().optional(),
   features: z
     .array(

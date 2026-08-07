@@ -14,7 +14,7 @@ export type ApiErrorResponse = {
 };
 
 /** User roles in the system */
-export type UserRole = "customer" | "owner";
+export type UserRole = "customer" | "owner" | "team_member";
 
 /** Common request status across the rental flow */
 export type RequestStatus =

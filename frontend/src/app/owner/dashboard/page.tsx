@@ -14,6 +14,7 @@ import Link from "next/link";
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
 import { useMe } from "@/features/auth/api";
+import { useMyScope } from "@/features/team/api";
 import { PromoBanner } from "@/shared/components";
 import { useOwnerRequests } from "@/features/requests/api";
 import { useMyCarsList } from "@/features/listings/api";
@@ -46,7 +47,7 @@ const OWNER_QUICK_LINKS: QuickLink[] = [
   { label: "Rewards", description: "Loyalty points and owner perks.", icon: "gift", href: "/owner/loyalty", bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)" },
 ];
 
-// Fleet/business owners can run multiple branch locations; shown only to them.
+// Fleet/business owners can run multiple branch locations + staff; shown only to them.
 const BRANCHES_QUICK_LINK: QuickLink = {
   label: "Branches",
   description: "Manage your dealership locations.",
@@ -54,6 +55,15 @@ const BRANCHES_QUICK_LINK: QuickLink = {
   href: "/owner/branches",
   bg: "var(--brc-primary-tint)",
   fg: "var(--brc-primary)",
+};
+
+const TEAM_QUICK_LINK: QuickLink = {
+  label: "Team",
+  description: "Add staff and assign them to branches.",
+  icon: "user",
+  href: "/owner/team",
+  bg: "var(--brc-bg-muted)",
+  fg: "var(--brc-text-secondary)",
 };
 
 type RequestStatus = "approved" | "pending" | "rejected" | "cancelled" | "paid" | "active" | "completed";
@@ -395,6 +405,7 @@ function statusNote(status: string): string {
 export default function OwnerDashboard() {
   const greeting = useGreeting();
   const { data: user } = useMe();
+  const { data: scope } = useMyScope();
   const { data: requestsData } = useOwnerRequests();
   const { data: carsData } = useMyCarsList();
   const { data: txnData } = useTransactions();
@@ -491,12 +502,39 @@ export default function OwnerDashboard() {
           <div className="flex min-w-0 flex-col gap-7">
             <section className="flex flex-col gap-4">
               <SectionHeader eyebrow="Shortcuts" title="Quick Actions" />
+              {user?.role === "team_member" && scope ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-(--brc-border) bg-(--brc-bg) px-4 py-3 [font-family:var(--brc-font-ui)]">
+                  <span className="text-[12.5px] font-semibold text-(--brc-text-muted)">
+                    Viewing:
+                  </span>
+                  {scope.branches.length ? (
+                    scope.branches.map((b) => (
+                      <span
+                        key={b.id}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-(--brc-primary-tint) px-2.5 py-1 text-xs font-bold text-(--brc-primary)"
+                      >
+                        {b.name}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-(--brc-text-muted)">
+                      No branch assigned yet — ask your business owner.
+                    </span>
+                  )}
+                </div>
+              ) : null}
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                {(user?.owner_profile?.owner_type === "fleet"
-                  ? OWNER_QUICK_LINKS.flatMap((link, i) =>
-                      i === 0 ? [link, BRANCHES_QUICK_LINK] : [link],
+                {(user?.role === "team_member"
+                  ? OWNER_QUICK_LINKS.filter((l) =>
+                      ["My Cars", "Offers", "Deals"].includes(l.label),
                     )
-                  : OWNER_QUICK_LINKS
+                  : user?.owner_profile?.owner_type === "fleet"
+                    ? OWNER_QUICK_LINKS.flatMap((link, i) =>
+                        i === 0
+                          ? [link, BRANCHES_QUICK_LINK, TEAM_QUICK_LINK]
+                          : [link],
+                      )
+                    : OWNER_QUICK_LINKS
                 ).map((link, index) => (
                   <QuickActionTile key={link.label} link={link} delay={220 + index * 70} />
                 ))}

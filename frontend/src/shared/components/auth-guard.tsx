@@ -8,8 +8,18 @@ import type { UserRole } from "@/shared/types";
 
 type AuthGuardProps = {
   children: React.ReactNode;
-  requiredRole?: UserRole;
+  /** A single role, or a set of roles any of which may enter. */
+  requiredRole?: UserRole | UserRole[];
 };
+
+function roleAllowed(
+  current: UserRole | null | undefined,
+  required?: UserRole | UserRole[],
+): boolean {
+  if (!required) return true;
+  const allowed = Array.isArray(required) ? required : [required];
+  return current != null && allowed.includes(current);
+}
 
 /**
  * Client-side auth guard. Wraps protected layouts.
@@ -45,9 +55,11 @@ export function AuthGuard({ children, requiredRole }: AuthGuardProps) {
     }
 
     // Wrong role
-    if (requiredRole && currentRole !== requiredRole) {
+    if (!roleAllowed(currentRole, requiredRole)) {
       const correctDashboard =
-        currentRole === "owner" ? "/owner/dashboard" : "/customer/dashboard";
+        currentRole === "owner" || currentRole === "team_member"
+          ? "/owner/dashboard"
+          : "/customer/dashboard";
       router.replace(correctDashboard);
     }
   }, [currentRole, isStaff, isReadyAuthenticated, isLoading, isError, requiredRole, router]);
@@ -62,7 +74,7 @@ export function AuthGuard({ children, requiredRole }: AuthGuardProps) {
     return null;
   }
 
-  if (requiredRole && currentRole !== requiredRole) {
+  if (!roleAllowed(currentRole, requiredRole)) {
     return null;
   }
 
