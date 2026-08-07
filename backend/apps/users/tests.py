@@ -775,3 +775,32 @@ class StaffRoleModelTest(APITestCase):
         u.save()
         u.refresh_from_db()
         assert u.staff_role == "inspector"
+
+
+class InspectPublishPermsTest(APITestCase):
+    def _req(self, u):
+        class R:
+            user = u
+        return R()
+
+    def test_permissions(self):
+        from common.permissions import IsInspector, IsPublisher
+
+        def staff(role):
+            return User.objects.create_user(email=f"{role or 'none'}-perm@t.com",
+                first_name="A", last_name="B", password="x", role="customer",
+                is_staff=True, staff_role=role)
+
+        insp = staff("inspector"); pub = staff("publisher")
+        adm = staff("admin"); none = staff("")
+        customer = User.objects.create_user(email="cperm@t.com", first_name="C",
+            last_name="D", password="x", role="customer")
+
+        assert IsInspector().has_permission(self._req(insp), None) is True
+        assert IsInspector().has_permission(self._req(adm), None) is True
+        assert IsInspector().has_permission(self._req(pub), None) is False
+        assert IsPublisher().has_permission(self._req(pub), None) is True
+        assert IsPublisher().has_permission(self._req(adm), None) is True
+        assert IsPublisher().has_permission(self._req(insp), None) is False
+        assert IsInspector().has_permission(self._req(customer), None) is False
+        assert IsPublisher().has_permission(self._req(none), None) is False

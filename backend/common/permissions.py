@@ -40,3 +40,25 @@ class IsOwnerOrTeamMember(BasePermission):
             and request.user.is_authenticated
             and request.user.role in ("owner", "team_member")
         )
+
+
+class IsInspector(BasePermission):
+    def has_permission(self, request, view):
+        u = request.user
+        return bool(
+            u
+            and u.is_authenticated
+            and u.is_staff
+            and u.staff_role in ("inspector", "admin")
+        )
+
+
+class IsPublisher(BasePermission):
+    def has_permission(self, request, view):
+        u = request.user
+        return bool(
+            u
+            and u.is_authenticated
+            and u.is_staff
+            and u.staff_role in ("publisher", "admin")
+        )
