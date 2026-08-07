@@ -330,6 +330,30 @@ inspection (owner books + pays → inspector starts + submits Passed).
 
 ---
 
+## 7.6 Spec D — Offer negotiation fallback
+
+**Setup:** a buy car with two+ customers who each offer.
+
+🟢 **Happy path**
+- Accept Buyer A → Buyer B's offer → **`standby`** ("On standby"), B notified.
+- Cancel the deal → B's offer (and A's) **revive to `pending`** with a **fresh 48h**
+  expiry + `revived_at` set; owner sees a **"Re-opened"** badge; prior bidders emailed.
+- Owner **accepts B directly** (no re-submission) → new Deal; a third standby offer
+  goes back to `standby`.
+- Complete a deal instead → standby offers → **`superseded`** (terminal).
+
+🟠 **Edge cases**
+- **Reverse** (dispute upheld) revives standby offers the same as cancel.
+- A **standby** offer is **not** auto-expired by `expire_offers` (it filters active
+  statuses only); on revival it gets a fresh window.
+- The previously-**accepted** offer is also released on cancel/reverse — it no longer
+  blocks the seller from accepting a fallback ("another offer already accepted").
+- The per-customer **offer cap** is unaffected (a revived offer is the same offer).
+- Buyer view: a `standby` offer reads "On standby" with an explanation, **not** "declined."
+- 🔴 On **completion**, standby offers must become terminal (`superseded`) — never revived.
+
+---
+
 ## 8. Cross-cutting edge cases (worth a pass across the whole app)
 
 **Auth & sessions**
@@ -393,4 +417,4 @@ cd frontend && npx tsc --noEmit && npm run lint && npm run build   # all clean
 | A | Dealer branches | ✅ `main` |
 | B | Team members & branch-scoped RBAC (+ Car→Branch) | ✅ `main` |
 | C | Two-stage inspect→publish + Inspector/Publisher roles | 🚧 on `feat/spec8-inspect-publish` |
-| D | Offer negotiation fallback (persistent counter-offers) | ⏳ planned |
+| D | Offer negotiation fallback (persistent counter-offers) | 🚧 on `feat/spec9-offer-fallback` |
