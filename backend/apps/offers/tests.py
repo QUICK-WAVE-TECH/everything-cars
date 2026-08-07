@@ -272,10 +272,11 @@ class AcceptOfferTest(APITestCase):
         self.offer.refresh_from_db()
         self.assertEqual(str(self.offer.deal.agreed_amount), "17800000.00")
 
-    def test_rival_offers_superseded(self):
+    def test_rival_offers_go_on_standby(self):
+        # Spec D: rivals are preserved on standby (revivable), not terminally closed.
         self._accept()
         self.rival_offer.refresh_from_db()
-        self.assertEqual(self.rival_offer.status, OfferStatus.SUPERSEDED)
+        self.assertEqual(self.rival_offer.status, OfferStatus.STANDBY)
 
     def test_car_reads_reserved_after_acceptance(self):
         self._accept()
@@ -520,3 +521,23 @@ class StandbyStatusTest(APITestCase):
     def test_standby_status_and_revived_at_exist(self):
         assert OfferStatus.STANDBY == "standby"
         assert any(f.name == "revived_at" for f in Offer._meta.get_fields())
+
+
+class AcceptStandbyTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("as-owner@test.com", "owner")
+        self.car = create_negotiable_car(self.owner)
+        self.a = create_user("buyer-a@test.com")
+        self.b = create_user("buyer-b@test.com")
+        self.offer_a = Offer.objects.create(car=self.car, customer=self.a,
+            amount="14000000.00", currency="NGN", expires_at=timezone.now() + timedelta(hours=48))
+        self.offer_b = Offer.objects.create(car=self.car, customer=self.b,
+            amount="13000000.00", currency="NGN", expires_at=timezone.now() + timedelta(hours=48))
+
+    def test_accepting_puts_rivals_on_standby(self):
+        from apps.offers.services import accept_offer
+        accept_offer(self.offer_a)
+        self.offer_a.refresh_from_db()
+        self.offer_b.refresh_from_db()
+        assert self.offer_a.status == OfferStatus.ACCEPTED
+        assert self.offer_b.status == OfferStatus.STANDBY
