@@ -303,6 +303,33 @@ phone/email**. Individual-owner cars show no branch block.
 
 ---
 
+## 7.5 Spec C — Two-stage inspect→publish + staff roles
+
+**Setup:** in Django admin set staff `staff_role` — one `inspector`, one
+`publisher` (existing staff auto-become `admin` = both). Get a car to a **Passed**
+inspection (owner books + pays → inspector starts + submits Passed).
+
+🟢 **Happy path**
+- Inspector submits **Passed** → car → **Pending Publishing** (not live); owner told it passed.
+- Publisher opens `/admin/publishing` → paginated **oldest-first** queue with a "N waiting" count + search.
+- **Review** → drawer shows listing + inspection report + **inspector's notes**.
+- **Publish live** → car `PUBLISHED`, appears in public browse, owner notified.
+- **Send back** (note ≥ 15) → car `NEEDS_CHANGES`, owner notified.
+
+🟠 **Edge cases**
+- Send-back note **< 15 chars** → 400 / inline error.
+- **Publish a car not in the queue** (already published / wrong state) → 404.
+- **Inspector** on the publishing queue/publish/send-back APIs → **403**; the
+  `/admin/publishing` page shows a "Publishers only" notice; the nav **Publishing**
+  link is hidden for inspectors.
+- **Publisher** on inspection start/submit → **403** (that's the inspector's stage).
+- **Admin** (existing staff) can do **both** stages.
+- **Direct publish:** in the admin car-status console, only publisher/admin may push a car to `Published`.
+- 🔴 A car in **Pending Publishing** must **never** appear in public browse (only `PUBLISHED` is live).
+- 🔴 Existing staff must not lose access after the migration (they're backfilled to `admin`).
+
+---
+
 ## 8. Cross-cutting edge cases (worth a pass across the whole app)
 
 **Auth & sessions**
@@ -365,5 +392,5 @@ cd frontend && npx tsc --noEmit && npm run lint && npm run build   # all clean
 | 5 | VIN transfer & relist | ✅ `main` |
 | A | Dealer branches | ✅ `main` |
 | B | Team members & branch-scoped RBAC (+ Car→Branch) | ✅ `main` |
-| C | Two-stage inspect→publish + Inspector/Publisher roles | ⏳ planned |
+| C | Two-stage inspect→publish + Inspector/Publisher roles | 🚧 on `feat/spec8-inspect-publish` |
 | D | Offer negotiation fallback (persistent counter-offers) | ⏳ planned |

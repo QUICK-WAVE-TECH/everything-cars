@@ -74,6 +74,8 @@ export type UserProfile = {
   phone: string;
   role: UserRole;
   is_staff: boolean;
+  /** Staff sub-role — only meaningful when is_staff. "" for non-staff. */
+  staff_role: "inspector" | "publisher" | "admin" | "";
   date_joined: string;
   customer_profile: {
     national_id: string;

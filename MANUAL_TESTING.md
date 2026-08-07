@@ -212,6 +212,42 @@ mail prints to the `runserver` terminal; they sign in with the normal
 
 ---
 
+## Spec C — Two-stage inspect→publish + staff roles · 🚧 on `feat/spec8-inspect-publish`
+
+**Goal:** Passing a physical inspection no longer publishes a car directly —
+it lands in a **"Pending Publishing"** queue where a **Publisher** reviews the
+inspection and either **publishes** it live or **sends it back** to the owner.
+Staff `is_staff` is split into **Inspector** / **Publisher** / **Admin**
+(`staff_role`, set in Django admin; existing staff auto-become **admin**).
+
+**Setup:** in Django admin, set a staff user's **Staff role** to `inspector`,
+another to `publisher` (leave existing staff as `admin` = both). To reach the
+queue you need a car that **passed** inspection (owner books + pays → inspector
+starts + submits a **Passed** result).
+
+**Manual checklist**
+
+- [ ] As an **inspector**, submit a **Passed** inspection → the car goes to
+  **Pending Publishing** (NOT live yet); the owner is told it passed.
+- [ ] A **publisher** (or admin) sees a **"Publishing"** link in the admin nav; an
+  inspector does **not**. `/admin/publishing` shows the queue with a **"N waiting"**
+  count, **oldest-first**, search, skeletons, and an **"All caught up"** empty state.
+- [ ] Click **Review** → a drawer shows the **listing** (photos, price, branch) and
+  the **inspection report** (checks + **inspector's notes** + inspector name/date).
+- [ ] **Publish live** (confirm) → the car goes **PUBLISHED** and appears in public
+  browse; owner notified.
+- [ ] **Send back** → a note (**≥ 15 chars**) is required; on submit the car goes
+  **Changes requested** and the owner is notified. A short note is rejected.
+- [ ] **Pagination:** with > 20 queued cars, Prev/Next work and the count is right.
+- [ ] _(Roles)_ An **inspector** hitting `/admin/publishing` sees a "Publishers only"
+  notice; the queue/publish/send-back APIs return **403** for inspectors.
+- [ ] _(Public)_ A car in **Pending Publishing** does **not** appear in public
+  browse (only Published is live).
+- [ ] _(Direct publish)_ In the admin car-status console, only a **publisher/admin**
+  can push a listing to **Published**.
+
+---
+
 ### How brands get populated (for reviewers)
 
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh
