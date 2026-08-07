@@ -762,3 +762,16 @@ class MyScopeApiTest(APITestCase):
         assert r.data["is_team_member"] is True
         assert r.data["can_manage_team"] is False
         assert [b["name"] for b in r.data["branches"]] == ["A"]
+
+
+class StaffRoleModelTest(APITestCase):
+    def test_staff_role_choices_and_default(self):
+        u = User.objects.create_user(
+            email="sr@test.com", first_name="S", last_name="R",
+            password="x", role="customer", is_staff=True,
+        )
+        assert u.staff_role == ""
+        u.staff_role = User.StaffRole.INSPECTOR
+        u.save()
+        u.refresh_from_db()
+        assert u.staff_role == "inspector"
