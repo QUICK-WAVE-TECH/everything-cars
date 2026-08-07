@@ -343,7 +343,7 @@ class MyCarListCreateView(APIView):
         if err:
             return err
         obj = (
-            scoped.select_related("owner__owner_profile", "brand")
+            scoped.select_related("owner__owner_profile", "brand", "branch")
             .prefetch_related("images")
             # Annotate availability so the serializer doesn't run per-car request
             # queries (N+1) computing each card's status.
@@ -402,7 +402,7 @@ class MyCarListCreateView(APIView):
             )
 
         car = (
-            Car.objects.select_related("owner__owner_profile", "brand")
+            Car.objects.select_related("owner__owner_profile", "brand", "branch")
             .prefetch_related("images", "features")
             .get(id=car.id)
         )
@@ -421,7 +421,7 @@ class MyCarDetailView(APIView):
             return None
         try:
             return (
-                scoped.select_related("owner__owner_profile", "brand")
+                scoped.select_related("owner__owner_profile", "brand", "branch")
                 .prefetch_related("images", "features")
                 .get(id=car_id)
             )
@@ -644,7 +644,7 @@ class PublicCarListView(APIView):
             .annotate(_is_sold=sold_annotation())
             # Archived cars appear publicly only when actually sold
             .filter(Q(status=CarStatus.PUBLISHED) | Q(_is_sold=True))
-            .select_related("owner__owner_profile", "brand")
+            .select_related("owner__owner_profile", "brand", "branch")
             .prefetch_related("images")
             .annotate(**availability_annotations())
         )
@@ -768,7 +768,7 @@ class PublicCarDetailView(APIView):
 
         try:
             car = (
-                Car.objects.select_related("owner__owner_profile", "brand")
+                Car.objects.select_related("owner__owner_profile", "brand", "branch")
                 .prefetch_related(
                     "images", "features", booked_prefetch, passed_prefetch
                 )
@@ -897,7 +897,7 @@ class MyCarStatusView(APIView):
 
         return Response(
             CarDetailSerializer(
-                Car.objects.select_related("owner__owner_profile", "brand")
+                Car.objects.select_related("owner__owner_profile", "brand", "branch")
                 .prefetch_related("images", "features")
                 .get(id=car.id),
                 context={"request": request},
@@ -1208,7 +1208,7 @@ class AdminCarListView(APIView):
 
     def get(self, request):
         cars = (
-            Car.objects.select_related("owner__owner_profile", "brand")
+            Car.objects.select_related("owner__owner_profile", "brand", "branch")
             .prefetch_related("images")
             # Annotate availability so the serializer doesn't run per-car request
             # queries (N+1) computing each card's status.
@@ -1257,7 +1257,7 @@ class AdminCarDetailView(APIView):
     def get(self, request, car_id):
         try:
             car = (
-                Car.objects.select_related("owner__owner_profile", "brand")
+                Car.objects.select_related("owner__owner_profile", "brand", "branch")
                 .prefetch_related("images", "features")
                 .get(id=car_id)
             )
@@ -1364,7 +1364,7 @@ class AdminCarStatusView(APIView):
                 )
 
         car = (
-            Car.objects.select_related("owner__owner_profile", "brand")
+            Car.objects.select_related("owner__owner_profile", "brand", "branch")
             .prefetch_related("images", "features")
             .get(id=car_id)
         )
@@ -1757,7 +1757,7 @@ class AdminApproveListingView(APIView):
             lambda car_id=car.id: Car.objects.select_related("owner", "brand").get(id=car_id),
         )
         car = (
-            Car.objects.select_related("owner__owner_profile", "brand")
+            Car.objects.select_related("owner__owner_profile", "brand", "branch")
             .prefetch_related("images", "features")
             .get(id=car_id)
         )

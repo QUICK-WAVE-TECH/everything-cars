@@ -222,6 +222,21 @@ class CarDetailSerializer(serializers.ModelSerializer):
     def get_brand(self, obj):
         return obj.brand.name if obj.brand_id else ""
 
+    branch = serializers.SerializerMethodField()
+
+    def get_branch(self, obj):
+        b = obj.branch
+        if not b:
+            return None
+        return {
+            "id": b.id,
+            "name": b.name,
+            "city": b.city,
+            "state": b.state,
+            "phone": b.phone,
+            "email": b.email,
+        }
+
     booked_periods = serializers.SerializerMethodField()
     available_from = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
@@ -253,6 +268,7 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "country",
             "state",
             "city",
+            "branch",
             "description",
             "status",
             "tracking_id",
