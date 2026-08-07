@@ -862,17 +862,22 @@ def notify_offer_expired(offer):
 
 
 def notify_car_no_longer_available(offer):
-    """Tell a superseded bidder the vehicle is gone. Uses the existing template."""
+    """Tell a bidder their offer is on standby while another sale is in progress —
+    it's preserved and will be revived if that deal falls through (Spec D)."""
     _create_notification(
         recipient=offer.customer,
         notification_type=NotificationType.CAR_NO_LONGER_AVAILABLE,
-        title="Vehicle no longer available",
-        message=f"{offer.car.title} is no longer available — another buyer's offer was accepted.",
+        title="Your offer is on standby",
+        message=(
+            f"Another buyer's offer on {offer.car.title} was accepted, so your "
+            "offer is on standby. If that sale falls through we'll bring it back "
+            "and let you know."
+        ),
         data=_offer_data(offer),
     )
     send_email(
         recipient=offer.customer.email,
-        subject="A vehicle you offered on is no longer available",
+        subject="Your offer is on standby",
         template_key="car_sold",
         context={
             "first_name": offer.customer.first_name,
@@ -1002,14 +1007,16 @@ def notify_dispute_dismissed(deal):
 
 
 def notify_car_available_again(offer):
-    """A prior bidder: the car they bid on is back on the market."""
+    """A prior bidder: the deal fell through, their offer is live again, and the
+    seller is reviewing it (Spec D — no need to re-submit)."""
     _create_notification(
         recipient=offer.customer,
         notification_type=NotificationType.CAR_AVAILABLE_AGAIN,
-        title="Vehicle available again",
+        title="Your offer is back in play",
         message=(
-            f"{offer.car.title} is back on the market. "
-            "Make a new offer if you're still interested."
+            f"The deal on {offer.car.title} fell through, so it's available again. "
+            "Your previous offer is active once more and the seller is reviewing it "
+            "— no need to re-submit."
         ),
         data=_offer_data(offer),
     )

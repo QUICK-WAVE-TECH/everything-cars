@@ -567,7 +567,8 @@ class FallbackAcceptTest(APITestCase):
         self.ob.refresh_from_db()
         assert self.ob.status == OfferStatus.PENDING            # acceptable again
         accept_offer(self.ob)                                   # accept fallback B
-        self.ob.refresh_from_db(); self.oc.refresh_from_db()
+        self.ob.refresh_from_db()
+        self.oc.refresh_from_db()
         assert self.ob.status == OfferStatus.ACCEPTED
         assert self.oc.status == OfferStatus.STANDBY            # C back on standby
 
