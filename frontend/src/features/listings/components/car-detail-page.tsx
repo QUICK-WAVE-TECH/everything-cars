@@ -325,6 +325,29 @@ export function CarDetailPage({ carId }: { carId: string }) {
             {car.city && <span>{car.city},</span>} <span>{car.state}</span> {car.country && <span>· {car.country.length === 2 ? (new Intl.DisplayNames(["en"], { type: "region" }).of(car.country.toUpperCase()) ?? car.country) : car.country}</span>}
           </div>
 
+          {/* Branch — inherited location & contact for dealer listings */}
+          {car.branch && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 14, marginBottom: 20, borderRadius: "var(--brc-radius-md)", border: "1px solid var(--brc-border)", background: "var(--brc-bg-subtle)", fontFamily: "var(--brc-font-ui)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, color: "var(--brc-text)" }}>
+                <Icon name="pin" size={15} stroke="var(--brc-primary)" />
+                {car.branch.name}
+              </div>
+              <div style={{ fontSize: 13, color: "var(--brc-text-secondary)" }}>
+                {car.branch.city}, {car.branch.state}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 18px", fontSize: 13, color: "var(--brc-text-secondary)" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Icon name="phone" size={14} stroke="var(--brc-text-muted)" />
+                  {car.branch.phone}
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Icon name="mail" size={14} stroke="var(--brc-text-muted)" />
+                  {car.branch.email}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* CTA — context-aware */}
           {isSold ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, height: 52, width: "100%", borderRadius: "var(--brc-radius-sm)", background: "var(--brc-bg-muted)", color: "var(--brc-text-muted)", fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 15 }}>

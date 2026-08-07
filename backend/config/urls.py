@@ -31,6 +31,7 @@ urlpatterns = [
     path("api/v1/offers/", include("apps.offers.urls")),
     path("api/v1/deals/", include("apps.sales.urls")),
     path("api/v1/owner/", include("apps.listings.branch_urls")),
+    path("api/v1/owner/", include("apps.users.team_urls")),
 ]
 
 if settings.DEBUG:

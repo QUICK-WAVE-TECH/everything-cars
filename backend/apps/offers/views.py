@@ -9,8 +9,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.pagination import StandardPagination
+from common.permissions import IsOwnerOrTeamMember
 
 from apps.listings.models import Car
+from apps.users.services import resolve_business_scope, NoBusinessAccess
 from apps.notifications.notifications import schedule_notification
 from apps.notifications.service import (
     notify_offer_received,
@@ -58,12 +60,20 @@ class OfferRespondView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, offer_id):
-        # A user may only ever see their own offers or offers on their own cars;
+        # A user may only ever see their own offers or offers on cars within
+        # their business scope (owner: all; team member: assigned branches);
         # anything else is a 404, not a 403 — we don't confirm the offer exists.
+        visible = Q(customer=request.user)
+        try:
+            business_owner, branch_ids = resolve_business_scope(request.user)
+            owner_side = Q(car__owner=business_owner)
+            if branch_ids is not None:
+                owner_side &= Q(car__branch_id__in=branch_ids)
+            visible |= owner_side
+        except NoBusinessAccess:
+            pass
         offer = get_object_or_404(
-            Offer.objects.select_related("car", "customer").filter(
-                Q(customer=request.user) | Q(car__owner=request.user)
-            ),
+            Offer.objects.select_related("car", "customer").filter(visible),
             id=offer_id,
         )
         serializer = OfferRespondSerializer(data=request.data)
@@ -76,7 +86,9 @@ class OfferRespondView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        is_owner = offer.car.owner_id == request.user.id
+        # Anyone reaching here who isn't the customer is acting on the owner side
+        # (the primary owner or one of their team members).
+        is_owner = offer.customer_id != request.user.id
         try:
             if is_owner:
                 offer = owner_respond(offer, action, serializer.validated_data)
@@ -140,16 +152,25 @@ class MyOfferListView(APIView):
 
 
 class OwnerOfferListView(APIView):
-    """Offers on the authenticated owner's cars."""
+    """Offers on the business's cars, scoped to the caller's branches."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsOwnerOrTeamMember]
 
     def get(self, request):
+        try:
+            business_owner, branch_ids = resolve_business_scope(request.user)
+        except NoBusinessAccess:
+            return Response(
+                {"detail": "You don't have access to any branch."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         offers = (
-            Offer.objects.filter(car__owner=request.user)
+            Offer.objects.filter(car__owner=business_owner)
             .select_related("car", "customer", "resulting_request")
             .prefetch_related("car__images")
         )
+        if branch_ids is not None:
+            offers = offers.filter(car__branch_id__in=branch_ids)
         offers = _apply_offer_filters(offers, request)
         paginator = StandardPagination()
         page = paginator.paginate_queryset(offers, request)

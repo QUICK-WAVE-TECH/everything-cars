@@ -1,9 +1,9 @@
-import { Breadcrumb } from "@/shared/components";
+import { AuthGuard, Breadcrumb } from "@/shared/components";
 import { TransactionsTable } from "@/features/payments";
 
 export default function OwnerTransactionsPage() {
   return (
-    <>
+    <AuthGuard requiredRole="owner">
       <Breadcrumb
         items={[
           { label: "Dashboard", href: "/owner/dashboard" },
@@ -34,6 +34,6 @@ export default function OwnerTransactionsPage() {
           <TransactionsTable />
         </div>
       </div>
-    </>
+    </AuthGuard>
   );
 }

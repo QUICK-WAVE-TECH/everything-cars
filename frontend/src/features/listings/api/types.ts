@@ -105,8 +105,20 @@ export type CarDetail = CarListItem & {
   booked_periods: BookedPeriod[];
   available_from: string | null;
   verified_report: VerifiedReport | null;
+  /** The branch this car is at, with its inherited contact details. Null for
+   * individual-owner listings. */
+  branch: CarBranch | null;
   /** Owner- and staff-only. Absent from every public payload, so these are
    * optional: never assume they exist on a publicly-fetched car. */
   vin?: string | null;
   plate_number?: string | null;
+};
+
+export type CarBranch = {
+  id: string;
+  name: string;
+  city: string;
+  state: string;
+  phone: string;
+  email: string;
 };

@@ -156,7 +156,7 @@ to relist (customers go through the normal owner onboarding first).
 
 ---
 
-## Spec A — Dealer branches · 🚧 on `feat/spec6-dealer-branches`
+## Spec A — Dealer branches · ✅ on `main`
 
 **Goal:** Give verified **fleet/business** owners multiple physical **branch**
 locations (name, address, dedicated phone/email). The business name is inherited
@@ -181,6 +181,34 @@ members, branch-tagged listings, and the inspect→publish pipeline.)
 - [ ] A **second branch with the same name** is rejected (**"You already have a branch with this name."**).
 - [ ] Loading shows **skeleton cards**; an **individual** owner visiting `/owner/branches` sees a "branches are for business accounts" notice.
 - [ ] _(Isolation)_ Branches are per-business — another fleet owner never sees yours (API returns 404 for cross-business access).
+
+---
+
+## Spec B — Team members & branch-scoped RBAC · 🚧 on `feat/spec7-team-rbac`
+
+**Goal:** Verified **fleet** owners can add **team-member** staff accounts and
+assign each to one or more **branches**. Team members sign in and manage only the
+**inventory, offers, and deals for their assigned branches**. Every fleet car is
+now **tagged with a branch** when listed. (Folds in the `Car → Branch` attribution;
+the inspect→publish pipeline + Inspector/Publisher roles are a later spec.)
+
+**Setup:** a **verified fleet** owner (owner_type=fleet) with at least one branch
+(Spec A). Dev uses the console email backend — team-member "you've been added"
+mail prints to the `runserver` terminal; they sign in with the normal
+**passwordless** flow (enter email → code → in).
+
+**Manual checklist**
+
+- [ ] As the fleet **owner**, the dashboard shows a **"Team"** tile (next to Branches). Open `/owner/team`.
+- [ ] Empty state ("Build your team") → **Add member**: email + first/last name + optional title + a **branch multi-select** (must pick ≥1). Submitting a **duplicate email** or **no branch** shows inline errors. Save → toast "Member added", the member card appears (avatar, name, title, email, **branch chips**, Active).
+- [ ] **Edit** a member (⋯) → email is **read-only**; you can change title + reassign branches. **Deactivate** (confirm dialog) → card dims, "Disabled" badge; ⋯ → **Reactivate**.
+- [ ] **Listing gets a branch:** as owner (or team member), `/owner/my-cars/new` now has a required **Branch** select. Individual owners never see it. A fleet owner with no branch is still redirected to Branches.
+- [ ] **Sign in as the team member** (passwordless). Their dashboard shows a **"Viewing: {branch chips}"** indicator and only **My Cars / Offers / Deals** tiles (no Branches/Team/Transactions).
+- [ ] The team member sees **only their assigned branch's** cars in My Cars, and only offers/deals on those cars. A car/offer/deal in an **unassigned** branch is **not found** (404) if hit directly.
+- [ ] The team member can **list a car** (must pick one of *their* branches — the car is owned by the business, tagged to that branch), **respond to / accept** an offer on their branch, and **complete/cancel** a deal on their branch.
+- [ ] A team member visiting `/owner/branches`, `/owner/team`, or `/owner/transactions` is **redirected** to their dashboard (owner-only).
+- [ ] **Retire a branch** (as owner) → it's **removed from every member's** assignments; a member left with no branch sees the "ask your business owner" notice on the list-car page.
+- [ ] **Public listing:** a dealer car's detail page shows the **branch location + inherited phone/email**.
 
 ---
 

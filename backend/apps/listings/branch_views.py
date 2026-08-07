@@ -94,6 +94,9 @@ class BranchDeactivateView(BranchDetailView):
         branch = self._get_branch(request, branch_id)
         branch.is_active = False
         branch.save(update_fields=["is_active", "updated_at"])
+        # Drop the retired branch from any team member's assignments; a member
+        # left with no active branch simply sees an empty dashboard.
+        branch.team_memberships.clear()
         return Response(BranchSerializer(branch).data)
 
 

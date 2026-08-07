@@ -222,6 +222,21 @@ class CarDetailSerializer(serializers.ModelSerializer):
     def get_brand(self, obj):
         return obj.brand.name if obj.brand_id else ""
 
+    branch = serializers.SerializerMethodField()
+
+    def get_branch(self, obj):
+        b = obj.branch
+        if not b:
+            return None
+        return {
+            "id": b.id,
+            "name": b.name,
+            "city": b.city,
+            "state": b.state,
+            "phone": b.phone,
+            "email": b.email,
+        }
+
     booked_periods = serializers.SerializerMethodField()
     available_from = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
@@ -253,6 +268,7 @@ class CarDetailSerializer(serializers.ModelSerializer):
             "country",
             "state",
             "city",
+            "branch",
             "description",
             "status",
             "tracking_id",
@@ -431,6 +447,11 @@ class CarCreateSerializer(serializers.ModelSerializer):
     # Accept the brand as a name string (the picker sends the canonical name, or
     # nothing when "Other" is chosen). validate() resolves it to the Brand FK.
     brand = serializers.CharField(required=False, allow_blank=True)
+    # The branch this car is physically at. Required for fleet listers; ownership
+    # + team-member assignment are checked in validate().
+    branch = serializers.PrimaryKeyRelatedField(
+        queryset=Branch.objects.all(), required=False, allow_null=True
+    )
     MIN_MODEL_YEAR = 1900
     MAX_SEATS = 60
     VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
@@ -514,6 +535,7 @@ class CarCreateSerializer(serializers.ModelSerializer):
             "vin",
             "plate_number",
             "is_negotiable",
+            "branch",
             "country",
             "state",
             "city",
@@ -576,7 +598,47 @@ class CarCreateSerializer(serializers.ModelSerializer):
                 )
 
             data["rent_price_per_day"] = None
+
+        self._validate_branch(data)
         return data
+
+    def _validate_branch(self, data):
+        """Fleet listers (owner or team member) must tag the car with a branch
+        they're allowed to use; individual owners never carry a branch."""
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if user is None:
+            return
+
+        from apps.users.services import NoBusinessAccess, resolve_business_scope
+
+        try:
+            business_owner, branch_ids = resolve_business_scope(user)
+        except NoBusinessAccess:
+            return
+        profile = getattr(business_owner, "owner_profile", None)
+        is_fleet = bool(profile and profile.owner_type == "fleet")
+
+        if not is_fleet:
+            data["branch"] = None
+            return
+
+        branch = data.get("branch")
+        # On edit with the field omitted, leave the existing branch untouched.
+        if branch is None and self.instance is not None and "branch" not in data:
+            return
+        if branch is None:
+            raise serializers.ValidationError(
+                {"branch": "Select the branch this vehicle is at."}
+            )
+        if branch.business_id != profile.id:
+            raise serializers.ValidationError(
+                {"branch": "That branch isn't part of your business."}
+            )
+        if branch_ids is not None and branch.id not in branch_ids:
+            raise serializers.ValidationError(
+                {"branch": "You aren't assigned to that branch."}
+            )
 
     def validate_year(self, value):
         max_year = timezone.now().year + 1
