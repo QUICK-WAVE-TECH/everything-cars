@@ -20,6 +20,11 @@ from .models import (
     InspectionCenter,
     PhysicalInspection,
     AssistanceRequest,
+    FuelType,
+    CarType,
+    VehicleUsedCondition,
+    ComponentCondition,
+    InspectionResult,
 )
 from .services import generate_tracking_id, record_status_change
 
@@ -2182,15 +2187,6 @@ class InspectionRoleGateTest(APITestCase):
             f"/api/v1/inspections/admin/bookings/{uuid.uuid4()}/start/"
         )
         assert r.status_code == 403
-
-
-from apps.inspections.models import (
-    FuelType,
-    CarType,
-    VehicleUsedCondition,
-    ComponentCondition,
-    InspectionResult,
-)
 
 
 def make_pending_publishing_car(owner, inspector, slot, title="Queued Car"):

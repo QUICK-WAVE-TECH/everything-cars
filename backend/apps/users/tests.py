@@ -791,8 +791,10 @@ class InspectPublishPermsTest(APITestCase):
                 first_name="A", last_name="B", password="x", role="customer",
                 is_staff=True, staff_role=role)
 
-        insp = staff("inspector"); pub = staff("publisher")
-        adm = staff("admin"); none = staff("")
+        insp = staff("inspector")
+        pub = staff("publisher")
+        adm = staff("admin")
+        none = staff("")
         customer = User.objects.create_user(email="cperm@t.com", first_name="C",
             last_name="D", password="x", role="customer")
 
