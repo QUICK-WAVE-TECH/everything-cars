@@ -804,3 +804,13 @@ class InspectPublishPermsTest(APITestCase):
         assert IsPublisher().has_permission(self._req(insp), None) is False
         assert IsInspector().has_permission(self._req(customer), None) is False
         assert IsPublisher().has_permission(self._req(none), None) is False
+
+
+class MeStaffRoleTest(APITestCase):
+    def test_me_includes_staff_role(self):
+        u = User.objects.create_user(email="me-sr@test.com", first_name="M", last_name="E",
+            password="x", role="customer", is_active=True, is_staff=True, staff_role="publisher")
+        self.client.force_authenticate(u)
+        r = self.client.get("/api/v1/users/me")
+        assert r.status_code == 200
+        assert r.data["staff_role"] == "publisher"

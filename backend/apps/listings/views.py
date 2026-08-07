@@ -1320,6 +1320,16 @@ class AdminCarStatusView(APIView):
                     new_status = CarStatus.LISTING_APPROVED
                 # anything else (published or unknown) → published
 
+            # Publishing is a Publisher/Admin action (two-stage integrity).
+            if new_status == CarStatus.PUBLISHED and request.user.staff_role not in (
+                "publisher",
+                "admin",
+            ):
+                return Response(
+                    {"detail": "Only a publisher can publish a listing."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
             # Suspending mid-booking would strand a PENDING booking that
             # keeps consuming slot capacity — release it.
             if (
