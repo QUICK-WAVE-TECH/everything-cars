@@ -24,15 +24,16 @@ from .models import (
 
 
 def _revive_standby_offers(car):
-    """A deal fell through — bring the car's standby offers back as acceptable
-    PENDING offers (fresh 48h TTL) so the seller can accept a fallback without
-    the buyer re-submitting. Returns the revived offers (for notifications).
-    Must run inside the caller's transaction."""
+    """A deal fell through — the car reverts to active negotiation. Bring every
+    still-open offer (the standby rivals AND the now-defunct accepted offer) back
+    as acceptable PENDING offers (fresh 48h TTL) so the seller can accept a
+    fallback without the buyer re-submitting. Returns the revived offers (for
+    notifications). Must run inside the caller's transaction."""
     now = timezone.now()
     revived = list(
-        Offer.objects.filter(car=car, status=OfferStatus.STANDBY).select_related(
-            "car", "customer"
-        )
+        Offer.objects.filter(
+            car=car, status__in=[OfferStatus.STANDBY, OfferStatus.ACCEPTED]
+        ).select_related("car", "customer")
     )
     Offer.objects.filter(id__in=[o.id for o in revived]).update(
         status=OfferStatus.PENDING,
