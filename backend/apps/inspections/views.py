@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.pagination import StandardPagination
-from common.permissions import IsOwner, IsStaff
+from common.permissions import IsOwner, IsStaff, IsInspector
 from apps.listings.models import (
     Car,
     CarStatus,
@@ -1126,7 +1126,7 @@ class StaffBookingDetailView(APIView):
 class StaffInspectionStartView(APIView):
     """Marks the start of the physical inspection: car → inspection_in_progress."""
 
-    permission_classes = [IsStaff]
+    permission_classes = [IsInspector]
 
     def post(self, request, booking_id):
         with transaction.atomic():
@@ -1179,7 +1179,7 @@ class StaffInspectionStartView(APIView):
 
 # result → (car status, owner notification)
 RESULT_TRANSITIONS = {
-    InspectionResult.PASSED: (CarStatus.PUBLISHED, notify_inspection_passed),
+    InspectionResult.PASSED: (CarStatus.PENDING_PUBLISHING, notify_inspection_passed),
     InspectionResult.NEEDS_CLEARANCE: (
         CarStatus.NEEDS_CLEARANCE,
         notify_needs_clearance,
@@ -1196,7 +1196,7 @@ class StaffInspectionSubmitView(APIView):
     next status: passed → published (auto), needs_clearance → owner loop,
     failed → inspection_rejected (terminal)."""
 
-    permission_classes = [IsStaff]
+    permission_classes = [IsInspector]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def post(self, request, booking_id):

@@ -941,13 +941,14 @@ class StaffInspectionFlowTest(APITestCase):
         res = self._submit()
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_submit_passed_publishes_car(self):
+    def test_submit_passed_moves_to_pending_publishing(self):
         self._start()
         res = self._submit_with_documents(result="passed")
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.car.refresh_from_db()
-        self.assertEqual(self.car.status, CarStatus.PUBLISHED)
-        self.assertIsNotNone(self.car.published_at)
+        # Two-stage flow: a passed inspection awaits a publisher, not live yet.
+        self.assertEqual(self.car.status, CarStatus.PENDING_PUBLISHING)
+        self.assertIsNone(self.car.published_at)
         self.booking.refresh_from_db()
         self.assertEqual(self.booking.status, BookingStatus.COMPLETED)
         inspection = PhysicalInspection.objects.get(booking=self.booking)
@@ -998,7 +999,7 @@ class StaffInspectionFlowTest(APITestCase):
         transitions = list(self.car.status_history.values_list("to_status", flat=True))
         self.assertEqual(
             transitions,
-            [CarStatus.INSPECTION_IN_PROGRESS, CarStatus.PUBLISHED],
+            [CarStatus.INSPECTION_IN_PROGRESS, CarStatus.PENDING_PUBLISHING],
         )
 
     def test_mark_no_show(self):
@@ -2166,3 +2167,18 @@ class BookingDetailPaymentTest(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["payment"]["total"], "21500.00")
         self.assertEqual(res.data["payment"]["status"], "submitted")
+
+
+class InspectionRoleGateTest(APITestCase):
+    """Only inspectors (or admins) may start/submit inspections; a publisher can't."""
+
+    def setUp(self):
+        self.publisher = create_user("insp-gate-pub@test.com", "owner",
+            is_staff=True, staff_role="publisher")
+
+    def test_publisher_cannot_start_inspection(self):
+        self.client.force_authenticate(self.publisher)
+        r = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{uuid.uuid4()}/start/"
+        )
+        assert r.status_code == 403

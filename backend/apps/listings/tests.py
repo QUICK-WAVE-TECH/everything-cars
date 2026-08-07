@@ -29,6 +29,10 @@ from apps.listings.migration_helpers import delete_both_cars
 
 
 def create_user(email, role, **extra):
+    # Mirror the production backfill: a staff test user is a full-access "admin"
+    # unless the test asks for a specific staff_role (inspector/publisher).
+    if extra.get("is_staff") and "staff_role" not in extra:
+        extra["staff_role"] = "admin"
     return User.objects.create_user(
         email=email,
         first_name=extra.pop("first_name", role.title()),
