@@ -30,9 +30,10 @@ class UserAdmin(BaseUserAdmin):
         "role",
         "is_active",
         "is_staff",
+        "staff_role",
         "date_joined",
     )
-    list_filter = ("role", "is_active", "is_staff")
+    list_filter = ("role", "is_active", "is_staff", "staff_role")
     search_fields = ("email", "first_name", "last_name", "phone")
     ordering = ("-date_joined",)
     inlines = [CustomerProfileInline, OwnerProfileInline]
@@ -45,6 +46,7 @@ class UserAdmin(BaseUserAdmin):
                 "fields": (
                     "is_active",
                     "is_staff",
+                    "staff_role",
                     "is_superuser",
                     "groups",
                     "user_permissions",
