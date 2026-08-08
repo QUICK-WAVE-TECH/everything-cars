@@ -25,6 +25,8 @@ import {
 import { BookingModal } from "@/features/inspections/components/booking-modal";
 import { useMyBookings } from "@/features/inspections/api/inspections-api";
 import type { InspectionBooking } from "@/features/inspections/api/types";
+import { useMe } from "@/features/auth/api";
+import { useMyScope } from "@/features/team/api";
 
 // ---------- Types ----------
 type ListingStatus =
@@ -653,6 +655,8 @@ export default function MyCarsPage() {
   const { data: rawListings, isLoading } = useMyCarsList();
   const { data: bookingsData } = useMyBookings({ page_size: 100 });
   const deleteCar = useDeleteCar();
+  const { data: me } = useMe();
+  const scopeQuery = useMyScope();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -779,6 +783,53 @@ export default function MyCarsPage() {
             </div>
           </div>
         </div>
+        </div>
+      </>
+    );
+  }
+
+  // Fleet owners (and team members) can't list cars until they have an active
+  // branch — gate the whole page with a prompt to add/get assigned a branch.
+  const needsBranch =
+    (me?.role === "owner" && me?.owner_profile?.owner_type === "fleet") ||
+    me?.role === "team_member";
+  const isTeamMember = me?.role === "team_member";
+  const hasBranch = (scopeQuery.data?.branches.length ?? 0) > 0;
+
+  if (needsBranch && scopeQuery.isSuccess && !hasBranch) {
+    return (
+      <>
+        <Breadcrumb items={[{ label: "Dashboard", href: "/owner/dashboard" }, { label: "Listed Cars" }]} />
+        <div className="min-h-screen bg-[linear-gradient(180deg,#f8f9fc_0%,#f3f6fb_42%,#fff_100%)]">
+          <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-6 px-4 py-6 pb-14 sm:gap-8 sm:px-6 sm:py-10 lg:px-[var(--brc-space-10,40px)] lg:py-12 lg:pb-20">
+            <h1 className="m-0 text-[34px] font-black tracking-tight text-(--brc-text) [font-family:var(--brc-font-display)] sm:text-[44px]">
+              Listed Cars
+            </h1>
+            <div className="flex flex-col items-center gap-5 rounded-2xl border border-(--brc-border) bg-white p-8 text-center shadow-[0_22px_60px_rgba(18,18,18,0.06)] sm:p-12 [font-family:var(--brc-font-ui)]">
+              <span className="flex size-16 items-center justify-center rounded-full bg-(--brc-primary-tint) text-(--brc-primary)">
+                <Icon name="building" size={28} stroke="currentColor" />
+              </span>
+              <div className="flex flex-col gap-2">
+                <h2 className="m-0 text-2xl font-extrabold text-(--brc-text) [font-family:var(--brc-font-display)]">
+                  {isTeamMember ? "No branch assigned yet" : "Add a branch to start listing cars"}
+                </h2>
+                <p className="m-0 max-w-[46ch] text-base leading-relaxed text-(--brc-text-muted)">
+                  {isTeamMember
+                    ? "You haven't been assigned to a branch yet. Ask your business owner to assign you a branch — then you can list and manage vehicles here."
+                    : "Your vehicles are organised by branch. Create your first branch, then you can list cars and manage them here."}
+                </p>
+              </div>
+              {!isTeamMember ? (
+                <Link
+                  href="/owner/branches"
+                  className="inline-flex h-12 items-center gap-2 rounded-lg bg-(--brc-primary) px-6 text-sm font-bold text-(--brc-text-on-primary) no-underline transition-colors hover:bg-(--brc-primary-hover) [font-family:var(--brc-font-ui)]"
+                >
+                  <Icon name="plus" size={18} stroke="currentColor" />
+                  Add branch
+                </Link>
+              ) : null}
+            </div>
+          </div>
         </div>
       </>
     );
