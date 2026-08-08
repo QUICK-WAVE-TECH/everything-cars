@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.db import transaction
 from django.http import Http404
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -8,11 +10,15 @@ from common.pagination import StandardPagination
 from common.permissions import IsOwner
 
 from apps.listings.models import Branch
-from apps.users.models import TeamMembership
+from apps.notifications.service import notify_team_member_added
+from apps.users.models import PasswordResetToken, TeamMembership
 from apps.users.team_serializers import (
     TeamMemberCreateSerializer,
     TeamMemberSerializer,
 )
+
+# Team-member invites live longer than a password reset — 7 days.
+INVITE_TOKEN_MINUTES = 7 * 24 * 60
 
 
 def _verified_fleet_profile(user):
@@ -52,7 +58,20 @@ class TeamListCreateView(APIView):
             data=request.data, context={"business": profile}
         )
         serializer.is_valid(raise_exception=True)
-        membership = serializer.save()
+        with transaction.atomic():
+            membership = serializer.save()
+            # A set-your-password link (like a reset), so the new member can pick
+            # a password and sign in — every account needs a username + password.
+            token = PasswordResetToken.create_token(
+                membership.user, expires_in_minutes=INVITE_TOKEN_MINUTES
+            )
+            setup_url = (
+                settings.FRONTEND_URL.rstrip("/")
+                + f"/reset-password?token={token.plain_token}"
+            )
+            transaction.on_commit(
+                lambda m=membership, url=setup_url: notify_team_member_added(m, url)
+            )
         return Response(
             TeamMemberSerializer(membership).data, status=status.HTTP_201_CREATED
         )

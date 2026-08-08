@@ -214,8 +214,9 @@ class PasswordResetToken(models.Model):
         db_table = "password_reset_tokens"
 
     @classmethod
-    def create_token(cls, user):
-        # Invalidate old token for this user
+    def create_token(cls, user, expires_in_minutes=30):
+        # Invalidate old token for this user. A longer window is used for
+        # team-member invites (set-your-password) than for a password reset.
 
         cls.objects.filter(
             user=user,
@@ -225,7 +226,7 @@ class PasswordResetToken(models.Model):
         obj = cls.objects.create(
             user=user,
             token_hash=hashlib.sha256(token.encode()).hexdigest(),
-            expires_at=timezone.now() + timedelta(minutes=30),
+            expires_at=timezone.now() + timedelta(minutes=expires_in_minutes),
         )
         obj.plain_token = token
         return obj
