@@ -370,6 +370,12 @@ const STATUS_STYLES: Record<
     dot: "var(--brc-warning)",
     label: "Needs Changes",
   },
+  pending_publishing: {
+    bg: "var(--brc-accent-bg)",
+    fg: "var(--brc-accent)",
+    dot: "var(--brc-accent)",
+    label: "Awaiting Publishing",
+  },
   published: {
     bg: "var(--brc-success-bg)",
     fg: "var(--brc-success)",

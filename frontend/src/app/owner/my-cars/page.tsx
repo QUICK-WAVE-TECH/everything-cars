@@ -34,6 +34,7 @@ type ListingStatus =
   | "listing_approved"
   | "needs_changes"
   | "needs_clearance"
+  | "pending_publishing"
   | "published"
   | "paused"
   | "suspended"
@@ -126,6 +127,7 @@ const STATUS_MAP: Record<ListingStatus, { bg: string; fg: string; dot: string; l
   listing_approved: { bg: "var(--brc-success-bg)", fg: "var(--brc-success)", dot: "var(--brc-success)", label: "Approved" },
   needs_changes: { bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)", dot: "var(--brc-accent)", label: "Needs Changes" },
   needs_clearance: { bg: "var(--brc-warning-bg)", fg: "#9a7400", dot: "var(--brc-warning)", label: "Needs Clearance" },
+  pending_publishing: { bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)", dot: "var(--brc-accent)", label: "Awaiting Publishing" },
   published: { bg: "var(--brc-success-bg)", fg: "var(--brc-success)", dot: "var(--brc-success)", label: "Published" },
   paused: { bg: "var(--brc-accent-bg)", fg: "var(--brc-accent)", dot: "var(--brc-accent)", label: "Paused" },
   suspended: { bg: "var(--brc-danger-bg)", fg: "var(--brc-danger)", dot: "var(--brc-danger)", label: "Suspended" },

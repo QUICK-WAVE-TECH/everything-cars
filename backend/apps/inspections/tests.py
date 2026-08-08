@@ -946,6 +946,23 @@ class StaffInspectionFlowTest(APITestCase):
         res = self._submit()
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_passed_inspection_alerts_publishers_not_inspectors(self):
+        from django.core import mail
+        publisher = create_user("flow-pub@test.com", "owner", is_staff=True,
+            staff_role="publisher")
+        inspector = create_user("flow-insp@test.com", "owner", is_staff=True,
+            staff_role="inspector")
+        self._start()
+        mail.outbox = []
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self._submit_with_documents(result="passed")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        recipients = {addr for m in mail.outbox for addr in m.to}
+        assert "flow-pub@test.com" in recipients        # publisher alerted
+        assert "flow-insp@test.com" not in recipients   # inspector is not
+        assert publisher.notifications.filter(title__icontains="ready to publish").exists()
+        assert not inspector.notifications.filter(title__icontains="ready to publish").exists()
+
     def test_submit_passed_moves_to_pending_publishing(self):
         self._start()
         res = self._submit_with_documents(result="passed")

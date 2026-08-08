@@ -147,6 +147,15 @@ const STATUS_PRESENTATIONS: Record<string, StatusPresentation> = {
     secondary: { label: "Resubmit", icon: CheckIcon, command: "resubmit" },
     more: ["archive"],
   },
+  pending_publishing: {
+    label: "Awaiting Publishing",
+    tone: "accent",
+    icon: CheckIcon,
+    title: "Passed inspection — awaiting publishing",
+    body: "Your car passed inspection. Our team is giving it a final review before it goes live on the marketplace.",
+    // Locked while awaiting publishing (backend EDITABLE_CAR_STATUSES = [needs_changes]).
+    more: ["archive"],
+  },
   published: {
     label: "Published",
     tone: "success",
@@ -247,6 +256,7 @@ function formatBookingDate(booking: InspectionBooking) {
 
 function progressIndex(status: string) {
   if (["published", "paused"].includes(status)) return 4;
+  if (status === "pending_publishing") return 3;
   if (["inspection_pending", "inspection_in_progress", "needs_clearance", "inspection_rejected", "inspection_no_show"].includes(status)) return 2;
   if (status === "listing_approved") return 2;
   if (["draft", "needs_changes"].includes(status)) return 1;
