@@ -11,7 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { StateSelect } from "@/features/auth/components";
+import { CityCombobox, StateSelect } from "@/features/auth/components";
+import { COUNTRIES } from "@/features/auth/data/countries";
+import { useMe } from "@/features/auth/api";
 import { ApiError } from "@/lib/api-client";
 
 import { useCreateBranch, useUpdateBranch } from "../api/branches-api";
@@ -75,6 +77,14 @@ export function BranchFormDialog({
   const create = useCreateBranch();
   const update = useUpdateBranch();
   const saving = create.isPending || update.isPending;
+
+  // State/City dropdowns are driven by the country the owner registered with
+  // (their profile country is an ISO code); fall back to Nigeria if unset.
+  const { data: me } = useMe();
+  const countryName =
+    COUNTRIES.find(
+      (c) => c.iso === (me?.owner_profile?.country ?? "").toLowerCase(),
+    )?.name ?? "Nigeria";
 
   // Lazy init from `branch`; the parent remounts this dialog on each open (via a
   // changing key), so state resets without a setState-in-effect.
@@ -199,24 +209,28 @@ export function BranchFormDialog({
             />
           </Field>
 
-          {/* State (shared searchable combobox) + City */}
+          {/* State + City — same geo API as registration, driven by the
+              owner's registered country. Changing the state clears the city. */}
           <div className="flex flex-col gap-1.5">
             <StateSelect
-              country="Nigeria"
+              country={countryName}
               value={values.state}
-              onChange={(s) => set("state", s)}
+              onChange={(s) => {
+                set("state", s);
+                set("city", "");
+              }}
             />
             {errors.state ? <ErrorText>{errors.state}</ErrorText> : null}
           </div>
-          <Field label="City" error={errors.city}>
-            <input
-              type="text"
+          <div className="flex flex-col gap-1.5">
+            <CityCombobox
+              country={countryName}
+              state={values.state}
               value={values.city}
-              onChange={(e) => set("city", e.target.value)}
-              placeholder="e.g., Amuwo Odofin"
-              className={inputClass("city")}
+              onChange={(c) => set("city", c)}
             />
-          </Field>
+            {errors.city ? <ErrorText>{errors.city}</ErrorText> : null}
+          </div>
 
           {/* Street address */}
           <Field
