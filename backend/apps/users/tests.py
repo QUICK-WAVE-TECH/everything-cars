@@ -89,6 +89,11 @@ class WiredEmailTemplatesTest(APITestCase):
         "auth_login_code": {"code": "123456", "expires_minutes": 10},
         "auth_signup_code": {"code": "123456", "expires_minutes": 10},
         "owner_verified": {"first_name": "Ada", "action_url": "http://fe/x"},
+        "team_member_added": {
+            "first_name": "Chidi",
+            "business_name": "AutoKings Motors",
+            "action_url": "http://fe/reset-password?token=abc123",
+        },
         "listing_approved": {"car_title": "Lexus NX", "action_url": "http://fe/x"},
         "changes_requested": {
             "car_title": "Lexus NX",
@@ -816,3 +821,61 @@ class MeStaffRoleTest(APITestCase):
         r = self.client.get("/api/v1/users/me")
         assert r.status_code == 200
         assert r.data["staff_role"] == "publisher"
+
+
+class TeamMemberWelcomeEmailTest(APITestCase):
+    def test_creating_a_member_sends_a_welcome_email(self):
+        from django.core import mail
+        owner = create_user_owner("welcome-owner@test.com")
+        profile = create_fleet_owner_profile(owner, fleet_name="AutoKings Motors")
+        b1 = Branch.objects.create(business=profile, name="HQ", state="Lagos",
+            city="Ikeja", street_address="1 A", phone="+2348010000000", email="a@x.ng")
+        self.client.force_authenticate(owner)
+        mail.outbox = []
+        with self.captureOnCommitCallbacks(execute=True):
+            r = self.client.post("/api/v1/owner/team/", {
+                "email": "newrep@test.com", "first_name": "Chidi", "last_name": "Okafor",
+                "title": "Sales", "branch_ids": [str(b1.id)],
+            }, format="json")
+        assert r.status_code == 201, r.data
+        # Welcome email lands with the member and business named.
+        assert any(m.to == ["newrep@test.com"] for m in mail.outbox), [m.to for m in mail.outbox]
+        welcome = next(m for m in mail.outbox if m.to == ["newrep@test.com"])
+        assert "AutoKings Motors" in welcome.subject
+        # It links to a set-password page (reset-password token).
+        body = " ".join([welcome.body, *[b for b, _ in welcome.alternatives]])
+        assert "/reset-password?token=" in body
+        # A usable set-password token was minted for the member.
+        member = User.objects.get(email="newrep@test.com")
+        from apps.users.models import PasswordResetToken
+        assert PasswordResetToken.objects.filter(user=member, is_used=False).exists()
+        # And an in-app notification for the member.
+        assert member.notifications.filter(title__icontains="AutoKings Motors").exists()
+
+    def test_member_can_set_password_and_sign_in(self):
+        import re
+        from django.core import mail
+        owner = create_user_owner("e2e-owner@test.com")
+        profile = create_fleet_owner_profile(owner, fleet_name="AutoKings Motors")
+        b1 = Branch.objects.create(business=profile, name="HQ", state="Lagos",
+            city="Ikeja", street_address="1 A", phone="+2348010000000", email="a@x.ng")
+        self.client.force_authenticate(owner)
+        mail.outbox = []
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post("/api/v1/owner/team/", {
+                "email": "e2e-rep@test.com", "first_name": "Chidi",
+                "last_name": "Okafor", "branch_ids": [str(b1.id)],
+            }, format="json")
+        # Pull the real token out of the emailed set-password link.
+        welcome = next(m for m in mail.outbox if m.to == ["e2e-rep@test.com"])
+        html = " ".join([welcome.body, *[b for b, _ in welcome.alternatives]])
+        match = re.search(r"/reset-password\?token=([^\s\"'&<]+)", html)
+        assert match, html[:400]
+        plain_token = match.group(1)
+        # The member sets their password via that link, then can sign in.
+        self.client.force_authenticate(None)
+        r = self.client.post("/api/v1/auth/reset-password",
+            {"token": plain_token, "password": "MyNewPass123!"}, format="json")
+        assert r.status_code == 200, r.data
+        member = User.objects.get(email="e2e-rep@test.com")
+        assert member.check_password("MyNewPass123!")

@@ -193,9 +193,10 @@ now **tagged with a branch** when listed. (Folds in the `Car → Branch` attribu
 the inspect→publish pipeline + Inspector/Publisher roles are a later spec.)
 
 **Setup:** a **verified fleet** owner (owner_type=fleet) with at least one branch
-(Spec A). Dev uses the console email backend — team-member "you've been added"
-mail prints to the `runserver` terminal; they sign in with the normal
-**passwordless** flow (enter email → code → in).
+(Spec A). Dev uses the console email backend — the team-member "you've been added"
+mail prints to the `runserver` terminal. That email contains a **"Set up your
+password"** link (`/reset-password?token=…`, valid 7 days); the member sets a
+password there, then signs in with their **email + password**.
 
 **Manual checklist**
 
@@ -203,7 +204,7 @@ mail prints to the `runserver` terminal; they sign in with the normal
 - [ ] Empty state ("Build your team") → **Add member**: email + first/last name + optional title + a **branch multi-select** (must pick ≥1). Submitting a **duplicate email** or **no branch** shows inline errors. Save → toast "Member added", the member card appears (avatar, name, title, email, **branch chips**, Active).
 - [ ] **Edit** a member (⋯) → email is **read-only**; you can change title + reassign branches. **Deactivate** (confirm dialog) → card dims, "Disabled" badge; ⋯ → **Reactivate**.
 - [ ] **Listing gets a branch:** as owner (or team member), `/owner/my-cars/new` now has a required **Branch** select. Individual owners never see it. A fleet owner with no branch is still redirected to Branches.
-- [ ] **Sign in as the team member** (passwordless). Their dashboard shows a **"Viewing: {branch chips}"** indicator and only **My Cars / Offers / Deals** tiles (no Branches/Team/Transactions).
+- [ ] The new member gets a **"Set up your password"** email → open the link, set a password, then **sign in with email + password**. Their dashboard shows a **"Viewing: {branch chips}"** indicator and only **My Cars / Offers / Deals** tiles (no Branches/Team/Transactions).
 - [ ] The team member sees **only their assigned branch's** cars in My Cars, and only offers/deals on those cars. A car/offer/deal in an **unassigned** branch is **not found** (404) if hit directly.
 - [ ] The team member can **list a car** (must pick one of *their* branches — the car is owned by the business, tagged to that branch), **respond to / accept** an offer on their branch, and **complete/cancel** a deal on their branch.
 - [ ] A team member visiting `/owner/branches`, `/owner/team`, or `/owner/transactions` is **redirected** to their dashboard (owner-only).

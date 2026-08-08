@@ -694,6 +694,34 @@ def notify_owner_verified(user):
     )
 
 
+def notify_team_member_added(membership, setup_url):
+    """A new team member is welcomed (and emailed) when the business owner adds
+    them — mirrors the owner's onboarding email. `setup_url` is a set-your-password
+    link (a reset-password token) so they can pick a password and sign in."""
+    user = membership.user
+    business_name = membership.business.fleet_name
+    _create_notification(
+        recipient=user,
+        notification_type=NotificationType.SYSTEM,
+        title=f"You've been added to {business_name}",
+        message=(
+            f"{business_name} added you to their team. Set up your password to sign "
+            "in and manage their vehicles and offers."
+        ),
+        data={},
+    )
+    send_email(
+        recipient=user.email,
+        subject=f"You've been added to {business_name} on EverythingCars",
+        template_key="team_member_added",
+        context={
+            "first_name": user.first_name,
+            "business_name": business_name,
+            "action_url": setup_url,
+        },
+    )
+
+
 # ── Offers (Spec D1) ──────────────────────────────────────────────────────────
 #
 # In-app notifications are the critical, tested path. Emails are fail-soft
