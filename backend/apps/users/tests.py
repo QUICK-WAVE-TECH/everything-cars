@@ -133,6 +133,11 @@ class WiredEmailTemplatesTest(APITestCase):
             "owner_name": "Ada Bello",
             "review_url": "http://fe/admin",
         },
+        "staff_car_ready_to_publish": {
+            "car_title": "Lexus NX",
+            "owner_name": "Ada Bello",
+            "review_url": "http://fe/admin/publishing",
+        },
         "staff_assistance_request": {
             "owner_name": "Ada Bello",
             "state": "Kano",

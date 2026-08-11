@@ -27,6 +27,7 @@ from apps.notifications.service import (
     notify_inspection_started,
     notify_needs_clearance,
     notify_inspection_passed,
+    notify_car_ready_to_publish,
     notify_inspection_failed,
     notify_inspection_no_show,
     notify_inspection_rescheduled,
@@ -1316,6 +1317,15 @@ class StaffInspectionSubmitView(APIView):
             notify_func,
             lambda bid=booking.id: booking_detail_queryset().get(id=bid),
         )
+        # A passed inspection lands the car in the publishing queue — alert the
+        # publishers/admins who review and publish it.
+        if new_status == CarStatus.PENDING_PUBLISHING:
+            schedule_notification(
+                notify_car_ready_to_publish,
+                lambda cid=car.id: Car.objects.select_related(
+                    "owner__owner_profile", "brand"
+                ).get(id=cid),
+            )
 
         return Response(
             PhysicalInspectionSerializer(inspection).data,

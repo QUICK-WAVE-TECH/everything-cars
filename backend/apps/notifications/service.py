@@ -309,6 +309,36 @@ def notify_listing_submitted(car, resubmitted=False):
         )
 
 
+def notify_car_ready_to_publish(car):
+    """Publishers + admins are alerted when a car passes inspection and enters
+    the Pending Publishing queue — they review the inspection and publish it."""
+    publishers = User.objects.filter(
+        is_staff=True, is_active=True, staff_role__in=["publisher", "admin"]
+    )
+    owner_name = car.owner.get_full_name() or car.owner.email
+    review_url = _fe("/admin/publishing")
+    title = "Car passed inspection — ready to publish"
+    message = f"'{car.title}' passed inspection and is waiting to be published."
+    for staff in publishers:
+        _create_notification(
+            recipient=staff,
+            notification_type=NotificationType.INSPECTION_PASSED,
+            title=title,
+            message=message,
+            data={"car_id": str(car.id), "car_title": car.title},
+        )
+        send_email(
+            recipient=staff.email,
+            subject=title,
+            template_key="staff_car_ready_to_publish",
+            context={
+                "car_title": car.title,
+                "owner_name": owner_name,
+                "review_url": review_url,
+            },
+        )
+
+
 def notify_changes_requested(car):
     """Owner gets notified when staff requests changes to their listing."""
     _create_notification(

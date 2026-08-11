@@ -15,6 +15,7 @@ const STATUS_LABELS: Record<string, string> = {
   inspection_rejected: "Inspection Failed",
   inspection_no_show: "Missed Appointment",
   needs_changes: "Changes Requested",
+  pending_publishing: "Awaiting Publishing",
   published: "Published",
   paused: "Paused",
   suspended: "Suspended",

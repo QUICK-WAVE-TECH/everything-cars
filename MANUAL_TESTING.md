@@ -229,7 +229,9 @@ starts + submits a **Passed** result).
 **Manual checklist**
 
 - [ ] As an **inspector**, submit a **Passed** inspection → the car goes to
-  **Pending Publishing** (NOT live yet); the owner is told it passed.
+  **Pending Publishing** (NOT live yet); the **owner** sees the status
+  **"Awaiting Publishing"** (in My Cars + the car detail), and **publishers/admins**
+  (not inspectors) get a **"ready to publish"** email + in-app notification.
 - [ ] A **publisher** (or admin) sees a **"Publishing"** link in the admin nav; an
   inspector does **not**. `/admin/publishing` shows the queue with a **"N waiting"**
   count, **oldest-first**, search, skeletons, and an **"All caught up"** empty state.
