@@ -2099,3 +2099,39 @@ class PendingPublishingNotPublicTest(APITestCase):
         ids = [c["id"] for c in r.data["results"]]
         assert str(live.id) in ids
         assert str(pending.id) not in ids
+
+
+class FleetCarLocationFromBranchTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("floc-owner@test.com", "owner")
+        self.profile = create_fleet_owner_profile(self.owner)
+        self.b1 = Branch.objects.create(business=self.profile, name="A", state="Oyo",
+            city="Ibadan", street_address="1 A", phone="+2348010000000", email="a@x.ng")
+
+    def _payload(self, **over):
+        data = {"title": "Test Car", "listing_type": "rent", "rent_price_per_day": "20000.00",
+            "brand": "Toyota", "model": "Corolla", "year": 2021, "vin": "1HGCM82633A004352",
+            "plate_number": "ABC123DE", "branch": str(self.b1.id)}
+        data.update(over)
+        return data
+
+    def test_fleet_car_inherits_location_from_branch(self):
+        self.client.force_authenticate(self.owner)
+        # No state/city in the payload — they come from the branch.
+        r = self.client.post("/api/v1/listings/my-cars", self._payload(), format="json")
+        assert r.status_code == 201, r.data
+        car = Car.objects.get(id=r.data["id"])
+        assert car.state == "Oyo"
+        assert car.city == "Ibadan"
+
+    def test_individual_owner_still_needs_state(self):
+        indiv = create_user("floc-indiv@test.com", "owner")
+        create_owner_profile(indiv)
+        self.client.force_authenticate(indiv)
+        r = self.client.post("/api/v1/listings/my-cars", {
+            "title": "T", "listing_type": "rent", "rent_price_per_day": "20000.00",
+            "brand": "Toyota", "model": "Corolla", "year": 2021,
+            "vin": "1HGCM82633A004399", "plate_number": "IND123XY",
+        }, format="json")
+        assert r.status_code == 400
+        assert "state" in str(r.data).lower()

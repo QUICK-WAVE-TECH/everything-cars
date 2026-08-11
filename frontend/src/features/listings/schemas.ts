@@ -56,7 +56,9 @@ const createCarBase = z.object({
     .default(5),
   mileage: digitsOnly("Mileage must be a number"),
   country: z.string().trim().optional(),
-  state: z.string().trim().min(1, "State is required"),
+  // Individual owners must provide a state (enforced in the form); fleet/team
+  // listers inherit it from their branch, so it's optional at the schema level.
+  state: z.string().trim().optional(),
   city: z.string().trim().optional(),
   // The branch this car is at — required for fleet listers (enforced in the
   // form + backend); omitted by individual owners.
