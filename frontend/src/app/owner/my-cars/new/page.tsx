@@ -419,6 +419,10 @@ function ListCarPageInner() {
         });
         return;
       }
+      if (!needsBranch && !values.state?.trim()) {
+        form.setError("state", { message: "State is required." });
+        return;
+      }
       setPendingValues(values);
       setConfirmOpen(true);
     })(event);
@@ -621,35 +625,39 @@ function ListCarPageInner() {
                 <TextField label="Seats" placeholder="Number of seats" value={w.seats != null ? String(w.seats) : ""} onChange={(v) => form.setValue("seats", v === "" ? (0 as unknown as number) : parseInt(v, 10))} inputMode="numeric" filter="digits" />
                 <TextField label="Mileage (km)" placeholder="e.g. 45000" value={w.mileage ?? ""} onChange={(v) => form.setValue("mileage", v)} inputMode="numeric" filter="digits" />
 
-                <div className="sm:col-span-2 lg:col-span-3">
-                  <CountrySelect
-                    label="Country"
-                    value={w.country ?? ""}
-                    onChange={(iso) => {
-                      form.setValue("country", iso);
-                      form.setValue("state", "");
-                      form.setValue("city", "");
-                    }}
-                  />
-                </div>
-                <div className="sm:col-span-1 lg:col-span-2">
-                  <StateSelect
-                    country={countryName}
-                    value={w.state ?? ""}
-                    onChange={(val) => {
-                      form.setValue("state", val);
-                      form.setValue("city", "");
-                    }}
-                  />
-                </div>
-                <CityCombobox
-                  country={countryName}
-                  state={w.state ?? ""}
-                  value={w.city ?? ""}
-                  onChange={(val) => form.setValue("city", val)}
-                />
-
-                {needsBranch ? (
+                {/* Individual owners pick a location; fleet/team listers inherit
+                    it from the branch, so they only choose the branch. */}
+                {!needsBranch ? (
+                  <>
+                    <div className="sm:col-span-2 lg:col-span-3">
+                      <CountrySelect
+                        label="Country"
+                        value={w.country ?? ""}
+                        onChange={(iso) => {
+                          form.setValue("country", iso);
+                          form.setValue("state", "");
+                          form.setValue("city", "");
+                        }}
+                      />
+                    </div>
+                    <div className="sm:col-span-1 lg:col-span-2">
+                      <StateSelect
+                        country={countryName}
+                        value={w.state ?? ""}
+                        onChange={(val) => {
+                          form.setValue("state", val);
+                          form.setValue("city", "");
+                        }}
+                      />
+                    </div>
+                    <CityCombobox
+                      country={countryName}
+                      state={w.state ?? ""}
+                      value={w.city ?? ""}
+                      onChange={(val) => form.setValue("city", val)}
+                    />
+                  </>
+                ) : (
                   <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-3">
                     <label
                       htmlFor="branch"
@@ -673,8 +681,11 @@ function ListCarPageInner() {
                         </option>
                       ))}
                     </select>
+                    <span className="text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                      The car&apos;s location is taken from the branch you select.
+                    </span>
                   </div>
-                ) : null}
+                )}
 
                 <CarPhotoSlotsField value={files} onChange={setFiles} />
                 <TextAreaField label="Description" placeholder="Describe your car, its condition, and any special features" value={w.description ?? ""} onChange={(v) => form.setValue("description", v)} />

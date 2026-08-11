@@ -452,6 +452,9 @@ class CarCreateSerializer(serializers.ModelSerializer):
     branch = serializers.PrimaryKeyRelatedField(
         queryset=Branch.objects.all(), required=False, allow_null=True
     )
+    # A fleet car inherits its location from the branch, so fleet listers don't
+    # send state; it's required for individual owners (enforced in validate()).
+    state = serializers.CharField(required=False, allow_blank=True)
     MIN_MODEL_YEAR = 1900
     MAX_SEATS = 60
     VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{17}$")
@@ -620,7 +623,10 @@ class CarCreateSerializer(serializers.ModelSerializer):
         is_fleet = bool(profile and profile.owner_type == "fleet")
 
         if not is_fleet:
+            # Individual owners pick their own location; state is required.
             data["branch"] = None
+            if not self.instance and not (data.get("state") or "").strip():
+                raise serializers.ValidationError({"state": "State is required."})
             return
 
         branch = data.get("branch")
@@ -639,6 +645,11 @@ class CarCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"branch": "You aren't assigned to that branch."}
             )
+        # A fleet car inherits its location from the branch (business country).
+        data["state"] = branch.state
+        data["city"] = branch.city
+        if profile.country:
+            data["country"] = profile.country
 
     def validate_year(self, value):
         max_year = timezone.now().year + 1
