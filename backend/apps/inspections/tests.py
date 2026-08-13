@@ -863,6 +863,140 @@ class OwnerBookingTest(APITestCase):
         self.assertIsNone(new_booking.consent_accepted_at)
 
 
+class TeamMemberBookingTest(APITestCase):
+    """A team member has no owner_profile of their own, yet must be able to
+    manage inspection bookings for cars in their assigned branches. The booking
+    belongs to the business (the branch owner), whose verified ID satisfies the
+    on-file gate."""
+
+    def setUp(self):
+        from apps.listings.models import Branch
+        from apps.listings.tests import create_fleet_owner_profile
+        from apps.users.models import TeamMembership
+
+        self.staff = create_user("tm-staff@test.com", "owner", is_staff=True)
+        self.center = create_center(self.staff)
+        self.slot = create_slot(self.staff, center=self.center)
+
+        self.owner = create_user("tm-owner@test.com", "owner")
+        self.profile = create_fleet_owner_profile(self.owner)
+        self.b1 = Branch.objects.create(
+            business=self.profile, name="A", state="Lagos",
+            city="Ikeja", street_address="1", phone="+2340000000000", email="a@x.ng",
+        )
+        self.b2 = Branch.objects.create(
+            business=self.profile, name="B", state="Oyo",
+            city="Ibadan", street_address="2", phone="+2340000000002", email="b@x.ng",
+        )
+        self.car1 = create_car(
+            self.owner, branch=self.b1, status=CarStatus.LISTING_APPROVED
+        )
+        self.car2 = create_car(
+            self.owner, branch=self.b2, status=CarStatus.LISTING_APPROVED
+        )
+
+        # Team member assigned to b1 only, with no owner_profile / ID of their own.
+        self.member = create_user("tm-member@test.com", "team_member")
+        m = TeamMembership.objects.create(user=self.member, business=self.profile)
+        m.branches.set([self.b1])
+
+    def test_member_books_using_business_identity(self):
+        self.client.force_authenticate(self.member)
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {
+                "car_id": str(self.car1.id),
+                "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
+            },
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        booking = InspectionBooking.objects.get(car=self.car1)
+        # The booking belongs to the business, not the acting team member.
+        self.assertEqual(booking.booked_by, self.owner)
+        self.car1.refresh_from_db()
+        self.assertEqual(self.car1.status, CarStatus.INSPECTION_PENDING)
+
+    def test_member_cannot_book_car_outside_assigned_branch(self):
+        self.client.force_authenticate(self.member)
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {
+                "car_id": str(self.car2.id),
+                "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
+            },
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(InspectionBooking.objects.filter(car=self.car2).exists())
+
+    def test_member_booking_blocked_when_business_has_no_id(self):
+        # Strip the business's ID document — the on-file gate must now block.
+        self.profile.id_type = ""
+        self.profile.id_document = ""
+        self.profile.save(update_fields=["id_type", "id_document"])
+        self.client.force_authenticate(self.member)
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {
+                "car_id": str(self.car1.id),
+                "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
+            },
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("business account", res.data["detail"].lower())
+
+    def test_member_lists_only_assigned_branch_bookings(self):
+        b1_booking = InspectionBooking.objects.create(
+            car=self.car1, slot=self.slot, booked_by=self.owner
+        )
+        InspectionBooking.objects.create(
+            car=self.car2, slot=self.slot, booked_by=self.owner
+        )
+        self.client.force_authenticate(self.member)
+        res = self.client.get("/api/v1/inspections/bookings/my/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        ids = [b["id"] for b in res.data["results"]]
+        self.assertIn(str(b1_booking.id), ids)
+        self.assertEqual(len(ids), 1)
+
+    def test_member_cancels_own_branch_booking(self):
+        self.car1.status = CarStatus.INSPECTION_PENDING
+        self.car1.save(update_fields=["status"])
+        booking = InspectionBooking.objects.create(
+            car=self.car1,
+            slot=self.slot,
+            booked_by=self.owner,
+            status=BookingStatus.PENDING,
+        )
+        self.client.force_authenticate(self.member)
+        res = self.client.post(
+            f"/api/v1/inspections/bookings/{booking.id}/cancel/"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, BookingStatus.CANCELLED)
+
+    def test_member_cannot_cancel_other_branch_booking(self):
+        self.car2.status = CarStatus.INSPECTION_PENDING
+        self.car2.save(update_fields=["status"])
+        booking = InspectionBooking.objects.create(
+            car=self.car2,
+            slot=self.slot,
+            booked_by=self.owner,
+            status=BookingStatus.PENDING,
+        )
+        self.client.force_authenticate(self.member)
+        res = self.client.post(
+            f"/api/v1/inspections/bookings/{booking.id}/cancel/"
+        )
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+
 def inspection_form_payload(**overrides):
     base = {
         "condition": "used",

@@ -406,7 +406,10 @@ export function BookingModal({
 
   const { data: me } = useMe();
   const ownerProfile = me?.owner_profile;
-  const hasIdOnFile = !!(ownerProfile?.id_type && ownerProfile?.id_document);
+  // The ID-on-file gate is about the *business*, not the logged-in user — a
+  // team member books against their business's verified identity and has no
+  // owner_profile of their own. The server resolves this into can_book_inspections.
+  const hasIdOnFile = !!me?.can_book_inspections;
   const showIdGate = mode !== "reschedule" && !!me && !hasIdOnFile;
 
   const { data: locations, isLoading: isLoadingLocations } = useLocations();
@@ -708,23 +711,28 @@ export function BookingModal({
                   </span>
                   <div>
                     <p className="text-sm font-bold text-(--brc-text) [font-family:var(--brc-font-ui)]">
-                      Complete your ID verification
+                      {me?.role === "team_member"
+                        ? "Business ID verification needed"
+                        : "Complete your ID verification"}
                     </p>
                     <p className="mt-1 max-w-sm text-xs leading-5 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                      Add your means of identification to your profile before booking an
-                      inspection. You only need to do this once.
+                      {me?.role === "team_member"
+                        ? "The business account must add its means of identification before you can book an inspection. Please ask your account owner."
+                        : "Add your means of identification to your profile before booking an inspection. You only need to do this once."}
                     </p>
                   </div>
-                  <Link
-                    href="/owner/profile"
-                    onClick={() => onClose()}
-                    className={cn(
-                      "inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-black no-underline [font-family:var(--brc-font-ui)]",
-                      primaryButtonClass,
-                    )}
-                  >
-                    Go to profile
-                  </Link>
+                  {me?.role !== "team_member" && (
+                    <Link
+                      href="/owner/profile"
+                      onClick={() => onClose()}
+                      className={cn(
+                        "inline-flex h-10 items-center gap-2 rounded-lg px-4 text-sm font-black no-underline [font-family:var(--brc-font-ui)]",
+                        primaryButtonClass,
+                      )}
+                    >
+                      Go to profile
+                    </Link>
+                  )}
                 </div>
               )}
 

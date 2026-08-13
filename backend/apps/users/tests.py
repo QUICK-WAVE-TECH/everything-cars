@@ -828,6 +828,37 @@ class MeStaffRoleTest(APITestCase):
         assert r.data["staff_role"] == "publisher"
 
 
+class MeCanBookInspectionsTest(APITestCase):
+    def test_owner_with_id_can_book(self):
+        owner = create_user_owner("cb-owner@test.com")
+        create_owner_profile(owner)  # includes id_type + id_document
+        self.client.force_authenticate(owner)
+        r = self.client.get("/api/v1/users/me")
+        assert r.data["can_book_inspections"] is True
+
+    def test_team_member_inherits_business_id(self):
+        owner = create_user_owner("cb-biz@test.com")
+        profile = create_fleet_owner_profile(owner)
+        branch = Branch.objects.create(
+            business=profile, name="A", state="Lagos", city="Ikeja",
+            street_address="1", phone="+2340000000000", email="a@x.ng",
+        )
+        member, _ = make_team_member("cb-tm@test.com", profile, [branch])
+        self.client.force_authenticate(member)
+        r = self.client.get("/api/v1/users/me")
+        # The team member has no owner_profile of their own, yet inherits the
+        # business's verified identity.
+        assert r.data["owner_profile"] is None
+        assert r.data["can_book_inspections"] is True
+
+    def test_customer_cannot_book(self):
+        u = User.objects.create_user(email="cb-cust@test.com", first_name="C",
+            last_name="U", password="x", role="customer", is_active=True)
+        self.client.force_authenticate(u)
+        r = self.client.get("/api/v1/users/me")
+        assert r.data["can_book_inspections"] is False
+
+
 class TeamMemberWelcomeEmailTest(APITestCase):
     def test_creating_a_member_sends_a_welcome_email(self):
         from django.core import mail
