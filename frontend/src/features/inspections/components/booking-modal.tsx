@@ -46,6 +46,7 @@ import {
 } from "@/features/inspections/api/inspections-api";
 import type { AvailableSlot, InspectionCenter } from "@/features/inspections/api/types";
 import { useMe } from "@/features/auth/api";
+import { useMyCarDetail } from "@/features/listings/api/listings-api";
 import { IdTypeSelect } from "@/features/auth/components";
 import { UploadField } from "@/features/auth/components/upload-field";
 import { formatOfferAmount } from "@/features/offers/lib/offer-format";
@@ -406,6 +407,19 @@ export function BookingModal({
 
   const { data: me } = useMe();
   const ownerProfile = me?.owner_profile;
+  // Team members have no owner_profile, so their locked country/state can't come
+  // from a personal profile. Source it from the car itself instead — a fleet
+  // car's country/state/city are inherited from its branch, which is exactly
+  // where the inspection should happen.
+  const { data: bookingCar } = useMyCarDetail(open ? carId : "");
+  const locationSource = ownerProfile
+    ? {
+        country: ownerProfile.country || "",
+        state: ownerProfile.state || "",
+      }
+    : bookingCar
+    ? { country: bookingCar.country || "", state: bookingCar.state || "" }
+    : null;
   // The ID-on-file gate is about the *business*, not the logged-in user — a
   // team member books against their business's verified identity and has no
   // owner_profile of their own. The server resolves this into can_book_inspections.
@@ -468,14 +482,16 @@ export function BookingModal({
     return new Date(y, m - 1, d);
   }, [availabilitySummary]);
 
-  // Pre-fill country/state from the owner's profile once, when the modal opens
-  // (state-adjustment-during-render — avoids a setState-in-effect cascade). Runs
-  // when the profile becomes available even if that's after `open` flips true.
+  // Pre-fill country/state from the resolved location source once, when the
+  // modal opens (state-adjustment-during-render — avoids a setState-in-effect
+  // cascade). For an owner this is their profile; for a team member it's the
+  // car's (branch) location. Runs when the source becomes available even if
+  // that's after `open` flips true.
   const [prefilledForOpen, setPrefilledForOpen] = useState(false);
-  if (open && !prefilledForOpen && mode !== "reschedule" && ownerProfile) {
+  if (open && !prefilledForOpen && mode !== "reschedule" && locationSource) {
     setPrefilledForOpen(true);
-    setCountry((prev) => prev || ownerProfile.country || "");
-    setState((prev) => prev || ownerProfile.state || "");
+    setCountry((prev) => prev || locationSource.country);
+    setState((prev) => prev || locationSource.state);
   }
   if (!open && prefilledForOpen) {
     setPrefilledForOpen(false);
@@ -683,7 +699,10 @@ export function BookingModal({
                     {step === 4 && "Confirm your appointment"}
                   </h3>
                   <p className="mt-1 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
-                    {step === 1 && "Your country and state are set from your profile — pick your city, or ask staff to book for you."}
+                    {step === 1 &&
+                      (me?.role === "team_member"
+                        ? "Country and state come from the car's branch — pick your city, or ask staff to book for you."
+                        : "Your country and state are set from your profile — pick your city, or ask staff to book for you.")}
                     {step === 2 && "These centers serve your selected city."}
                     {step === 3 &&
                       (selectedDateLabel ?? "Only dates with staff-created openings are selectable.")}
