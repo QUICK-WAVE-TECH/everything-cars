@@ -996,6 +996,58 @@ class TeamMemberBookingTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
 
+    # ── Read-side access: the booking flow's supporting endpoints must serve
+    # team members too, or the location/center/date steps are a dead end. ──
+
+    def test_member_can_read_locations(self):
+        self.client.force_authenticate(self.member)
+        res = self.client.get("/api/v1/inspections/locations/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        countries = {row["country"] for row in res.data}
+        self.assertIn("NG", countries)
+
+    def test_member_can_read_centers_by_city(self):
+        self.client.force_authenticate(self.member)
+        res = self.client.get(
+            "/api/v1/inspections/centers/?country=NG&state=Lagos&city=Lagos"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(res.data), 1)
+
+    def test_member_can_read_available_slots_summary(self):
+        self.client.force_authenticate(self.member)
+        res = self.client.get(
+            f"/api/v1/inspections/available-slots/summary/?center={self.center.id}"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_member_can_read_fee_quote(self):
+        self.client.force_authenticate(self.member)
+        res = self.client.get("/api/v1/inspections/bookings/fee-quote/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_member_assistance_request_belongs_to_business(self):
+        self.client.force_authenticate(self.member)
+        res = self.client.post(
+            "/api/v1/inspections/assistance/",
+            {"car_id": str(self.car1.id), "message": "Please book for me"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        from apps.inspections.models import AssistanceRequest
+
+        req = AssistanceRequest.objects.get(car=self.car1)
+        self.assertEqual(req.owner, self.owner)
+
+    def test_member_cannot_raise_assistance_for_other_branch_car(self):
+        self.client.force_authenticate(self.member)
+        res = self.client.post(
+            "/api/v1/inspections/assistance/",
+            {"car_id": str(self.car2.id), "message": "Please book for me"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
 
 def inspection_form_payload(**overrides):
     base = {

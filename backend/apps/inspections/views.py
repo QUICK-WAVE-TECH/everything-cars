@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.pagination import StandardPagination
-from common.permissions import IsOwner, IsStaff, IsInspector, IsOwnerOrTeamMember
+from common.permissions import IsStaff, IsInspector, IsOwnerOrTeamMember
 from apps.users.services import resolve_business_scope, NoBusinessAccess
 from apps.listings.models import (
     Car,
@@ -503,9 +503,9 @@ class StaffSlotDetailView(APIView):
 
 
 class AvailableSlotsView(APIView):
-    # Owners browse slots to book; staff also need them to book on an owner's
-    # behalf from the assistance queue.
-    permission_classes = [IsOwner | IsStaff]
+    # Owners and their team members browse slots to book; staff also need them
+    # to book on an owner's behalf from the assistance queue.
+    permission_classes = [IsOwnerOrTeamMember | IsStaff]
 
     def get(self, request):
         slots, error = _open_available_slots(request)
@@ -528,7 +528,7 @@ class AvailableSlotsSummaryView(APIView):
     duplicates the nested center on every row and scales with slot density; this
     aggregate returns at most one tiny row per day in the window."""
 
-    permission_classes = [IsOwner | IsStaff]
+    permission_classes = [IsOwnerOrTeamMember | IsStaff]
 
     def get(self, request):
         slots, error = _open_available_slots(request)
@@ -635,7 +635,7 @@ def _open_available_slots(request):
 
 
 class FeeQuoteView(APIView):
-    permission_classes = [IsOwner]
+    permission_classes = [IsOwnerOrTeamMember]
 
     def get(self, request):
         fee = FeeSetting.get_solo()
@@ -1699,7 +1699,7 @@ class StaffCenterDetailView(APIView):
 
 
 class LocationsView(APIView):
-    permission_classes = [IsOwner]
+    permission_classes = [IsOwnerOrTeamMember]
 
     def get(self, request):
         rows = (
@@ -1733,7 +1733,7 @@ class LocationsView(APIView):
 
 class PublicCentersView(APIView):
 
-    permission_classes = [IsOwner]
+    permission_classes = [IsOwnerOrTeamMember]
 
     def get(self, request):
         qs = InspectionCenter.objects.filter(is_active=True)
@@ -1747,16 +1747,24 @@ class PublicCentersView(APIView):
 
 
 class OwnerAssistanceCreateView(APIView):
-    permission_classes = [IsOwner]
+    permission_classes = [IsOwnerOrTeamMember]
 
     def get(self, request):
-        """The owner's own assistance requests — lets the UI show an already-sent
-        state instead of allowing a duplicate."""
+        """The business's assistance requests — lets the UI show an already-sent
+        state instead of allowing a duplicate. A team member sees the business's
+        requests (scoped to their branches' cars)."""
+        business_owner, branch_ids, error = booking_business_scope(request)
+        if error:
+            return error
         qs = (
-            AssistanceRequest.objects.filter(owner=request.user)
+            AssistanceRequest.objects.filter(owner=business_owner)
             .select_related("car")
             .order_by("-created_at")
         )
+        if branch_ids is not None:
+            # Team member: only requests they raised (car-linked to their
+            # branches, or their own general requests).
+            qs = qs.filter(Q(car__branch_id__in=branch_ids) | Q(car__isnull=True))
         car = request.query_params.get("car")
         if car:
             car_uuid = _valid_uuid_or_none(car)
@@ -1776,17 +1784,24 @@ class OwnerAssistanceCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        business_owner, branch_ids, error = booking_business_scope(request)
+        if error:
+            return error
+
         car = None
         if data.get("car_id"):
-            car = Car.objects.filter(id=data["car_id"], owner=request.user).first()
+            car_qs = Car.objects.filter(id=data["car_id"], owner=business_owner)
+            if branch_ids is not None:
+                car_qs = car_qs.filter(branch_id__in=branch_ids)
+            car = car_qs.first()
             if car is None:
                 return Response(
                     {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
                 )
 
-        # Dedup — one open request per owner+car, so repeated taps don't pile up.
+        # Dedup — one open request per business+car, so repeated taps don't pile up.
         if AssistanceRequest.objects.filter(
-            owner=request.user, car=car, status=AssistanceStatus.OPEN
+            owner=business_owner, car=car, status=AssistanceStatus.OPEN
         ).exists():
             return Response(
                 {
@@ -1796,7 +1811,7 @@ class OwnerAssistanceCreateView(APIView):
             )
 
         assistance = AssistanceRequest.objects.create(
-            owner=request.user,
+            owner=business_owner,
             car=car,
             country=data.get("country", ""),
             state=data.get("state", ""),
