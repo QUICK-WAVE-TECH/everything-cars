@@ -1048,6 +1048,42 @@ class TeamMemberBookingTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_staff_can_run_full_inspection_flow_on_member_booking(self):
+        # A team member's booking must be a first-class booking: staff confirm
+        # the payment, then start the inspection — exactly like an owner booking.
+        self.client.force_authenticate(self.member)
+        res = self.client.post(
+            "/api/v1/inspections/bookings/",
+            {
+                "car_id": str(self.car1.id),
+                "slot_id": str(self.slot.id),
+                "receipt": _receipt(),
+            },
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        booking = InspectionBooking.objects.get(car=self.car1)
+        self.assertEqual(booking.status, BookingStatus.AWAITING_PAYMENT)
+
+        # Staff can only start once the payment is confirmed.
+        self.client.force_authenticate(self.staff)
+        early = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{booking.id}/start/"
+        )
+        self.assertEqual(early.status_code, status.HTTP_400_BAD_REQUEST)
+
+        confirm = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{booking.id}/confirm-payment/"
+        )
+        self.assertEqual(confirm.status_code, status.HTTP_200_OK)
+
+        started = self.client.post(
+            f"/api/v1/inspections/admin/bookings/{booking.id}/start/"
+        )
+        self.assertEqual(started.status_code, status.HTTP_200_OK)
+        self.car1.refresh_from_db()
+        self.assertEqual(self.car1.status, CarStatus.INSPECTION_IN_PROGRESS)
+
 
 def inspection_form_payload(**overrides):
     base = {
