@@ -102,6 +102,12 @@ export type UserProfile = {
     bank_name: string;
     is_verified: boolean;
   } | null;
+  /**
+   * Whether this user can book an inspection: their business (their own, or the
+   * one they're a team member of) has an ID document on file. Team members have
+   * no owner_profile of their own, so this can't be derived client-side.
+   */
+  can_book_inspections: boolean;
 };
 
 type SignOutResponse = {

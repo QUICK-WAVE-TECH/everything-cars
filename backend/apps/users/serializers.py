@@ -215,6 +215,11 @@ class OwnerProfileSerializer(serializers.ModelSerializer):
 class MeSerializer(serializers.ModelSerializer):
     customer_profile = CustomerProfileSerializer(read_only=True)
     owner_profile = OwnerProfileSerializer(read_only=True)
+    # Whether the caller can book an inspection: the *business* (their own, or
+    # the one they're a team member of) has an ID document on file. Team members
+    # have no owner_profile of their own, so the client can't derive this from
+    # owner_profile alone.
+    can_book_inspections = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -230,8 +235,19 @@ class MeSerializer(serializers.ModelSerializer):
             "date_joined",
             "customer_profile",
             "owner_profile",
+            "can_book_inspections",
         ]
         read_only_fields = ["id", "email", "role", "is_staff", "date_joined"]
+
+    def get_can_book_inspections(self, obj):
+        from apps.users.services import NoBusinessAccess, resolve_business_scope
+
+        try:
+            business_owner, _ = resolve_business_scope(obj)
+        except NoBusinessAccess:
+            return False
+        profile = getattr(business_owner, "owner_profile", None)
+        return bool(profile and profile.id_type and profile.id_document)
 
 
 class AdminOwnerSerializer(serializers.ModelSerializer):

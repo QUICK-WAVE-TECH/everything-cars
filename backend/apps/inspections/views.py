@@ -11,7 +11,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from common.pagination import StandardPagination
-from common.permissions import IsOwner, IsStaff, IsInspector
+from common.permissions import IsOwner, IsStaff, IsInspector, IsOwnerOrTeamMember
+from apps.users.services import resolve_business_scope, NoBusinessAccess
 from apps.listings.models import (
     Car,
     CarStatus,
@@ -150,6 +151,31 @@ def booking_detail_queryset():
         "inspection__documents",
         "payment",
     ).prefetch_related("car__images", "car__features")
+
+
+def booking_business_scope(request):
+    """(business_owner, branch_ids, None) for the caller, or (None, None, error).
+
+    An inspection booking belongs to the *business* (the car's owner). A plain
+    owner is their own business (all branches → branch_ids None); a team member's
+    business is their primary owner, scoped to their assigned branches.
+    """
+    try:
+        business_owner, branch_ids = resolve_business_scope(request.user)
+    except NoBusinessAccess:
+        return None, None, Response(
+            {"detail": "You don't have access to any branch."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return business_owner, branch_ids, None
+
+
+def scoped_bookings(business_owner, branch_ids):
+    """The business's bookings, narrowed to the given branches (None = all)."""
+    qs = InspectionBooking.objects.filter(booked_by=business_owner)
+    if branch_ids is not None:
+        qs = qs.filter(car__branch_id__in=branch_ids)
+    return qs
 
 
 def create_booking_core(
@@ -623,7 +649,7 @@ class FeeQuoteView(APIView):
 
 
 class OwnerBookingCreateView(APIView):
-    permission_classes = [IsOwner]
+    permission_classes = [IsOwnerOrTeamMember]
     parser_classes = [MultiPartParser, FormParser]
 
     ALLOWED_RECEIPT_TYPES = [
@@ -638,19 +664,22 @@ class OwnerBookingCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        # ID-on-file gate — an owner with no ID document on record can't book.
-        # This is what lets us avoid asking for the owner's ID at every booking.
-        profile = getattr(request.user, "owner_profile", None)
+        # An inspection booking belongs to the business. A team member books
+        # against their business's verified identity, not their own.
+        business_owner, branch_ids, error = booking_business_scope(request)
+        if error:
+            return error
+
+        # ID-on-file gate — the *business* must have an ID document on record.
+        # This is what lets us avoid asking for ID at every booking.
+        profile = getattr(business_owner, "owner_profile", None)
         if not profile or not profile.id_type or not profile.id_document:
-            return Response(
-                {
-                    "detail": (
-                        "Complete your ID verification in your profile "
-                        "before booking."
-                    )
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+            detail = (
+                "The business account must complete ID verification before booking."
+                if request.user.role == "team_member"
+                else "Complete your ID verification in your profile before booking."
             )
+            return Response({"detail": detail}, status=status.HTTP_400_BAD_REQUEST)
 
         # Payment gate — the owner pays (inspection + listing + VAT) up front.
         method = request.data.get("payment_method", "transfer")
@@ -677,10 +706,11 @@ class OwnerBookingCreateView(APIView):
             )
 
         with transaction.atomic():
+            car_qs = Car.objects.filter(owner=business_owner)
+            if branch_ids is not None:
+                car_qs = car_qs.filter(branch_id__in=branch_ids)
             try:
-                car = Car.objects.select_for_update().get(
-                    id=data["car_id"], owner=request.user
-                )
+                car = car_qs.select_for_update().get(id=data["car_id"])
             except Car.DoesNotExist:
                 return Response(
                     {"detail": "Car not found."}, status=status.HTTP_404_NOT_FOUND
@@ -700,7 +730,10 @@ class OwnerBookingCreateView(APIView):
             booking, error = create_booking_core(
                 car=car,
                 slot=slot,
-                booked_by=request.user,
+                # The booking (and its fee) belong to the business, so the owner
+                # and scoped team members all see it; the team member who acted
+                # is recorded as the history actor.
+                booked_by=business_owner,
                 attendee=data,
                 actor=request.user,
                 actor_role=ActorRole.OWNER,
@@ -838,11 +871,14 @@ class StaffRejectInspectionPaymentView(APIView):
 
 
 class OwnerBookingListView(APIView):
-    permission_classes = [IsOwner]
+    permission_classes = [IsOwnerOrTeamMember]
 
     def get(self, request):
+        business_owner, branch_ids, error = booking_business_scope(request)
+        if error:
+            return error
         bookings = (
-            InspectionBooking.objects.filter(booked_by=request.user)
+            scoped_bookings(business_owner, branch_ids)
             .select_related("car", "slot")
             .order_by("-created_at")
         )
@@ -862,15 +898,19 @@ class OwnerBookingListView(APIView):
 
 
 class OwnerBookingCancelView(APIView):
-    permission_classes = [IsOwner]
+    permission_classes = [IsOwnerOrTeamMember]
 
     def post(self, request, booking_id):
+        business_owner, branch_ids, error = booking_business_scope(request)
+        if error:
+            return error
         with transaction.atomic():
             try:
                 booking = (
-                    InspectionBooking.objects.select_related("slot")
+                    scoped_bookings(business_owner, branch_ids)
+                    .select_related("slot")
                     .select_for_update(of=("self",))
-                    .get(id=booking_id, booked_by=request.user)
+                    .get(id=booking_id)
                 )
             except InspectionBooking.DoesNotExist:
                 return Response(
@@ -921,7 +961,7 @@ class OwnerBookingCancelView(APIView):
 
 
 class OwnerBookingRescheduleView(APIView):
-    permission_classes = [IsOwner]
+    permission_classes = [IsOwnerOrTeamMember]
 
     def post(self, request, booking_id):
         new_slot_id = request.data.get("slot_id")
@@ -932,12 +972,16 @@ class OwnerBookingRescheduleView(APIView):
             )
         consent_accepted = bool(request.data.get("consent_accepted"))
 
+        business_owner, branch_ids, error = booking_business_scope(request)
+        if error:
+            return error
         with transaction.atomic():
             try:
                 booking = (
-                    InspectionBooking.objects.select_related("slot__center")
+                    scoped_bookings(business_owner, branch_ids)
+                    .select_related("slot__center")
                     .select_for_update(of=("self",))
-                    .get(id=booking_id, booked_by=request.user)
+                    .get(id=booking_id)
                 )
             except InspectionBooking.DoesNotExist:
                 return Response(
@@ -1033,7 +1077,7 @@ class OwnerBookingRescheduleView(APIView):
             new_booking = InspectionBooking.objects.create(
                 car=booking.car,
                 slot=new_slot,
-                booked_by=request.user,
+                booked_by=booking.booked_by,
                 reschedule_count=booking.reschedule_count + 1,
                 attendee_type=booking.attendee_type,
                 rep_name=booking.rep_name,
@@ -1475,7 +1519,7 @@ class OwnerClearanceResponseView(APIView):
     same-status history row so it appears on the timeline, and staff are
     notified to re-review."""
 
-    permission_classes = [IsOwner]
+    permission_classes = [IsOwnerOrTeamMember]
 
     def post(self, request, booking_id):
         message = (request.data.get("message") or "").strip()
@@ -1485,10 +1529,15 @@ class OwnerClearanceResponseView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        business_owner, branch_ids, error = booking_business_scope(request)
+        if error:
+            return error
         with transaction.atomic():
             try:
-                booking = InspectionBooking.objects.select_for_update().get(
-                    id=booking_id, booked_by=request.user
+                booking = (
+                    scoped_bookings(business_owner, branch_ids)
+                    .select_for_update()
+                    .get(id=booking_id)
                 )
             except InspectionBooking.DoesNotExist:
                 return Response(
