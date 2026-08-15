@@ -12,6 +12,10 @@ export type Branch = {
   email: string;
   is_active: boolean;
   created_at: string;
+  /** Cars kept for records (have sale/rental history) if this branch is deleted. */
+  record_car_count: number;
+  /** Active listings that would be permanently removed if this branch is deleted. */
+  deletable_car_count: number;
 };
 
 /** Writable branch fields (create + edit). `business_name` is intentionally absent. */

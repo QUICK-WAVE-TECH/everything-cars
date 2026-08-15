@@ -1930,6 +1930,80 @@ class BranchLifecycleApiTest(APITestCase):
         assert self.branch.is_active is False
 
 
+class BranchDeleteApiTest(APITestCase):
+    def setUp(self):
+        from apps.users.models import TeamMembership
+
+        self.user = create_user("del-fleet@test.com", "owner")
+        self.profile = create_fleet_owner_profile(self.user)
+        self.branch = Branch.objects.create(
+            business=self.profile, name="HQ", state="Lagos", city="Ikeja",
+            street_address="1 A", phone="+2348010000000", email="a@x.ng",
+        )
+        self.customer = create_user("del-cust@test.com", "customer")
+        # A disposable listing — no deals or requests.
+        self.listing = create_car(
+            self.user, branch=self.branch, status=CarStatus.PUBLISHED
+        )
+        # A record-bearing car — has a rental/buy request, so it must be kept.
+        self.record_car = create_car(
+            self.user, branch=self.branch, status=CarStatus.PUBLISHED
+        )
+        Request.objects.create(
+            car=self.record_car, customer=self.customer,
+            request_type="buy", price_offered="1000000.00",
+        )
+        # A team member assigned to the branch.
+        self.member = create_user("del-member@test.com", "team_member")
+        m = TeamMembership.objects.create(user=self.member, business=self.profile)
+        m.branches.set([self.branch])
+        self.membership = m
+        self.client.force_authenticate(self.user)
+
+    def test_delete_removes_disposable_and_archives_records(self):
+        r = self.client.delete(f"/api/v1/owner/branches/{self.branch.id}/")
+        assert r.status_code == 200, r.data
+        assert r.data == {"deleted_listings": 1, "archived_records": 1}
+        assert not Branch.objects.filter(id=self.branch.id).exists()
+        # The plain listing is gone…
+        assert not Car.objects.filter(id=self.listing.id).exists()
+        # …the record-bearing car is kept, archived, and detached.
+        rec = Car.objects.get(id=self.record_car.id)
+        assert rec.branch_id is None
+        assert rec.status == CarStatus.ARCHIVED
+
+    def test_delete_unassigns_team_members(self):
+        self.client.delete(f"/api/v1/owner/branches/{self.branch.id}/")
+        assert self.membership.branches.count() == 0
+
+    def test_serializer_reports_delete_impact(self):
+        r = self.client.get("/api/v1/owner/branches/")
+        results = r.data["results"] if "results" in r.data else r.data
+        b = next(x for x in results if x["id"] == str(self.branch.id))
+        assert b["deletable_car_count"] == 1
+        assert b["record_car_count"] == 1
+
+    def test_delete_empty_branch(self):
+        empty = Branch.objects.create(
+            business=self.profile, name="Empty", state="Lagos", city="Lekki",
+            street_address="3 C", phone="+2348010000001", email="e@x.ng",
+        )
+        r = self.client.delete(f"/api/v1/owner/branches/{empty.id}/")
+        assert r.status_code == 200
+        assert r.data == {"deleted_listings": 0, "archived_records": 0}
+
+    def test_delete_scoped_to_own_business(self):
+        other = create_user("del-other@test.com", "owner")
+        other_profile = create_fleet_owner_profile(other, fleet_name="Rivals")
+        other_branch = Branch.objects.create(
+            business=other_profile, name="X", state="Oyo", city="Ibadan",
+            street_address="2 B", phone="+2348099999999", email="z@x.ng",
+        )
+        r = self.client.delete(f"/api/v1/owner/branches/{other_branch.id}/")
+        assert r.status_code == 404
+        assert Branch.objects.filter(id=other_branch.id).exists()
+
+
 class ListingBranchGateTest(APITestCase):
     def setUp(self):
         self.fleet_user = create_user("gatefleet@test.com", "owner")

@@ -62,3 +62,19 @@ export function useReactivateBranch() {
       queryClient.invalidateQueries({ queryKey: branchKeys.list() }),
   });
 }
+
+export type DeleteBranchResult = {
+  deleted_listings: number;
+  archived_records: number;
+};
+
+export function useDeleteBranch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiClient.delete<DeleteBranchResult>(`/owner/branches/${id}/`),
+    meta: { skipGlobalOverlay: true },
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: branchKeys.list() }),
+  });
+}
