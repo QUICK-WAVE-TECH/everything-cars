@@ -9,12 +9,14 @@ import {
   Pencil,
   Phone,
   RotateCcw,
+  Trash2,
 } from "lucide-react";
 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -22,17 +24,19 @@ import type { Branch } from "../api/types";
 
 /** A single branch tile: name, inherited business badge, address + contacts,
  * an active/retired status footer, and an actions menu (edit / retire /
- * reactivate). Retired branches render dimmed with a "Retired" badge. */
+ * reactivate / delete). Retired branches render dimmed with a "Retired" badge. */
 export function BranchCard({
   branch,
   onEdit,
   onRetire,
   onReactivate,
+  onDelete,
 }: {
   branch: Branch;
   onEdit: (branch: Branch) => void;
   onRetire: (branch: Branch) => void;
   onReactivate: (branch: Branch) => void;
+  onDelete: (branch: Branch) => void;
 }) {
   const retired = !branch.is_active;
 
@@ -80,6 +84,14 @@ export function BranchCard({
                 Retire branch
               </DropdownMenuItem>
             )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => onDelete(branch)}
+              className="text-(--brc-danger) data-[highlighted]:text-(--brc-danger)"
+            >
+              <Trash2 size={15} />
+              Delete branch
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

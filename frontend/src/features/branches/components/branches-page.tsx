@@ -9,6 +9,7 @@ import { useMe } from "@/features/auth/api";
 
 import {
   useDeactivateBranch,
+  useDeleteBranch,
   useMyBranches,
   useReactivateBranch,
 } from "../api/branches-api";
@@ -23,11 +24,13 @@ export function BranchesPage() {
   const branchesQuery = useMyBranches();
   const deactivate = useDeactivateBranch();
   const reactivate = useReactivateBranch();
+  const deleteBranch = useDeleteBranch();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Branch | null>(null);
   const [formNonce, setFormNonce] = useState(0);
   const [retireTarget, setRetireTarget] = useState<Branch | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Branch | null>(null);
 
   const businessName = user?.owner_profile?.fleet_name ?? "";
   const isFleet =
@@ -66,6 +69,30 @@ export function BranchesPage() {
       },
       onError: () =>
         toast.error("Couldn't retire the branch. Please try again."),
+    });
+  }
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    deleteBranch.mutate(deleteTarget.id, {
+      onSuccess: (result) => {
+        const parts: string[] = [];
+        if (result.deleted_listings > 0) {
+          parts.push(
+            `${result.deleted_listings} listing${result.deleted_listings === 1 ? "" : "s"} removed`,
+          );
+        }
+        if (result.archived_records > 0) {
+          parts.push(
+            `${result.archived_records} car${result.archived_records === 1 ? "" : "s"} archived`,
+          );
+        }
+        toast.success("Branch deleted", {
+          description: parts.length ? parts.join(" · ") : undefined,
+        });
+        setDeleteTarget(null);
+      },
+      onError: () =>
+        toast.error("Couldn't delete the branch. Please try again."),
     });
   }
 
@@ -152,6 +179,7 @@ export function BranchesPage() {
               onEdit={openEdit}
               onRetire={setRetireTarget}
               onReactivate={handleReactivate}
+              onDelete={setDeleteTarget}
             />
           ))}
         </div>
@@ -183,6 +211,46 @@ export function BranchesPage() {
         destructive
         isPending={deactivate.isPending}
         onConfirm={confirmRetire}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !deleteBranch.isPending && !o && setDeleteTarget(null)}
+        title="Delete this branch?"
+        description={
+          <>
+            {deleteTarget ? (
+              <span className="mb-2 block font-bold text-(--brc-text-secondary)">
+                {deleteTarget.name}
+              </span>
+            ) : null}
+            {deleteTarget && deleteTarget.deletable_car_count > 0 ? (
+              <>
+                {deleteTarget.deletable_car_count} active listing
+                {deleteTarget.deletable_car_count === 1 ? "" : "s"} will be{" "}
+                <strong>permanently deleted</strong>.{" "}
+              </>
+            ) : null}
+            {deleteTarget && deleteTarget.record_car_count > 0 ? (
+              <>
+                {deleteTarget.record_car_count} car
+                {deleteTarget.record_car_count === 1 ? "" : "s"} with sales/rental
+                records will be <strong>kept</strong> and unassigned from this
+                branch.{" "}
+              </>
+            ) : null}
+            {deleteTarget &&
+            deleteTarget.deletable_car_count === 0 &&
+            deleteTarget.record_car_count === 0 ? (
+              <>This branch has no cars. </>
+            ) : null}
+            This can&apos;t be undone.
+          </>
+        }
+        confirmLabel="Delete branch"
+        destructive
+        isPending={deleteBranch.isPending}
+        onConfirm={confirmDelete}
       />
     </div>
   );

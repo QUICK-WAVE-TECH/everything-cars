@@ -1,3 +1,5 @@
+from django.db import transaction
+from django.db.models import Count, Q
 from django.http import Http404
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -7,8 +9,28 @@ from rest_framework.views import APIView
 from common.pagination import StandardPagination
 from common.permissions import IsOwner
 
-from apps.listings.models import Branch
+from apps.listings.models import Branch, CarStatus
 from apps.listings.serializers import BranchSerializer
+
+# A car worth keeping for records: it has sale/rental history (a deal or a
+# request). Everything else attached to a branch is a disposable listing.
+# Car-queryset form (branch.cars.filter(...)):
+RECORD_CAR_FILTER = Q(deals__isnull=False) | Q(requests__isnull=False)
+# Branch-queryset form, for annotating a Count over the reverse "cars" relation:
+_BRANCH_RECORD_FILTER = Q(cars__deals__isnull=False) | Q(cars__requests__isnull=False)
+
+
+def _branches_with_car_counts(profile):
+    """Branches for a business, annotated with total_cars / record_cars so the
+    serializer can report delete impact without an N+1."""
+    return (
+        Branch.objects.filter(business=profile)
+        .annotate(
+            total_cars=Count("cars", distinct=True),
+            record_cars=Count("cars", filter=_BRANCH_RECORD_FILTER, distinct=True),
+        )
+        .order_by("-is_active", "name")
+    )
 
 
 def _verified_fleet_profile(user):
@@ -29,7 +51,7 @@ class BranchListCreateView(APIView):
                 {"detail": "Branch management is for verified business accounts."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        branches = Branch.objects.filter(business=profile)
+        branches = _branches_with_car_counts(profile)
         paginator = StandardPagination()
         page = paginator.paginate_queryset(branches, request)
         return paginator.get_paginated_response(BranchSerializer(page, many=True).data)
@@ -62,7 +84,7 @@ class BranchDetailView(APIView):
         if not profile:
             raise Http404
         try:
-            return Branch.objects.get(id=branch_id, business=profile)
+            return _branches_with_car_counts(profile).get(id=branch_id)
         except Branch.DoesNotExist:
             raise Http404
 
@@ -87,6 +109,38 @@ class BranchDetailView(APIView):
             )
         serializer.save()
         return Response(serializer.data)
+
+    def delete(self, request, branch_id):
+        branch = self._get_branch(request, branch_id)
+        cars = branch.cars.all()
+        # Cars with sale/rental history are kept for records: archive them and
+        # detach from the branch (Car.branch is PROTECT, so they'd otherwise
+        # block the delete; archiving frees their VIN/plate too). Everything else
+        # is a disposable listing and is removed with the branch.
+        retained = list(cars.filter(RECORD_CAR_FILTER).distinct().values_list("id", flat=True))
+        with transaction.atomic():
+            archived_records = (
+                branch.cars.filter(id__in=retained).update(
+                    branch=None, status=CarStatus.ARCHIVED
+                )
+                if retained
+                else 0
+            )
+            disposable = branch.cars.exclude(id__in=retained)
+            # Count cars first — .delete() returns the full cascade tally, not
+            # the number of listings removed.
+            deleted_listings = disposable.count()
+            disposable.delete()
+            # Drop the branch from every team member's assignments, then remove it.
+            branch.team_memberships.clear()
+            branch.delete()
+        return Response(
+            {
+                "deleted_listings": deleted_listings,
+                "archived_records": archived_records,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class BranchDeactivateView(BranchDetailView):

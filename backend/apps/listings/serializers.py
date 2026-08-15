@@ -1054,6 +1054,12 @@ class TransactionDetailSerializer(serializers.ModelSerializer):
 
 class BranchSerializer(serializers.ModelSerializer):
     business_name = serializers.CharField(source="business.fleet_name", read_only=True)
+    # Deleting a branch removes its disposable listings (no deals/requests) and
+    # archives the record-bearing ones. These counts drive the delete confirm
+    # dialog. Read the annotations set by the branch list/detail views when
+    # present, otherwise fall back to a query (single-object responses).
+    record_car_count = serializers.SerializerMethodField()
+    deletable_car_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Branch
@@ -1068,5 +1074,22 @@ class BranchSerializer(serializers.ModelSerializer):
             "email",
             "is_active",
             "created_at",
+            "record_car_count",
+            "deletable_car_count",
         ]
         read_only_fields = ["id", "is_active", "created_at"]
+
+    def get_record_car_count(self, obj):
+        from django.db.models import Q
+
+        if hasattr(obj, "record_cars"):
+            return obj.record_cars
+        return (
+            obj.cars.filter(Q(deals__isnull=False) | Q(requests__isnull=False))
+            .distinct()
+            .count()
+        )
+
+    def get_deletable_car_count(self, obj):
+        total = obj.total_cars if hasattr(obj, "total_cars") else obj.cars.count()
+        return total - self.get_record_car_count(obj)

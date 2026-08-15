@@ -178,6 +178,7 @@ members, branch-tagged listings, and the inspect→publish pipeline.)
 - [ ] Now **list a car** again → the form loads (gate cleared).
 - [ ] **Edit** a branch (⋯ menu) → business name still read-only; changes save with **"Branch updated"**.
 - [ ] **Retire** a branch (⋯ menu) → confirm dialog ("Retire this branch?") → the card dims with a **"Retired"** badge; toast **"Branch retired"**. Its menu now offers **Reactivate** → **"Branch reactivated"**.
+- [ ] **Delete** a branch (⋯ menu → **Delete branch**) → confirm dialog spells out the impact from the branch's cars: **active listings** (no sale/rental history) are **permanently deleted**, while cars with **sales/rental records** (sold, rented, reserved) are **kept, archived, and unassigned** from the branch. Confirm → toast **"Branch deleted"** with a breakdown (e.g. "1 listing removed · 2 cars archived"); the card disappears and any team member loses that branch assignment. An **empty** branch deletes cleanly ("This branch has no cars.").
 - [ ] A **second branch with the same name** is rejected (**"You already have a branch with this name."**).
 - [ ] Loading shows **skeleton cards**; an **individual** owner visiting `/owner/branches` sees a "branches are for business accounts" notice.
 - [ ] _(Isolation)_ Branches are per-business — another fleet owner never sees yours (API returns 404 for cross-business access).
