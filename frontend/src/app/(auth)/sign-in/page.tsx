@@ -44,6 +44,9 @@ export default function SignInPage() {
             router.push(`/verify?email=${encodeURIComponent(data.email)}&purpose=sign_up_verify`);
             return;
           }
+          // Suspended team member — a 403 with a detail message and no verification.
+          toast.error("Account suspended", { description: error.message });
+          return;
         }
         toast.error(error.message);
       },

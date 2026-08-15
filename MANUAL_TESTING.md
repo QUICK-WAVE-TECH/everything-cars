@@ -282,6 +282,43 @@ discarded — they go **on standby**. If the deal **falls through**, those offer
 
 ---
 
+## Password policy · 🚧 on `feat/password-policy-and-suspension`
+
+**Goal:** every place a password is set enforces the same rule — **8–128
+characters, with an uppercase letter, a lowercase letter, and a number or
+symbol** — on both the frontend (Zod, with a visible label) and the backend.
+
+**Manual checklist**
+
+- [ ] On **customer sign-up**, **owner sign-up**, the **profile** password
+  section, and the **reset-password** page, a **hint label** states the rule
+  ("Must be at least 8 characters, including an uppercase letter, a lowercase
+  letter, and a number or symbol.").
+- [ ] Typing a weak password (e.g. `password`, `securepass123`, `ALLCAPS1!`,
+  `NoNumbersOrSymbols`) shows an **inline error** naming the missing rule and
+  blocks submit. `SecurePass123!` (or `Abcdefg1`) is accepted.
+- [ ] The **backend rejects** a weak password even if the client is bypassed
+  (e.g. reset-password / change-password API returns 400) — try `alllowercase1`.
+- [ ] A **team member** setting their password via the invite link
+  (`/reset-password?token=…`) is held to the same rule.
+
+## Team-member suspension · 🚧 on `feat/password-policy-and-suspension`
+
+**Goal:** a suspended (deactivated) team member is logged out immediately and
+cannot sign back in.
+
+**Manual checklist**
+
+- [ ] As the fleet **owner**, **Deactivate** a team member in `/owner/team`.
+- [ ] That member, if currently signed in, is **bounced to `/sign-in`** on their
+  next action/navigation (their token stops working immediately).
+- [ ] The member **cannot sign in**: entering their correct email + password
+  shows an **"Account suspended"** message ("Your account has been suspended.
+  Contact your account owner.") and **no access code is sent**.
+- [ ] **Reactivate** the member → they can sign in again and regain access to
+  their branches.
+- [ ] A **normal owner** and an **active** team member are unaffected.
+
 ### How brands get populated (for reviewers)
 
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh

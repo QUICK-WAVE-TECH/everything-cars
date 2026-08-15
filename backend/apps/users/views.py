@@ -31,6 +31,8 @@ from .services import (
     issue_tokens,
     verify_refresh_token,
     blacklist_token,
+    is_suspended_team_member,
+    SUSPENDED_MESSAGE,
 )
 
 logger = logging.getLogger(__name__)
@@ -121,6 +123,13 @@ class SignInView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        # A suspended team member cannot sign in — no access code is sent.
+        if is_suspended_team_member(user):
+            return Response(
+                {"detail": SUSPENDED_MESSAGE},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         # User exists and password is correct but account not verified
         if not user.is_active:
             generate_and_send_code(
@@ -178,6 +187,12 @@ class VerifyView(APIView):
             user.is_active = True
             user.save(update_fields=["is_active"])
 
+        if is_suspended_team_member(user):
+            return Response(
+                {"detail": SUSPENDED_MESSAGE},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         tokens = issue_tokens(user)
 
         response = Response(
@@ -225,6 +240,11 @@ class RefreshView(APIView):
         except User.DoesNotExist:
             return Response(
                 {"detail": "User not found."}, status=status.HTTP_401_UNAUTHORIZED
+            )
+        if is_suspended_team_member(user):
+            return Response(
+                {"detail": SUSPENDED_MESSAGE},
+                status=status.HTTP_401_UNAUTHORIZED,
             )
         tokens = issue_tokens(user)
         response = Response(

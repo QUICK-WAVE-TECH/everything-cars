@@ -19,6 +19,21 @@ export const ID_TYPE_VALUES = [
 export const idTypeLabel = (value?: string) =>
   ID_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? "";
 
+/** Human-readable password policy — show this under every password field.
+ * Kept in sync with the backend PasswordComplexityValidator. */
+export const PASSWORD_HINT =
+  "Must be at least 8 characters, including an uppercase letter, a lowercase letter, and a number or symbol.";
+
+/** Shared password policy: 8–128 chars, an uppercase, a lowercase, and a number
+ * or symbol (either satisfies). Used by sign-up, reset, and change-password. */
+export const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(128, "Password must be 128 characters or fewer")
+  .regex(/[A-Z]/, "Include at least one uppercase letter")
+  .regex(/[a-z]/, "Include at least one lowercase letter")
+  .regex(/[0-9\p{P}\p{S}]/u, "Include at least one number or symbol");
+
 const isBlank = (value?: string) => !value?.trim();
 const phoneSchema = z
   .string()
@@ -40,7 +55,7 @@ export const customerSignUpSchema = z
       .min(2, "Last name must be at least 2 characters"),
     email: z.string().trim().email("Invalid email address"),
     phone: phoneSchema,
-    password: z.string().min(8, "Password must be at least 8 characters"),
+    password: passwordSchema,
     confirmPassword: z.string(),
     date_of_birth: z.string().trim().optional(),
     address: z.string().trim().optional(),
@@ -65,7 +80,7 @@ export const ownerSignUpSchema = z
       .min(2, "Last name must be at least 2 characters"),
     email: z.string().trim().email("Invalid email address"),
     phone: phoneSchema,
-    password: z.string().min(8, "Password must be at least 8 characters"),
+    password: passwordSchema,
     confirmPassword: z.string(),
     owner_type: z.enum(["individual", "fleet"], {
       message: "Select ownership type",
@@ -182,7 +197,7 @@ export const ownerProfileUpdateSchema = z.object({
 export const changePasswordSchema = z
   .object({
     old_password: z.string().min(1, "Current password required"),
-    new_password: z.string().min(8, "Password must be at least 8 characters"),
+    new_password: passwordSchema,
     confirm_password: z.string(),
   })
   .refine((data) => data.new_password === data.confirm_password, {

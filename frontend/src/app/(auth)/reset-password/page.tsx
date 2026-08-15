@@ -19,10 +19,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { PASSWORD_HINT, passwordSchema } from "@/features/auth/schemas";
 
 const resetSchema = z
   .object({
-    password: z.string().min(8, "Password must be at least 8 characters"),
+    password: passwordSchema,
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -177,7 +178,7 @@ function ResetContent() {
                 Set New Password
               </CardTitle>
               <CardDescription className="text-sm leading-6 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-                Choose a strong password that you haven&apos;t used before. Must be at least 8 characters.
+                Choose a strong password that you haven&apos;t used before. {PASSWORD_HINT}
               </CardDescription>
             </div>
           </CardHeader>

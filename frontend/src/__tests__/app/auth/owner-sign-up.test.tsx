@@ -49,8 +49,8 @@ function fillStepOne() {
   });
 
   const { password, confirmPassword } = getPasswordFields();
-  fireEvent.change(password, { target: { value: "securepass123" } });
-  fireEvent.change(confirmPassword, { target: { value: "securepass123" } });
+  fireEvent.change(password, { target: { value: "SecurePass123!" } });
+  fireEvent.change(confirmPassword, { target: { value: "SecurePass123!" } });
 
   fireEvent.click(screen.getByRole("radio", { name: /private car/i }));
 }

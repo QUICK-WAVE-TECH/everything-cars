@@ -19,6 +19,7 @@ import { useMe, useUpdateProfile, useChangePassword } from "@/features/auth/api"
 import {
   profileUpdateSchema,
   changePasswordSchema,
+  PASSWORD_HINT,
 } from "@/features/auth/schemas";
 import { COUNTRIES } from "@/features/auth/data/countries";
 import { ApiError } from "@/lib/api-client";
@@ -477,6 +478,7 @@ export default function ProfilePage() {
                             type="password"
                             value={field.value}
                             onChange={field.onChange}
+                            hint={PASSWORD_HINT}
                           />
                           <FormMessage />
                         </FormItem>
