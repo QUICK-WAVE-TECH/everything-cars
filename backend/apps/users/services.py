@@ -124,6 +124,18 @@ def generate_and_send_code(email: str, purpose: str, user=None) -> AccessCode:
     return code_obj
 
 
+SUSPENDED_MESSAGE = "Your account has been suspended. Contact your account owner."
+
+
+def is_suspended_team_member(user):
+    """True for a team member whose access has been revoked — the role is
+    team_member but they have no active membership. Used to reject them at every
+    token chokepoint (auth, sign-in, verify, refresh)."""
+    if getattr(user, "role", None) != User.Role.TEAM_MEMBER:
+        return False
+    return not TeamMembership.objects.filter(user=user, is_active=True).exists()
+
+
 class NoBusinessAccess(Exception):
     """The user has no usable business/branch context (a customer, or a team
     member with a disabled/absent membership)."""

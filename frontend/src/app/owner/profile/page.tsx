@@ -20,6 +20,7 @@ import {
   ownerProfileUpdateSchema,
   changePasswordSchema,
   idTypeLabel,
+  PASSWORD_HINT,
 } from "@/features/auth/schemas";
 import { COUNTRIES } from "@/features/auth/data/countries";
 import { ApiError } from "@/lib/api-client";
@@ -665,6 +666,7 @@ export default function OwnerProfilePage() {
                             type="password"
                             value={field.value}
                             onChange={field.onChange}
+                            hint={PASSWORD_HINT}
                           />
                           <FormMessage />
                         </FormItem>

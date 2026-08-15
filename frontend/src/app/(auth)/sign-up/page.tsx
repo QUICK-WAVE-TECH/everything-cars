@@ -20,6 +20,7 @@ import { COUNTRIES } from "@/features/auth/data/countries";
 import { useSignUp } from "@/features/auth/api";
 import {
   customerSignUpSchema,
+  PASSWORD_HINT,
   type CustomerSignUpInput,
 } from "@/features/auth/schemas";
 import { Card, CardContent } from "@/components/ui/card";
@@ -282,6 +283,7 @@ export default function SignUpPage() {
                             type="password"
                             value={field.value}
                             onChange={field.onChange}
+                            hint={PASSWORD_HINT}
                           />
                           <FormMessage />
                         </FormItem>

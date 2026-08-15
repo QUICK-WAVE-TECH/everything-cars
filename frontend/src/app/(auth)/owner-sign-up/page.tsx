@@ -25,6 +25,7 @@ import { useSignUp } from "@/features/auth/api";
 import {
   ownerSignUpSchema,
   idTypeLabel,
+  PASSWORD_HINT,
   type OwnerSignUpInput,
 } from "@/features/auth/schemas";
 import { Card, CardContent } from "@/components/ui/card";
@@ -214,7 +215,7 @@ export default function OwnerSignUpPage() {
                     )} />
                     <FormField control={form.control} name="password" render={({ field }) => (
                       <FormItem>
-                        <AuthField label="Password" placeholder="Password" type="password" value={field.value} onChange={field.onChange} />
+                        <AuthField label="Password" placeholder="Password" type="password" value={field.value} onChange={field.onChange} hint={PASSWORD_HINT} />
                         <FormMessage />
                       </FormItem>
                     )} />

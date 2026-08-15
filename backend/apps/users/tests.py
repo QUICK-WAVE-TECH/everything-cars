@@ -12,6 +12,7 @@ from apps.listings.tests import (
 )
 from apps.listings.models import Branch
 from apps.users.models import TeamMembership
+from apps.users.services import SUSPENDED_MESSAGE
 
 
 def create_user_owner(email):
@@ -281,7 +282,7 @@ class OwnerSignUpIDTest(APITestCase):
             "email": "newowner@test.com",
             "first_name": "New",
             "last_name": "Owner",
-            "password": "securepass123",
+            "password": "SecurePass123!",
             "role": "owner",
             "owner_type": "individual",
             "bank_account": "1234567890",
@@ -436,7 +437,7 @@ class CustomerSignUpNoNinTest(APITestCase):
             "email": "newcustomer@test.com",
             "first_name": "New",
             "last_name": "Customer",
-            "password": "securepass123",
+            "password": "SecurePass123!",
             "role": "customer",
         }
         payload.update(overrides)
@@ -465,7 +466,7 @@ class CustomerSignUpNoNinTest(APITestCase):
             "email": "o-nonid@test.com",
             "first_name": "No",
             "last_name": "Id",
-            "password": "securepass123",
+            "password": "SecurePass123!",
             "role": "owner",
             "owner_type": "individual",
             "bank_account": "1234567890",
@@ -530,7 +531,7 @@ class CustomerVerificationEmailTest(APITestCase):
                     "email": "verify-me@test.com",
                     "first_name": "Vee",
                     "last_name": "Rify",
-                    "password": "securepass123",
+                    "password": "SecurePass123!",
                     "role": "customer",
                 },
                 format="multipart",
@@ -915,3 +916,159 @@ class TeamMemberWelcomeEmailTest(APITestCase):
         assert r.status_code == 200, r.data
         member = User.objects.get(email="e2e-rep@test.com")
         assert member.check_password("MyNewPass123!")
+
+
+class PasswordComplexityValidatorTest(APITestCase):
+    def _validate(self, pw):
+        from django.core.exceptions import ValidationError
+
+        from common.password_validation import PasswordComplexityValidator
+
+        try:
+            PasswordComplexityValidator().validate(pw)
+            return None
+        except ValidationError as exc:
+            return exc.messages
+
+    def test_compliant_password_passes(self):
+        self.assertIsNone(self._validate("MyNewPass123!"))
+        self.assertIsNone(self._validate("Abcdefg1"))  # letters + a digit
+
+    def test_missing_uppercase_rejected(self):
+        msgs = self._validate("mynewpass123!")
+        self.assertTrue(any("uppercase" in m for m in msgs))
+
+    def test_missing_lowercase_rejected(self):
+        msgs = self._validate("MYNEWPASS123!")
+        self.assertTrue(any("lowercase" in m for m in msgs))
+
+    def test_missing_number_or_symbol_rejected(self):
+        msgs = self._validate("MyNewPassword")
+        self.assertTrue(any("number or symbol" in m for m in msgs))
+
+    def test_symbol_alone_satisfies_number_or_symbol(self):
+        self.assertIsNone(self._validate("MyNewPass!"))
+
+    def test_over_max_length_rejected(self):
+        msgs = self._validate("Aa1" + "a" * 130)
+        self.assertTrue(any("128 characters or fewer" in m for m in msgs))
+
+
+class PasswordPolicyEndpointTest(APITestCase):
+    def _reset_token(self):
+        from apps.users.models import PasswordResetToken
+
+        user = create_user("pw-reset@test.com", "customer")
+        token = PasswordResetToken.create_token(user)
+        return user, token.plain_token
+
+    def test_reset_password_rejects_weak(self):
+        _user, plain = self._reset_token()
+        r = self.client.post(
+            "/api/v1/auth/reset-password",
+            {"token": plain, "password": "alllowercase1"},
+            format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_reset_password_accepts_compliant(self):
+        _user, plain = self._reset_token()
+        r = self.client.post(
+            "/api/v1/auth/reset-password",
+            {"token": plain, "password": "GoodPass1!"},
+            format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+
+    def test_signup_serializer_rejects_weak_password(self):
+        from apps.users.serializers import SignUpSerializer
+
+        s = SignUpSerializer(
+            data={
+                "email": "pw-signup@test.com",
+                "first_name": "Ada",
+                "last_name": "Obi",
+                "password": "weakpass1",  # no uppercase
+                "role": "customer",
+            }
+        )
+        self.assertFalse(s.is_valid())
+        self.assertIn("password", s.errors)
+
+    def test_change_password_rejects_weak(self):
+        user = create_user("pw-change@test.com", "customer")
+        user.set_password("OldPass1!")
+        user.save(update_fields=["password"])
+        self.client.force_authenticate(user)
+        r = self.client.post(
+            "/api/v1/auth/change-password",
+            {"old_password": "OldPass1!", "new_password": "nouppercase1"},
+            format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class TeamSuspensionAuthTest(APITestCase):
+    def setUp(self):
+        from apps.users.services import issue_tokens
+
+        self.owner = create_user_owner("susp-owner@test.com")
+        self.profile = create_fleet_owner_profile(self.owner)
+        self.branch = Branch.objects.create(
+            business=self.profile, name="HQ", state="Lagos", city="Ikeja",
+            street_address="1", phone="+2348010000000", email="hq@x.ng",
+        )
+        self.member, self.membership = make_team_member(
+            "susp-member@test.com", self.profile, [self.branch]
+        )
+        self.member.set_password("MemberPass1!")
+        self.member.save(update_fields=["password"])
+        self._issue_tokens = issue_tokens
+
+    def _auth_as(self, user):
+        token = self._issue_tokens(user)["access_token"]
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    def _suspend(self):
+        self.membership.is_active = False
+        self.membership.save(update_fields=["is_active"])
+
+    def test_active_member_can_access_authenticated_endpoint(self):
+        self._auth_as(self.member)
+        r = self.client.get("/api/v1/users/me")
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+
+    def test_suspended_member_token_rejected_immediately(self):
+        # A token minted while active must stop working once suspended.
+        self._auth_as(self.member)
+        self._suspend()
+        r = self.client.get("/api/v1/users/me")
+        self.assertIn(
+            r.status_code,
+            (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
+        )
+        self.assertIn(SUSPENDED_MESSAGE, str(r.data))
+
+    def test_suspended_member_cannot_sign_in(self):
+        self._suspend()
+        self.client.credentials()
+        r = self.client.post(
+            "/api/v1/auth/sign-in",
+            {"email": "susp-member@test.com", "password": "MemberPass1!"},
+            format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(r.data["detail"], SUSPENDED_MESSAGE)
+
+    def test_reactivated_member_regains_access(self):
+        self._suspend()
+        self.membership.is_active = True
+        self.membership.save(update_fields=["is_active"])
+        self._auth_as(self.member)
+        r = self.client.get("/api/v1/users/me")
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+
+    def test_owner_unaffected_by_suspension_check(self):
+        self._auth_as(self.owner)
+        r = self.client.get("/api/v1/users/me")
+        self.assertEqual(r.status_code, status.HTTP_200_OK)

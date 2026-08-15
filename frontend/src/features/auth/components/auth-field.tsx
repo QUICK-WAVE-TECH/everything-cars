@@ -20,6 +20,8 @@ type AuthFieldProps = {
   inputMode?: InputHTMLAttributes<HTMLInputElement>["inputMode"];
   pattern?: string;
   required?: boolean;
+  /** Optional helper text shown under the field (e.g. the password policy). */
+  hint?: string;
 };
 
 export function AuthField({
@@ -33,6 +35,7 @@ export function AuthField({
   inputMode,
   pattern,
   required,
+  hint,
 }: AuthFieldProps) {
   const [show, setShow] = useState(false);
   const isPw = type === "password";
@@ -86,6 +89,14 @@ export function AuthField({
         )}
         {isSelect && <Icon name="chevdown" size={20} stroke="var(--brc-text-muted)" />}
       </div>
+      {hint && (
+        <p
+          className="text-xs leading-5"
+          style={{ fontFamily: "var(--brc-font-ui)", color: "var(--brc-text-muted)" }}
+        >
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

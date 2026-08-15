@@ -29,7 +29,7 @@ class SignUpSerializer(serializers.Serializer):
     email = serializers.EmailField()
     first_name = serializers.CharField(min_length=2, max_length=150)
     last_name = serializers.CharField(min_length=2, max_length=150)
-    password = serializers.CharField(min_length=8, write_only=True)
+    password = serializers.CharField(min_length=8, max_length=128, write_only=True)
     phone = serializers.CharField(max_length=20, required=False, default="")
     role = serializers.ChoiceField(choices=User.Role.choices)
     id_type = serializers.ChoiceField(choices=IDType.choices, required=False)
@@ -75,6 +75,13 @@ class SignUpSerializer(serializers.Serializer):
     def validate_national_id(self, value):
         value = value.strip()
        
+        return value
+
+    def validate_password(self, value):
+        try:
+            validate_password(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
         return value
 
     def validate(self, data):
@@ -292,7 +299,7 @@ class ForgotPasswordSerializer(serializers.Serializer):
 
 class ResetPasswordSerializer(serializers.Serializer):
     token = serializers.CharField()
-    password = serializers.CharField(min_length=8)
+    password = serializers.CharField(min_length=8, max_length=128)
 
     def validate_password(self, value):
         try:
@@ -305,4 +312,11 @@ class ResetPasswordSerializer(serializers.Serializer):
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField()
-    new_password = serializers.CharField(min_length=8)
+    new_password = serializers.CharField(min_length=8, max_length=128)
+
+    def validate_new_password(self, value):
+        try:
+            validate_password(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
+        return value
