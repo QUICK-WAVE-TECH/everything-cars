@@ -82,7 +82,7 @@ class CustomerProfileAdmin(admin.ModelAdmin):
 
 @admin.register(OwnerProfile)
 class OwnerProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "owner_type", "is_verified", "bank_name", "created_at")
+    list_display = ("user", "owner_type", "is_verified", "created_at")
     list_filter = ("owner_type", "is_verified")
     list_select_related = ("user",)
     search_fields = ("user__email", "user__name", "fleet_name")

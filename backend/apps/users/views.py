@@ -79,8 +79,6 @@ class SignUpView(APIView):
                     state=data.get("state", ""),
                     city=data.get("city", ""),
                     address=data.get("address", ""),
-                    bank_account=data["bank_account"],
-                    bank_name=data["bank_name"],
                     document=data.get("document"),
                     id_type=data.get("id_type", ""),
                     id_document=data.get("id_document"),

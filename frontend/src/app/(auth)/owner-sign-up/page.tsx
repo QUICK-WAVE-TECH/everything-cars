@@ -58,8 +58,6 @@ export default function OwnerSignUpPage() {
       location: "",
       address: "",
       rc_number: "",
-      bank_account: "",
-      bank_name: "",
       country: "",
       state: "",
       city: "",
@@ -128,8 +126,6 @@ export default function OwnerSignUpPage() {
         country: values.country,
         state: values.state,
         city: values.city,
-        bank_account: values.bank_account,
-        bank_name: values.bank_name,
         document: document ?? undefined,
       },
       {
@@ -371,26 +367,6 @@ export default function OwnerSignUpPage() {
                       />
                     </div>
 
-                    <FormField control={form.control} name="bank_account" render={({ field }) => (
-                      <FormItem>
-                        <AuthField
-                          label={isCompany ? "Company Bank Account Number" : "Bank Account Number"}
-                          placeholder={isCompany ? "Enter company account number" : "Enter bank account number"}
-                          value={field.value}
-                          onChange={(value) => field.onChange(onlyDigits(value))}
-                          type="tel"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                        />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="bank_name" render={({ field }) => (
-                      <FormItem>
-                        <AuthField label={isCompany ? "Company Bank Name" : "Bank Name"} placeholder={isCompany ? "Enter company bank name" : "Enter bank name"} value={field.value} onChange={field.onChange} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
                     <Checkbox checked={agree} onChange={() => setAgree(!agree)}>
                       I agree to the{" "}
                       <span className="text-(--brc-accent) underline">Terms of Service</span>{" "}

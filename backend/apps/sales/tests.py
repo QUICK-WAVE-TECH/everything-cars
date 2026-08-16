@@ -27,8 +27,6 @@ def make_owner(email="deal-owner@test.com"):
     OwnerProfile.objects.create(
         user=owner,
         owner_type=OwnerProfile.OwnerType.INDIVIDUAL,
-        bank_account="1234567890",
-        bank_name="Bank",
         is_verified=True,
     )
     return owner

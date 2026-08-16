@@ -40,8 +40,12 @@ const phoneSchema = z
   .trim()
   .regex(/^\d*$/, "Phone number must contain digits only")
   .optional();
-const requiredDigitsSchema = (requiredMessage: string, digitsMessage: string) =>
-  z.string().trim().min(1, requiredMessage).regex(/^\d+$/, digitsMessage);
+// Registration requires a phone number (customers and owners alike).
+const requiredPhoneSchema = z
+  .string()
+  .trim()
+  .min(1, "Phone number is required")
+  .regex(/^\d+$/, "Phone number must contain digits only");
 
 export const customerSignUpSchema = z
   .object({
@@ -54,7 +58,7 @@ export const customerSignUpSchema = z
       .trim()
       .min(2, "Last name must be at least 2 characters"),
     email: z.string().trim().email("Invalid email address"),
-    phone: phoneSchema,
+    phone: requiredPhoneSchema,
     password: passwordSchema,
     confirmPassword: z.string(),
     date_of_birth: z.string().trim().optional(),
@@ -79,7 +83,7 @@ export const ownerSignUpSchema = z
       .trim()
       .min(2, "Last name must be at least 2 characters"),
     email: z.string().trim().email("Invalid email address"),
-    phone: phoneSchema,
+    phone: requiredPhoneSchema,
     password: passwordSchema,
     confirmPassword: z.string(),
     owner_type: z.enum(["individual", "fleet"], {
@@ -96,11 +100,6 @@ export const ownerSignUpSchema = z
     country: z.string().trim().optional(),
     state: z.string().trim().optional(),
     city: z.string().trim().optional(),
-    bank_account: requiredDigitsSchema(
-      "Bank account is required",
-      "Bank account number must contain digits only",
-    ),
-    bank_name: z.string().trim().min(1, "Bank name is required"),
   })
   .superRefine((data, ctx) => {
     if (data.password !== data.confirmPassword) {
@@ -190,8 +189,6 @@ export const ownerProfileUpdateSchema = z.object({
   state: z.string().trim().optional(),
   city: z.string().trim().optional(),
   address: z.string().trim().optional(),
-  bank_account: z.string().trim().min(1, "Bank account required"),
-  bank_name: z.string().trim().min(1, "Bank name required"),
 });
 
 export const changePasswordSchema = z

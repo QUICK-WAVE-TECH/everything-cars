@@ -402,8 +402,6 @@ class OwnerBookingTest(APITestCase):
         OwnerProfile.objects.create(
             user=owner,
             owner_type="individual",
-            bank_account="1",
-            bank_name="B",
             is_verified=True,
         )
         car = create_car(owner, status=CarStatus.LISTING_APPROVED)
