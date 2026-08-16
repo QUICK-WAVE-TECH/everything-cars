@@ -112,8 +112,6 @@ class OwnerProfile(models.Model):
     state = models.CharField(max_length=250, blank=True, default="")
     city = models.CharField(max_length=250, blank=True, default="")
     address = models.CharField(max_length=300, blank=True, default="")
-    bank_account = models.CharField(max_length=20)
-    bank_name = models.CharField(max_length=100)
     document = models.FileField(upload_to=owner_document_path, blank=True)
     is_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

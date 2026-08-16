@@ -69,20 +69,5 @@ describe("OwnerSignUpPage", () => {
     expect(screen.getByText("ID Number")).toBeInTheDocument();
     expect(screen.getByText("Upload ID Document")).toBeInTheDocument();
     expect(screen.getByText("Upload Car Ownership Document")).toBeInTheDocument();
-    expect(screen.getByText("Bank Account Number")).toBeInTheDocument();
-    expect(screen.getByText("Bank Name")).toBeInTheDocument();
-  });
-
-  it("keeps the bank account number digit-only", async () => {
-    renderWithQueryClient(<OwnerSignUpPage />);
-
-    fillStepOne();
-    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
-
-    const bankAccount = await screen.findByPlaceholderText(
-      "Enter bank account number",
-    );
-    fireEvent.change(bankAccount, { target: { value: "00x12#34" } });
-    expect(bankAccount).toHaveValue("001234");
   });
 });

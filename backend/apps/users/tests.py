@@ -212,8 +212,6 @@ class AdminOwnerVerifyTest(APITestCase):
         self.profile = OwnerProfile.objects.create(
             user=self.owner,
             owner_type="individual",
-            bank_account="1",
-            bank_name="B",
             id_type="nin",
             national_id="123",
         )
@@ -283,10 +281,9 @@ class OwnerSignUpIDTest(APITestCase):
             "first_name": "New",
             "last_name": "Owner",
             "password": "SecurePass123!",
+            "phone": "08012345678",
             "role": "owner",
             "owner_type": "individual",
-            "bank_account": "1234567890",
-            "bank_name": "Test Bank",
             "national_id": "12345678901",
             "id_type": "nin",
             "address": "24 Awolowo Rd",
@@ -377,6 +374,22 @@ class OwnerSignUpIDTest(APITestCase):
         self.assertEqual(profile.address, "24 Awolowo Rd")
         self.assertTrue(profile.id_document.name)
 
+    def test_owner_signup_no_longer_needs_bank_details(self):
+        # Bank fields were removed from registration entirely.
+        res = self.client.post(
+            "/api/v1/auth/sign-up", self._owner_payload(), format="multipart"
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+    def test_owner_signup_requires_phone(self):
+        res = self.client.post(
+            "/api/v1/auth/sign-up",
+            self._owner_payload(phone=""),
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("phone", res.data)
+
 
 class OwnerProfileIdentityLockTest(APITestCase):
     def setUp(self):
@@ -392,8 +405,6 @@ class OwnerProfileIdentityLockTest(APITestCase):
         OwnerProfile.objects.create(
             user=self.user,
             owner_type="individual",
-            bank_account="1234567890",
-            bank_name="Test Bank",
             national_id="12345678901",
             id_type="nin",
             id_document=id_image("locked-id.jpg"),
@@ -438,10 +449,20 @@ class CustomerSignUpNoNinTest(APITestCase):
             "first_name": "New",
             "last_name": "Customer",
             "password": "SecurePass123!",
+            "phone": "08012345678",
             "role": "customer",
         }
         payload.update(overrides)
         return payload
+
+    def test_customer_signup_requires_phone(self):
+        res = self.client.post(
+            "/api/v1/auth/sign-up",
+            self._customer_payload(phone=""),
+            format="multipart",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("phone", res.data)
 
     def test_customer_signup_succeeds_without_national_id(self):
         res = self.client.post(
@@ -467,10 +488,9 @@ class CustomerSignUpNoNinTest(APITestCase):
             "first_name": "No",
             "last_name": "Id",
             "password": "SecurePass123!",
+            "phone": "08012345678",
             "role": "owner",
             "owner_type": "individual",
-            "bank_account": "1234567890",
-            "bank_name": "Test Bank",
             "id_type": "nin",
             "document": id_image("ownership.jpg"),
             "id_document": id_image("id.jpg"),
@@ -532,6 +552,7 @@ class CustomerVerificationEmailTest(APITestCase):
                     "first_name": "Vee",
                     "last_name": "Rify",
                     "password": "SecurePass123!",
+                    "phone": "08012345678",
                     "role": "customer",
                 },
                 format="multipart",

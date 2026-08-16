@@ -30,7 +30,8 @@ class SignUpSerializer(serializers.Serializer):
     first_name = serializers.CharField(min_length=2, max_length=150)
     last_name = serializers.CharField(min_length=2, max_length=150)
     password = serializers.CharField(min_length=8, max_length=128, write_only=True)
-    phone = serializers.CharField(max_length=20, required=False, default="")
+    # Phone is required at registration for both customers and owners.
+    phone = serializers.CharField(max_length=20, min_length=1)
     role = serializers.ChoiceField(choices=User.Role.choices)
     id_type = serializers.ChoiceField(choices=IDType.choices, required=False)
     id_document = serializers.FileField(required=False)
@@ -52,8 +53,6 @@ class SignUpSerializer(serializers.Serializer):
     fleet_name = serializers.CharField(max_length=200, required=False, default="")
     location = serializers.CharField(max_length=200, required=False, default="")
     rc_number = serializers.CharField(max_length=50, required=False, default="")
-    bank_account = serializers.CharField(max_length=20, required=False, default="")
-    bank_name = serializers.CharField(max_length=100, required=False, default="")
     document = serializers.FileField(required=False)
 
     def validate_email(self, value):
@@ -107,10 +106,6 @@ class SignUpSerializer(serializers.Serializer):
             if not data.get("owner_type"):
                 raise serializers.ValidationError(
                     {"owner_type": "Required for owner accounts."}
-                )
-            if not data.get("bank_account") or not data.get("bank_name"):
-                raise serializers.ValidationError(
-                    {"bank_account": "Bank details are required for owner accounts."}
                 )
             if not data.get("document"):
                 raise serializers.ValidationError(
@@ -204,8 +199,6 @@ class OwnerProfileSerializer(serializers.ModelSerializer):
             "state",
             "city",
             "address",
-            "bank_account",
-            "bank_name",
             "is_verified",
         ]
         read_only_fields = ["is_verified"]

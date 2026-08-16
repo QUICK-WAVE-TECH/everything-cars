@@ -131,8 +131,6 @@ export default function OwnerProfilePage() {
       state: profile?.state ?? "",
       city: profile?.city ?? "",
       address: profile?.address ?? "",
-      bank_account: profile?.bank_account ?? "",
-      bank_name: profile?.bank_name ?? "",
     },
   });
 
@@ -161,8 +159,6 @@ export default function OwnerProfilePage() {
       state: profile?.state ?? "",
       city: profile?.city ?? "",
       address: profile?.address ?? "",
-      bank_account: profile?.bank_account ?? "",
-      bank_name: profile?.bank_name ?? "",
     });
     setEditing(true);
   }
@@ -245,12 +241,6 @@ export default function OwnerProfilePage() {
     { label: "Country", value: profile?.country || "—", icon: "pin" },
     { label: "State", value: profile?.state || "—", icon: "pin" },
     { label: "City", value: profile?.city || "—", icon: "pin" },
-    { label: "Bank Name", value: profile?.bank_name || "—", icon: "banknote" },
-    {
-      label: "Bank Account",
-      value: profile?.bank_account || "—",
-      icon: "banknote",
-    },
   ];
 
   return (
@@ -559,37 +549,6 @@ export default function OwnerProfilePage() {
                             state={watchedState ?? ""}
                             value={field.value ?? ""}
                             onChange={field.onChange}
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="bank_name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <AuthField
-                            label="Bank Name"
-                            placeholder="Bank name"
-                            value={field.value}
-                            onChange={field.onChange}
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="bank_account"
-                      render={({ field }) => (
-                        <FormItem>
-                          <AuthField
-                            label="Bank Account"
-                            placeholder="Account number"
-                            value={field.value}
-                            onChange={field.onChange}
-                            inputMode="numeric"
                           />
                           <FormMessage />
                         </FormItem>

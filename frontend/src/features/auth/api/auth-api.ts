@@ -36,8 +36,6 @@ export type OwnerSignUpData = BaseSignUpData & {
   country?: string;
   state?: string;
   city?: string;
-  bank_account: string;
-  bank_name: string;
   document?: File;
 };
 
@@ -98,8 +96,6 @@ export type UserProfile = {
     state: string;
     city: string;
     address: string;
-    bank_account: string;
-    bank_name: string;
     is_verified: boolean;
   } | null;
   /**
