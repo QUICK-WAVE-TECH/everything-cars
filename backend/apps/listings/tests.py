@@ -1765,6 +1765,7 @@ class BranchSerializerTest(TestCase):
         s = BranchSerializer(
             data={
                 "name": "HQ",
+                "country": "NG",
                 "state": "Lagos",
                 "city": "Ikeja",
                 "street_address": "1 A",
@@ -1795,6 +1796,7 @@ class BranchListCreateApiTest(APITestCase):
     def _payload(self, **over):
         data = {
             "name": "Lagos Branch",
+            "country": "NG",
             "state": "Lagos",
             "city": "Ikeja",
             "street_address": "1 A",
@@ -1829,6 +1831,21 @@ class BranchListCreateApiTest(APITestCase):
         assert r2.status_code == 200
         results = r2.data["results"] if "results" in r2.data else r2.data
         assert len(results) == 1
+
+    def test_branch_can_use_a_different_country(self):
+        self.client.force_authenticate(self.fleet_user)
+        r = self.client.post(
+            "/api/v1/owner/branches/",
+            self._payload(name="Accra", country="GH", state="Greater Accra"),
+        )
+        assert r.status_code == 201, r.data
+        assert r.data["country"] == "GH"
+
+    def test_country_is_required(self):
+        self.client.force_authenticate(self.fleet_user)
+        r = self.client.post("/api/v1/owner/branches/", self._payload(country=""))
+        assert r.status_code == 400
+        assert "country" in r.data
 
     def test_duplicate_name_rejected(self):
         self.client.force_authenticate(self.fleet_user)
@@ -2193,6 +2210,30 @@ class FleetCarLocationFromBranchTest(APITestCase):
         car = Car.objects.get(id=r.data["id"])
         assert car.state == "Oyo"
         assert car.city == "Ibadan"
+
+    def test_fleet_car_inherits_branch_country(self):
+        # The business is registered in NG but this branch is in Ghana; a car
+        # listed there must take the branch's country, not the business's.
+        self.profile.country = "NG"
+        self.profile.save(update_fields=["country"])
+        gh_branch = Branch.objects.create(
+            business=self.profile, name="Accra", country="GH",
+            state="Greater Accra", city="Accra", street_address="2 B",
+            phone="+233200000000", email="g@x.ng",
+        )
+        self.client.force_authenticate(self.owner)
+        r = self.client.post(
+            "/api/v1/listings/my-cars",
+            self._payload(
+                branch=str(gh_branch.id), vin="1HGCM82633A004400",
+                plate_number="GHA123XY",
+            ),
+            format="json",
+        )
+        assert r.status_code == 201, r.data
+        car = Car.objects.get(id=r.data["id"])
+        assert car.country == "GH"
+        assert car.state == "Greater Accra"
 
     def test_individual_owner_still_needs_state(self):
         indiv = create_user("floc-indiv@test.com", "owner")

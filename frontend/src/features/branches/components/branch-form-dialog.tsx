@@ -11,7 +11,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CityCombobox, StateSelect } from "@/features/auth/components";
+import {
+  CityCombobox,
+  CountrySelect,
+  PhoneField,
+  StateSelect,
+} from "@/features/auth/components";
 import { COUNTRIES } from "@/features/auth/data/countries";
 import { useMe } from "@/features/auth/api";
 import { ApiError } from "@/lib/api-client";
@@ -19,11 +24,15 @@ import { ApiError } from "@/lib/api-client";
 import { useCreateBranch, useUpdateBranch } from "../api/branches-api";
 import type { Branch, BranchInput } from "../api/types";
 
+// `country` holds a lowercase ISO code (matches the COUNTRIES data + CountrySelect);
+// `phone` is just the local number — the dial code is tracked separately and
+// combined on submit.
 type FormValues = BranchInput;
 type FormErrors = Partial<Record<keyof FormValues, string>>;
 
 const EMPTY: FormValues = {
   name: "",
+  country: "",
   state: "",
   city: "",
   street_address: "",
@@ -31,11 +40,20 @@ const EMPTY: FormValues = {
   email: "",
 };
 
+/** Split a stored international phone ("+2348012345678") into a dial code and
+ * the local number, using the branch's country to find the dial prefix. */
+function splitPhone(phone: string, iso: string): { code: string; number: string } {
+  const dial = COUNTRIES.find((c) => c.iso === iso)?.dial ?? "+234";
+  const number = phone.startsWith(dial) ? phone.slice(dial.length) : phone;
+  return { code: dial, number: number.replace(/\D/g, "") };
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function validate(v: FormValues): FormErrors {
   const e: FormErrors = {};
   if (!v.name.trim()) e.name = "Branch name is required.";
+  if (!v.country.trim()) e.country = "Country is required.";
   if (!v.state.trim()) e.state = "State is required.";
   if (!v.city.trim()) e.city = "City is required.";
   if (!v.street_address.trim()) e.street_address = "Street address is required.";
@@ -78,13 +96,11 @@ export function BranchFormDialog({
   const update = useUpdateBranch();
   const saving = create.isPending || update.isPending;
 
-  // State/City dropdowns are driven by the country the owner registered with
-  // (their profile country is an ISO code); fall back to Nigeria if unset.
+  // A new branch defaults to the owner's registered country, but it can be
+  // changed so a branch can live in another country. State/City are driven by
+  // whichever country is selected here.
   const { data: me } = useMe();
-  const countryName =
-    COUNTRIES.find(
-      (c) => c.iso === (me?.owner_profile?.country ?? "").toLowerCase(),
-    )?.name ?? "Nigeria";
+  const defaultIso = (me?.owner_profile?.country ?? "").toLowerCase();
 
   // Lazy init from `branch`; the parent remounts this dialog on each open (via a
   // changing key), so state resets without a setState-in-effect.
@@ -92,19 +108,36 @@ export function BranchFormDialog({
     branch
       ? {
           name: branch.name,
+          country: branch.country.toLowerCase(),
           state: branch.state,
           city: branch.city,
           street_address: branch.street_address,
-          phone: branch.phone,
+          phone: splitPhone(branch.phone, branch.country.toLowerCase()).number,
           email: branch.email,
         }
-      : EMPTY,
+      : { ...EMPTY, country: defaultIso },
+  );
+  const [phoneCode, setPhoneCode] = useState(() =>
+    branch
+      ? splitPhone(branch.phone, branch.country.toLowerCase()).code
+      : COUNTRIES.find((c) => c.iso === defaultIso)?.dial ?? "+234",
   );
   const [errors, setErrors] = useState<FormErrors>({});
+
+  const countryName =
+    COUNTRIES.find((c) => c.iso === values.country)?.name ?? "";
 
   const set = (key: keyof FormValues, value: string) => {
     setValues((prev) => ({ ...prev, [key]: value }));
     setErrors((prev) => ({ ...prev, [key]: undefined }));
+  };
+
+  // Changing the country resets the dependent state/city and moves the dial
+  // code to the new country's default.
+  const handleCountryChange = (iso: string) => {
+    setValues((prev) => ({ ...prev, country: iso, state: "", city: "" }));
+    setErrors((prev) => ({ ...prev, country: undefined }));
+    setPhoneCode(COUNTRIES.find((c) => c.iso === iso)?.dial ?? phoneCode);
   };
 
   function handleSubmit() {
@@ -115,10 +148,12 @@ export function BranchFormDialog({
     }
     const trimmed: FormValues = {
       name: values.name.trim(),
+      country: values.country.toUpperCase(),
       state: values.state.trim(),
       city: values.city.trim(),
       street_address: values.street_address.trim(),
-      phone: values.phone.trim(),
+      // Store the full international number (dial code + local number).
+      phone: `${phoneCode}${values.phone.replace(/\D/g, "")}`,
       email: values.email.trim(),
     };
 
@@ -209,8 +244,15 @@ export function BranchFormDialog({
             />
           </Field>
 
+          {/* Country — defaults to the owner's, but a branch can be elsewhere.
+              Changing it repopulates State/City and the phone dial code. */}
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <CountrySelect value={values.country} onChange={handleCountryChange} />
+            {errors.country ? <ErrorText>{errors.country}</ErrorText> : null}
+          </div>
+
           {/* State + City — same geo API as registration, driven by the
-              owner's registered country. Changing the state clears the city. */}
+              selected country. Changing the state clears the city. */}
           <div className="flex flex-col gap-1.5">
             <StateSelect
               country={countryName}
@@ -248,15 +290,17 @@ export function BranchFormDialog({
           </Field>
 
           {/* Phone + Email */}
-          <Field label="Branch phone" error={errors.phone}>
-            <input
-              type="tel"
+          <div className="flex flex-col gap-1.5">
+            <PhoneField
+              label="Branch phone"
+              placeholder="Enter branch phone number"
               value={values.phone}
-              onChange={(e) => set("phone", e.target.value)}
-              placeholder="+234…"
-              className={`${inputClass("phone")} tabular-nums`}
+              onChange={(v) => set("phone", v)}
+              code={phoneCode}
+              onCodeChange={setPhoneCode}
             />
-          </Field>
+            {errors.phone ? <ErrorText>{errors.phone}</ErrorText> : null}
+          </div>
           <Field label="Branch email" error={errors.email}>
             <input
               type="email"
