@@ -173,7 +173,8 @@ members, branch-tagged listings, and the inspect→publish pipeline.)
 - [ ] As a verified **fleet** owner, the dashboard **Quick Actions** shows a **"Branches"** tile (individual owners don't see it). Open `/owner/branches`.
 - [ ] With **no branches yet**, you see the **onboarding empty state** ("Set up your first branch") with your **business name** shown as the parent, and an **"Add your first branch"** button.
 - [ ] Try to **list a car** (`/owner/my-cars/new`) with no branch → you're **redirected to `/owner/branches`** with a "set up a branch first" notice. (Backend also rejects it with a 400.)
-- [ ] **Add a branch** → the dialog shows a **read-only Business name** field (greyed, lock icon, "Inherited from your business — can't be changed here"), plus Branch name, State (searchable), City, Street address, Phone, Email. **All required**; submitting empty / a bad email shows **inline errors**.
+- [ ] **Add a branch** → the dialog shows a **read-only Business name** field (greyed, lock icon, "Inherited from your business — can't be changed here"), plus Branch name, **Country**, State (searchable), City, Street address, Phone, Email. **All required**; submitting empty / a bad email shows **inline errors**.
+- [ ] The **Country** defaults to your registered country but can be **changed** — pick a different country and the **State/City** pickers repopulate for it and the **phone dial code** switches to that country's code. Save a branch in another country → its **fleet cars inherit that branch's country** (list a car at it and check its location). Editing a branch pre-fills its saved country and splits its phone into dial code + number.
 - [ ] Save → toast **"Branch created"**, the card appears (name, business badge, address, phone, email, green **Active** status).
 - [ ] Now **list a car** again → the form loads (gate cleared).
 - [ ] **Edit** a branch (⋯ menu) → business name still read-only; changes save with **"Branch updated"**.

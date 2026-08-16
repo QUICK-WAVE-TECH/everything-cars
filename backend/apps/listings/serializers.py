@@ -1,6 +1,9 @@
 from datetime import date, timedelta
 import re
 from rest_framework import serializers
+from django_countries.serializer_fields import (
+    CountryField as CountrySerializerField,
+)
 from django.utils import timezone
 
 from apps.sales.models import DealStatus
@@ -645,11 +648,12 @@ class CarCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"branch": "You aren't assigned to that branch."}
             )
-        # A fleet car inherits its location from the branch (business country).
+        # A fleet car inherits its full location from the branch — including the
+        # branch's country, which may differ from the business's registered one.
         data["state"] = branch.state
         data["city"] = branch.city
-        if profile.country:
-            data["country"] = profile.country
+        if branch.country:
+            data["country"] = branch.country
 
     def validate_year(self, value):
         max_year = timezone.now().year + 1
@@ -1054,6 +1058,9 @@ class TransactionDetailSerializer(serializers.ModelSerializer):
 
 class BranchSerializer(serializers.ModelSerializer):
     business_name = serializers.CharField(source="business.fleet_name", read_only=True)
+    # ISO code in and out (e.g. "NG"); required when creating a branch so its
+    # fleet cars have a country to inherit.
+    country = CountrySerializerField(country_dict=False)
     # Deleting a branch removes its disposable listings (no deals/requests) and
     # archives the record-bearing ones. These counts drive the delete confirm
     # dialog. Read the annotations set by the branch list/detail views when
@@ -1067,6 +1074,7 @@ class BranchSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "business_name",
+            "country",
             "state",
             "city",
             "street_address",

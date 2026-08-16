@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.text import slugify
+from django_countries.fields import CountryField
 import uuid
 
 
@@ -442,6 +443,9 @@ class Branch(models.Model):
         OwnerProfile, on_delete=models.CASCADE, related_name="branches"
     )
     name = models.CharField(max_length=255)
+    # A branch can be in a different country than the business's registered one;
+    # its fleet cars inherit this country (and the state/city below).
+    country = CountryField(blank=True, blank_label="Select country")
     state = models.CharField(max_length=255)
     city = models.CharField(max_length=255)
     street_address = models.CharField(max_length=255)

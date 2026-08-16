@@ -5,6 +5,9 @@ export type Branch = {
   id: string;
   name: string;
   business_name: string;
+  /** ISO country code (e.g. "NG"). A branch may sit in a different country
+   * than the business's registered one. */
+  country: string;
   state: string;
   city: string;
   street_address: string;
@@ -21,6 +24,7 @@ export type Branch = {
 /** Writable branch fields (create + edit). `business_name` is intentionally absent. */
 export type BranchInput = {
   name: string;
+  country: string;
   state: string;
   city: string;
   street_address: string;
