@@ -428,7 +428,14 @@ class RequestStatusEvent(models.Model):
     from_status = models.CharField(max_length=20)
     to_status = models.CharField(max_length=20)
 
-    actor = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="+")
+    # SET_NULL (not CASCADE) so deleting a staff/team-member account anonymizes
+    # the events they authored instead of erasing a request's history.
+    actor = models.ForeignKey(
+        "users.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="+",
+    )
     note = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

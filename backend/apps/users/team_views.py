@@ -112,6 +112,13 @@ class TeamDetailView(APIView):
             membership.branches.set(ids)
         return Response(TeamMemberSerializer(membership).data)
 
+    def delete(self, request, member_id):
+        membership = self._get(request, member_id)
+        # Full account delete: removing the user cascades the membership, tokens
+        # and notifications; history they authored is anonymised (SET_NULL).
+        membership.user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class TeamDeactivateView(TeamDetailView):
     def post(self, request, member_id):

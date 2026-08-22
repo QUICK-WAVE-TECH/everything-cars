@@ -283,6 +283,10 @@ function generateReceiptHTML(txn: NonNullable<ReturnType<typeof useTransactionDe
         <div class="detail-label">Vehicle</div>
         <div class="detail-value">${carTitle}</div>
       </div>
+      ${txn.company_name ? `<div class="detail-cell">
+        <div class="detail-label">Company</div>
+        <div class="detail-value">${txn.company_name}</div>
+      </div>` : ""}
       <div class="detail-cell">
         <div class="detail-label">Transaction Type</div>
         <div class="detail-value">${capitalize(txn.transaction_type)}</div>
@@ -482,6 +486,9 @@ export function TransactionDetailPage({ backHref }: { backHref: string }) {
               <div className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-x-6 gap-y-[26px]">
                 <TxnField icon="idcard" label="Reference" value={txn.reference} mono />
                 <TxnField icon="car" label="Vehicle" value={carTitle} />
+                {txn.company_name && (
+                  <TxnField icon="building" label="Company" value={txn.company_name} />
+                )}
                 <TxnField icon="handshake" label="Type" value={capitalize(txn.transaction_type)} />
                 <TxnField icon="banknote" label="Total Amount" value={formatAmount(txn.amount, txn.currency)} accent="var(--brc-primary)" />
                 {isRent && txn.request?.duration_days && (
