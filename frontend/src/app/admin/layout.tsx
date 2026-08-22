@@ -17,6 +17,7 @@ const NAV_LINKS = [
   { label: "Disputes", href: "/admin/disputes" },
   { label: "Payments", href: "/admin/payments" },
   { label: "Transactions", href: "/admin/transactions" },
+  { label: "Reports", href: "/admin/reports" },
 ];
 
 /** Nav links visible to this staff member — role-restricted ones (Publishing)

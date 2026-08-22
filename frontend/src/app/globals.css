@@ -69,11 +69,12 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /* Brand chart palette (matches the BRC design tokens). */
+  --chart-1: #00008b;
+  --chart-2: #c36523;
+  --chart-3: #5b5bc4;
+  --chart-4: #ff9500;
+  --chart-5: #a9a9df;
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -104,11 +105,12 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  /* Brand chart palette — brighter variants for dark backgrounds. */
+  --chart-1: #6a6aff;
+  --chart-2: #e0894a;
+  --chart-3: #9a9ae6;
+  --chart-4: #ffab33;
+  --chart-5: #c7c7ef;
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);

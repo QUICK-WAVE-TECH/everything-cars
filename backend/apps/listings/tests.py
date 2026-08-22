@@ -2529,3 +2529,64 @@ class TransactionCompanyNameTest(APITestCase):
         self.client.force_authenticate(owner)
         r = self.client.get("/api/v1/listings/transactions?car=not-a-uuid")
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class SalesReportTest(APITestCase):
+    def setUp(self):
+        self.staff = create_user("sr-staff@test.com", "owner", is_staff=True)
+        self.owner = create_user("sr-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.customer = create_user("sr-cust@test.com", "customer")
+        create_customer_profile(self.customer)
+
+    def _completed_purchase(self, amount, tid):
+        from apps.listings.models import (
+            Transaction,
+            TransactionStatus,
+            TransactionType,
+        )
+
+        car = create_car(
+            self.owner, listing_type=ListingType.BUY, sale_price=amount,
+            vin=f"1HGCM82633A2{tid}", plate_number=f"SR{tid}XY",
+        )
+        req = Request.objects.create(
+            car=car, customer=self.customer, request_type=ListingType.BUY,
+            price_offered=amount, status=RequestStatus.PAID,
+        )
+        return Transaction.objects.create(
+            request=req, payer=self.customer, receiver=self.owner,
+            amount=amount, transaction_type=TransactionType.PURCHASE,
+            status=TransactionStatus.COMPLETED, reference=f"SR-{tid}",
+        )
+
+    def test_non_staff_forbidden(self):
+        self.client.force_authenticate(self.owner)
+        r = self.client.get("/api/v1/listings/admin/reports/sales")
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_report_aggregates_completed_sales(self):
+        self._completed_purchase("5000000.00", "00001")
+        self._completed_purchase("3000000.00", "00002")
+        self.client.force_authenticate(self.staff)
+        r = self.client.get("/api/v1/listings/admin/reports/sales?range=12m")
+        self.assertEqual(r.status_code, status.HTTP_200_OK, r.data)
+        self.assertEqual(r.data["kpis"]["total_revenue"], 8000000.0)
+        self.assertEqual(r.data["kpis"]["units_sold"], 2)
+        self.assertEqual(r.data["kpis"]["avg_sale_price"], 4000000.0)
+        # Series/sections present for the frontend.
+        for key in (
+            "revenue_series", "by_period", "revenue_mix", "top_models",
+            "avg_price_series", "by_branch", "target", "branches",
+        ):
+            self.assertIn(key, r.data)
+        mix = {row["category"]: row["value"] for row in r.data["revenue_mix"]}
+        self.assertEqual(mix["Purchases"], 8000000.0)
+
+    def test_type_filter_rent_excludes_purchases(self):
+        self._completed_purchase("5000000.00", "00003")
+        self.client.force_authenticate(self.staff)
+        r = self.client.get(
+            "/api/v1/listings/admin/reports/sales?range=12m&type=rent"
+        )
+        self.assertEqual(r.data["kpis"]["total_revenue"], 0.0)

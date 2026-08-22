@@ -447,6 +447,28 @@ survey; deletion still works if skipped.
 - [ ] In **Django admin → Car deletion feedback**, the recorded rows show the
   outcome, amount (null when "prefer not to say"), and who deleted it.
 
+## Sales report (admin) · 🚧 on `feat/sales-report`
+
+**Goal:** a staff **Sales performance** dashboard (platform-wide) with shadcn
+interactive charts over completed purchase/rental transactions.
+
+**Setup:** sign in as **staff**; have some **completed** purchase/rental
+transactions. Open **Reports** in the admin nav (`/admin/reports`).
+
+**Manual checklist**
+
+- [ ] **KPI cards** (Total revenue, Units sold, Avg sale price, Conversion) each
+  show a **delta vs the previous period** and a **sparkline**.
+- [ ] Charts render (shadcn/recharts, brand `--chart-*` colours): **Revenue over
+  time** (stacked area), **Volume and revenue** (bars), **Revenue mix** (donut,
+  total in centre), **Top models** (horizontal bars), **Average price trend**
+  (2-line), **Branch performance** (bars), **Revenue against target** (radial).
+  Hover shows **₦-formatted tooltips**.
+- [ ] The **filters** (range / type / branch) update every card and chart;
+  **Reset filters** appears when changed. **Export CSV** downloads a file.
+- [ ] No sales → empty state; loading → skeletons; error → retry. A **non-staff**
+  user gets 403 from `/api/v1/listings/admin/reports/sales`.
+
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh
 clone just needs `python manage.py migrate` — no manual step. When we grow the
 bundled list we add a small `reseed_brands` migration, so existing databases
