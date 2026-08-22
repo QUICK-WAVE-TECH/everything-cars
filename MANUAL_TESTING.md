@@ -346,6 +346,27 @@ cannot sign back in.
 - [ ] Any request-timeline entries that member authored now read **"System"** instead
   of their name (history preserved, not erased).
 
+## Unverified-owner gate · 🚧 on `feat/owner-verification-gate`
+
+**Goal:** an owner whose KYC an admin hasn't approved sees only an "Account in
+review" screen; the rest of the owner area is blocked until verified.
+
+**Setup:** sign up a **new owner** (individual or fleet). In Django admin their
+`OwnerProfile.is_verified` is `false` until you approve it.
+
+**Manual checklist**
+
+- [ ] As the **unverified owner**, signing in and visiting any `/owner/*` page
+  (dashboard, my-cars, branches, offers, profile, …) shows the **"Your account is
+  under review"** screen — never the actual page content.
+- [ ] The screen shows your **submitted details** (business/personal name, email,
+  account type, ID on file) read-only, a "we'll email you when approved" note, and
+  a working **Sign out**.
+- [ ] In Django admin, set `is_verified = true` (or use the admin verify action) →
+  the owner now reaches the **real dashboard and all pages** normally.
+- [ ] A **team member** (whose business is already verified) is **never** gated.
+- [ ] An already-**verified** owner is unaffected.
+
 ### How brands get populated (for reviewers)
 
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh
