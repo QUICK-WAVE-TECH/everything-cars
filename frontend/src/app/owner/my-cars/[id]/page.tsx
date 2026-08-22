@@ -698,9 +698,13 @@ export default function CarDetailPage() {
             </h1>
             <StatusBadge status={car.status} />
             {car.tracking_id && (
-              <span className="inline-flex items-center rounded-full border border-(--brc-border) bg-white px-2.5 py-1 text-xs font-bold text-(--brc-text-muted)">
+              <Link
+                href={`/owner/transactions?car=${car.id}`}
+                title="View this vehicle's transactions"
+                className="inline-flex items-center rounded-full border border-(--brc-border) bg-white px-2.5 py-1 text-xs font-bold text-(--brc-text-muted) no-underline transition-colors hover:border-(--brc-primary) hover:text-(--brc-primary)"
+              >
                 #{car.tracking_id}
-              </span>
+              </Link>
             )}
           </div>
           <p className="mt-2 text-sm text-(--brc-text-muted)">

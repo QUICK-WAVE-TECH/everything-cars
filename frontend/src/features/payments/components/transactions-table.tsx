@@ -19,7 +19,7 @@ const PAGE_SIZE = 8;
 // ledger (not just the first server page). Server-side paging is the follow-up
 // once a single account can exceed this many transactions.
 const FETCH_SIZE = 100;
-const COLUMNS = ["Description", "Type", "Date", "Method", "Amount", "Status"];
+const COLUMNS = ["Description", "Tracking ID", "Type", "Date", "Method", "Amount", "Status"];
 
 const FILTER_FIELDS: FilterField[] = [
   {
@@ -124,10 +124,13 @@ function getDetailPath(pathname: string, txnId: string) {
   return `/customer/transactions/${txnId}`;
 }
 
-export function TransactionsTable() {
+export function TransactionsTable({ carFilter }: { carFilter?: string } = {}) {
   const router = useRouter();
   const pathname = usePathname();
-  const { data: paginatedData, isLoading } = useTransactions({ page_size: FETCH_SIZE });
+  const { data: paginatedData, isLoading } = useTransactions({
+    page_size: FETCH_SIZE,
+    car: carFilter,
+  });
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<FilterValues>({});
@@ -137,13 +140,19 @@ export function TransactionsTable() {
     [paginatedData?.results],
   );
 
+  // When filtered to one car, its tracking ID heads the "showing X" banner.
+  const filteredTrackingId = carFilter
+    ? transactions.find((t) => t.tracking_id)?.tracking_id ?? null
+    : null;
+
   const filtered = useMemo(() => {
     return transactions.filter((t) => {
       if (search) {
         const q = search.toLowerCase();
         if (
           !t.car_detail.toLowerCase().includes(q) &&
-          !t.reference.toLowerCase().includes(q)
+          !t.reference.toLowerCase().includes(q) &&
+          !(t.tracking_id ?? "").toLowerCase().includes(q)
         )
           return false;
       }
@@ -183,13 +192,29 @@ export function TransactionsTable() {
       }}
     >
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <h2 style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 18, color: "var(--brc-text)", margin: 0 }}>
-          All Transactions
+          {carFilter ? "Vehicle Transactions" : "All Transactions"}
         </h2>
         <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 12, fontWeight: 600, color: "var(--brc-primary)", background: "var(--brc-primary-tint)", borderRadius: "var(--brc-radius-pill)", padding: "2px 9px" }}>
           {filtered.length}
         </span>
+        {carFilter && (
+          <div className="flex items-center gap-2 [font-family:var(--brc-font-ui)]">
+            {filteredTrackingId && (
+              <span className="rounded-(--brc-radius-pill) bg-(--brc-bg-muted) px-2.5 py-1 text-xs font-bold text-(--brc-text-secondary)">
+                {filteredTrackingId}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => router.push(pathname)}
+              className="text-xs font-bold text-(--brc-primary) hover:underline"
+            >
+              Clear filter
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Toolbar */}
@@ -241,6 +266,14 @@ export function TransactionsTable() {
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-(--brc-text-secondary)">
+                  {t.tracking_id && (
+                    <>
+                      <span className="font-bold tabular-nums text-(--brc-text-secondary)">
+                        {t.tracking_id}
+                      </span>
+                      <span aria-hidden>·</span>
+                    </>
+                  )}
                   <span>{formatDate(t.created_at)}</span>
                   <span aria-hidden>·</span>
                   <span>{capitalize(t.payment_method)}</span>
@@ -256,7 +289,7 @@ export function TransactionsTable() {
 
       {/* Table (desktop) */}
       <div className="hidden md:block" style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 820 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 940 }}>
           <thead>
             <tr>
               {COLUMNS.map((c) => (
@@ -287,6 +320,9 @@ export function TransactionsTable() {
                       <span className="font-semibold transition-colors duration-300 group-hover/row:text-(--brc-primary)">
                         {typeLabel(t.transaction_type)} — {t.car_detail}
                       </span>
+                    </td>
+                    <td style={{ ...tdStyle, color: "var(--brc-text-secondary)", fontVariantNumeric: "tabular-nums" }}>
+                      {t.tracking_id ?? "—"}
                     </td>
                     <td style={tdStyle}>{typeLabel(t.transaction_type)}</td>
                     <td style={{ ...tdStyle, color: "var(--brc-text-secondary)" }}>{formatDate(t.created_at)}</td>

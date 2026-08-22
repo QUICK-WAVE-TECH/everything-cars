@@ -11,6 +11,8 @@ import type {
 
 type TransactionParams = {
   status?: string;
+  /** Filter to one car (its tracking ID links here). */
+  car?: string;
   page?: number;
   page_size?: number;
 };

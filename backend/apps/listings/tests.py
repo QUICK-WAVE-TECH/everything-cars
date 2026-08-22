@@ -2391,3 +2391,60 @@ class TransactionCompanyNameTest(APITestCase):
         r = self.client.get(f"/api/v1/listings/transactions/{txn.id}")
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.assertIsNone(r.data["company_name"])
+
+    def _txn_for_car(self, owner, customer, car):
+        from apps.listings.models import Transaction, TransactionType
+
+        req = Request.objects.create(
+            car=car, customer=customer, request_type=ListingType.BUY,
+            price_offered="5000000.00", status=RequestStatus.PAID,
+        )
+        return Transaction.objects.create(
+            request=req, payer=customer, receiver=owner,
+            amount="5000000.00", transaction_type=TransactionType.PURCHASE,
+            reference=f"TXN-{car.tracking_id}",
+        )
+
+    def test_detail_exposes_car_and_tracking_id(self):
+        owner = create_user("txn-track@test.com", "owner")
+        create_owner_profile(owner)
+        car = create_car(
+            owner, listing_type=ListingType.BUY, sale_price="5000000.00",
+            tracking_id="NG-A7K3P9",
+        )
+        customer = create_user("txn-track-cust@test.com", "customer")
+        create_customer_profile(customer)
+        txn = self._txn_for_car(owner, customer, car)
+        self.client.force_authenticate(customer)
+        r = self.client.get(f"/api/v1/listings/transactions/{txn.id}")
+        self.assertEqual(r.data["tracking_id"], "NG-A7K3P9")
+        self.assertEqual(r.data["car_id"], str(car.id))
+
+    def test_list_filters_by_car(self):
+        owner = create_user("txn-filter@test.com", "owner")
+        create_owner_profile(owner)
+        customer = create_user("txn-filter-cust@test.com", "customer")
+        create_customer_profile(customer)
+        car1 = create_car(
+            owner, listing_type=ListingType.BUY, sale_price="5000000.00",
+            tracking_id="NG-AAA111", vin="1HGCM82633A100001", plate_number="CAR001AA",
+        )
+        car2 = create_car(
+            owner, listing_type=ListingType.BUY, sale_price="6000000.00",
+            tracking_id="NG-BBB222", vin="1HGCM82633A100002", plate_number="CAR002BB",
+        )
+        t1 = self._txn_for_car(owner, customer, car1)
+        self._txn_for_car(owner, customer, car2)
+        self.client.force_authenticate(customer)
+        r = self.client.get(f"/api/v1/listings/transactions?car={car1.id}")
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        results = r.data["results"] if "results" in r.data else r.data
+        ids = [row["id"] for row in results]
+        self.assertEqual(ids, [str(t1.id)])
+
+    def test_list_invalid_car_filter_400(self):
+        owner = create_user("txn-badfilter@test.com", "owner")
+        create_owner_profile(owner)
+        self.client.force_authenticate(owner)
+        r = self.client.get("/api/v1/listings/transactions?car=not-a-uuid")
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)

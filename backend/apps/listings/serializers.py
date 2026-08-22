@@ -979,8 +979,20 @@ def _transaction_company_name(obj):
     return None
 
 
+def _transaction_car_id(obj):
+    car = _transaction_car(obj)
+    return str(car.id) if car else None
+
+
+def _transaction_tracking_id(obj):
+    car = _transaction_car(obj)
+    return car.tracking_id if car else None
+
+
 class TransactionListSerializer(serializers.ModelSerializer):
     car_detail = serializers.SerializerMethodField()
+    car_id = serializers.SerializerMethodField()
+    tracking_id = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
     payer_name = serializers.SerializerMethodField()
     receiver_name = serializers.SerializerMethodField()
@@ -995,6 +1007,8 @@ class TransactionListSerializer(serializers.ModelSerializer):
             "transaction_type",
             "payment_method",
             "car_detail",
+            "car_id",
+            "tracking_id",
             "company_name",
             "payer_name",
             "receiver_name",
@@ -1003,6 +1017,12 @@ class TransactionListSerializer(serializers.ModelSerializer):
             "reference",
             "created_at",
         ]
+
+    def get_car_id(self, obj):
+        return _transaction_car_id(obj)
+
+    def get_tracking_id(self, obj):
+        return _transaction_tracking_id(obj)
 
     def get_car_detail(self, obj):
         car = _transaction_car(obj)
@@ -1031,6 +1051,8 @@ class TransactionListSerializer(serializers.ModelSerializer):
 
 class TransactionDetailSerializer(serializers.ModelSerializer):
     car_detail = serializers.SerializerMethodField()
+    car_id = serializers.SerializerMethodField()
+    tracking_id = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
     payer_name = serializers.SerializerMethodField()
     receiver_name = serializers.SerializerMethodField()
@@ -1046,6 +1068,8 @@ class TransactionDetailSerializer(serializers.ModelSerializer):
             "transaction_type",
             "payment_method",
             "car_detail",
+            "car_id",
+            "tracking_id",
             "company_name",
             "payer_name",
             "receiver_name",
@@ -1059,6 +1083,12 @@ class TransactionDetailSerializer(serializers.ModelSerializer):
     def get_car_detail(self, obj):
         car = _transaction_car(obj)
         return car.title if car else "—"
+
+    def get_car_id(self, obj):
+        return _transaction_car_id(obj)
+
+    def get_tracking_id(self, obj):
+        return _transaction_tracking_id(obj)
 
     def get_company_name(self, obj):
         return _transaction_company_name(obj)

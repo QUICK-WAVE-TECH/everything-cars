@@ -407,6 +407,26 @@ alongside status changes, owner- and staff-visible.
 - [ ] The staff review drawer's timeline shows the same edit entries (with staff
   names on staff rows).
 
+## Tracking-ID redesign + transaction linking · 🚧 on `feat/tracking-id-transactions`
+
+**Goal:** new tracking IDs read `NG-XXXXXX` (country + 6 unambiguous
+alphanumerics); transactions show their car's tracking ID and can be filtered to
+one car.
+
+**Manual checklist**
+
+- [ ] Book + start + pass a new inspection → the car's **tracking ID** now looks
+  like **`NG-A7K3P9`** (country code + 6 chars, no `I/O/L/0/1`), not the old
+  `NG-LOS-482913`. Existing cars keep their old IDs.
+- [ ] On the **owner transactions** table, every row shows a **Tracking ID**
+  column (mobile cards show it too); search matches the tracking ID.
+- [ ] On the **owner car detail** page, the **`#tracking-id` badge is a link** →
+  it opens `/owner/transactions?car=<id>` showing **only that vehicle's
+  transactions**, with a header ("Vehicle Transactions" + the tracking ID) and a
+  **Clear filter** action.
+- [ ] Hitting `/api/v1/listings/transactions?car=<bad>` returns **400**; a valid
+  car id returns only that car's rows.
+
 ### How brands get populated (for reviewers)
 
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh
