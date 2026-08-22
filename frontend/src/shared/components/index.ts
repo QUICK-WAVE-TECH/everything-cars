@@ -25,5 +25,7 @@ export { WebsiteNavbar } from "./website-navbar";
 export { PageHero } from "./page-hero";
 export { TextImageRow } from "./text-image-row";
 export { AuthGuard } from "./auth-guard";
+export { OwnerVerificationGate } from "./owner-verification-gate";
+export { AccountReview } from "./account-review";
 export { PromoBanner } from "./promo-banner";
 export { Preloader, FormSubmitOverlay } from "./preloader";
