@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from pathlib import Path
 
@@ -33,9 +34,11 @@ from .models import (
     ACTIVE_REQUEST_STATUSES,
     Brand,
     Car,
+    CarDeletionFeedback,
     CarImage,
     CarImageType,
     CarStatus,
+    DeletionOutcome,
     ListingType,
     Request,
     RequestStatus,
@@ -506,6 +509,13 @@ class MyCarDetailView(APIView):
                     status=status.HTTP_409_CONFLICT,
                 )
 
+            # Optional "was it sold?" survey — recorded when an outcome is given,
+            # skipped otherwise. Validate before archiving so a bad payload 400s
+            # instead of leaving a half-done delete.
+            feedback_error = self._record_deletion_feedback(request, car)
+            if feedback_error:
+                return feedback_error
+
             record_status_change(
                 car,
                 CarStatus.ARCHIVED,
@@ -514,6 +524,52 @@ class MyCarDetailView(APIView):
                 request=request,
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def _record_deletion_feedback(self, request, car):
+        """Create a CarDeletionFeedback row from the (optional) request body.
+        Returns an error Response on invalid input, else None."""
+        data = request.data if isinstance(request.data, dict) else {}
+        outcome = (data.get("outcome") or "").strip()
+        if not outcome:
+            return None
+        valid = {c.value for c in DeletionOutcome}
+        if outcome not in valid:
+            return Response(
+                {"detail": "Invalid deletion outcome."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        amount_hidden = bool(data.get("amount_hidden"))
+        sale_amount = None
+        raw_amount = data.get("sale_amount")
+        keep_amount = (
+            outcome == DeletionOutcome.SOLD_PLATFORM
+            and not amount_hidden
+            and raw_amount not in (None, "")
+        )
+        if keep_amount:
+            try:
+                sale_amount = Decimal(str(raw_amount))
+            except (InvalidOperation, ValueError):
+                return Response(
+                    {"detail": "Enter a valid sale amount."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if sale_amount <= 0:
+                return Response(
+                    {"detail": "Sale amount must be greater than zero."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        CarDeletionFeedback.objects.create(
+            car=car,
+            deleted_by=request.user,
+            deleted_by_name=request.user.get_full_name(),
+            outcome=outcome,
+            sale_amount=sale_amount,
+            amount_hidden=amount_hidden,
+        )
+        return None
 
 
 class CarImageUploadView(APIView):

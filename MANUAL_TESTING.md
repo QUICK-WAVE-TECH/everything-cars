@@ -427,7 +427,25 @@ one car.
 - [ ] Hitting `/api/v1/listings/transactions?car=<bad>` returns **400**; a valid
   car id returns only that car's rows.
 
-### How brands get populated (for reviewers)
+## Car-deletion feedback form · 🚧 on `feat/car-deletion-form`
+
+**Goal:** deleting (archiving) a listing asks an **optional** "was it sold?"
+survey; deletion still works if skipped.
+
+**Manual checklist**
+
+- [ ] From the **car detail** page (and the **My Cars** list card), clicking
+  delete opens **"Delete this listing?"** with **"Was this vehicle sold?"** and
+  three options: on EverythingCars / somewhere else / not sold (optional).
+- [ ] Choosing **On EverythingCars** shows a **₦ amount** field + a **"Prefer not
+  to say"** checkbox (which disables/clears the amount).
+- [ ] Choosing **Somewhere else** shows the **apology message** ("Sorry to see it
+  go — we'll take this on board and work on helping you market your cars better
+  next time.").
+- [ ] Clicking **Delete listing** with **no option picked** still deletes (skips
+  the survey). The car moves to **Archived**.
+- [ ] In **Django admin → Car deletion feedback**, the recorded rows show the
+  outcome, amount (null when "prefer not to say"), and who deleted it.
 
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh
 clone just needs `python manage.py migrate` — no manual step. When we grow the

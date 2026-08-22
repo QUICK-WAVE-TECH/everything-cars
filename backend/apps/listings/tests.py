@@ -923,6 +923,87 @@ class ArchiveGuardTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
 
 
+class CarDeletionFeedbackTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("owner-df@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.client.force_authenticate(user=self.owner)
+
+    def _delete(self, body=None):
+        car = create_car(self.owner, status=CarStatus.PUBLISHED)
+        res = self.client.delete(
+            f"/api/v1/listings/my-cars/{car.id}", body, format="json"
+        )
+        return car, res
+
+    def test_sold_platform_records_amount(self):
+        from apps.listings.models import CarDeletionFeedback
+
+        car, res = self._delete(
+            {"outcome": "sold_platform", "sale_amount": "4500000.00"}
+        )
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        fb = CarDeletionFeedback.objects.get(car=car)
+        self.assertEqual(fb.outcome, "sold_platform")
+        self.assertEqual(str(fb.sale_amount), "4500000.00")
+        self.assertEqual(fb.deleted_by, self.owner)
+
+    def test_prefer_not_to_say_hides_amount(self):
+        from apps.listings.models import CarDeletionFeedback
+
+        car, res = self._delete(
+            {
+                "outcome": "sold_platform",
+                "sale_amount": "4500000.00",
+                "amount_hidden": True,
+            }
+        )
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        fb = CarDeletionFeedback.objects.get(car=car)
+        self.assertTrue(fb.amount_hidden)
+        self.assertIsNone(fb.sale_amount)
+
+    def test_sold_elsewhere_records_no_amount(self):
+        from apps.listings.models import CarDeletionFeedback
+
+        car, res = self._delete(
+            {"outcome": "sold_elsewhere", "sale_amount": "999"}
+        )
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        fb = CarDeletionFeedback.objects.get(car=car)
+        self.assertEqual(fb.outcome, "sold_elsewhere")
+        self.assertIsNone(fb.sale_amount)
+
+    def test_delete_without_body_still_archives_no_feedback(self):
+        from apps.listings.models import CarDeletionFeedback
+
+        car, res = self._delete()
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        car.refresh_from_db()
+        self.assertEqual(car.status, CarStatus.ARCHIVED)
+        self.assertFalse(CarDeletionFeedback.objects.filter(car=car).exists())
+
+    def test_invalid_outcome_400_and_not_archived(self):
+        car = create_car(self.owner, status=CarStatus.PUBLISHED)
+        res = self.client.delete(
+            f"/api/v1/listings/my-cars/{car.id}",
+            {"outcome": "bogus"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        car.refresh_from_db()
+        self.assertEqual(car.status, CarStatus.PUBLISHED)
+
+    def test_bad_amount_400(self):
+        car = create_car(self.owner, status=CarStatus.PUBLISHED)
+        res = self.client.delete(
+            f"/api/v1/listings/my-cars/{car.id}",
+            {"outcome": "sold_platform", "sale_amount": "-5"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+
 class SuspendReinstateTest(APITestCase):
     def setUp(self):
         self.staff = create_user("staff-sr@test.com", "owner", is_staff=True)

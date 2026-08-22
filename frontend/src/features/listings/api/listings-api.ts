@@ -99,12 +99,24 @@ export function useUpdateCar(carId: string) {
   });
 }
 
-// Owner — delete (archive) car
+// Owner — delete (archive) car, with an optional "was it sold?" survey.
+export type DeletionOutcome = "sold_platform" | "sold_elsewhere" | "not_sold";
+export type CarDeletionFeedback = {
+  outcome: DeletionOutcome;
+  sale_amount?: string;
+  amount_hidden?: boolean;
+};
+
 export function useDeleteCar() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (carId: string) =>
-      apiClient.delete(`/listings/my-cars/${carId}`),
+    mutationFn: ({
+      carId,
+      feedback,
+    }: {
+      carId: string;
+      feedback?: CarDeletionFeedback;
+    }) => apiClient.delete(`/listings/my-cars/${carId}`, feedback),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: listingKeys.owner });
     },

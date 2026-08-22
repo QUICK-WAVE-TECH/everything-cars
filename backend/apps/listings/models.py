@@ -444,6 +444,40 @@ class RequestStatusEvent(models.Model):
         ordering = ["created_at"]  # Correct — oldest first, shows the timeline in order
 
 
+class DeletionOutcome(models.TextChoices):
+    SOLD_PLATFORM = "sold_platform", "Sold on EverythingCars"
+    SOLD_ELSEWHERE = "sold_elsewhere", "Sold elsewhere"
+    NOT_SOLD = "not_sold", "Not sold / other reason"
+
+
+class CarDeletionFeedback(models.Model):
+    """Optional 'was it sold?' survey captured when an owner deletes (archives) a
+    listing. Feeds sales/marketing analytics — a 'sold elsewhere' answer is a lost
+    sale we can act on."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    car = models.ForeignKey(
+        Car, on_delete=models.CASCADE, related_name="deletion_feedback"
+    )
+    deleted_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name="+"
+    )
+    deleted_by_name = models.CharField(max_length=255, blank=True, default="")
+    outcome = models.CharField(max_length=20, choices=DeletionOutcome.choices)
+    sale_amount = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True
+    )
+    amount_hidden = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "car_deletion_feedback"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.car_id} — {self.outcome}"
+
+
 class Branch(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     business = models.ForeignKey(

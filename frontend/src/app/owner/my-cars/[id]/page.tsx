@@ -44,6 +44,8 @@ import {
 } from "@/features/listings/lib/decimal-input";
 import { capitalizeFirstLetter } from "@/features/listings/lib/text-input";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { DeleteListingDialog } from "@/features/listings/components/delete-listing-dialog";
+import type { CarDeletionFeedback } from "@/features/listings/api/listings-api";
 import { ApiError } from "@/lib/api-client";
 import { BookingModal } from "@/features/inspections/components/booking-modal";
 import {
@@ -617,14 +619,14 @@ export default function CarDetailPage() {
     }
   }
 
-  async function handleArchive() {
+  async function handleArchive(feedback?: CarDeletionFeedback) {
     try {
-      await deleteCar.mutateAsync(carId);
-      toast.success("Listing archived");
+      await deleteCar.mutateAsync({ carId, feedback });
+      toast.success("Listing deleted");
       router.push("/owner/my-cars");
     } catch (error) {
       toast.error(
-        error instanceof ApiError ? error.message : "Failed to archive listing",
+        error instanceof ApiError ? error.message : "Failed to delete listing",
       );
       setConfirmArchiveOpen(false);
     }
@@ -1019,13 +1021,9 @@ export default function CarDetailPage() {
         onConfirm={handleCancelBooking}
       />
 
-      <ConfirmDialog
+      <DeleteListingDialog
         open={confirmArchiveOpen}
         onOpenChange={setConfirmArchiveOpen}
-        title="Archive this listing?"
-        description="It will be removed from the marketplace and can no longer receive requests. You can still see it in your listings."
-        confirmLabel="Archive"
-        destructive
         isPending={deleteCar.isPending}
         onConfirm={handleArchive}
       />
