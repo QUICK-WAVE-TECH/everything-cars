@@ -14,6 +14,11 @@ from apps.notifications.service import (
     notify_dispute_dismissed,
 )
 from apps.offers.models import OFFER_TTL_HOURS, Offer, OfferStatus
+from apps.listings.models import (
+    Transaction,
+    TransactionStatus,
+    TransactionType,
+)
 from .models import (
     DEAL_DISPUTE_WINDOW_DAYS,
     Deal,
@@ -21,6 +26,32 @@ from .models import (
     DealStatus,
     DisputeResolution,
 )
+
+
+def record_deal_sale_transaction(deal):
+    """Record a completed negotiated sale in the ledger so it counts as revenue
+    (sales report + transactions page). Idempotent, and skips cars that already
+    have a completed purchase transaction so a single sale is never double
+    counted."""
+    if Transaction.objects.filter(deal=deal).exists():
+        return None
+    already = Transaction.objects.filter(
+        request__car_id=deal.car_id,
+        transaction_type=TransactionType.PURCHASE,
+        status=TransactionStatus.COMPLETED,
+    ).exists()
+    if already:
+        return None
+    return Transaction.objects.create(
+        deal=deal,
+        payer=deal.buyer,
+        receiver=deal.seller,
+        amount=deal.agreed_amount,
+        currency=deal.currency,
+        transaction_type=TransactionType.PURCHASE,
+        status=TransactionStatus.COMPLETED,
+        reference=f"DEAL-{deal.id.hex[:12].upper()}",
+    )
 
 
 def _revive_standby_offers(car):
@@ -97,6 +128,8 @@ def complete_deal(deal):
         deal.save(update_fields=["status", "completed_at"])
         car.status = CarStatus.ARCHIVED
         car.save(update_fields=["status"])
+        # Record the sale in the ledger so it counts toward revenue everywhere.
+        record_deal_sale_transaction(deal)
         # The car genuinely sold — standby offers are now terminally closed.
         Offer.objects.filter(car=car, status=OfferStatus.STANDBY).update(
             status=OfferStatus.SUPERSEDED, responded_at=timezone.now()

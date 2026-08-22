@@ -2590,3 +2590,43 @@ class SalesReportTest(APITestCase):
             "/api/v1/listings/admin/reports/sales?range=12m&type=rent"
         )
         self.assertEqual(r.data["kpis"]["total_revenue"], 0.0)
+
+    def test_completed_deals_count_as_sales(self):
+        # A negotiated sale (deal → transaction) shows in the report alongside
+        # request-based purchases.
+        from apps.listings.models import (
+            Transaction,
+            TransactionStatus,
+            TransactionType,
+        )
+        from apps.offers.models import Offer, OfferStatus
+        from apps.sales.models import Deal, DEAL_TTL_DAYS
+        from django.utils import timezone as tz
+        from datetime import timedelta as td
+
+        car = create_car(
+            self.owner, listing_type=ListingType.BUY, sale_price="26000000.00",
+            is_negotiable=True, vin="1HGCM82633A2DEAL1", plate_number="DEAL01XY",
+        )
+        offer = Offer.objects.create(
+            car=car, customer=self.customer, amount="25000000.00",
+            currency=car.currency, status=OfferStatus.ACCEPTED,
+            expires_at=tz.now() + td(days=1),
+        )
+        deal = Deal.objects.create(
+            car=car, buyer=self.customer, seller=self.owner, offer=offer,
+            agreed_amount="25000000.00", currency=car.currency,
+            expires_at=tz.now() + td(days=DEAL_TTL_DAYS),
+        )
+        Transaction.objects.create(
+            deal=deal, payer=self.customer, receiver=self.owner,
+            amount="25000000.00", transaction_type=TransactionType.PURCHASE,
+            status=TransactionStatus.COMPLETED, reference="DEAL-TESTREF01",
+        )
+        self._completed_purchase("5000000.00", "00004")
+        self.client.force_authenticate(self.staff)
+        r = self.client.get("/api/v1/listings/admin/reports/sales?range=12m")
+        self.assertEqual(r.data["kpis"]["total_revenue"], 30000000.0)
+        self.assertEqual(r.data["kpis"]["units_sold"], 2)
+        models = {m["label"] for m in r.data["top_models"]}
+        self.assertTrue(any("Lexus" in m or car.model in m for m in models))

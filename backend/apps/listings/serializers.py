@@ -961,11 +961,14 @@ class RequestActionSerializer(serializers.Serializer):
 
 
 def _transaction_car(obj):
-    """The car a transaction relates to (via its request or inspection booking)."""
+    """The car a transaction relates to (via its request, inspection booking, or
+    negotiated deal)."""
     if obj.request_id:
         return obj.request.car
     if obj.inspection_booking_id:
         return obj.inspection_booking.car
+    if obj.deal_id:
+        return obj.deal.car
     return None
 
 
