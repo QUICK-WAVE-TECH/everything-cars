@@ -27,7 +27,12 @@ def _queue_qs():
     return (
         Car.objects.filter(status=CarStatus.PENDING_PUBLISHING)
         .select_related("owner__owner_profile", "brand", "branch")
-        .prefetch_related("images", "physical_inspections__inspector")
+        .prefetch_related(
+            "images",
+            "physical_inspections__inspector",
+            "physical_inspections__documents",
+            "physical_inspections__edit_events",
+        )
         .order_by("updated_at")
     )
 

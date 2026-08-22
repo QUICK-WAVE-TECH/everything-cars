@@ -54,6 +54,8 @@ from .models import (
     InspectionCenter,
     InspectionPayment,
     InspectionPaymentStatus,
+    InspectionEditAction,
+    InspectionEditEvent,
     InspectionResult,
     InspectionSlot,
     PhysicalInspection,
@@ -1322,6 +1324,12 @@ class StaffInspectionSubmitView(APIView):
                 inspector=request.user,
                 inspected_at=serializer.validated_data.get("inspected_at")
                 or timezone.now(),
+            )
+            InspectionEditEvent.objects.create(
+                inspection=inspection,
+                editor=request.user,
+                editor_name=request.user.get_full_name(),
+                action=InspectionEditAction.CREATED,
             )
 
             booking.status = BookingStatus.COMPLETED

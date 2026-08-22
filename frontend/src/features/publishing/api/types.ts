@@ -14,6 +14,23 @@ export type PendingPublishingRow = {
   inspected_at: string | null;
 };
 
+export type InspectionEditEvent = {
+  action: "created" | "edited";
+  editor_name: string;
+  changed_fields: string[];
+  created_at: string;
+};
+
+export type InspectionDocuments = {
+  id: string;
+  car_documents: string | null;
+  receipt_upload: string | null;
+  custom_duty_status: string;
+  receipt_type: string;
+  additional_notes: string;
+  created_at: string;
+};
+
 /** The inspection report a publisher reviews before publishing. */
 export type InspectionReport = {
   result: string;
@@ -29,7 +46,14 @@ export type InspectionReport = {
   has_accident_history: boolean;
   staff_notes: string;
   inspector_name: string;
+  inspector_email: string;
   inspected_at: string;
+  presented_attendee: string;
+  presented_id_type: string;
+  presented_id_number: string;
+  presented_id_document: string | null;
+  documents: InspectionDocuments | null;
+  edit_history: InspectionEditEvent[];
 };
 
 /** The review detail: the full listing plus its inspection report. */

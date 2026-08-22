@@ -1183,6 +1183,19 @@ class StaffInspectionFlowTest(APITestCase):
         assert publisher.notifications.filter(title__icontains="ready to publish").exists()
         assert not inspector.notifications.filter(title__icontains="ready to publish").exists()
 
+    def test_submit_logs_created_edit_event(self):
+        from apps.inspections.models import InspectionEditEvent
+
+        self._start()
+        res = self._submit_with_documents(result="passed")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        insp = PhysicalInspection.objects.get(booking=self.booking)
+        events = InspectionEditEvent.objects.filter(inspection=insp)
+        self.assertEqual(events.count(), 1)
+        ev = events.first()
+        self.assertEqual(ev.action, "created")
+        self.assertEqual(ev.editor, self.staff)
+
     def test_submit_passed_moves_to_pending_publishing(self):
         self._start()
         res = self._submit_with_documents(result="passed")
@@ -2474,6 +2487,57 @@ class PendingPublishingQueueTest(APITestCase):
         assert r.status_code == 200
         assert r.data["inspection"]["staff_notes"] == "Clean, minor wear on tyres."
         assert r.data["inspection"]["inspector_name"]
+
+    def test_detail_exposes_full_inputs_and_edit_history(self):
+        from apps.inspections.models import (
+            InspectionEditAction,
+            InspectionEditEvent,
+            PhysicalInspection,
+        )
+
+        insp = PhysicalInspection.objects.get(car=self.car)
+        InspectionEditEvent.objects.create(
+            inspection=insp, editor=self.inspector,
+            editor_name=self.inspector.get_full_name(),
+            action=InspectionEditAction.EDITED, changed_fields=["mileage"],
+        )
+        self.client.force_authenticate(self.publisher)
+        r = self.client.get(f"/api/v1/inspections/staff/pending-publishing/{self.car.id}/")
+        report = r.data["inspection"]
+        # Every inspector input the publisher should see is present.
+        for key in (
+            "inspector_email", "presented_attendee", "presented_id_type",
+            "presented_id_number", "presented_id_document", "documents",
+            "edit_history",
+        ):
+            assert key in report, key
+        actions = [e["action"] for e in report["edit_history"]]
+        assert "edited" in actions
+        edited = next(e for e in report["edit_history"] if e["action"] == "edited")
+        assert edited["changed_fields"] == ["mileage"]
+
+    def test_admin_edit_logs_edited_event(self):
+        from django.contrib.admin.sites import AdminSite
+
+        from apps.inspections.admin import PhysicalInspectionAdmin
+        from apps.inspections.models import InspectionEditEvent, PhysicalInspection
+
+        insp = PhysicalInspection.objects.get(car=self.car)
+        admin_obj = PhysicalInspectionAdmin(PhysicalInspection, AdminSite())
+
+        class _Req:
+            user = self.publisher
+
+        class _Form:
+            changed_data = ["mileage", "condition"]
+
+        insp.mileage = 99999
+        admin_obj.save_model(_Req(), insp, _Form(), change=True)
+        ev = InspectionEditEvent.objects.get(
+            inspection=insp, action="edited"
+        )
+        self.assertEqual(ev.editor, self.publisher)
+        self.assertEqual(ev.changed_fields, ["mileage", "condition"])
 
     def test_publish_goes_live(self):
         self.client.force_authenticate(self.publisher)

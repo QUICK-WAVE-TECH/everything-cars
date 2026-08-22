@@ -1,7 +1,8 @@
 from rest_framework import serializers
 
 from apps.listings.models import Car
-from apps.inspections.models import PhysicalInspection
+from apps.inspections.models import InspectionEditEvent, PhysicalInspection
+from apps.inspections.serializers import InspectionDocumentSerializer
 
 
 def _latest_inspection(car):
@@ -10,8 +11,20 @@ def _latest_inspection(car):
     return next(iter(car.physical_inspections.all()), None)
 
 
+class InspectionEditEventSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InspectionEditEvent
+        fields = ["action", "editor_name", "changed_fields", "created_at"]
+
+
 class InspectionReportSerializer(serializers.ModelSerializer):
     inspector_name = serializers.SerializerMethodField()
+    inspector_email = serializers.EmailField(source="inspector.email", default="")
+    presented_id_document = serializers.SerializerMethodField()
+    documents = serializers.SerializerMethodField()
+    edit_history = InspectionEditEventSerializer(
+        source="edit_events", many=True, read_only=True
+    )
 
     class Meta:
         model = PhysicalInspection
@@ -29,11 +42,32 @@ class InspectionReportSerializer(serializers.ModelSerializer):
             "has_accident_history",
             "staff_notes",
             "inspector_name",
+            "inspector_email",
             "inspected_at",
+            # Day-of identity capture (staff-only; the publisher is staff).
+            "presented_attendee",
+            "presented_id_type",
+            "presented_id_number",
+            "presented_id_document",
+            "documents",
+            "edit_history",
         ]
 
     def get_inspector_name(self, obj):
-        return obj.inspector.get_full_name()
+        return obj.inspector.get_full_name() if obj.inspector_id else ""
+
+    def get_presented_id_document(self, obj):
+        if not obj.presented_id_document:
+            return None
+        request = self.context.get("request")
+        url = obj.presented_id_document.url
+        return request.build_absolute_uri(url) if request else url
+
+    def get_documents(self, obj):
+        docs = getattr(obj, "documents", None)
+        if not docs:
+            return None
+        return InspectionDocumentSerializer(docs, context=self.context).data
 
 
 class PendingPublishingRowSerializer(serializers.ModelSerializer):
@@ -101,5 +135,9 @@ class PendingPublishingDetailSerializer(serializers.Serializer):
 
         data = CarDetailSerializer(car, context=self.context).data
         insp = _latest_inspection(car)
-        data["inspection"] = InspectionReportSerializer(insp).data if insp else None
+        data["inspection"] = (
+            InspectionReportSerializer(insp, context=self.context).data
+            if insp
+            else None
+        )
         return data
