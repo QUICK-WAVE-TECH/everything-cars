@@ -340,7 +340,9 @@ class OwnerBookingTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.car.refresh_from_db()
         self.assertEqual(self.car.status, CarStatus.INSPECTION_PENDING)
-        self.assertRegex(self.car.tracking_id, r"^NG-LOS-\d{6}$")
+        self.assertRegex(
+            self.car.tracking_id, r"^NG-[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$"
+        )
 
     def test_representative_requires_consent(self):
         res = self.client.post(
@@ -1488,8 +1490,9 @@ class TrackingIdTest(TestCase):
         self.center = create_center(self.staff)
 
     def test_format(self):
+        # Country code + 6 unambiguous alphanumerics (no I/O/L/0/1).
         tid = generate_tracking_id(self.center)
-        self.assertRegex(tid, r"^NG-LOS-\d{6}$")
+        self.assertRegex(tid, r"^NG-[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$")
 
     def test_skips_existing_ids(self):
         owner = create_user("owner-tid@test.com", "owner")

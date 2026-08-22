@@ -1,7 +1,12 @@
 import { AuthGuard, Breadcrumb } from "@/shared/components";
 import { TransactionsTable } from "@/features/payments";
 
-export default function OwnerTransactionsPage() {
+export default async function OwnerTransactionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ car?: string }>;
+}) {
+  const { car } = await searchParams;
   return (
     <AuthGuard requiredRole="owner">
       <Breadcrumb
@@ -31,7 +36,7 @@ export default function OwnerTransactionsPage() {
             </p>
           </div>
 
-          <TransactionsTable />
+          <TransactionsTable carFilter={car} />
         </div>
       </div>
     </AuthGuard>

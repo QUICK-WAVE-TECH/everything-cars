@@ -3,6 +3,9 @@ import type { RequestDetail } from "@/features/requests/api/types";
 export type TransactionListItem = {
   id: string;
   car_detail: string;
+  /** The transaction's car + its tracking ID (for linking/categorizing). */
+  car_id: string | null;
+  tracking_id: string | null;
   /** Fleet business behind the car, or null for an individual owner. */
   company_name: string | null;
   payer_name: string;

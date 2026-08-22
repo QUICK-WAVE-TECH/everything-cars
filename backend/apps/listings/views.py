@@ -1418,6 +1418,21 @@ class TransactionListView(APIView):
         if status_filter:
             qs = qs.filter(status=status_filter)
 
+        # Categorize by car: a car's tracking ID links here to show only its
+        # transactions (rental/sale + inspection fee).
+        car_filter = request.query_params.get("car")
+        if car_filter:
+            try:
+                car_uuid = uuid_lib.UUID(str(car_filter))
+            except (ValueError, AttributeError, TypeError):
+                return Response(
+                    {"detail": "Invalid car id."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            qs = qs.filter(
+                Q(request__car_id=car_uuid) | Q(inspection_booking__car_id=car_uuid)
+            )
+
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request)
         serializer = TransactionListSerializer(

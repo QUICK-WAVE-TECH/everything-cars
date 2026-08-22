@@ -49,11 +49,20 @@ def record_status_change(
     car.save(update_fields=["status", "updated_at", *extra_update_fields])
 
 
+# Unambiguous alphabet: A–Z + 2–9, minus the look-alikes I, O, L, 0, 1.
+TRACKING_ID_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+TRACKING_ID_LENGTH = 6
+
+
 def generate_tracking_id(center):
-    """Generate a unique tracking id like NG-LOS-482913"""
-    prefix = f"{center.country_code}-{center.city_code}"
+    """Generate a unique tracking id like NG-A7K3P9 (country code + 6 random
+    unambiguous alphanumerics)."""
+    prefix = center.country_code
     for _ in range(MAX_TRACKING_ATTEMPTS):
-        candidate = f"{prefix}-{secrets.randbelow(1_000_000):06d}"
+        suffix = "".join(
+            secrets.choice(TRACKING_ID_ALPHABET) for _ in range(TRACKING_ID_LENGTH)
+        )
+        candidate = f"{prefix}-{suffix}"
         if not Car.objects.filter(tracking_id=candidate).exists():
             return candidate
-    raise RuntimeError("Exhausted tracking-id attempts; widen the digit space")
+    raise RuntimeError("Exhausted tracking-id attempts; widen the alphabet/length")
