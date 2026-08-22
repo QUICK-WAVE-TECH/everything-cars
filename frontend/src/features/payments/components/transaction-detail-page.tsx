@@ -159,9 +159,20 @@ function MetaRow({ icon, label, value }: { icon: IconName; label: string; value:
 // ── PDF Receipt Generator ──
 import { RECEIPT_LOGO } from "./receipt-logo";
 
+/** Escape user-controlled values before interpolating them into the receipt
+ * HTML string (this markup is written into a new window, so raw interpolation
+ * would be an XSS vector). */
+const esc = (s: string) =>
+  String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 function generateReceiptHTML(txn: NonNullable<ReturnType<typeof useTransactionDetail>["data"]>) {
   const isRent = txn.request_type === "rent";
-  const carTitle = txn.car_detail;
+  const carTitle = esc(txn.car_detail);
   const sym = txn.currency === "NGN" ? "\u20A6" : txn.currency === "USD" ? "$" : txn.currency;
   const amount = `${sym}${Number(txn.amount).toLocaleString("en-NG")}`;
   const date = new Date(txn.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
@@ -169,12 +180,12 @@ function generateReceiptHTML(txn: NonNullable<ReturnType<typeof useTransactionDe
   const statusLabel = txn.status === "completed" ? "Paid" : capitalize(txn.status);
   const statusColor = txn.status === "completed" ? "#1A9346" : "#9a7400";
   const statusBg = txn.status === "completed" ? "#e8f5e9" : "#fff8e1";
-  const location = txn.request?.car ? `${txn.request.car.state}${txn.request.car.city ? `, ${txn.request.car.city}` : ""}` : "";
+  const location = txn.request?.car ? esc(`${txn.request.car.state}${txn.request.car.city ? `, ${txn.request.car.city}` : ""}`) : "";
 
   return `<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
-<title>Receipt - ${txn.reference}</title>
+<title>Receipt - ${esc(txn.reference)}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -274,7 +285,7 @@ function generateReceiptHTML(txn: NonNullable<ReturnType<typeof useTransactionDe
   <div class="body">
     <!-- Reference pill -->
     <div class="ref-pill">
-      Receipt &nbsp;<strong>#${txn.reference}</strong>
+      Receipt &nbsp;<strong>#${esc(txn.reference)}</strong>
     </div>
 
     <!-- Transaction details grid -->
@@ -283,6 +294,10 @@ function generateReceiptHTML(txn: NonNullable<ReturnType<typeof useTransactionDe
         <div class="detail-label">Vehicle</div>
         <div class="detail-value">${carTitle}</div>
       </div>
+      ${txn.company_name ? `<div class="detail-cell">
+        <div class="detail-label">Company</div>
+        <div class="detail-value">${esc(txn.company_name)}</div>
+      </div>` : ""}
       <div class="detail-cell">
         <div class="detail-label">Transaction Type</div>
         <div class="detail-value">${capitalize(txn.transaction_type)}</div>
@@ -320,11 +335,11 @@ function generateReceiptHTML(txn: NonNullable<ReturnType<typeof useTransactionDe
     <div class="parties">
       <div class="party-card">
         <div class="party-role">Paid By</div>
-        <div class="party-name">${txn.payer_name.trim()}</div>
+        <div class="party-name">${esc(txn.payer_name.trim())}</div>
       </div>
       <div class="party-card">
         <div class="party-role">Car Owner</div>
-        <div class="party-name">${txn.receiver_name.trim()}</div>
+        <div class="party-name">${esc(txn.receiver_name.trim())}</div>
       </div>
     </div>
 
@@ -482,6 +497,9 @@ export function TransactionDetailPage({ backHref }: { backHref: string }) {
               <div className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-x-6 gap-y-[26px]">
                 <TxnField icon="idcard" label="Reference" value={txn.reference} mono />
                 <TxnField icon="car" label="Vehicle" value={carTitle} />
+                {txn.company_name && (
+                  <TxnField icon="building" label="Company" value={txn.company_name} />
+                )}
                 <TxnField icon="handshake" label="Type" value={capitalize(txn.transaction_type)} />
                 <TxnField icon="banknote" label="Total Amount" value={formatAmount(txn.amount, txn.currency)} accent="var(--brc-primary)" />
                 {isRent && txn.request?.duration_days && (

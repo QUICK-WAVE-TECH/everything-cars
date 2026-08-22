@@ -426,7 +426,10 @@ export function CarDetailPage({ carId }: { carId: string }) {
                   await createRequest.mutateAsync({
                     car: car.id,
                     request_type: effectiveMode,
-                    price_offered: reqPrice,
+                    // A non-negotiable buy is pinned to the set sale price; only
+                    // rentals carry a user-entered price.
+                    price_offered:
+                      effectiveMode === "rent" ? reqPrice : car.sale_price ?? "",
                     ...(effectiveMode === "rent" ? {
                       duration_days: Number(reqDays),
                       start_date: reqStartDate,
@@ -447,22 +450,34 @@ export function CarDetailPage({ carId }: { carId: string }) {
               style={{ display: "flex", flexDirection: "column", gap: 12, padding: 20, border: "1px solid var(--brc-border)", borderRadius: "var(--brc-radius-md)", background: "var(--brc-bg-subtle)" }}
             >
               <h3 style={{ fontFamily: "var(--brc-font-display)", fontSize: 16, fontWeight: 700, color: "var(--brc-text)", margin: 0 }}>
-                {effectiveMode === "rent" ? "Rental Request" : "Purchase Offer"}
+                {effectiveMode === "rent" ? "Rental Request" : "Purchase Request"}
               </h3>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--brc-text-secondary)", fontFamily: "var(--brc-font-ui)" }}>
-                  {effectiveMode === "rent" ? "Price Offered (per day)" : "Offer Price"}
-                </label>
-                <input
-                  type="number"
-                  required
-                  value={reqPrice}
-                  onChange={(e) => setReqPrice(e.target.value)}
-                  placeholder={effectiveMode === "rent" && car.rent_price_per_day ? car.rent_price_per_day : car.sale_price ?? ""}
-                  style={{ height: 44, borderRadius: "var(--brc-radius-sm)", border: "1px solid var(--brc-border)", padding: "0 12px", fontSize: 14, fontFamily: "var(--brc-font-ui)", color: "var(--brc-text)", outline: "none", background: "#fff" }}
-                />
-              </div>
+              {effectiveMode === "rent" ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--brc-text-secondary)", fontFamily: "var(--brc-font-ui)" }}>
+                    Price Offered (per day)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={reqPrice}
+                    onChange={(e) => setReqPrice(e.target.value)}
+                    placeholder={car.rent_price_per_day ?? ""}
+                    style={{ height: 44, borderRadius: "var(--brc-radius-sm)", border: "1px solid var(--brc-border)", padding: "0 12px", fontSize: 14, fontFamily: "var(--brc-font-ui)", color: "var(--brc-text)", outline: "none", background: "#fff" }}
+                  />
+                </div>
+              ) : (
+                // Non-negotiable buy — the price is fixed at the set sale price.
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--brc-text-secondary)", fontFamily: "var(--brc-font-ui)" }}>
+                    Set Price (not negotiable)
+                  </label>
+                  <div style={{ height: 44, display: "flex", alignItems: "center", borderRadius: "var(--brc-radius-sm)", border: "1px solid var(--brc-border)", padding: "0 12px", fontSize: 15, fontWeight: 700, fontFamily: "var(--brc-font-ui)", color: "var(--brc-text)", background: "var(--brc-bg-muted)" }}>
+                    {car.currency} {Number(car.sale_price ?? 0).toLocaleString()}
+                  </div>
+                </div>
+              )}
 
               {effectiveMode === "rent" && (
                 <>

@@ -321,6 +321,31 @@ cannot sign back in.
   their branches.
 - [ ] A **normal owner** and an **active** team member are unaffected.
 
+## Quick-wins bundle · 🚧 on `feat/quickwins-bundle`
+
+**Non-negotiable = fixed price**
+
+- [ ] Open a **non-negotiable buy** listing as a signed-in customer → the purchase
+  form shows the **set price read-only** ("Set Price (not negotiable)"), no editable
+  offer field, heading "Purchase Request". Submitting sends a request at the set price.
+- [ ] A **negotiable buy** listing still shows **Make an Offer**; a **rent** listing
+  still has the per-day price input. (Backend pins a non-negotiable buy request to
+  `sale_price` even if the API is called directly with a lower value.)
+
+**Company name in transactions**
+
+- [ ] Open a transaction whose car belongs to a **fleet/business** owner → the detail
+  view (and the printable receipt) shows a **Company** row with the business name.
+  A transaction for an **individual** owner's car shows no Company row.
+
+**Delete a team member**
+
+- [ ] In `/owner/team`, a member's ⋯ menu has **Delete member** (below Deactivate,
+  destructive). Confirm → the card disappears, toast "Member deleted". The account is
+  **permanently deleted** (they can no longer sign in, email freed for re-invite).
+- [ ] Any request-timeline entries that member authored now read **"System"** instead
+  of their name (history preserved, not erased).
+
 ### How brands get populated (for reviewers)
 
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh

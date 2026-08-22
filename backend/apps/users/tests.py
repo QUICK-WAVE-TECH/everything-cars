@@ -750,6 +750,51 @@ class TeamLifecycleApiTest(APITestCase):
         self.client.force_authenticate(other)
         assert self.client.get(f"/api/v1/owner/team/{self.m.id}/").status_code == 404
 
+    def test_delete_removes_member_and_account(self):
+        member_user = self.m.user
+        self.client.force_authenticate(self.owner)
+        r = self.client.delete(f"/api/v1/owner/team/{self.m.id}/")
+        assert r.status_code == 204, r.data
+        assert not TeamMembership.objects.filter(id=self.m.id).exists()
+        assert not User.objects.filter(id=member_user.id).exists()
+
+    def test_delete_anonymises_authored_request_history(self):
+        # A request event the member authored survives with a null actor
+        # ("System") rather than being cascade-deleted with their account.
+        from apps.listings.models import (
+            Request,
+            RequestStatus,
+            RequestStatusEvent,
+        )
+        from apps.listings.tests import create_car, create_customer_profile
+
+        car = create_car(self.owner, branch=self.b1)
+        customer = create_user("del-cust@test.com", "customer")
+        create_customer_profile(customer)
+        req = Request.objects.create(
+            car=car, customer=customer, request_type="buy",
+            price_offered="5000000.00", status=RequestStatus.PENDING,
+        )
+        event = RequestStatusEvent.objects.create(
+            request=req, from_status="pending", to_status="approved",
+            actor=self.m.user,
+        )
+        self.client.force_authenticate(self.owner)
+        assert self.client.delete(f"/api/v1/owner/team/{self.m.id}/").status_code == 204
+        event.refresh_from_db()
+        assert event.actor_id is None
+
+    def test_team_member_cannot_delete(self):
+        member, m2 = make_team_member("del-intruder@test.com", self.profile, [self.b1])
+        self.client.force_authenticate(member)
+        assert self.client.delete(f"/api/v1/owner/team/{self.m.id}/").status_code == 403
+
+    def test_cross_business_delete_is_404(self):
+        other = create_user_owner("del-other@test.com")
+        create_fleet_owner_profile(other, fleet_name="Rivals")
+        self.client.force_authenticate(other)
+        assert self.client.delete(f"/api/v1/owner/team/{self.m.id}/").status_code == 404
+
 
 class BranchRetireUnassignsTest(APITestCase):
     def test_retiring_branch_unassigns_members(self):

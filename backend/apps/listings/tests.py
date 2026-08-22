@@ -1317,6 +1317,22 @@ class RequestTypeMatchTest(APITestCase):
         )
         self.assertEqual(self._post(car, "buy", "18500000.00").status_code, 201)
 
+    def test_non_negotiable_buy_forces_set_price(self):
+        """A non-negotiable buy request is pinned to the sale price — a lower
+        submitted value is ignored, not honoured."""
+        from apps.listings.models import Request
+
+        car = create_car(
+            self.owner,
+            listing_type=ListingType.BUY,
+            sale_price="18500000.00",
+            is_negotiable=False,
+        )
+        res = self._post(car, "buy", "1.00")  # try to undercut
+        self.assertEqual(res.status_code, 201, res.data)
+        req = Request.objects.get(car=car, customer=self.customer)
+        self.assertEqual(str(req.price_offered), "18500000.00")
+
 
 class ReservedListingPauseTest(APITestCase):
     """A car reserved by an accepted offer (active buy request) can't be paused."""
@@ -2246,3 +2262,39 @@ class FleetCarLocationFromBranchTest(APITestCase):
         }, format="json")
         assert r.status_code == 400
         assert "state" in str(r.data).lower()
+
+
+class TransactionCompanyNameTest(APITestCase):
+    def _txn_for(self, owner):
+        from apps.listings.models import Transaction, TransactionType
+
+        car = create_car(owner, listing_type=ListingType.BUY, sale_price="5000000.00")
+        customer = create_user(f"txn-cust-{owner.email}", "customer")
+        create_customer_profile(customer)
+        req = Request.objects.create(
+            car=car, customer=customer, request_type=ListingType.BUY,
+            price_offered="5000000.00", status=RequestStatus.PAID,
+        )
+        txn = Transaction.objects.create(
+            request=req, payer=customer, receiver=owner,
+            amount="5000000.00", transaction_type=TransactionType.PURCHASE,
+        )
+        return txn, customer
+
+    def test_fleet_owner_transaction_exposes_company_name(self):
+        owner = create_user("txn-fleet@test.com", "owner")
+        create_fleet_owner_profile(owner, fleet_name="AutoKings Motors")
+        txn, customer = self._txn_for(owner)
+        self.client.force_authenticate(customer)
+        r = self.client.get(f"/api/v1/listings/transactions/{txn.id}")
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(r.data["company_name"], "AutoKings Motors")
+
+    def test_individual_owner_transaction_has_no_company(self):
+        owner = create_user("txn-indiv@test.com", "owner")
+        create_owner_profile(owner)
+        txn, customer = self._txn_for(owner)
+        self.client.force_authenticate(customer)
+        r = self.client.get(f"/api/v1/listings/transactions/{txn.id}")
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertIsNone(r.data["company_name"])

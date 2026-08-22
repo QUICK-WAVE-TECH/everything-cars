@@ -1432,6 +1432,7 @@ class TransactionDetailView(APIView):
                     "request",
                     "request__car",
                     "request__car__owner",
+                    "request__car__owner__owner_profile",
                     "payer",
                     "receiver",
                 )

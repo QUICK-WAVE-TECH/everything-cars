@@ -1,11 +1,12 @@
 "use client";
 
-import { MapPin, Mail, MoreHorizontal, Pencil, UserMinus, UserPlus } from "lucide-react";
+import { MapPin, Mail, MoreHorizontal, Pencil, Trash2, UserMinus, UserPlus } from "lucide-react";
 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -32,11 +33,13 @@ export function TeamMemberCard({
   onEdit,
   onDeactivate,
   onReactivate,
+  onDelete,
 }: {
   member: TeamMember;
   onEdit: (m: TeamMember) => void;
   onDeactivate: (m: TeamMember) => void;
   onReactivate: (m: TeamMember) => void;
+  onDelete: (m: TeamMember) => void;
 }) {
   const disabled = !member.is_active;
   const t = tint(member);
@@ -95,6 +98,14 @@ export function TeamMemberCard({
                 Deactivate
               </DropdownMenuItem>
             )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => onDelete(member)}
+              className="text-(--brc-danger) data-[highlighted]:text-(--brc-danger)"
+            >
+              <Trash2 size={15} />
+              Delete member
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

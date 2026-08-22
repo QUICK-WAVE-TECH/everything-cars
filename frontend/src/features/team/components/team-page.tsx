@@ -9,6 +9,7 @@ import { useMe } from "@/features/auth/api";
 
 import {
   useDeactivateMember,
+  useDeleteMember,
   useReactivateMember,
   useTeam,
 } from "../api/team-api";
@@ -23,11 +24,13 @@ export function TeamPage() {
   const teamQuery = useTeam();
   const deactivate = useDeactivateMember();
   const reactivate = useReactivateMember();
+  const deleteMember = useDeleteMember();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
   const [formNonce, setFormNonce] = useState(0);
   const [deactivateTarget, setDeactivateTarget] = useState<TeamMember | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TeamMember | null>(null);
 
   const businessName = user?.owner_profile?.fleet_name ?? "";
   const isFleet =
@@ -66,6 +69,16 @@ export function TeamPage() {
       },
       onError: () =>
         toast.error("Couldn't deactivate the member. Please try again."),
+    });
+  }
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    deleteMember.mutate(deleteTarget.id, {
+      onSuccess: () => {
+        toast.success("Member deleted");
+        setDeleteTarget(null);
+      },
+      onError: () => toast.error("Couldn't delete the member. Please try again."),
     });
   }
 
@@ -143,6 +156,7 @@ export function TeamPage() {
               onEdit={openEdit}
               onDeactivate={setDeactivateTarget}
               onReactivate={handleReactivate}
+              onDelete={setDeleteTarget}
             />
           ))}
         </div>
@@ -176,6 +190,27 @@ export function TeamPage() {
         destructive
         isPending={deactivate.isPending}
         onConfirm={confirmDeactivate}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !deleteMember.isPending && !o && setDeleteTarget(null)}
+        title="Delete this member?"
+        description={
+          <>
+            This permanently deletes their account and removes them from your team.
+            This can&apos;t be undone.
+            {deleteTarget ? (
+              <span className="mt-2 block font-bold text-(--brc-text-secondary)">
+                {deleteTarget.first_name} {deleteTarget.last_name}
+              </span>
+            ) : null}
+          </>
+        }
+        confirmLabel="Delete member"
+        destructive
+        isPending={deleteMember.isPending}
+        onConfirm={confirmDelete}
       />
     </div>
   );

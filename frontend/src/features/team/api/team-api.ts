@@ -72,3 +72,12 @@ export function useReactivateMember() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: teamKeys.list() }),
   });
 }
+
+export function useDeleteMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.delete<void>(`/owner/team/${id}/`),
+    meta: { skipGlobalOverlay: true },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: teamKeys.list() }),
+  });
+}

@@ -7,6 +7,7 @@ from django_countries.serializer_fields import (
 from django.utils import timezone
 
 from apps.sales.models import DealStatus
+from apps.users.models import OwnerProfile
 from .models import (
     Brand,
     Car,
@@ -747,6 +748,8 @@ class RequestStatusEventSerializer(serializers.ModelSerializer):
         fields = ["id", "from_status", "to_status", "actor_name", "note", "created_at"]
 
     def get_actor_name(self, obj):
+        if not obj.actor_id:
+            return "System"
         return f"{obj.actor.first_name} {obj.actor.last_name}"
 
 
@@ -927,20 +930,19 @@ class RequestCreateSerializer(serializers.ModelSerializer):
                                 }
                             )
 
-        if (
-            car
-            and request_type == ListingType.BUY
-            and car.is_negotiable
-            and self.instance is None
-        ):
-            raise serializers.ValidationError(
-                {
-                    "detail": (
-                        "This vehicle accepts offers. Submit an offer instead of a "
-                        "direct purchase request."
-                    )
-                }
-            )
+        if car and request_type == ListingType.BUY and self.instance is None:
+            if car.is_negotiable:
+                raise serializers.ValidationError(
+                    {
+                        "detail": (
+                            "This vehicle accepts offers. Submit an offer instead "
+                            "of a direct purchase request."
+                        )
+                    }
+                )
+            # Non-negotiable: the price is the set sale price, not up for
+            # negotiation — ignore any submitted value.
+            data["price_offered"] = car.sale_price
         return data
 
     def create(self, validated_data):
@@ -958,8 +960,28 @@ class RequestActionSerializer(serializers.Serializer):
     note = serializers.CharField(required=False, allow_blank=True, default="")
 
 
+def _transaction_car(obj):
+    """The car a transaction relates to (via its request or inspection booking)."""
+    if obj.request_id:
+        return obj.request.car
+    if obj.inspection_booking_id:
+        return obj.inspection_booking.car
+    return None
+
+
+def _transaction_company_name(obj):
+    """The fleet business behind the transaction's car, or None for an
+    individual owner / no car."""
+    car = _transaction_car(obj)
+    profile = getattr(getattr(car, "owner", None), "owner_profile", None)
+    if profile and profile.owner_type == OwnerProfile.OwnerType.FLEET:
+        return profile.fleet_name
+    return None
+
+
 class TransactionListSerializer(serializers.ModelSerializer):
     car_detail = serializers.SerializerMethodField()
+    company_name = serializers.SerializerMethodField()
     payer_name = serializers.SerializerMethodField()
     receiver_name = serializers.SerializerMethodField()
     request_type = serializers.SerializerMethodField()
@@ -973,6 +995,7 @@ class TransactionListSerializer(serializers.ModelSerializer):
             "transaction_type",
             "payment_method",
             "car_detail",
+            "company_name",
             "payer_name",
             "receiver_name",
             "request_type",
@@ -982,11 +1005,11 @@ class TransactionListSerializer(serializers.ModelSerializer):
         ]
 
     def get_car_detail(self, obj):
-        if obj.request_id:
-            return obj.request.car.title
-        if obj.inspection_booking_id:
-            return obj.inspection_booking.car.title
-        return "—"
+        car = _transaction_car(obj)
+        return car.title if car else "—"
+
+    def get_company_name(self, obj):
+        return _transaction_company_name(obj)
 
     def get_payer_name(self, obj: Transaction):
         first_name = obj.payer.first_name
@@ -1008,6 +1031,7 @@ class TransactionListSerializer(serializers.ModelSerializer):
 
 class TransactionDetailSerializer(serializers.ModelSerializer):
     car_detail = serializers.SerializerMethodField()
+    company_name = serializers.SerializerMethodField()
     payer_name = serializers.SerializerMethodField()
     receiver_name = serializers.SerializerMethodField()
     request_type = serializers.SerializerMethodField()
@@ -1022,6 +1046,7 @@ class TransactionDetailSerializer(serializers.ModelSerializer):
             "transaction_type",
             "payment_method",
             "car_detail",
+            "company_name",
             "payer_name",
             "receiver_name",
             "request_type",
@@ -1032,11 +1057,11 @@ class TransactionDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_car_detail(self, obj):
-        if obj.request_id:
-            return obj.request.car.title
-        if obj.inspection_booking_id:
-            return obj.inspection_booking.car.title
-        return "—"
+        car = _transaction_car(obj)
+        return car.title if car else "—"
+
+    def get_company_name(self, obj):
+        return _transaction_company_name(obj)
 
     def get_payer_name(self, obj: Transaction):
         first_name = obj.payer.first_name
