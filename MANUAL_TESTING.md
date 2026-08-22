@@ -388,6 +388,25 @@ publisher's queue). Sign in as a **publisher** and open its review drawer at
   · {date} · changed mileage"** entry (newest first).
 - [ ] The owner/public car pages are **unchanged** (this is a staff-only view).
 
+## Car-listing edit history · 🚧 on `feat/listing-edit-history`
+
+**Goal:** the car's timeline now shows **listing edits** (what changed, old → new)
+alongside status changes, owner- and staff-visible.
+
+**Setup:** a car in an **editable** status (Changes Requested / `needs_changes`).
+
+**Manual checklist**
+
+- [ ] As the owner, **edit** the listing (e.g. change price + mileage) and save →
+  the car detail's status timeline gains a **"Listing updated"** entry (pencil
+  icon) listing each change as **old → new** (e.g. "Mileage: 40,000 → 41,000").
+- [ ] Saving with **no actual change** adds **no** timeline entry.
+- [ ] When a **team member** edits, the owner's timeline names **that team
+  member** ("Silver …" by their name). A **platform-staff** status change still
+  shows **"Staff"** with **no name** to the owner.
+- [ ] The staff review drawer's timeline shows the same edit entries (with staff
+  names on staff rows).
+
 ### How brands get populated (for reviewers)
 
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh

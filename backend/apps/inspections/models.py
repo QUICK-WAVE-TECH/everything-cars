@@ -444,6 +444,9 @@ class CarStatusHistory(models.Model):
     actor_name = models.CharField(max_length=255, blank=True, default="")
     actor_email = models.CharField(max_length=254, blank=True, default="")
     actor_phone = models.CharField(max_length=20, blank=True, default="")
+    # Set on listing-edit annotation rows (from_status == to_status): a list of
+    # {field, label, old, new} display strings. Null on normal status rows.
+    changed_fields = models.JSONField(null=True, blank=True)
     # Request forensics — who acted, from where. Empty for system transitions
     # (auto-publish, etc.) since those have no HTTP request behind them.
     ip_address = models.GenericIPAddressField(blank=True, null=True)

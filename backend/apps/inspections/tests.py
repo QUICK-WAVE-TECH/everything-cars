@@ -75,7 +75,9 @@ class StaffHistoryNamesTest(APITestCase):
         self.client.force_authenticate(user=self.owner)
         owner_res = self.client.get(f"/api/v1/listings/my-cars/{self.car.id}/history")
         self.assertEqual(owner_res.status_code, status.HTTP_200_OK)
-        self.assertNotIn("actor_name", owner_res.data[0])
+        # The owner still never sees a *staff* member's name — it's blank for
+        # staff-role rows (business-side actor names are surfaced separately).
+        self.assertEqual(owner_res.data[0]["actor_name"], "")
 
 
 class StaffSlotManagementTest(APITestCase):

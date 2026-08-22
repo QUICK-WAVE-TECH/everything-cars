@@ -201,6 +201,13 @@ export type PhysicalInspection = PhysicalInspectionPayload & {
   created_at: string;
 };
 
+export type CarFieldChange = {
+  field: string;
+  label: string;
+  old: string;
+  new: string;
+};
+
 export type CarStatusHistoryEntry = {
   id: string;
   from_status: string;
@@ -208,8 +215,12 @@ export type CarStatusHistoryEntry = {
   actor_role: "owner" | "staff" | "system";
   note: string;
   created_at: string;
-  /** Present only on the staff-facing timeline. */
+  /** Staff timeline: any actor. Owner timeline: business-side actors only
+   * (owner/team member), blank for platform staff. */
   actor_name?: string;
+  /** Set on listing-edit rows (from_status === to_status): the fields that
+   * changed, old → new. */
+  changed_fields?: CarFieldChange[] | null;
 };
 
 /** One time-slot row in the batch slot-creation payload — capacity is optional

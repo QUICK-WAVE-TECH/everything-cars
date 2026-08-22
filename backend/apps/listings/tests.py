@@ -209,6 +209,7 @@ class EditLockdownTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
+
     def test_edit_blocked_in_inspection_in_progress(self):
         self.car.status = CarStatus.INSPECTION_IN_PROGRESS
         self.car.save(update_fields=["status"])
@@ -237,6 +238,98 @@ class EditLockdownTest(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
 
+
+class ListingEditHistoryTest(APITestCase):
+    def setUp(self):
+        self.owner = create_user("leh-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(
+            self.owner, status=CarStatus.NEEDS_CHANGES, color="White",
+            mileage=40000,
+        )
+
+    def _history(self):
+        return self.client.get(f"/api/v1/listings/my-cars/{self.car.id}/history").data
+
+    def test_edit_records_old_new_change(self):
+        self.client.force_authenticate(self.owner)
+        res = self.client.patch(
+            f"/api/v1/listings/my-cars/{self.car.id}",
+            {"color": "Blue", "mileage": 41000},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        rows = [h for h in self._history() if h.get("changed_fields")]
+        self.assertEqual(len(rows), 1)
+        changed = {c["field"]: c for c in rows[0]["changed_fields"]}
+        self.assertEqual(changed["color"]["old"], "White")
+        self.assertEqual(changed["color"]["new"], "Blue")
+        self.assertEqual(changed["mileage"]["old"], "40000")
+        self.assertEqual(changed["mileage"]["new"], "41000")
+        # from == to (annotation row), not a status transition.
+        self.assertEqual(rows[0]["from_status"], rows[0]["to_status"])
+
+    def test_no_op_edit_records_nothing(self):
+        self.client.force_authenticate(self.owner)
+        self.client.patch(
+            f"/api/v1/listings/my-cars/{self.car.id}",
+            {"color": "White"},  # unchanged
+            format="json",
+        )
+        rows = [h for h in self._history() if h.get("changed_fields")]
+        self.assertEqual(rows, [])
+
+    def test_team_member_edit_is_named_to_owner(self):
+        from apps.listings.models import Branch
+        from apps.users.models import TeamMembership
+
+        fleet_owner = create_user("leh-fleet@test.com", "owner")
+        profile = create_fleet_owner_profile(fleet_owner)
+        branch = Branch.objects.create(
+            business=profile, name="HQ", country="NG", state="Lagos",
+            city="Ikeja", street_address="1", phone="+2348010000000", email="a@x.ng",
+        )
+        car = create_car(
+            fleet_owner, status=CarStatus.NEEDS_CHANGES, branch=branch, color="White"
+        )
+        member = create_user("leh-tm@test.com", "team_member")
+        m = TeamMembership.objects.create(user=member, business=profile)
+        m.branches.set([branch])
+
+        self.client.force_authenticate(member)
+        r = self.client.patch(
+            f"/api/v1/listings/my-cars/{car.id}",
+            {"color": "Silver"},
+            format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK, r.data)
+        # Owner views history — the team member who edited is named.
+        self.client.force_authenticate(fleet_owner)
+        rows = [
+            h
+            for h in self.client.get(
+                f"/api/v1/listings/my-cars/{car.id}/history"
+            ).data
+            if h.get("changed_fields")
+        ]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["actor_name"], member.get_full_name())
+
+    def test_owner_history_hides_staff_name_on_status_rows(self):
+        from apps.inspections.models import ActorRole, CarStatusHistory
+
+        staff = create_user("leh-staff@test.com", "owner", is_staff=True)
+        CarStatusHistory.objects.create(
+            car=self.car, from_status="needs_changes", to_status="listing_approved",
+            actor=staff, actor_role=ActorRole.STAFF,
+            actor_name=staff.get_full_name(),
+        )
+        self.client.force_authenticate(self.owner)
+        staff_rows = [
+            h for h in self._history() if h["actor_role"] == "staff"
+        ]
+        self.assertTrue(staff_rows)
+        self.assertEqual(staff_rows[0]["actor_name"], "")
 
 class BuyRequestConflictTests(APITestCase):
     def setUp(self):
