@@ -4,10 +4,13 @@ import {
   BadgeCheck,
   Building2,
   FileText,
+  History,
   Loader2,
   MapPin,
+  Paperclip,
   Rocket,
   Undo2,
+  UserCheck,
 } from "lucide-react";
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -39,6 +42,15 @@ function checks(report: InspectionReport): { label: string; value: string }[] {
 function inspectorInitials(name: string) {
   const parts = name.trim().split(/\s+/);
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <span className="text-[11px] font-medium text-(--brc-text-muted)">{label}</span>
+      <span className="truncate text-[13px] font-bold text-(--brc-text)">{value}</span>
+    </div>
+  );
 }
 
 /** The publisher's review drawer: full listing + the inspection report, with
@@ -178,13 +190,18 @@ export function PublishingReviewSheet({
                       <p className="text-sm leading-relaxed text-(--brc-text-secondary) text-pretty">
                         {report.staff_notes || "No notes recorded."}
                       </p>
-                      <div className="flex items-center gap-2 pt-1">
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
                         <span className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-(--brc-accent) text-[10.5px] font-extrabold text-white">
                           {inspectorInitials(report.inspector_name)}
                         </span>
                         <span className="text-[12.5px] font-bold text-(--brc-text-secondary)">
                           {report.inspector_name}
                         </span>
+                        {report.inspector_email ? (
+                          <span className="text-[12px] text-(--brc-text-muted)">
+                            {report.inspector_email}
+                          </span>
+                        ) : null}
                         {report.inspected_at ? (
                           <span className="text-[12.5px] text-(--brc-text-muted)">
                             · {new Date(report.inspected_at).toLocaleDateString()}
@@ -192,6 +209,117 @@ export function PublishingReviewSheet({
                         ) : null}
                       </div>
                     </div>
+
+                    {/* Inspector's recorded features */}
+                    {report.features?.length ? (
+                      <div className="flex flex-col gap-2">
+                        <span className={`${LABEL} text-(--brc-text-muted)`}>
+                          Features
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {report.features.map((f) => (
+                            <span
+                              key={f}
+                              className="rounded-full bg-(--brc-bg-subtle) px-2.5 py-1 text-[12px] font-semibold text-(--brc-text-secondary)"
+                            >
+                              {titleize(f)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* Day-of identity capture (staff-only) */}
+                    {report.presented_attendee ? (
+                      <div className="flex flex-col gap-2 rounded-xl border border-(--brc-border) bg-(--brc-bg-subtle) p-4">
+                        <span className={`${LABEL} inline-flex items-center gap-2 text-(--brc-text-muted)`}>
+                          <UserCheck size={14} />
+                          Presented at inspection
+                        </span>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                          <Fact label="Attendee" value={titleize(report.presented_attendee)} />
+                          {report.presented_id_type ? (
+                            <Fact label="ID type" value={titleize(report.presented_id_type)} />
+                          ) : null}
+                          {report.presented_id_number ? (
+                            <Fact label="ID number" value={report.presented_id_number} />
+                          ) : null}
+                        </div>
+                        {report.presented_id_document ? (
+                          <a
+                            href={report.presented_id_document}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex w-fit items-center gap-1.5 text-[13px] font-bold text-(--brc-primary) hover:underline"
+                          >
+                            <Paperclip size={14} />
+                            View presented ID document
+                          </a>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {/* Uploaded documents */}
+                    {report.documents &&
+                    (report.documents.car_documents || report.documents.receipt_upload) ? (
+                      <div className="flex flex-col gap-2">
+                        <span className={`${LABEL} text-(--brc-text-muted)`}>
+                          Uploaded documents
+                        </span>
+                        <div className="flex flex-wrap gap-3">
+                          {report.documents.car_documents ? (
+                            <a
+                              href={report.documents.car_documents}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-[13px] font-bold text-(--brc-primary) hover:underline"
+                            >
+                              <Paperclip size={14} />
+                              Car documents
+                            </a>
+                          ) : null}
+                          {report.documents.receipt_upload ? (
+                            <a
+                              href={report.documents.receipt_upload}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-[13px] font-bold text-(--brc-primary) hover:underline"
+                            >
+                              <Paperclip size={14} />
+                              Receipt
+                            </a>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* Inspection edit history */}
+                    {report.edit_history?.length ? (
+                      <div className="flex flex-col gap-2">
+                        <span className={`${LABEL} inline-flex items-center gap-2 text-(--brc-text-muted)`}>
+                          <History size={14} />
+                          Inspection history
+                        </span>
+                        <ol className="flex flex-col gap-2">
+                          {report.edit_history.map((e, i) => (
+                            <li key={i} className="flex items-baseline gap-2 text-[12.5px]">
+                              <span className="font-bold text-(--brc-text)">
+                                {e.action === "created" ? "Submitted" : "Edited"} by{" "}
+                                {e.editor_name || "System"}
+                              </span>
+                              <span className="text-(--brc-text-muted)">
+                                · {new Date(e.created_at).toLocaleDateString()}
+                                {e.action === "edited" && e.changed_fields?.length
+                                  ? ` · changed ${e.changed_fields
+                                      .map((f) => f.replace(/_/g, " "))
+                                      .join(", ")}`
+                                  : ""}
+                              </span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ) : null}

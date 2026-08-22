@@ -367,6 +367,27 @@ review" screen; the rest of the owner area is blocked until verified.
 - [ ] A **team member** (whose business is already verified) is **never** gated.
 - [ ] An already-**verified** owner is unaffected.
 
+## Full inspector inputs + edit history · 🚧 on `feat/inspector-inputs-history`
+
+**Goal:** before publishing, the publisher sees **everything** the inspector
+entered — plus a history of who touched the report.
+
+**Setup:** run a car through inspection to a **Passed** result (it lands in the
+publisher's queue). Sign in as a **publisher** and open its review drawer at
+`/admin/publishing`.
+
+**Manual checklist**
+
+- [ ] The review drawer's inspection report now shows: the check grid, **features**
+  chips, the **"Presented at inspection"** block (attendee + ID type/number + a
+  link to the presented ID document), any **uploaded documents** (car documents /
+  receipt links), the inspector's **name + email + date**, and an **"Inspection
+  history"** timeline reading **"Submitted by {inspector} · {date}"**.
+- [ ] In **Django admin**, edit that `PhysicalInspection` (e.g. change the mileage)
+  and save. Reopen the review drawer → the history now shows an **"Edited by {you}
+  · {date} · changed mileage"** entry (newest first).
+- [ ] The owner/public car pages are **unchanged** (this is a staff-only view).
+
 ### How brands get populated (for reviewers)
 
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh

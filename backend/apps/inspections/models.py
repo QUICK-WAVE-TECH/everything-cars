@@ -354,6 +354,38 @@ class PhysicalInspection(models.Model):
         return f"Inspection for {self.car} on {self.created_at} -> {self.get_result_display()}"
 
 
+class InspectionEditAction(models.TextChoices):
+    CREATED = "created", "Created"
+    EDITED = "edited", "Edited"
+
+
+class InspectionEditEvent(models.Model):
+    """Audit trail for an inspection report — the initial submission and any
+    later corrections (currently made via Django admin). Shown to publishers so
+    they can see who touched the report and when."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    inspection = models.ForeignKey(
+        PhysicalInspection, on_delete=models.CASCADE, related_name="edit_events"
+    )
+    # SET_NULL so deleting a staff account doesn't erase the audit row; the name
+    # is snapshotted so the timeline still reads correctly.
+    editor = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name="+"
+    )
+    editor_name = models.CharField(max_length=255, blank=True, default="")
+    action = models.CharField(max_length=10, choices=InspectionEditAction.choices)
+    changed_fields = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "inspection_edit_events"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.action} by {self.editor_name} on {self.created_at}"
+
+
 class CustomDutyStatus(models.TextChoices):
     FULLY_PAID = "fully_paid", "Fully Paid"
     PARTLY_PAID = "partly_paid", "Partly Paid"

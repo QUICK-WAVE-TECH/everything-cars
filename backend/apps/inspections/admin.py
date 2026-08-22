@@ -6,6 +6,8 @@ from .models import (
     InspectionBooking,
     InspectionCenter,
     InspectionDocument,
+    InspectionEditAction,
+    InspectionEditEvent,
     InspectionPayment,
     InspectionSlot,
     PhysicalInspection,
@@ -80,6 +82,34 @@ class PhysicalInspectionAdmin(admin.ModelAdmin):
     list_filter = ["result", "fuel_type", "car_type"]
     search_fields = ["car__title", "car__tracking_id", "inspector__email"]
     list_select_related = ["car", "inspector"]
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        # Record staff corrections so the publisher's review timeline shows who
+        # edited the report and what changed. (Submissions are logged in the API.)
+        if change and form.changed_data:
+            InspectionEditEvent.objects.create(
+                inspection=obj,
+                editor=request.user,
+                editor_name=request.user.get_full_name() or request.user.email,
+                action=InspectionEditAction.EDITED,
+                changed_fields=list(form.changed_data),
+            )
+
+
+@admin.register(InspectionEditEvent)
+class InspectionEditEventAdmin(admin.ModelAdmin):
+    list_display = ["inspection", "action", "editor_name", "created_at"]
+    list_filter = ["action"]
+    list_select_related = ["inspection", "inspection__car"]
+    readonly_fields = [
+        "inspection",
+        "editor",
+        "editor_name",
+        "action",
+        "changed_fields",
+        "created_at",
+    ]
 
 
 @admin.register(InspectionDocument)
