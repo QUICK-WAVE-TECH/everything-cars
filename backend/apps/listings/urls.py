@@ -29,8 +29,14 @@ from .views import (
     TransactionDetailView,
     TransactionListView,
 )
+from .reports_views import SalesReportView
 
 urlpatterns = [
+    path(
+        "admin/reports/sales",
+        SalesReportView.as_view(),
+        name="admin-sales-report",
+    ),
     # Owner car endpoints
     path("my-cars", MyCarListCreateView.as_view(), name="my-cars-list-create"),
     path("my-cars/<uuid:car_id>", MyCarDetailView.as_view(), name="my-car-detail"),
