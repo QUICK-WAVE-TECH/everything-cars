@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckIcon, MessageSquareIcon } from "lucide-react";
+import { CheckIcon, MessageSquareIcon, PencilIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCarHistory } from "@/features/inspections/api/inspections-api";
 import type { CarStatusHistoryEntry } from "@/features/inspections/api/types";
@@ -34,7 +34,12 @@ function actorLabel(
   viewer: "owner" | "staff",
 ): string {
   const role = entry.actor_role;
-  if (role === "owner") return viewer === "owner" ? "You" : "Owner";
+  if (role === "owner") {
+    // A named business-side actor (e.g. a team member) is shown by name to both
+    // the owner and staff; otherwise fall back to the generic label.
+    if (entry.actor_name) return entry.actor_name;
+    return viewer === "owner" ? "You" : "Owner";
+  }
   if (role === "staff") {
     // Staff see the acting staff member's name; owners never do.
     return viewer === "staff" && entry.actor_name
@@ -105,6 +110,8 @@ export function CarStatusTimeline({
       {history.map((entry, i) => {
         const isLast = i === history.length - 1;
         const isAnnotation = entry.from_status === entry.to_status;
+        const changes = entry.changed_fields ?? [];
+        const isEdit = isAnnotation && changes.length > 0;
 
         return (
           <li key={entry.id} className="relative flex gap-3 pb-6 last:pb-0">
@@ -125,7 +132,9 @@ export function CarStatusTimeline({
                   : "border-(--brc-success)/30 bg-(--brc-success-bg) text-(--brc-success)",
               )}
             >
-              {isAnnotation ? (
+              {isEdit ? (
+                <PencilIcon size={14} />
+              ) : isAnnotation ? (
                 <MessageSquareIcon size={14} />
               ) : (
                 <CheckIcon size={14} />
@@ -140,7 +149,11 @@ export function CarStatusTimeline({
                     isLast ? "text-(--brc-primary)" : "text-(--brc-text)",
                   )}
                 >
-                  {isAnnotation ? `${actorLabel(entry, viewer)} responded` : statusLabel(entry.to_status)}
+                  {isEdit
+                    ? "Listing updated"
+                    : isAnnotation
+                    ? `${actorLabel(entry, viewer)} responded`
+                    : statusLabel(entry.to_status)}
                 </span>
                 {isLast && (
                   <span className="rounded-full bg-(--brc-primary-tint) px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-(--brc-primary) [font-family:var(--brc-font-ui)]">
@@ -155,6 +168,22 @@ export function CarStatusTimeline({
                 <p className="mt-2 rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) p-3 text-sm leading-relaxed text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
                   {entry.note}
                 </p>
+              )}
+              {isEdit && (
+                <ul className="mt-2 flex flex-col gap-1.5 rounded-lg border border-(--brc-border) bg-(--brc-bg-subtle) p-3 [font-family:var(--brc-font-ui)]">
+                  {changes.map((c) => (
+                    <li key={c.field} className="flex flex-wrap items-baseline gap-1.5 text-xs">
+                      <span className="font-bold text-(--brc-text)">{c.label}:</span>
+                      <span className="text-(--brc-text-muted) line-through">
+                        {c.old || "—"}
+                      </span>
+                      <span className="text-(--brc-text-muted)">→</span>
+                      <span className="font-semibold text-(--brc-text-secondary)">
+                        {c.new || "—"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           </li>

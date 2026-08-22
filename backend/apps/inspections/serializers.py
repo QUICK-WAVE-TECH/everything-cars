@@ -4,6 +4,7 @@ from rest_framework import serializers
 from django.utils import timezone
 
 from .models import (
+    ActorRole,
     AttendeeType,
     CarStatusHistory,
     InspectionBooking,
@@ -503,8 +504,11 @@ class StaffInspectionReadSerializer(serializers.ModelSerializer):
 
 
 class CarStatusHistorySerializer(serializers.ModelSerializer):
-    """Owner-facing timeline entries. `actor` is deliberately excluded —
-    owners see the role (staff/owner/system) but never staff identity."""
+    """Owner-facing timeline entries. Platform-staff identity is deliberately
+    hidden (owners see the role), but business-side actors — the owner and their
+    own team members — are named so the owner can see who edited a listing."""
+
+    actor_name = serializers.SerializerMethodField()
 
     class Meta:
         model = CarStatusHistory
@@ -513,19 +517,27 @@ class CarStatusHistorySerializer(serializers.ModelSerializer):
             "from_status",
             "to_status",
             "actor_role",
+            "actor_name",
+            "changed_fields",
             "note",
             "created_at",
         ]
 
+    def get_actor_name(self, obj):
+        # Only name business-side actors (owner / team member); never staff.
+        if obj.actor_role != ActorRole.OWNER:
+            return ""
+        if obj.actor_name:
+            return obj.actor_name
+        if obj.actor_id:
+            return obj.actor.get_full_name()
+        return ""
+
 
 class StaffCarStatusHistorySerializer(CarStatusHistorySerializer):
-    """Staff-facing variant — adds the actor's name (from the audit snapshot,
-    falling back to the live FK). Owners never receive this serializer."""
-
-    actor_name = serializers.SerializerMethodField()
-
-    class Meta(CarStatusHistorySerializer.Meta):
-        fields = CarStatusHistorySerializer.Meta.fields + ["actor_name"]
+    """Staff-facing variant — names the actor for EVERY row (including staff),
+    from the audit snapshot, falling back to the live FK. Owners never receive
+    this serializer."""
 
     def get_actor_name(self, obj):
         if obj.actor_name:

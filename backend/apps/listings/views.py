@@ -84,6 +84,7 @@ from apps.inspections.serializers import (
     StaffCarStatusHistorySerializer,
 )
 from apps.inspections.services import record_status_change
+from apps.listings.edit_history import listing_snapshot, record_listing_edit
 from apps.sales.models import Deal, DealStatus
 
 
@@ -453,13 +454,17 @@ class MyCarDetailView(APIView):
                     {"detail": "Car details cannot be edited in this status."},
                     status=status.HTTP_403_FORBIDDEN,
                 )
+            before = listing_snapshot(car)
             serializer = CarCreateSerializer(
                 car, data=request.data, partial=True, context={"request": request}
             )
             serializer.is_valid(raise_exception=True)
             car = serializer.save()
+            car.refresh_from_db()
+            record_listing_edit(
+                car, before, listing_snapshot(car), actor=request.user, request=request
+            )
 
-        car.refresh_from_db()
         car = self._get_car(request, car_id)
         return Response(CarDetailSerializer(car, context={"request": request}).data)
 
