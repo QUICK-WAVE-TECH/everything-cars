@@ -2,12 +2,36 @@ from django.contrib import admin
 from .models import (
     Brand,
     Car,
+    CarDeletionFeedback,
     CarImage,
     ListingFeature,
     Request,
     RequestStatusEvent,
     Transaction,
 )
+
+
+@admin.register(CarDeletionFeedback)
+class CarDeletionFeedbackAdmin(admin.ModelAdmin):
+    list_display = [
+        "car",
+        "outcome",
+        "sale_amount",
+        "amount_hidden",
+        "deleted_by_name",
+        "created_at",
+    ]
+    list_filter = ["outcome", "amount_hidden"]
+    list_select_related = ["car"]
+    readonly_fields = [
+        "car",
+        "deleted_by",
+        "deleted_by_name",
+        "outcome",
+        "sale_amount",
+        "amount_hidden",
+        "created_at",
+    ]
 
 
 @admin.register(Brand)

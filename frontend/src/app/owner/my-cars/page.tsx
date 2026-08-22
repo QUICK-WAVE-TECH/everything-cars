@@ -13,6 +13,8 @@ import type { IconName } from "@/features/auth/components/icon";
 import { cn } from "@/lib/utils";
 import { Breadcrumb } from "@/shared/components";
 import { useDeleteCar, useMyCarsList } from "@/features/listings/api";
+import type { CarDeletionFeedback } from "@/features/listings/api/listings-api";
+import { DeleteListingDialog } from "@/features/listings/components/delete-listing-dialog";
 import type { CarListItem } from "@/features/listings/api";
 import {
   DropdownMenu,
@@ -659,6 +661,7 @@ export default function MyCarsPage() {
   const deleteCar = useDeleteCar();
   const { data: me } = useMe();
   const scopeQuery = useMyScope();
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -697,12 +700,18 @@ export default function MyCarsPage() {
 
   const listings = useMemo(() => (rawListings?.results ?? []).map(toListing), [rawListings]);
 
-  async function handleCloseListing(listingId: string) {
+  function handleCloseListing(listingId: string) {
+    setDeleteTargetId(listingId);
+  }
+
+  async function handleConfirmDelete(feedback?: CarDeletionFeedback) {
+    if (!deleteTargetId) return;
     try {
-      await deleteCar.mutateAsync(listingId);
-      toast.success("Listing closed");
+      await deleteCar.mutateAsync({ carId: deleteTargetId, feedback });
+      toast.success("Listing deleted");
+      setDeleteTargetId(null);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to close listing");
+      toast.error(error instanceof Error ? error.message : "Failed to delete listing");
     }
   }
 
@@ -1054,6 +1063,13 @@ export default function MyCarsPage() {
           />
         );
       })()}
+
+      <DeleteListingDialog
+        open={deleteTargetId !== null}
+        onOpenChange={(o) => !o && setDeleteTargetId(null)}
+        isPending={deleteCar.isPending}
+        onConfirm={handleConfirmDelete}
+      />
     </>
   );
 }
