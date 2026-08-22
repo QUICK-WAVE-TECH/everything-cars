@@ -1452,6 +1452,8 @@ class TransactionListView(APIView):
             "request__car",
             "inspection_booking",
             "inspection_booking__car",
+            "deal",
+            "deal__car",
             "payer",
             "receiver",
         )
@@ -1509,6 +1511,10 @@ class TransactionDetailView(APIView):
                     "request__car",
                     "request__car__owner",
                     "request__car__owner__owner_profile",
+                    "deal",
+                    "deal__car",
+                    "deal__car__owner",
+                    "deal__car__owner__owner_profile",
                     "payer",
                     "receiver",
                 )

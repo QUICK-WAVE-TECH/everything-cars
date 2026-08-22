@@ -377,6 +377,15 @@ class Transaction(models.Model):
         null=True,
         blank=True,
     )
+    # Set for negotiated (offer→deal) sales, which have no rental/buy Request —
+    # lets the car/owner be resolved the same way as request-based sales.
+    deal = models.ForeignKey(
+        "sales.Deal",
+        on_delete=models.SET_NULL,
+        related_name="transactions",
+        null=True,
+        blank=True,
+    )
     payer = models.ForeignKey(
         "users.User", on_delete=models.CASCADE, related_name="payments_made"
     )

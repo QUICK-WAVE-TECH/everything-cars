@@ -546,3 +546,58 @@ class StandbyReviveTest(APITestCase):
         self.offer_b.refresh_from_db()
         assert self.offer_b.status == OfferStatus.PENDING
         assert self.offer_b.revived_at is not None
+
+
+class DealSaleTransactionTest(APITestCase):
+    def setUp(self):
+        self.owner = make_owner("dst-owner@test.com")
+        self.buyer = make_user("dst-buyer@test.com")
+        self.car = make_negotiable_car(self.owner)
+        self.offer = make_accepted_offer(self.car, self.buyer)
+        self.deal = Deal.objects.create(
+            car=self.car, buyer=self.buyer, seller=self.owner, offer=self.offer,
+            agreed_amount="14000000.00", currency=self.car.currency,
+            expires_at=timezone.now() + timedelta(days=DEAL_TTL_DAYS),
+        )
+
+    def test_completing_a_deal_records_a_purchase_transaction(self):
+        from apps.listings.models import Transaction
+        from apps.sales.services import complete_deal
+
+        complete_deal(self.deal)
+        txn = Transaction.objects.get(deal=self.deal)
+        self.assertEqual(txn.transaction_type, "purchase")
+        self.assertEqual(txn.status, "completed")
+        self.assertEqual(str(txn.amount), "14000000.00")
+        self.assertEqual(txn.payer, self.buyer)
+        self.assertEqual(txn.receiver, self.owner)
+
+    def test_no_double_transaction_when_car_already_has_purchase(self):
+        # A pre-existing request-based purchase txn for the car → the deal must
+        # not add a second (no double counting).
+        from apps.listings.models import (
+            Request,
+            RequestStatus,
+            Transaction,
+            TransactionStatus,
+            TransactionType,
+        )
+        from apps.sales.services import complete_deal
+
+        req = Request.objects.create(
+            car=self.car, customer=self.buyer, request_type="buy",
+            price_offered="14000000.00", status=RequestStatus.PAID,
+        )
+        Transaction.objects.create(
+            request=req, payer=self.buyer, receiver=self.owner,
+            amount="14000000.00", transaction_type=TransactionType.PURCHASE,
+            status=TransactionStatus.COMPLETED, reference="TXN-EXISTING",
+        )
+        complete_deal(self.deal)
+        self.assertFalse(Transaction.objects.filter(deal=self.deal).exists())
+        self.assertEqual(
+            Transaction.objects.filter(
+                transaction_type="purchase", status="completed"
+            ).count(),
+            1,
+        )

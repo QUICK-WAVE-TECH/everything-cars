@@ -5,6 +5,7 @@ from collections import OrderedDict
 from datetime import timedelta
 from decimal import Decimal
 
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework.permissions import IsAuthenticated
@@ -55,18 +56,33 @@ def _sale_txns(start, end, type_filter, branch):
         "buy": [TransactionType.PURCHASE],
         "rent": [TransactionType.RENTAL],
     }.get(type_filter, [TransactionType.PURCHASE, TransactionType.RENTAL])
-    qs = (
-        Transaction.objects.filter(
-            status=TransactionStatus.COMPLETED,
-            transaction_type__in=types,
-            created_at__date__gte=start,
-            created_at__date__lte=end,
-        )
-        .select_related("request", "request__car", "request__car__branch")
+    qs = Transaction.objects.filter(
+        status=TransactionStatus.COMPLETED,
+        transaction_type__in=types,
+        created_at__date__gte=start,
+        created_at__date__lte=end,
+    ).select_related(
+        "request",
+        "request__car",
+        "request__car__branch",
+        "deal",
+        "deal__car",
+        "deal__car__branch",
     )
     if branch:
-        qs = qs.filter(request__car__branch_id=branch)
+        qs = qs.filter(
+            Q(request__car__branch_id=branch) | Q(deal__car__branch_id=branch)
+        )
     return qs
+
+
+def _car_of(t):
+    """Resolve the car behind a sale transaction — request-based or a deal."""
+    if t.request_id:
+        return t.request.car
+    if t.deal_id:
+        return t.deal.car
+    return None
 
 
 def _summarize(txns):
@@ -220,7 +236,7 @@ class SalesReportView(APIView):
     def _top_models(self, txns):
         totals = {}
         for t in txns:
-            car = getattr(t.request, "car", None)
+            car = _car_of(t)
             if not car:
                 continue
             brand = car.brand.name if car.brand_id else (car.brand_other or "")
@@ -264,7 +280,7 @@ class SalesReportView(APIView):
     def _by_branch(self, txns):
         buckets = {}
         for t in txns:
-            car = getattr(t.request, "car", None)
+            car = _car_of(t)
             branch = getattr(car, "branch", None)
             name = branch.name if branch else "Individual / no branch"
             row = buckets.setdefault(name, {"branch": name, "revenue": 0.0, "units": 0})
