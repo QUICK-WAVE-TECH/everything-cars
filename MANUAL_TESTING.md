@@ -469,6 +469,31 @@ transactions. Open **Reports** in the admin nav (`/admin/reports`).
 - [ ] No sales → empty state; loading → skeletons; error → retry. A **non-staff**
   user gets 403 from `/api/v1/listings/admin/reports/sales`.
 
+## Delete an inspection centre · 🚧 on `feat/delete-inspection-center`
+
+**Goal:** admins can delete a centre; past inspection records are kept, upcoming
+appointments are cancelled and their owners emailed to rebook.
+
+**Setup:** sign in as **staff** → the Inspections area's **Centers** panel. Have a
+centre with a **future** booking (owner booked + it's pending) and, ideally, a
+**past** completed inspection at the same centre.
+
+**Manual checklist**
+
+- [ ] Each centre card now has a **Delete** (trash) button beside
+  Edit/Deactivate.
+- [ ] Clicking it shows a confirm dialog. If the centre has upcoming bookings it
+  warns **"N upcoming appointments will be cancelled and those owners emailed to
+  rebook. Past inspection records are kept."**
+- [ ] Confirm → the centre is **removed**; the toast reports how many appointments
+  were cancelled. The **upcoming** booking becomes **Cancelled** and its car
+  returns to **bookable** (Listing Approved); the **past/completed** booking and
+  its inspection record are **still there**.
+- [ ] The affected owner gets an **email + notification** ("your appointment was
+  cancelled — please rebook at another centre"). In dev the email prints to the
+  console / Mailpit.
+- [ ] A **non-staff** user gets 403 on `DELETE /inspections/admin/centers/{id}/`.
+
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh
 clone just needs `python manage.py migrate` — no manual step. When we grow the
 bundled list we add a small `reseed_brands` migration, so existing databases

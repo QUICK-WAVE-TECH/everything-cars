@@ -558,6 +558,45 @@ def notify_inspection_cancelled(booking):
         )
 
 
+def notify_inspection_center_removed(booking, center_name=""):
+    """The owner's upcoming inspection was cancelled because staff removed the
+    centre — email + notify them to rebook at another centre."""
+    when = (
+        f"{booking.slot.date.strftime('%b %d')}, "
+        f"{booking.slot.start_time.strftime('%I:%M %p')}"
+        if booking.slot_id
+        else "your scheduled date"
+    )
+    place = center_name or "the inspection centre"
+    _create_notification(
+        recipient=booking.booked_by,
+        notification_type=NotificationType.INSPECTION_CANCELLED,
+        title="Inspection appointment cancelled",
+        message=(
+            f"Your inspection for {booking.car.title} on {when} was cancelled "
+            f"because {place} was removed. Please rebook at another centre."
+        ),
+        data={
+            "booking_id": str(booking.id),
+            "car_id": str(booking.car_id),
+            "car_title": booking.car.title,
+            "center_name": center_name,
+        },
+    )
+    send_email(
+        recipient=booking.booked_by.email,
+        subject="Your inspection appointment was cancelled",
+        template_key="inspection_center_removed",
+        context={
+            "first_name": booking.booked_by.first_name,
+            "car_title": booking.car.title,
+            "when": when,
+            "center_name": place,
+            "action_url": _fe(f"/owner/my-cars/{booking.car_id}"),
+        },
+    )
+
+
 def notify_inspection_payment_submitted(booking):
     """All staff get pinged when an owner submits an inspection payment."""
     payment = booking.payment

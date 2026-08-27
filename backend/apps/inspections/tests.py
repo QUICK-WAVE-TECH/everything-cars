@@ -1565,6 +1565,65 @@ class StaffCenterCrudTest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertFalse(res.data["is_active"])
 
+    def test_delete_center_cancels_upcoming_keeps_past_and_notifies(self):
+        from datetime import timedelta as td
+        from django.core import mail
+        from django.utils import timezone as tz
+
+        owner = create_user("dc-owner@test.com", "owner")
+        create_owner_profile(owner)
+        center = create_center(self.staff)
+
+        # Upcoming booking (future date, pending) — should be cancelled.
+        future_slot = create_slot(self.staff, center=center, days_ahead=7)
+        upcoming_car = create_car(owner, status=CarStatus.INSPECTION_PENDING)
+        upcoming = InspectionBooking.objects.create(
+            car=upcoming_car, slot=future_slot, booked_by=owner,
+            status=BookingStatus.PENDING,
+        )
+        # Past booking (completed) — should be kept.
+        past_slot = create_slot(self.staff, center=center, days_ahead=20)
+        InspectionSlot.objects.filter(pk=past_slot.pk).update(
+            date=tz.localdate() - td(days=10)
+        )
+        past_car = create_car(
+            owner, status=CarStatus.PUBLISHED, vin="1HGCM82633A9PAST1",
+            plate_number="PAST01XY",
+        )
+        past = InspectionBooking.objects.create(
+            car=past_car, slot=past_slot, booked_by=owner,
+            status=BookingStatus.COMPLETED,
+        )
+
+        mail.outbox = []
+        self.client.force_authenticate(self.staff)
+        with self.captureOnCommitCallbacks(execute=True):
+            res = self.client.delete(
+                f"/api/v1/inspections/admin/centers/{center.id}/"
+            )
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual(res.data["cancelled"], 1)
+
+        # Centre gone; slots survive (SET_NULL); past booking kept.
+        self.assertFalse(InspectionCenter.objects.filter(id=center.id).exists())
+        upcoming.refresh_from_db()
+        self.assertEqual(upcoming.status, BookingStatus.CANCELLED)
+        past.refresh_from_db()
+        self.assertEqual(past.status, BookingStatus.COMPLETED)
+        upcoming_car.refresh_from_db()
+        self.assertEqual(upcoming_car.status, CarStatus.LISTING_APPROVED)
+        # The owner was emailed about the cancelled upcoming appointment.
+        self.assertTrue(any(owner.email in m.to for m in mail.outbox))
+
+    def test_delete_center_non_staff_forbidden(self):
+        center = create_center(self.staff)
+        owner = create_user("dc-intruder@test.com", "owner")
+        self.client.force_authenticate(user=owner)
+        res = self.client.delete(
+            f"/api/v1/inspections/admin/centers/{center.id}/"
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
 
 class LocationDiscoveryTest(APITestCase):
 

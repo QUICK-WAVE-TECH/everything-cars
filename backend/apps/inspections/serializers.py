@@ -21,6 +21,10 @@ from apps.users.models import IDType
 
 
 class InspectionCenterSerializer(serializers.ModelSerializer):
+    # Upcoming active bookings — deleting the centre cancels these, so the UI can
+    # warn before deleting.
+    booking_count = serializers.SerializerMethodField()
+
     class Meta:
         model = InspectionCenter
         fields = [
@@ -36,9 +40,21 @@ class InspectionCenterSerializer(serializers.ModelSerializer):
             "email",
             "max_reschedules",
             "is_active",
+            "booking_count",
             "created_at",
         ]
-        read_only_fields = ["id", "created_at"]
+        read_only_fields = ["id", "created_at", "booking_count"]
+
+    def get_booking_count(self, obj):
+        from django.utils import timezone
+
+        from .models import ACTIVE_BOOKING_STATUSES, InspectionBooking
+
+        return InspectionBooking.objects.filter(
+            slot__center=obj,
+            slot__date__gte=timezone.localdate(),
+            status__in=ACTIVE_BOOKING_STATUSES,
+        ).count()
 
     def validate_city_code(self, value):
         value = value.strip().upper()

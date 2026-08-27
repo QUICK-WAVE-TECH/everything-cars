@@ -13,6 +13,7 @@ import {
   MapPinIcon,
   PhoneIcon,
   MailIcon,
+  Trash2Icon,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ import { ApiError } from "@/lib/api-client";
 import {
   useAdminCenters,
   useCreateCenter,
+  useDeleteCenter,
   useUpdateCenter,
 } from "@/features/inspections/api/inspections-api";
 import type { InspectionCenter } from "@/features/inspections/api/types";
@@ -412,11 +414,13 @@ function CenterCard({
   center,
   onEdit,
   onToggle,
+  onDelete,
   onAddSlots,
 }: {
   center: InspectionCenter;
   onEdit: (center: InspectionCenter) => void;
   onToggle: (center: InspectionCenter) => void;
+  onDelete: (center: InspectionCenter) => void;
   onAddSlots: (center: InspectionCenter) => void;
 }) {
   return (
@@ -508,6 +512,15 @@ function CenterCard({
             style={{ color: center.is_active ? "var(--brc-danger)" : "var(--brc-success)" }}
           />
         </button>
+        <button
+          type="button"
+          onClick={() => onDelete(center)}
+          aria-label="Delete center"
+          title="Delete center"
+          className="flex size-10 cursor-pointer items-center justify-center rounded-xl border border-(--brc-danger) bg-white text-(--brc-danger) transition-colors hover:bg-(--brc-danger-bg)"
+        >
+          <Trash2Icon size={15} />
+        </button>
       </div>
     </div>
   );
@@ -526,6 +539,26 @@ export function CentersPanel({
   const [formOpen, setFormOpen] = useState(false);
   const [editingCenter, setEditingCenter] = useState<InspectionCenter | null>(null);
   const [toggleCenter, setToggleCenter] = useState<InspectionCenter | null>(null);
+  const [deleteCenter, setDeleteCenter] = useState<InspectionCenter | null>(null);
+  const deleteMutation = useDeleteCenter();
+
+  function confirmDelete() {
+    if (!deleteCenter) return;
+    deleteMutation.mutate(deleteCenter.id, {
+      onSuccess: (res) => {
+        toast.success(
+          res.cancelled > 0
+            ? `Center deleted · ${res.cancelled} upcoming appointment${res.cancelled === 1 ? "" : "s"} cancelled.`
+            : "Center deleted.",
+        );
+        setDeleteCenter(null);
+      },
+      onError: (error) =>
+        toast.error(
+          error instanceof ApiError ? error.message : "Couldn't delete the center.",
+        ),
+    });
+  }
 
   function openCreate() {
     setEditingCenter(null);
@@ -593,6 +626,7 @@ export function CentersPanel({
               center={center}
               onEdit={openEdit}
               onToggle={setToggleCenter}
+              onDelete={setDeleteCenter}
               onAddSlots={onAddSlots}
             />
           ))}
@@ -601,6 +635,28 @@ export function CentersPanel({
 
       <CenterFormDialog open={formOpen} onClose={closeForm} center={editingCenter} />
       <ConfirmToggleDialog center={toggleCenter} onClose={() => setToggleCenter(null)} />
+
+      <ConfirmDialog
+        open={deleteCenter !== null}
+        onOpenChange={(open) => !open && !deleteMutation.isPending && setDeleteCenter(null)}
+        title="Delete this center?"
+        description={
+          <>
+            {deleteCenter && deleteCenter.booking_count > 0 ? (
+              <>
+                <strong>{deleteCenter.booking_count}</strong> upcoming appointment
+                {deleteCenter.booking_count === 1 ? "" : "s"} at this center will be
+                cancelled and those owners emailed to rebook elsewhere.{" "}
+              </>
+            ) : null}
+            Past inspection records are kept. This can&apos;t be undone.
+          </>
+        }
+        confirmLabel="Delete center"
+        destructive
+        isPending={deleteMutation.isPending}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
