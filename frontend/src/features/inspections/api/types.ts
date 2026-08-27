@@ -11,6 +11,8 @@ export type InspectionCenter = {
   email: string;
   max_reschedules: number;
   is_active: boolean;
+  /** Upcoming active bookings — cancelled (owners notified) if the centre is deleted. */
+  booking_count: number;
   created_at: string;
 };
 

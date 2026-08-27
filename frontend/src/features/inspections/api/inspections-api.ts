@@ -144,6 +144,20 @@ export function useUpdateCenter() {
   });
 }
 
+export function useDeleteCenter() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (centerId: string) =>
+      apiClient.delete<{ cancelled: number }>(
+        `/inspections/admin/centers/${centerId}/`,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: inspectionKeys.adminCenters });
+      queryClient.invalidateQueries({ queryKey: inspectionKeys.locations });
+    },
+  });
+}
+
 // ── Owner Location Discovery ──
 
 export function useLocations() {

@@ -33,6 +33,7 @@ from apps.notifications.service import (
     notify_inspection_no_show,
     notify_inspection_rescheduled,
     notify_inspection_cancelled,
+    notify_inspection_center_removed,
     notify_inspection_payment_submitted,
     notify_inspection_payment_confirmed,
     notify_inspection_payment_rejected,
@@ -1704,6 +1705,57 @@ class StaffCenterDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(InspectionCenterSerializer(center).data)
+
+    def delete(self, request, center_id):
+        """Delete a centre: keep past bookings, cancel every upcoming one (and
+        notify its owner to rebook), then remove the centre. Slots survive
+        (SET_NULL) so inspection history isn't lost."""
+        center = self.get_query(center_id)
+        if center is None:
+            return Response(
+                {"detail": "Center not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        today = timezone.localdate()
+        center_name = center.company_name
+        with transaction.atomic():
+            upcoming = list(
+                InspectionBooking.objects.select_for_update()
+                .select_related("slot", "car")
+                .filter(
+                    slot__center=center,
+                    slot__date__gte=today,
+                    status__in=ACTIVE_BOOKING_STATUSES,
+                )
+            )
+            for booking in upcoming:
+                booking.status = BookingStatus.CANCELLED
+                booking.save(update_fields=["status", "updated_at"])
+                car = Car.objects.select_for_update().get(id=booking.car_id)
+                if car.status == CarStatus.INSPECTION_PENDING:
+                    record_status_change(
+                        car,
+                        CarStatus.LISTING_APPROVED,
+                        actor=request.user,
+                        actor_role=ActorRole.STAFF,
+                        note="Inspection centre removed — please rebook.",
+                        request=request,
+                    )
+
+            booking_ids = [b.id for b in upcoming]
+            center.delete()
+
+        # Notify the affected owners after the delete commits.
+        for bid in booking_ids:
+            schedule_notification(
+                lambda booking, cn=center_name: notify_inspection_center_removed(
+                    booking, cn
+                ),
+                lambda b=bid: booking_detail_queryset().get(id=b),
+            )
+        return Response(
+            {"cancelled": len(booking_ids)}, status=status.HTTP_200_OK
+        )
 
 
 class LocationsView(APIView):

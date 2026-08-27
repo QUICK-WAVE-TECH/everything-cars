@@ -99,8 +99,13 @@ class InspectionSlot(models.Model):
     end_time = models.TimeField()
     capacity = models.PositiveSmallIntegerField(default=1)
 
+    # SET_NULL (not CASCADE) so deleting a centre doesn't erase its slots and
+    # their bookings — past inspection records survive as orphaned slots.
     center = models.ForeignKey(
-        InspectionCenter, on_delete=models.CASCADE, related_name="slots"
+        InspectionCenter,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="slots",
     )
     note = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
