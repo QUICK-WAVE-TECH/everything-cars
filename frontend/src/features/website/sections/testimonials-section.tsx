@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Icon } from "@/features/auth/components/icon";
 import { Pill } from "@/shared/components/pill";
 import { Star } from "@/shared/components/star";
@@ -19,6 +20,7 @@ const navBtnStyle: React.CSSProperties = {
 
 export function TestimonialsSection() {
   const [idx, setIdx] = useState(0);
+  const reduce = useReducedMotion();
   const prev = () => setIdx((idx - 1 + TESTIMONIALS.length) % TESTIMONIALS.length);
   const next = () => setIdx((idx + 1) % TESTIMONIALS.length);
 
@@ -46,25 +48,35 @@ export function TestimonialsSection() {
           color: "#fff", backgroundImage: "linear-gradient(rgba(255,255,255,.04),transparent)",
           position: "relative", minHeight: 240,
         }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20, gap: 16, flexWrap: "wrap" }}>
-            <div>
-              <div style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 18, color: "var(--brc-primary-tint)" }}>
-                {TESTIMONIALS[idx]!.name}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={idx}
+              initial={reduce ? false : { opacity: 0, x: 14 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={reduce ? { opacity: 0 } : { opacity: 0, x: -14 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20, gap: 16, flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 18, color: "var(--brc-primary-tint)" }}>
+                    {TESTIMONIALS[idx]!.name}
+                  </div>
+                  <div style={{ fontFamily: "var(--brc-font-ui)", fontSize: 13, color: "var(--brc-text-muted)" }}>
+                    {TESTIMONIALS[idx]!.role}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 1 }}>
+                  {[0, 1, 2, 3, 4].map((k) => <Star key={k} />)}
+                </div>
               </div>
-              <div style={{ fontFamily: "var(--brc-font-ui)", fontSize: 13, color: "var(--brc-text-muted)" }}>
-                {TESTIMONIALS[idx]!.role}
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 1 }}>
-              {[0, 1, 2, 3, 4].map((k) => <Star key={k} />)}
-            </div>
-          </div>
-          <p style={{
-            fontFamily: "var(--brc-font-ui)", fontSize: 16, lineHeight: 1.6,
-            color: "rgba(255,255,255,.9)", margin: 0,
-          }}>
-            {TESTIMONIALS[idx]!.text}
-          </p>
+              <p style={{
+                fontFamily: "var(--brc-font-ui)", fontSize: 16, lineHeight: 1.6,
+                color: "rgba(255,255,255,.9)", margin: 0,
+              }}>
+                {TESTIMONIALS[idx]!.text}
+              </p>
+            </motion.div>
+          </AnimatePresence>
           <div style={{ display: "flex", gap: 8, marginTop: 28 }}>
             <button className="brc-button-motion brc-button-motion-icon" onClick={prev} style={navBtnStyle}>
               <Icon name="chevleft" size={18} stroke="#fff" />

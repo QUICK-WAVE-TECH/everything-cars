@@ -556,6 +556,20 @@ centre with a **future** booking (owner booked + it's pending) and, ideally, a
 - [ ] With **OS "reduce motion"** on: photos swap instantly (still crossfade-
   free), nothing flashes.
 
+## Motion polish — Homepage scroll reveals & testimonials · 🚧 on `feat/motion-polish`
+
+**Goal:** the marketing homepage unfolds as you scroll; quotes switch smoothly.
+
+**Manual checklist** (homepage `/`)
+
+- [ ] Scroll down: **About → Services → Testimonials → FAQ → Loyalty** each
+  **fade + rise** in as it enters the viewport (once — they don't re-animate on
+  scroll back up).
+- [ ] In the **Testimonials** card, click **‹ / ›**: the quote **slides +
+  crossfades** to the next one instead of snapping.
+- [ ] With **OS "reduce motion"** on: sections are just present as you scroll
+  (no rise), and the testimonial swaps instantly. Nothing jumps or overlaps.
+
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh
 clone just needs `python manage.py migrate` — no manual step. When we grow the
 bundled list we add a small `reseed_brands` migration, so existing databases
