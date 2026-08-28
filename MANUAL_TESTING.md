@@ -599,6 +599,21 @@ New `LoadingButton` / `MorphingLabel` primitives in `components/ui/loading-butto
 - [ ] With **OS "reduce motion"** on: the label/spinner **swaps instantly** (no
   crossfade), spinner icon doesn't spin. Everything still works.
 
+## Motion polish — Homepage parallax · 🚧 on `feat/motion-polish`
+
+**Goal:** the same restrained scroll-depth on the public homepage.
+
+**Manual checklist** (homepage `/`)
+
+- [ ] **Hero:** as you scroll down, the **background photo lags** (drifts slower)
+  while the **headline/subtext/search bar drift up faster and fade** — a clear
+  sense of depth. No edge/gap ever shows at the top or bottom of the photo.
+- [ ] **About section:** its photo **drifts within its rounded frame** as the
+  section passes through the viewport (never revealing an edge).
+- [ ] With **OS "Reduce Motion"** on: the hero photo and About image are static
+  (no drift/fade); the hero still shows its content. Nothing clips or gaps.
+- [ ] No horizontal overflow at 1440 / 1280 / 768 / 390.
+
 ## Motion polish — Admin parallax & depth · 🚧 on `feat/motion-polish`
 
 **Goal:** a restrained sense of depth on the admin surfaces — premium, never
