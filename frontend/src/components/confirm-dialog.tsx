@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2Icon } from "lucide-react";
+import { MorphingLabel } from "@/components/ui/loading-button";
 
 import {
   AlertDialog,
@@ -70,8 +70,10 @@ export function ConfirmDialog({
               void onConfirm();
             }}
           >
-            {isPending ? <Loader2Icon className="animate-spin" aria-hidden="true" /> : null}
-            {confirmLabel}
+            <MorphingLabel
+              status={isPending ? "pending" : "idle"}
+              idle={confirmLabel}
+            />
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

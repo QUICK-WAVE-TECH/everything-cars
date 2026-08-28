@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { CarIcon, HourglassIcon, InfoIcon, Loader2Icon, SendIcon } from "lucide-react";
+import { CarIcon, HourglassIcon, InfoIcon, SendIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { usePlaceOffer } from "@/features/offers/api";
 import { formatOfferAmount } from "@/features/offers/lib/offer-format";
 import { ApiError } from "@/lib/api-client";
@@ -252,9 +252,11 @@ export function MakeOfferDialog({
             </span>
           </div>
 
-          <Button
+          <LoadingButton
             type="submit"
-            disabled={!amountDigits || placeOffer.isPending}
+            loading={placeOffer.isPending}
+            disabled={!amountDigits}
+            pendingLabel="Submitting…"
             className={cn(
               "h-12 w-full shrink-0 rounded-(--brc-radius-sm) text-[15px] font-bold transition-colors",
               "bg-(--brc-primary) text-white hover:bg-(--brc-primary-hover)",
@@ -263,18 +265,9 @@ export function MakeOfferDialog({
               "disabled:pointer-events-none disabled:opacity-100 disabled:bg-(--brc-bg-muted) disabled:text-(--brc-text-muted)",
             )}
           >
-            {placeOffer.isPending ? (
-              <>
-                <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
-                Submitting…
-              </>
-            ) : (
-              <>
-                <SendIcon className="size-4" aria-hidden="true" />
-                Submit offer
-              </>
-            )}
-          </Button>
+            <SendIcon className="size-4" aria-hidden="true" />
+            Submit offer
+          </LoadingButton>
         </form>
       </DialogContent>
       <style>{`

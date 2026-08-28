@@ -570,6 +570,27 @@ centre with a **future** booking (owner booked + it's pending) and, ideally, a
 - [ ] With **OS "reduce motion"** on: sections are just present as you scroll
   (no rise), and the testimonial swaps instantly. Nothing jumps or overlaps.
 
+## Motion polish — Loading buttons · 🚧 on `feat/motion-polish`
+
+**Goal:** in-flight buttons crossfade a spinner + label instead of a hard swap.
+New `LoadingButton` / `MorphingLabel` primitives in `components/ui/loading-button.tsx`
+(built on our own `Button` + `--brc` tokens — no stone/emerald).
+
+**Manual checklist**
+
+- [ ] **Make an offer** (car page → Make offer → enter amount → Submit offer):
+  while it submits, the label **crossfades** "Submit offer" → spinner
+  "Submitting…" and the button never resizes; double-clicks are ignored.
+- [ ] **Publish a listing** (staff Publishing → review → Publish live → confirm):
+  the confirm button's label crossfades to a spinner while it runs. Same on any
+  other confirm dialog (delete listing, dismiss dispute…).
+- [ ] **Sign in / Sign up / Verify / Reset** submit: the button crossfades to a
+  spinner + label while the request is in flight.
+- [ ] The morph **keeps the button's accessible name** (screen reader still
+  reads the label) and it stays disabled while pending.
+- [ ] With **OS "reduce motion"** on: the label/spinner **swaps instantly** (no
+  crossfade), spinner icon doesn't spin. Everything still works.
+
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh
 clone just needs `python manage.py migrate` — no manual step. When we grow the
 bundled list we add a small `reseed_brands` migration, so existing databases
