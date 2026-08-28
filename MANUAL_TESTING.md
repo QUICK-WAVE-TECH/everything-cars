@@ -524,6 +524,24 @@ centre with a **future** booking (owner booked + it's pending) and, ideally, a
 - [ ] With **OS "reduce motion"** on: no stagger, no rise, no zoom — cards and
   timeline appear instantly. Nothing overlaps or jumps.
 
+## Motion polish — Landing hero, brand strip & dialogs · 🚧 on `feat/motion-polish`
+
+**Goal:** a premium, "alive" front door and softer modals.
+
+**Manual checklist**
+
+- [ ] Homepage `/`: on load the **headline → subtext → search bar rise in** one
+  after another (a short stagger), not all at once.
+- [ ] The hero **photo slowly drifts/zooms** (Ken Burns) and a soft **coloured
+  glow drifts** over it — subtle, never distracting from the text.
+- [ ] Just below the hero, a **"Popular brands" strip scrolls** brand names
+  sideways in a seamless loop, fading out at both edges.
+- [ ] Open any **modal** (e.g. delete a listing, make an offer): it **eases in**
+  (fade + gentle zoom, ~200ms) instead of a hard pop, and eases out on close.
+- [ ] With **OS "reduce motion"** on: hero content appears instantly (no drift,
+  no glow), the brand strip is a **static centred wrap** (no scroll), and modals
+  appear without animation. Nothing breaks.
+
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh
 clone just needs `python manage.py migrate` — no manual step. When we grow the
 bundled list we add a small `reseed_brands` migration, so existing databases

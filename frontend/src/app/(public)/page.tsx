@@ -1,5 +1,6 @@
 import {
   HeroSection,
+  BrandMarquee,
   AboutSection,
   ServicesSection,
   TestimonialsSection,
@@ -11,6 +12,7 @@ export default function LandingPage() {
   return (
     <>
       <HeroSection />
+      <BrandMarquee />
       <AboutSection />
       <ServicesSection />
       <TestimonialsSection />
