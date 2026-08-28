@@ -542,6 +542,20 @@ centre with a **future** booking (owner booked + it's pending) and, ideally, a
   no glow), the brand strip is a **static centred wrap** (no scroll), and modals
   appear without animation. Nothing breaks.
 
+## Motion polish — Car detail gallery · 🚧 on `feat/motion-polish`
+
+**Goal:** the photo gallery on a car page feels smooth, not a hard swap.
+
+**Manual checklist** (any car page `/cars/<id>` with 2+ photos)
+
+- [ ] Click a **thumbnail** or the **‹ ›** arrows: the main photo **crossfades**
+  (old fades out while new fades + settles in), instead of snapping.
+- [ ] The **first** photo on page load does **not** flash/animate — only
+  subsequent switches animate.
+- [ ] Single-photo listings and the empty (no-photo) state are unaffected.
+- [ ] With **OS "reduce motion"** on: photos swap instantly (still crossfade-
+  free), nothing flashes.
+
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh
 clone just needs `python manage.py migrate` — no manual step. When we grow the
 bundled list we add a small `reseed_brands` migration, so existing databases
