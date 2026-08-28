@@ -2,17 +2,18 @@
 
 import { motion, useReducedMotion } from "motion/react";
 
-/** Fades + rises its children in the first time they scroll into view, then
+/** Rises + fades its children in the first time they scroll into view, then
  * leaves them alone. Wrap a whole marketing section so the page unfolds as you
- * scroll. No-op under reduced motion. */
+ * scroll. A spring settle + a generous rise make the entrance clearly readable
+ * (not a whisper). No-op under reduced motion. */
 export function ScrollReveal({
   children,
   className,
-  y = 24,
+  /** Vertical travel in px — how far it rises from. */
+  y = 48,
 }: {
   children: React.ReactNode;
   className?: string;
-  /** Vertical travel in px. */
   y?: number;
 }) {
   const reduce = useReducedMotion();
@@ -21,8 +22,10 @@ export function ScrollReveal({
       className={className}
       initial={reduce ? false : { opacity: 0, y }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+      // Fire once the section is ~18% into the viewport from the bottom, so the
+      // rise plays where the eye is looking instead of finishing off-screen.
+      viewport={{ once: true, margin: "0px 0px -18% 0px" }}
+      transition={{ type: "spring", stiffness: 80, damping: 18, mass: 1 }}
     >
       {children}
     </motion.div>
