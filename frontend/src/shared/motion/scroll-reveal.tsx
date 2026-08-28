@@ -10,7 +10,7 @@ export function ScrollReveal({
   children,
   className,
   /** Vertical travel in px — how far it rises from. */
-  y = 48,
+  y = 32,
 }: {
   children: React.ReactNode;
   className?: string;
@@ -25,7 +25,7 @@ export function ScrollReveal({
       // Fire once the section is ~18% into the viewport from the bottom, so the
       // rise plays where the eye is looking instead of finishing off-screen.
       viewport={{ once: true, margin: "0px 0px -18% 0px" }}
-      transition={{ type: "spring", stiffness: 80, damping: 18, mass: 1 }}
+      transition={{ type: "spring", stiffness: 90, damping: 26, mass: 1 }}
     >
       {children}
     </motion.div>
