@@ -1,4 +1,5 @@
 import { SectionHead } from "@/shared/components/section-head";
+import { ParallaxLayer } from "@/shared/motion/parallax-layer";
 import {
   Accordion,
   AccordionItem,
@@ -19,7 +20,9 @@ export function FAQSection() {
   return (
     <section style={{ background: "var(--brc-bg-subtle)", padding: "var(--brc-section-y, 104px) var(--brc-space-10, 104px)" }}>
       <div style={{ maxWidth: 1232, margin: "0 auto", display: "flex", flexDirection: "column", gap: "clamp(36px, 7vw, 64px)", alignItems: "center" }}>
-        <SectionHead pill="FAQS" title="Frequently Asked Questions" sub="Find answers to common questions about our services" center />
+        <ParallaxLayer from={16} to={-16}>
+          <SectionHead pill="FAQS" title="Frequently Asked Questions" sub="Find answers to common questions about our services" center />
+        </ParallaxLayer>
         <Accordion
           defaultValue={["faq-0"]}
           style={{

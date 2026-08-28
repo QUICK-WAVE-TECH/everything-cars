@@ -610,6 +610,9 @@ New `LoadingButton` / `MorphingLabel` primitives in `components/ui/loading-butto
   sense of depth. No edge/gap ever shows at the top or bottom of the photo.
 - [ ] **About section:** its photo **drifts within its rounded frame** as the
   section passes through the viewport (never revealing an edge).
+- [ ] **Services / FAQ headings** drift gently as their section scrolls through;
+  the **Testimonials quote card** drifts a little more than its heading beside
+  it (layered depth). Text stays centered and readable throughout.
 - [ ] With **OS "Reduce Motion"** on: the hero photo and About image are static
   (no drift/fade); the hero still shows its content. Nothing clips or gaps.
 - [ ] No horizontal overflow at 1440 / 1280 / 768 / 390.

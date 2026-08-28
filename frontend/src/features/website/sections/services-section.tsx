@@ -5,6 +5,7 @@ import { SectionHead } from "@/shared/components/section-head";
 import { ApiCarRow } from "@/shared/components/car-row";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePublicCars } from "@/features/listings/api";
+import { ParallaxLayer } from "@/shared/motion/parallax-layer";
 
 export function ServicesSection() {
   const { data, isLoading } = usePublicCars();
@@ -26,14 +27,14 @@ export function ServicesSection() {
   return (
     <section style={{ background: "#fff", padding: "var(--brc-section-y, 104px) var(--brc-space-10, 104px)" }}>
       <div style={{ maxWidth: 1232, margin: "0 auto", display: "flex", flexDirection: "column", gap: "clamp(48px, 8vw, 80px)" }}>
-        <div style={{ alignSelf: "center" }}>
+        <ParallaxLayer className="self-center" from={16} to={-16}>
           <SectionHead
             pill="Our Services"
             title="Find the Perfect Car for Every Journey"
             sub="Choose from our premium collection of vehicles for rent, buy, or sell."
             center
           />
-        </div>
+        </ParallaxLayer>
 
         {isLoading ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>

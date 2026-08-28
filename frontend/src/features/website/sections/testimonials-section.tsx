@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Icon } from "@/features/auth/components/icon";
 import { Pill } from "@/shared/components/pill";
 import { Star } from "@/shared/components/star";
+import { ParallaxLayer } from "@/shared/motion/parallax-layer";
 
 const TESTIMONIALS = [
   { name: "John Adewara", role: "Civil Engineer", text: "I rented a car for a weekend trip through Buy & Rent Cars, and it was seamless from start to finish. The car was clean, the process was fast, and the price was just right. I'll definitely rent again." },
@@ -43,6 +44,7 @@ export function TestimonialsSection() {
             Client&apos;s Success Stories
           </h2>
         </div>
+        <ParallaxLayer from={30} to={-30}>
         <div style={{
           background: "var(--brc-secondary)", borderRadius: 16, padding: "clamp(24px, 5vw, 40px)",
           color: "#fff", backgroundImage: "linear-gradient(rgba(255,255,255,.04),transparent)",
@@ -86,6 +88,7 @@ export function TestimonialsSection() {
             </button>
           </div>
         </div>
+        </ParallaxLayer>
       </div>
     </section>
   );
