@@ -599,6 +599,32 @@ New `LoadingButton` / `MorphingLabel` primitives in `components/ui/loading-butto
 - [ ] With **OS "reduce motion"** on: the label/spinner **swaps instantly** (no
   crossfade), spinner icon doesn't spin. Everything still works.
 
+## Motion polish — Admin parallax & depth · 🚧 on `feat/motion-polish`
+
+**Goal:** a restrained sense of depth on the admin surfaces — premium, never
+theatrical, and tables/data stay perfectly scannable. New primitives in
+`shared/motion/`: `Parallax`, `StaggerGroup`/`StaggerItem`, `RevealOnce`,
+`StickyToolbar`, and shared tuning in `premium.ts`.
+
+**Manual checklist** (staff account)
+
+- [ ] **Reports** (`/admin/reports`): scroll — the eyebrow + supporting copy
+  drift up a few px while the **title lags slightly** (depth). The **filter bar
+  sticks** below the nav and gains a **soft shadow** once scrolled. KPI cards
+  **stagger in** (~50ms apart) and each **chart panel fades + rises once** as it
+  enters. Hovering a KPI/chart panel lifts its shadow a touch.
+- [ ] **Transactions / Disputes / Owners / Payments / Inspections**: the page
+  **header eyebrow/title/copy** have the same subtle scroll parallax; the main
+  table/section **reveals once** on load.
+- [ ] **Tables never move while scanning** — only the container reveals once;
+  individual rows stay put. Charts keep stable dimensions (no replay on scroll).
+- [ ] Sticky filter bar does **not** cover table headers or overlap the nav.
+- [ ] Resize to 1440 / 1280 / 768 / 390: no horizontal overflow, no clipped
+  text, headers don't overlap the nav, motion is subtle on mobile.
+- [ ] With **OS "Reduce Motion"** on: **no parallax, no stagger, no rise** —
+  everything is present immediately; the sticky bar still works (shadow appears
+  without a transition). All workflows unaffected.
+
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh
 clone just needs `python manage.py migrate` — no manual step. When we grow the
 bundled list we add a small `reseed_brands` migration, so existing databases

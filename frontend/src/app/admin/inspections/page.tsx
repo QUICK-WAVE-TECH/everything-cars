@@ -16,6 +16,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { Parallax } from "@/shared/motion/parallax";
 import {
   useStaffSlots,
   useDeactivateSlot,
@@ -402,16 +403,22 @@ export default function AdminInspectionsPage() {
       {/* Hero band */}
       <section className="border-b border-(--brc-border) bg-white">
         <div className="mx-auto flex max-w-[1320px] flex-col gap-2 px-4 pb-7 pt-9 sm:px-6 lg:px-10">
-          <span className="text-[13px] font-bold uppercase tracking-[0.08em] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-            Admin · Inspection Scheduling
-          </span>
-          <h1 className="m-0 text-[clamp(30px,5vw,42px)] font-black leading-[1.1] tracking-[-0.02em] text-(--brc-text) [font-family:var(--brc-font-display)]">
-            Slots &amp; Centers
-          </h1>
-          <p className="m-0 max-w-[640px] text-[15px] leading-6 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-            Manage inspection centers and their booking slots in one place, and see who&apos;s
-            attending on any day.
-          </p>
+          <Parallax distance={-8}>
+            <span className="block text-[13px] font-bold uppercase tracking-[0.08em] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+              Admin · Inspection Scheduling
+            </span>
+          </Parallax>
+          <Parallax distance={-4}>
+            <h1 className="m-0 text-[clamp(30px,5vw,42px)] font-black leading-[1.1] tracking-[-0.02em] text-(--brc-text) [font-family:var(--brc-font-display)]">
+              Slots &amp; Centers
+            </h1>
+          </Parallax>
+          <Parallax distance={-9}>
+            <p className="m-0 max-w-[640px] text-[15px] leading-6 text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+              Manage inspection centers and their booking slots in one place, and see who&apos;s
+              attending on any day.
+            </p>
+          </Parallax>
         </div>
       </section>
 

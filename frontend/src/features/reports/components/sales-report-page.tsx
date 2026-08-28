@@ -29,10 +29,13 @@ import {
   VolumeRevenueChart,
   naira,
 } from "./sales-report-charts";
-import { MotionConfig } from "motion/react";
+import { MotionConfig, motion, useReducedMotion } from "motion/react";
 import { AnimatedNumber } from "@/shared/motion/animated-number";
-import { Reveal } from "@/shared/motion/reveal";
 import { SegmentedTabs } from "@/shared/motion/segmented-tabs";
+import { Parallax } from "@/shared/motion/parallax";
+import { StaggerGroup, StaggerItem } from "@/shared/motion/stagger";
+import { StickyToolbar } from "@/shared/motion/sticky-toolbar";
+import { PREMIUM_TWEEN } from "@/shared/motion/premium";
 
 const RANGES: { value: SalesRange; label: string }[] = [
   { value: "7d", label: "Last 7 days" },
@@ -118,7 +121,7 @@ function KpiCard({
   iconFg: string;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-3.5 rounded-2xl border border-(--brc-border) bg-white p-[18px] shadow-[var(--brc-shadow-xs)] [font-family:var(--brc-font-ui)]">
+    <div className="flex min-w-0 flex-col gap-3.5 rounded-2xl border border-(--brc-border) bg-white p-[18px] shadow-(--brc-shadow-xs) transition-shadow duration-200 hover:shadow-(--brc-shadow-md) motion-reduce:transition-none [font-family:var(--brc-font-ui)]">
       <div className="flex items-start justify-between gap-2.5">
         <span className="text-[11.5px] font-bold uppercase leading-snug tracking-wider text-(--brc-text-muted)">
           {label}
@@ -154,9 +157,14 @@ function ChartCard({
   span: string;
   children: React.ReactNode;
 }) {
+  const reduce = useReducedMotion();
   return (
-    <section
-      className={`flex min-w-0 flex-col gap-3.5 rounded-2xl border border-(--brc-border) bg-white p-[18px] shadow-[var(--brc-shadow-xs)] [font-family:var(--brc-font-ui)] ${span}`}
+    <motion.section
+      initial={reduce ? false : { opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={PREMIUM_TWEEN}
+      className={`flex min-w-0 flex-col gap-3.5 rounded-2xl border border-(--brc-border) bg-white p-[18px] shadow-(--brc-shadow-xs) transition-shadow duration-200 hover:shadow-(--brc-shadow-md) motion-reduce:transition-none [font-family:var(--brc-font-ui)] ${span}`}
     >
       <div className="flex flex-col gap-0.5">
         <h2 className="m-0 [font-family:var(--brc-font-display)] text-[17px] font-bold tracking-tight text-(--brc-text)">
@@ -169,7 +177,7 @@ function ChartCard({
         ) : null}
       </div>
       {children}
-    </section>
+    </motion.section>
   );
 }
 
@@ -229,16 +237,22 @@ export function SalesReportPage() {
       {/* Header */}
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
         <div className="flex min-w-0 flex-col gap-1.5">
-          <span className="text-xs font-bold uppercase tracking-[0.14em] text-(--brc-text-muted)">
-            Admin · Reports
-          </span>
-          <h1 className="m-0 [font-family:var(--brc-font-display)] text-[40px] font-extrabold leading-tight tracking-tight text-(--brc-text)">
-            Sales performance
-          </h1>
-          <p className="m-0 max-w-[62ch] text-sm leading-relaxed text-(--brc-text-secondary) text-pretty">
-            Completed purchase and rental transactions across every branch.
-            {data ? ` ${data.range.label}.` : ""}
-          </p>
+          <Parallax distance={-8}>
+            <span className="block text-xs font-bold uppercase tracking-[0.14em] text-(--brc-text-muted)">
+              Admin · Reports
+            </span>
+          </Parallax>
+          <Parallax distance={-4}>
+            <h1 className="m-0 [font-family:var(--brc-font-display)] text-[40px] font-extrabold leading-tight tracking-tight text-(--brc-text)">
+              Sales performance
+            </h1>
+          </Parallax>
+          <Parallax distance={-9}>
+            <p className="m-0 max-w-[62ch] text-sm leading-relaxed text-(--brc-text-secondary) text-pretty">
+              Completed purchase and rental transactions across every branch.
+              {data ? ` ${data.range.label}.` : ""}
+            </p>
+          </Parallax>
         </div>
         <button
           type="button"
@@ -252,7 +266,7 @@ export function SalesReportPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3.5 rounded-2xl border border-(--brc-border) bg-white px-4 py-3.5 shadow-[var(--brc-shadow-xs)]">
+      <StickyToolbar className="flex flex-wrap items-center gap-3.5 rounded-2xl border border-(--brc-border) bg-white px-4 py-3.5 shadow-(--brc-shadow-xs)">
         <select
           value={range}
           onChange={(e) => setRange(e.target.value as SalesRange)}
@@ -299,7 +313,7 @@ export function SalesReportPage() {
             Reset filters
           </button>
         )}
-      </div>
+      </StickyToolbar>
 
       {isError ? (
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-(--brc-border) bg-white p-12 text-center">
@@ -319,8 +333,8 @@ export function SalesReportPage() {
       ) : (
         <>
           {/* KPI row */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Reveal index={0}>
+          <StaggerGroup className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StaggerItem>
             <KpiCard
               label="Total revenue"
               value={data.kpis.total_revenue}
@@ -332,8 +346,8 @@ export function SalesReportPage() {
               iconBg="var(--brc-primary-tint)"
               iconFg="var(--brc-primary)"
             />
-            </Reveal>
-            <Reveal index={1}>
+            </StaggerItem>
+            <StaggerItem>
             <KpiCard
               label="Units sold"
               value={data.kpis.units_sold}
@@ -345,8 +359,8 @@ export function SalesReportPage() {
               iconBg="var(--brc-accent-bg)"
               iconFg="var(--brc-accent)"
             />
-            </Reveal>
-            <Reveal index={2}>
+            </StaggerItem>
+            <StaggerItem>
             <KpiCard
               label="Avg sale price"
               value={data.kpis.avg_sale_price}
@@ -358,8 +372,8 @@ export function SalesReportPage() {
               iconBg="var(--brc-primary-tint)"
               iconFg="var(--brc-primary)"
             />
-            </Reveal>
-            <Reveal index={3}>
+            </StaggerItem>
+            <StaggerItem>
             <KpiCard
               label="Conversion"
               value={data.kpis.conversion_rate}
@@ -371,8 +385,8 @@ export function SalesReportPage() {
               iconBg="var(--brc-success-bg)"
               iconFg="var(--brc-success)"
             />
-            </Reveal>
-          </div>
+            </StaggerItem>
+          </StaggerGroup>
 
           {isEmpty ? (
             <div className="rounded-2xl border border-dashed border-(--brc-border) bg-white p-16 text-center text-sm text-(--brc-text-muted)">
