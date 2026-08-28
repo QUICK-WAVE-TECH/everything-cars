@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Undo2 } from "lucide-react";
+import { Undo2 } from "lucide-react";
+import { MorphingLabel } from "@/components/ui/loading-button";
 
 import {
   Dialog,
@@ -112,10 +113,14 @@ export function SendBackDialog({
             type="button"
             onClick={submit}
             disabled={isPending}
+            aria-busy={isPending || undefined}
             className="inline-flex h-11 items-center gap-2 rounded-lg bg-(--brc-danger) px-5 text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-wait disabled:opacity-70"
           >
-            {isPending ? <Loader2 size={16} className="animate-spin" /> : <Undo2 size={16} />}
-            Send back
+            <MorphingLabel
+              status={isPending ? "pending" : "idle"}
+              idle={<><Undo2 size={16} /> Send back</>}
+              pendingLabel="Sending back…"
+            />
           </button>
         </div>
       </DialogContent>

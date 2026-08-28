@@ -4,7 +4,6 @@ import { useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import {
-  Loader2Icon,
   XIcon,
   CheckIcon,
   ExternalLinkIcon,
@@ -32,6 +31,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { MorphingLabel } from "@/components/ui/loading-button";
 import { StatusBadge } from "@/features/requests/components/status-badge";
 import { cn } from "@/lib/utils";
 import { useAdminRequestDetail } from "@/features/listings/api/admin-api";
@@ -483,14 +483,14 @@ export function PaymentDrawer({
                         type="button"
                         disabled={confirmDisabled}
                         onClick={() => setConfirmOpen(true)}
+                        aria-busy={confirmPayment.isPending || undefined}
                         className="flex h-12 flex-[2] cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-(--brc-success) text-sm font-bold text-white transition-colors hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [font-family:var(--brc-font-ui)]"
                       >
-                        {confirmPayment.isPending ? (
-                          <Loader2Icon size={16} className="animate-spin motion-reduce:animate-none" />
-                        ) : (
-                          <ShieldCheckIcon size={16} />
-                        )}
-                        Confirm Payment
+                        <MorphingLabel
+                          status={confirmPayment.isPending ? "pending" : "idle"}
+                          idle={<><ShieldCheckIcon size={16} /> Confirm Payment</>}
+                          pendingLabel="Confirm Payment"
+                        />
                       </button>
                     </div>
                     <span className="text-center text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">

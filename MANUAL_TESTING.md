@@ -586,6 +586,14 @@ New `LoadingButton` / `MorphingLabel` primitives in `components/ui/loading-butto
   other confirm dialog (delete listing, dismiss dispute…).
 - [ ] **Sign in / Sign up / Verify / Reset** submit: the button crossfades to a
   spinner + label while the request is in flight.
+- [ ] **Payment** — customer "I Have Made Payment" and staff "Confirm Payment"
+  crossfade to a spinner while submitting.
+- [ ] **Owner offer** — "Send counter-offer" crossfades to a spinner (previously
+  it only greyed out).
+- [ ] **Publishing** — the "Send back" dialog submit and **inspection** "Create
+  Slots" crossfade to a spinner.
+- [ ] **Deal dispute** — "Submit report" crossfades to a spinner (previously
+  just text "Submitting…").
 - [ ] The morph **keeps the button's accessible name** (screen reader still
   reads the label) and it stays disabled while pending.
 - [ ] With **OS "reduce motion"** on: the label/spinner **swaps instantly** (no

@@ -26,6 +26,7 @@ import { agreedAmount, formatOfferAmount } from "@/features/offers/lib/offer-for
 import { OfferStatusBadge } from "@/features/offers/components/offer-status-badge";
 import { OfferCountdown } from "@/features/offers/components/offer-countdown";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { MorphingLabel } from "@/components/ui/loading-button";
 import {
   Sheet,
   SheetContent,
@@ -515,10 +516,14 @@ export function OwnerRespondSheet({ offer, open, onOpenChange }: OwnerRespondShe
                         type="button"
                         onClick={handleSendCounter}
                         disabled={respond.isPending}
+                        aria-busy={respond.isPending || undefined}
                         className="flex h-12 flex-1 items-center justify-center gap-2 rounded-lg bg-(--brc-primary) text-sm font-bold text-white disabled:opacity-50 [font-family:var(--brc-font-ui)]"
                       >
-                        <SendIcon className="size-4" aria-hidden="true" />
-                        Send counter-offer
+                        <MorphingLabel
+                          status={respond.isPending ? "pending" : "idle"}
+                          idle={<><SendIcon className="size-4" aria-hidden="true" /> Send counter-offer</>}
+                          pendingLabel="Sending…"
+                        />
                       </button>
                     </div>
                   </div>
