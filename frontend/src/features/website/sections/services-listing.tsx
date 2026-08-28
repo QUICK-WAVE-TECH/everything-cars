@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePublicCars, useFilterOptions } from "@/features/listings/api";
 import { AvailabilityBadge } from "@/features/listings/components/availability-badge";
+import { Reveal } from "@/shared/motion/reveal";
 import type { CarListItem } from "@/features/listings/api";
 
 // ---------------------------------------------------------------------------
@@ -179,6 +180,8 @@ function ServiceCarCard({ car, mode, cta }: { car: CarListItem; mode: Mode; cta:
             style={{
               objectFit: "contain",
               padding: 20,
+              transform: hover && !isUnavailable ? "scale(1.06)" : "scale(1)",
+              transition: "transform .35s cubic-bezier(.16,1,.3,1)",
               filter: isRented ? "grayscale(0.3)" : isSold ? "grayscale(0.7)" : "none",
             }}
           />
@@ -874,8 +877,10 @@ export function ServicesListing() {
               gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
               gap: "clamp(16px, 3vw, 28px)",
             }}>
-              {currentCars.map((car) => (
-                <ServiceCarCard key={car.id} car={car} mode={mode} cta={modeData.cta} />
+              {currentCars.map((car, i) => (
+                <Reveal key={car.id} index={Math.min(i, 10)}>
+                  <ServiceCarCard car={car} mode={mode} cta={modeData.cta} />
+                </Reveal>
               ))}
             </div>
           ) : (

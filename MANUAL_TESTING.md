@@ -508,6 +508,22 @@ centre with a **future** booking (owner booked + it's pending) and, ideally, a
 - [ ] With **OS "reduce motion"** on, numbers snap and the pill jumps (no
   animation) — nothing breaks.
 
+## Motion polish — Marketplace & timeline · 🚧 on `feat/motion-polish`
+
+**Goal:** the "alive" polish extended off the report — card hover + entrances.
+
+**Manual checklist**
+
+- [ ] `/services` (public marketplace): as cars load, the grid cards **fade + rise
+  in sequence** (a gentle stagger), not all at once. Same on pagination / filter
+  changes.
+- [ ] Hover a marketplace car card: it **lifts** and the **photo zooms** slightly
+  (smooth ease). Sold / rented cards do **not** lift or zoom.
+- [ ] A car's **status timeline** (owner car detail, staff review) — its entries
+  **rise in one at a time** on open instead of appearing all at once.
+- [ ] With **OS "reduce motion"** on: no stagger, no rise, no zoom — cards and
+  timeline appear instantly. Nothing overlaps or jumps.
+
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh
 clone just needs `python manage.py migrate` — no manual step. When we grow the
 bundled list we add a small `reseed_brands` migration, so existing databases

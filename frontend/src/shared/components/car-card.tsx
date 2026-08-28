@@ -96,7 +96,13 @@ export function ApiCarCard({ car, displayMode }: ApiCarCardProps) {
             alt={car.title}
             width={258}
             height={160}
-            style={{ width: "86%", height: "auto", objectFit: "contain" }}
+            style={{
+              width: "86%",
+              height: "auto",
+              objectFit: "contain",
+              transform: hover && !isUnavailable ? "scale(1.06)" : "scale(1)",
+              transition: "transform .35s cubic-bezier(.16,1,.3,1)",
+            }}
           />
         ) : (
           <Icon name="car" size={48} stroke="var(--brc-border)" />
