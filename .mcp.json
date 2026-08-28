@@ -2,7 +2,7 @@
   "mcpServers": {
     "shadcn": {
       "command": "sh",
-      "args": ["-c", "cd frontend && npx shadcn@latest mcp"]
+      "args": ["-c", "cd /Users/namy/Work/EverythingCars/frontend && npx shadcn@latest mcp"]
     }
   }
 }

@@ -29,6 +29,10 @@ import {
   VolumeRevenueChart,
   naira,
 } from "./sales-report-charts";
+import { MotionConfig } from "motion/react";
+import { AnimatedNumber } from "@/shared/motion/animated-number";
+import { Reveal } from "@/shared/motion/reveal";
+import { SegmentedTabs } from "@/shared/motion/segmented-tabs";
 
 const RANGES: { value: SalesRange; label: string }[] = [
   { value: "7d", label: "Last 7 days" },
@@ -95,6 +99,7 @@ function DeltaBadge({ delta }: { delta: number | null }) {
 function KpiCard({
   label,
   value,
+  format,
   delta,
   spark,
   sparkColor,
@@ -103,7 +108,8 @@ function KpiCard({
   iconFg,
 }: {
   label: string;
-  value: string;
+  value: number;
+  format: (n: number) => string;
   delta: number | null;
   spark: number[];
   sparkColor: string;
@@ -124,9 +130,11 @@ function KpiCard({
           {icon}
         </span>
       </div>
-      <span className="[font-family:var(--brc-font-display)] text-[29px] font-extrabold leading-none tracking-tight tabular-nums text-(--brc-text)">
-        {value}
-      </span>
+      <AnimatedNumber
+        value={value}
+        format={format}
+        className="[font-family:var(--brc-font-display)] text-[29px] font-extrabold leading-none tracking-tight text-(--brc-text)"
+      />
       <div className="flex items-end justify-between gap-2.5">
         <DeltaBadge delta={delta} />
         <Sparkline values={spark} color={sparkColor} />
@@ -216,6 +224,7 @@ export function SalesReportPage() {
   }
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-4 py-9 sm:px-8 lg:px-14 [font-family:var(--brc-font-ui)]">
       {/* Header */}
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
@@ -256,22 +265,12 @@ export function SalesReportPage() {
           ))}
         </select>
 
-        <div className="flex gap-0.5 rounded-lg bg-(--brc-bg-muted) p-[3px]">
-          {TYPES.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => setType(t.value)}
-              className={`h-8 rounded-md px-3.5 text-[13px] font-bold transition-colors ${
-                type === t.value
-                  ? "bg-white text-(--brc-text) shadow-[var(--brc-shadow-xs)]"
-                  : "text-(--brc-text-muted)"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs
+          options={TYPES}
+          value={type}
+          onChange={setType}
+          groupId="report-type"
+        />
 
         <select
           value={branch}
@@ -321,9 +320,11 @@ export function SalesReportPage() {
         <>
           {/* KPI row */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Reveal index={0}>
             <KpiCard
               label="Total revenue"
-              value={naira(data.kpis.total_revenue)}
+              value={data.kpis.total_revenue}
+              format={naira}
               delta={data.kpis.deltas.total_revenue}
               spark={sparks.rev}
               sparkColor="var(--chart-1)"
@@ -331,9 +332,12 @@ export function SalesReportPage() {
               iconBg="var(--brc-primary-tint)"
               iconFg="var(--brc-primary)"
             />
+            </Reveal>
+            <Reveal index={1}>
             <KpiCard
               label="Units sold"
-              value={String(data.kpis.units_sold)}
+              value={data.kpis.units_sold}
+              format={(n) => Math.round(n).toLocaleString("en-NG")}
               delta={data.kpis.deltas.units_sold}
               spark={sparks.units}
               sparkColor="var(--chart-2)"
@@ -341,9 +345,12 @@ export function SalesReportPage() {
               iconBg="var(--brc-accent-bg)"
               iconFg="var(--brc-accent)"
             />
+            </Reveal>
+            <Reveal index={2}>
             <KpiCard
               label="Avg sale price"
-              value={naira(data.kpis.avg_sale_price)}
+              value={data.kpis.avg_sale_price}
+              format={naira}
               delta={data.kpis.deltas.avg_sale_price}
               spark={sparks.price}
               sparkColor="var(--chart-3)"
@@ -351,9 +358,12 @@ export function SalesReportPage() {
               iconBg="var(--brc-primary-tint)"
               iconFg="var(--brc-primary)"
             />
+            </Reveal>
+            <Reveal index={3}>
             <KpiCard
               label="Conversion"
-              value={`${data.kpis.conversion_rate}%`}
+              value={data.kpis.conversion_rate}
+              format={(n) => `${n.toFixed(n % 1 === 0 ? 0 : 1)}%`}
               delta={data.kpis.deltas.conversion_rate}
               spark={sparks.units}
               sparkColor="var(--chart-4)"
@@ -361,6 +371,7 @@ export function SalesReportPage() {
               iconBg="var(--brc-success-bg)"
               iconFg="var(--brc-success)"
             />
+            </Reveal>
           </div>
 
           {isEmpty ? (
@@ -422,6 +433,7 @@ export function SalesReportPage() {
         </>
       )}
     </div>
+    </MotionConfig>
   );
 }
 

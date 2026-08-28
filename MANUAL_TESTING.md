@@ -494,6 +494,20 @@ centre with a **future** booking (owner booked + it's pending) and, ideally, a
   console / Mailpit.
 - [ ] A **non-staff** user gets 403 on `DELETE /inspections/admin/centers/{id}/`.
 
+## Motion polish — Sales report · 🚧 on `feat/motion-polish`
+
+**Goal:** subtle Motion animations on the admin Sales report (reusable primitives).
+
+**Manual checklist** (staff → `/admin/reports`)
+
+- [ ] KPI cards **rise in sequence** on load, and their numbers **count up** to the
+  value (revenue/avg in ₦, units, conversion %).
+- [ ] The **All / Purchases / Rentals** tabs have a **pill that slides** between
+  them (spring), not a hard swap. Charts/KPIs update as before.
+- [ ] Changing the date range re-runs the count-up on the KPIs.
+- [ ] With **OS "reduce motion"** on, numbers snap and the pill jumps (no
+  animation) — nothing breaks.
+
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh
 clone just needs `python manage.py migrate` — no manual step. When we grow the
 bundled list we add a small `reseed_brands` migration, so existing databases
