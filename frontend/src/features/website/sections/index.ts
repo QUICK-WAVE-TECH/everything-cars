@@ -1,5 +1,6 @@
 export { HeroSection } from "./hero-section";
 export { BrandMarquee } from "./brand-marquee";
+export { FeaturedCars } from "./featured-cars";
 export { AboutSection } from "./about-section";
 export { ServicesSection } from "./services-section";
 export { TestimonialsSection } from "./testimonials-section";

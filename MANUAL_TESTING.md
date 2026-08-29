@@ -656,6 +656,29 @@ panel — matching the approved mockup, wired to real slot/booking data.
   narrow widths. Reduced-motion: KPI stagger / reveals are instant, Live-sync
   pulse is hidden.
 
+## Featured cars — 3D coverflow · 🚧 on `feat/motion-polish`
+
+**Goal:** a cinematic, brand-adapted 3D coverflow of real cars on the homepage.
+Reusable `CoverflowCarousel` (`src/shared/components/`), wired by `FeaturedCars`.
+
+**Manual checklist** (homepage `/`, after the brand strip)
+
+- [ ] A **"Featured Cars"** band shows available cars in a **3D coverflow**: the
+  centre card faces front; side cards recede, rotate and dim — real car photo,
+  title, price, and a **View car** button (→ `/cars/[id]`).
+- [ ] It **autoplays** and **pauses on hover**. **‹ ›** arrows, **dots**,
+  **arrow keys**, and **swipe** (touch) all move it. Clicking a side card
+  brings it to centre; the centre **View car** navigates.
+- [ ] Movement is a **smooth spring** (no hard snapping, no bounce); only the
+  centre card shows text/CTA.
+- [ ] Light, on-brand look (white cards, deep-blue accents/CTA/dots) — no dark
+  restaurant theme, no raw hex.
+- [ ] The section **hides entirely** if there are no photographed, available
+  cars.
+- [ ] With **OS "Reduce Motion"** on: **no autoplay**, no card rotation, and
+  switches are instant. Arrows/dots still work; nothing spins.
+- [ ] No horizontal page overflow at 390 / 768 / 1280 / 1440.
+
 ## Motion polish — Homepage parallax · 🚧 on `feat/motion-polish`
 
 **Goal:** the same restrained scroll-depth on the public homepage.
