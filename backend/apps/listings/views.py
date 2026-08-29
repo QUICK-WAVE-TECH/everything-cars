@@ -44,6 +44,8 @@ from .models import (
     RequestStatus,
     RequestStatusEvent,
     Transaction,
+    TransactionStatus,
+    TransactionType,
 )
 from .serializers import (
     BrandSerializer,
@@ -176,11 +178,19 @@ def availability_annotations():
 
 
 def sold_annotation():
-    """True when a Deal on the car completed (the car was genuinely sold).
-    Archived-without-sale means the owner withdrew the listing — those
-    cars must not appear publicly as 'sold'."""
+    """True when the car was genuinely sold — via either a completed offer→Deal
+    or a completed direct buy-request purchase transaction. (Both sale paths
+    count; earlier this only saw Deals, so request-sold cars 404'd publicly.)
+    Archived-without-sale means the owner withdrew the listing — those cars must
+    not appear publicly as 'sold'."""
     return Exists(
         Deal.objects.filter(car_id=OuterRef("id"), status=DealStatus.COMPLETED)
+    ) | Exists(
+        Transaction.objects.filter(
+            request__car_id=OuterRef("id"),
+            transaction_type=TransactionType.PURCHASE,
+            status=TransactionStatus.COMPLETED,
+        )
     )
 
 

@@ -2653,3 +2653,51 @@ class SalesReportTest(APITestCase):
         self.assertEqual(r.data["kpis"]["units_sold"], 2)
         models = {m["label"] for m in r.data["top_models"]}
         self.assertTrue(any("Lexus" in m or car.model in m for m in models))
+
+
+class PublicSoldCarDetailTest(APITestCase):
+    """A car sold via a direct buy-request purchase (no Deal) and archived is
+    still publicly viewable as 'sold' — not a 404."""
+
+    def setUp(self):
+        self.owner = create_user("psc-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.customer = create_user("psc-cust@test.com", "customer")
+        create_customer_profile(self.customer)
+
+    def test_request_sold_archived_car_is_public_as_sold(self):
+        from apps.listings.models import (
+            Transaction,
+            TransactionStatus,
+            TransactionType,
+        )
+
+        car = create_car(
+            self.owner,
+            listing_type=ListingType.BUY,
+            sale_price="5000000.00",
+            status=CarStatus.PUBLISHED,
+        )
+        req = Request.objects.create(
+            car=car, customer=self.customer, request_type=ListingType.BUY,
+            price_offered="5000000.00", status=RequestStatus.PAID,
+        )
+        Transaction.objects.create(
+            request=req, payer=self.customer, receiver=self.owner,
+            amount="5000000.00", transaction_type=TransactionType.PURCHASE,
+            status=TransactionStatus.COMPLETED, reference="PSC-1",
+        )
+        car.status = CarStatus.ARCHIVED
+        car.save(update_fields=["status"])
+
+        res = self.client.get(f"/api/v1/listings/cars/{car.id}")
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual(res.data["availability_status"], "sold")
+
+    def test_archived_without_sale_stays_404(self):
+        car = create_car(
+            self.owner, listing_type=ListingType.BUY, sale_price="5000000.00",
+            status=CarStatus.ARCHIVED,
+        )
+        res = self.client.get(f"/api/v1/listings/cars/{car.id}")
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
