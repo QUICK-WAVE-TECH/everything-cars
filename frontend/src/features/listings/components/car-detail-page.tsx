@@ -69,7 +69,7 @@ function formatDate(dateStr: string): string {
 // ── Main Component ──
 
 export function CarDetailPage({ carId }: { carId: string }) {
-  const { data: car, isLoading } = usePublicCarDetail(carId);
+  const { data: car, isLoading, isError } = usePublicCarDetail(carId);
   // Skip the request entirely on buy listings — reviews are rent-only.
   const { data: reviewsData } = useCarReviews(carId, {
     enabled: car ? car.listing_type === "rent" : false,
@@ -120,7 +120,7 @@ export function CarDetailPage({ carId }: { carId: string }) {
   // A car is listed for rent XOR buy, so the listing type IS the mode.
   const effectiveMode: "rent" | "buy" = isBuyListing ? "buy" : "rent";
 
-  if (isLoading || !car) {
+  if (isLoading) {
     return (
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 24px 80px" }}>
         <Skeleton className="mb-8 h-8 w-64" />
@@ -134,6 +134,28 @@ export function CarDetailPage({ carId }: { carId: string }) {
             <Skeleton className="h-40 w-full rounded-xl" />
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // A sold/removed listing is no longer public (404) — show a clear state
+  // instead of an endless skeleton.
+  if (isError || !car) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center [font-family:var(--brc-font-ui)]">
+        <Icon name="car" size={48} stroke="var(--brc-border)" />
+        <h1 className="m-0 text-xl font-extrabold text-(--brc-text) [font-family:var(--brc-font-display)]">
+          This car isn&apos;t available
+        </h1>
+        <p className="m-0 text-sm text-(--brc-text-muted)">
+          It may have been sold or removed from the marketplace.
+        </p>
+        <Link
+          href="/services"
+          className="mt-2 inline-flex h-10 items-center rounded-lg bg-(--brc-primary) px-5 text-sm font-bold text-white no-underline transition-all hover:brightness-95"
+        >
+          Browse other cars
+        </Link>
       </div>
     );
   }
@@ -198,6 +220,7 @@ export function CarDetailPage({ carId }: { carId: string }) {
               overlay={false}
               autoplay={false}
               imageFit="contain"
+              glass
               stageHeight="clamp(300px, 44vw, 440px)"
               cardWidth="clamp(200px, 62%, 320px)"
               items={sortedImages

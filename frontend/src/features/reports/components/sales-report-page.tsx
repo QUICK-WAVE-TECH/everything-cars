@@ -333,6 +333,7 @@ export function SalesReportPage() {
                 format={naira}
                 delta={data.kpis.deltas.total_revenue}
                 compare={compare}
+                valueColor="var(--brc-success)"
               />
               <Kpi
                 label="Units sold"
@@ -340,6 +341,7 @@ export function SalesReportPage() {
                 format={unitFmt}
                 delta={data.kpis.deltas.units_sold}
                 compare={compare}
+                valueColor="var(--brc-primary)"
               />
               <Kpi
                 label="Average sale price"
@@ -347,6 +349,7 @@ export function SalesReportPage() {
                 format={naira}
                 delta={data.kpis.deltas.avg_sale_price}
                 compare={compare}
+                valueColor="var(--chart-3)"
               />
               <Kpi
                 label="Conversion"
@@ -354,6 +357,7 @@ export function SalesReportPage() {
                 format={pctFmt}
                 delta={data.kpis.deltas.conversion_rate}
                 compare={compare}
+                valueColor="var(--brc-accent)"
               />
               <Kpi
                 label="Inspection revenue"
@@ -361,6 +365,7 @@ export function SalesReportPage() {
                 format={naira}
                 delta={data.kpis.deltas.inspection_revenue}
                 compare={compare}
+                valueColor="var(--brc-success)"
               />
             </KpiStrip>
 

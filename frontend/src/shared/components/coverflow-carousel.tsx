@@ -59,6 +59,7 @@ export function CoverflowCarousel({
   stageHeight,
   cardWidth = "clamp(240px, 68vw, 330px)",
   imageFit = "cover",
+  glass = false,
 }: {
   items: CoverflowItem[];
   sectionLabel?: string;
@@ -71,6 +72,9 @@ export function CoverflowCarousel({
   cardWidth?: string;
   /** "cover" crops to fill (hero shots); "contain" shows the whole photo. */
   imageFit?: "cover" | "contain";
+  /** Frosted translucent cards over a soft brand-tinted ambience, instead of
+   * flat white — best with `imageFit="contain"`. */
+  glass?: boolean;
 }) {
   const isSection = variant === "section";
   const [index, setIndex] = useState(0);
@@ -137,6 +141,16 @@ export function CoverflowCarousel({
           style={{ background: "radial-gradient(60% 50% at 50% 35%, rgba(0,0,139,0.06), transparent 70%)" }}
         />
       )}
+      {glass && !isSection && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(70% 60% at 30% 25%, rgba(0,0,139,0.12), transparent 60%), radial-gradient(60% 55% at 82% 80%, rgba(195,101,35,0.10), transparent 65%)",
+          }}
+        />
+      )}
 
       <div
         className={cn(
@@ -162,7 +176,12 @@ export function CoverflowCarousel({
               <motion.div
                 key={item.id}
                 onClick={() => !isCenter && goTo(idx)}
-                className="absolute overflow-hidden rounded-2xl border border-(--brc-border) bg-white"
+                className={cn(
+                  "absolute overflow-hidden rounded-2xl",
+                  glass
+                    ? "border border-white/45 bg-white/15 ring-1 ring-white/20 backdrop-blur-2xl"
+                    : "border border-(--brc-border) bg-white",
+                )}
                 style={{
                   width: cardWidth,
                   height: "86%",
