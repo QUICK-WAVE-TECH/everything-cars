@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRightIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
+import { cn } from "@/lib/utils";
 
 export type CoverflowItem = {
   id: string;
@@ -42,20 +43,36 @@ function Eyebrow({ label }: { label: string }) {
 
 /** A 3D coverflow. Motion-spring transitions, brand-token styling, keyboard +
  * touch + autoplay. Reduced motion drops the rotation/autoplay and swaps
- * instantly. */
+ * instantly.
+ *
+ * `variant="section"` is the full landing-page band (background + eyebrow);
+ * `variant="bare"` embeds it in a container (e.g. a photo gallery) — no band,
+ * and set `overlay={false}` for pure images. */
 export function CoverflowCarousel({
   items,
   sectionLabel,
   autoplay = true,
   autoplayDelay = 5000,
   ctaText = "View car",
+  variant = "section",
+  overlay = true,
+  stageHeight,
+  cardWidth = "clamp(240px, 68vw, 330px)",
+  imageFit = "cover",
 }: {
   items: CoverflowItem[];
   sectionLabel?: string;
   autoplay?: boolean;
   autoplayDelay?: number;
   ctaText?: string;
+  variant?: "section" | "bare";
+  overlay?: boolean;
+  stageHeight?: string;
+  cardWidth?: string;
+  /** "cover" crops to fill (hero shots); "contain" shows the whole photo. */
+  imageFit?: "cover" | "contain";
 }) {
+  const isSection = variant === "section";
   const [index, setIndex] = useState(0);
   const [hovered, setHovered] = useState(false);
   const [spread, setSpread] = useState(900);
@@ -63,6 +80,7 @@ export function CoverflowCarousel({
   const touchX = useRef(0);
   const reduce = useReducedMotion();
   const total = items.length;
+  const stageH = stageHeight ?? (isSection ? "clamp(380px,54vw,480px)" : "clamp(300px,60vw,420px)");
 
   useEffect(() => {
     const el = stageRef.current;
@@ -96,9 +114,12 @@ export function CoverflowCarousel({
   if (total === 0) return null;
 
   return (
-    <section
-      aria-label={sectionLabel ?? "Featured"}
-      className="relative w-full select-none overflow-hidden bg-(--brc-bg-subtle) py-14"
+    <div
+      aria-label={sectionLabel ?? "Gallery"}
+      className={cn(
+        "relative w-full select-none overflow-hidden",
+        isSection && "bg-(--brc-bg-subtle) py-14",
+      )}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onTouchStart={(e) => {
@@ -109,19 +130,26 @@ export function CoverflowCarousel({
         if (Math.abs(d) > 45) (d < 0 ? next : prev)();
       }}
     >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ background: "radial-gradient(60% 50% at 50% 35%, rgba(0,0,139,0.06), transparent 70%)" }}
-      />
+      {isSection && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{ background: "radial-gradient(60% 50% at 50% 35%, rgba(0,0,139,0.06), transparent 70%)" }}
+        />
+      )}
 
-      <div className="relative z-10 mx-auto flex max-w-6xl flex-col items-center px-4">
-        {sectionLabel && <Eyebrow label={sectionLabel} />}
+      <div
+        className={cn(
+          "relative z-10 mx-auto flex flex-col items-center",
+          isSection ? "max-w-6xl px-4" : "w-full",
+        )}
+      >
+        {isSection && sectionLabel && <Eyebrow label={sectionLabel} />}
 
         <div
           ref={stageRef}
-          className="relative mb-9 flex h-[clamp(380px,54vw,480px)] w-full items-center justify-center"
-          style={{ perspective: 1400 }}
+          className="relative mb-6 flex w-full items-center justify-center"
+          style={{ perspective: 1400, height: stageH }}
         >
           {items.map((item, idx) => {
             let rel = idx - index;
@@ -136,8 +164,8 @@ export function CoverflowCarousel({
                 onClick={() => !isCenter && goTo(idx)}
                 className="absolute overflow-hidden rounded-2xl border border-(--brc-border) bg-white"
                 style={{
-                  width: "clamp(240px, 68vw, 330px)",
-                  height: "clamp(340px, 48vw, 460px)",
+                  width: cardWidth,
+                  height: "86%",
                   zIndex: pos.z,
                   transformOrigin: "center",
                   cursor: isCenter ? "default" : "pointer",
@@ -155,57 +183,67 @@ export function CoverflowCarousel({
                 }}
                 transition={reduce ? { duration: 0 } : SPRING}
               >
-                <Image src={item.img} alt={item.title} fill sizes="330px" style={{ objectFit: "cover" }} />
-                <div
-                  aria-hidden
-                  className="absolute inset-0"
-                  style={{
-                    background:
-                      "linear-gradient(180deg, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.05) 30%, rgba(0,0,0,0.55) 68%, rgba(0,0,0,0.92) 100%)",
-                  }}
+                <Image
+                  src={item.img}
+                  alt={item.title}
+                  fill
+                  sizes="330px"
+                  style={{ objectFit: imageFit, padding: imageFit === "contain" ? 14 : 0 }}
                 />
-                <motion.div
-                  className="relative flex h-full flex-col justify-between p-4 text-center text-white"
-                  initial={false}
-                  animate={{ opacity: isCenter ? 1 : 0, y: isCenter ? 0 : 14 }}
-                  transition={{ duration: reduce ? 0 : 0.4 }}
-                  style={{ pointerEvents: isCenter ? "auto" : "none" }}
-                >
-                  {item.tag && (
-                    <div className="text-right">
-                      <span className="inline-block rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide backdrop-blur-sm">
-                        {item.tag}
-                      </span>
+                {overlay && (
+                  <div
+                    aria-hidden
+                    className="absolute inset-0"
+                    style={{
+                      background:
+                        "linear-gradient(180deg, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.05) 30%, rgba(0,0,0,0.55) 68%, rgba(0,0,0,0.92) 100%)",
+                    }}
+                  />
+                )}
+                {overlay && (
+                  <motion.div
+                    className="relative flex h-full flex-col justify-between p-4 text-center text-white"
+                    initial={false}
+                    animate={{ opacity: isCenter ? 1 : 0, y: isCenter ? 0 : 14 }}
+                    transition={{ duration: reduce ? 0 : 0.4 }}
+                    style={{ pointerEvents: isCenter ? "auto" : "none" }}
+                  >
+                    {item.tag && (
+                      <div className="text-right">
+                        <span className="inline-block rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide backdrop-blur-sm">
+                          {item.tag}
+                        </span>
+                      </div>
+                    )}
+                    <div className="mt-auto flex flex-col items-center gap-1.5">
+                      <h4
+                        className="m-0 text-[clamp(18px,2.4vw,24px)] font-black uppercase leading-tight tracking-tight [font-family:var(--brc-font-display)]"
+                        style={{ textShadow: "0 3px 12px rgba(0,0,0,0.95)" }}
+                      >
+                        {item.title}
+                      </h4>
+                      {item.subtitle && (
+                        <span
+                          className="text-[15px] font-bold text-white/90 [font-family:var(--brc-font-ui)]"
+                          style={{ textShadow: "0 2px 8px rgba(0,0,0,0.9)" }}
+                        >
+                          {item.subtitle}
+                        </span>
+                      )}
+                      <span className="my-1.5 h-0.5 w-9 rounded bg-(--brc-primary)" />
+                      {item.href && (
+                        <Link
+                          href={item.href}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-(--brc-primary) px-4 py-2 text-[12px] font-bold uppercase tracking-wide text-white transition-transform duration-200 hover:scale-[1.04] motion-reduce:transition-none [font-family:var(--brc-font-ui)]"
+                        >
+                          {ctaText}
+                          <ArrowRightIcon size={13} />
+                        </Link>
+                      )}
                     </div>
-                  )}
-                  <div className="mt-auto flex flex-col items-center gap-1.5">
-                    <h4
-                      className="m-0 text-[clamp(18px,2.4vw,24px)] font-black uppercase leading-tight tracking-tight [font-family:var(--brc-font-display)]"
-                      style={{ textShadow: "0 3px 12px rgba(0,0,0,0.95)" }}
-                    >
-                      {item.title}
-                    </h4>
-                    {item.subtitle && (
-                      <span
-                        className="text-[15px] font-bold text-white/90 [font-family:var(--brc-font-ui)]"
-                        style={{ textShadow: "0 2px 8px rgba(0,0,0,0.9)" }}
-                      >
-                        {item.subtitle}
-                      </span>
-                    )}
-                    <span className="my-1.5 h-0.5 w-9 rounded bg-(--brc-primary)" />
-                    {item.href && (
-                      <Link
-                        href={item.href}
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-(--brc-primary) px-4 py-2 text-[12px] font-bold uppercase tracking-wide text-white transition-transform duration-200 hover:scale-[1.04] motion-reduce:transition-none [font-family:var(--brc-font-ui)]"
-                      >
-                        {ctaText}
-                        <ArrowRightIcon size={13} />
-                      </Link>
-                    )}
-                  </div>
-                </motion.div>
+                  </motion.div>
+                )}
               </motion.div>
             );
           })}
@@ -217,37 +255,39 @@ export function CoverflowCarousel({
               type="button"
               onClick={prev}
               aria-label="Previous"
-              className="absolute left-3 top-1/2 z-40 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-(--brc-border) bg-white text-(--brc-text) shadow-[var(--brc-shadow-md)] transition-colors hover:bg-(--brc-primary-tint) sm:left-6"
+              className="absolute left-2 top-1/2 z-40 flex size-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-(--brc-border) bg-white text-(--brc-text) shadow-[var(--brc-shadow-md)] transition-colors hover:bg-(--brc-primary-tint) sm:left-4"
             >
-              <ChevronLeftIcon size={20} />
+              <ChevronLeftIcon size={18} />
             </button>
             <button
               type="button"
               onClick={next}
               aria-label="Next"
-              className="absolute right-3 top-1/2 z-40 flex size-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-(--brc-border) bg-white text-(--brc-text) shadow-[var(--brc-shadow-md)] transition-colors hover:bg-(--brc-primary-tint) sm:right-6"
+              className="absolute right-2 top-1/2 z-40 flex size-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-(--brc-border) bg-white text-(--brc-text) shadow-[var(--brc-shadow-md)] transition-colors hover:bg-(--brc-primary-tint) sm:right-4"
             >
-              <ChevronRightIcon size={20} />
+              <ChevronRightIcon size={18} />
             </button>
           </>
         )}
 
-        <div className="flex items-center gap-2">
-          {items.map((item, idx) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => goTo(idx)}
-              aria-label={`Go to slide ${idx + 1}`}
-              className="h-2 cursor-pointer rounded-full transition-all duration-300 motion-reduce:transition-none"
-              style={{
-                width: idx === index ? 28 : 8,
-                background: idx === index ? "var(--brc-primary)" : "var(--brc-border)",
-              }}
-            />
-          ))}
-        </div>
+        {total > 1 && (
+          <div className="flex items-center gap-2">
+            {items.map((item, idx) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => goTo(idx)}
+                aria-label={`Go to slide ${idx + 1}`}
+                className="h-2 cursor-pointer rounded-full transition-all duration-300 motion-reduce:transition-none"
+                style={{
+                  width: idx === index ? 28 : 8,
+                  background: idx === index ? "var(--brc-primary)" : "var(--brc-border)",
+                }}
+              />
+            ))}
+          </div>
+        )}
       </div>
-    </section>
+    </div>
   );
 }

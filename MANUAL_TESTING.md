@@ -542,19 +542,24 @@ centre with a **future** booking (owner booked + it's pending) and, ideally, a
   no glow), the brand strip is a **static centred wrap** (no scroll), and modals
   appear without animation. Nothing breaks.
 
-## Motion polish — Car detail gallery · 🚧 on `feat/motion-polish`
+## Car detail gallery — 3D coverflow · 🚧 on `feat/motion-polish`
 
-**Goal:** the photo gallery on a car page feels smooth, not a hard swap.
+**Goal:** a car's photos scroll in the same brand 3D coverflow (embedded
+`bare` variant, whole-photo `contain` fit, no overlay/autoplay).
 
 **Manual checklist** (any car page `/cars/<id>` with 2+ photos)
 
-- [ ] Click a **thumbnail** or the **‹ ›** arrows: the main photo **crossfades**
-  (old fades out while new fades + settles in), instead of snapping.
-- [ ] The **first** photo on page load does **not** flash/animate — only
-  subsequent switches animate.
-- [ ] Single-photo listings and the empty (no-photo) state are unaffected.
-- [ ] With **OS "reduce motion"** on: photos swap instantly (still crossfade-
-  free), nothing flashes.
+- [ ] The gallery is a **3D coverflow** of the car's photos — centre photo
+  front, side photos recede/rotate/dim. Photos show **whole** (contained, not
+  cropped).
+- [ ] **‹ ›** arrows, **dots**, **arrow keys**, **swipe**, and **clicking a side
+  photo** all move it. No autoplay (you browse at your own pace); movement is a
+  smooth spring.
+- [ ] Single-photo listings show one static card; the **no-photo** state shows
+  the placeholder.
+- [ ] With **OS "reduce motion"** on: no rotation, instant swaps; arrows/dots
+  still work.
+- [ ] No horizontal overflow inside the gallery column at narrow widths.
 
 ## Motion polish — Homepage scroll reveals & testimonials · 🚧 on `feat/motion-polish`
 
@@ -655,29 +660,6 @@ panel — matching the approved mockup, wired to real slot/booking data.
 - [ ] No horizontal page overflow; the week grid scrolls inside its own area at
   narrow widths. Reduced-motion: KPI stagger / reveals are instant, Live-sync
   pulse is hidden.
-
-## Featured cars — 3D coverflow · 🚧 on `feat/motion-polish`
-
-**Goal:** a cinematic, brand-adapted 3D coverflow of real cars on the homepage.
-Reusable `CoverflowCarousel` (`src/shared/components/`), wired by `FeaturedCars`.
-
-**Manual checklist** (homepage `/`, after the brand strip)
-
-- [ ] A **"Featured Cars"** band shows available cars in a **3D coverflow**: the
-  centre card faces front; side cards recede, rotate and dim — real car photo,
-  title, price, and a **View car** button (→ `/cars/[id]`).
-- [ ] It **autoplays** and **pauses on hover**. **‹ ›** arrows, **dots**,
-  **arrow keys**, and **swipe** (touch) all move it. Clicking a side card
-  brings it to centre; the centre **View car** navigates.
-- [ ] Movement is a **smooth spring** (no hard snapping, no bounce); only the
-  centre card shows text/CTA.
-- [ ] Light, on-brand look (white cards, deep-blue accents/CTA/dots) — no dark
-  restaurant theme, no raw hex.
-- [ ] The section **hides entirely** if there are no photographed, available
-  cars.
-- [ ] With **OS "Reduce Motion"** on: **no autoplay**, no card rotation, and
-  switches are instant. Arrows/dots still work; nothing spins.
-- [ ] No horizontal page overflow at 390 / 768 / 1280 / 1440.
 
 ## Motion polish — Homepage parallax · 🚧 on `feat/motion-polish`
 

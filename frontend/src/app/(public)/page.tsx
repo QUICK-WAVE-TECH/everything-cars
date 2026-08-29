@@ -1,7 +1,6 @@
 import {
   HeroSection,
   BrandMarquee,
-  FeaturedCars,
   AboutSection,
   ServicesSection,
   TestimonialsSection,
@@ -17,9 +16,6 @@ export default function LandingPage() {
           remaining sections unfold as they scroll into view. */}
       <HeroSection />
       <BrandMarquee />
-      <ScrollReveal>
-        <FeaturedCars />
-      </ScrollReveal>
       <ScrollReveal>
         <AboutSection />
       </ScrollReveal>
