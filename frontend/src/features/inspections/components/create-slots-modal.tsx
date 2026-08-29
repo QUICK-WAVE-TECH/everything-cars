@@ -384,10 +384,10 @@ export function CreateSlotsModal({
             </p>
           </div>
 
-          {/* Capacity + Center */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[120px_1fr]">
+          {/* Capacity + Center — same line */}
+          <div className="grid grid-cols-[150px_1fr] gap-3">
             <div>
-              <label className={labelClass}>Default capacity</label>
+              <label className={cn(labelClass, "whitespace-nowrap")}>Default capacity</label>
               <input
                 type="number"
                 required
