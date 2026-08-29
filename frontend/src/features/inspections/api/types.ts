@@ -78,6 +78,7 @@ export type InspectionBooking = {
   id: string;
   car_id: string;
   car_title: string;
+  car_plate: string;
   slot: InspectionSlot;
   booked_by_name: string;
   status: BookingStatus;

@@ -599,6 +599,36 @@ New `LoadingButton` / `MorphingLabel` primitives in `components/ui/loading-butto
 - [ ] With **OS "reduce motion"** on: the label/spinner **swaps instantly** (no
   crossfade), spinner icon doesn't spin. Everything still works.
 
+## Inspection Schedule console (admin) · 🚧 on `feat/motion-polish`
+
+**Goal:** redesigned `/admin/inspections` Schedule — left rail · week grid · day
+panel — matching the approved mockup, wired to real slot/booking data.
+
+**Manual checklist** (staff → **Inspections**)
+
+- [ ] Left rail shows **Schedule / Centers**; switching works. Below `lg` it
+  becomes a segmented control at the top.
+- [ ] Header reads **"Schedule"** with a green **Live sync** dot that pulses
+  while data refetches (background sync), steady otherwise.
+- [ ] **KPI row**: Total slots · Open · Partially booked · Full · Bookings —
+  numbers match the week's slots (Open+Partial+Full = Total). Filtering by
+  **center** or **status** updates the KPIs, grid and day panel together.
+- [ ] **Week grid** (Mon–Sun): each slot shows time, center, `X/Y booked`, and a
+  **capacity bar** (blue open / amber partial / green full). Hovering a slot
+  reveals its deactivate ✕ (with the existing confirm gate). **Today** column is
+  tagged; the **selected** day column is highlighted.
+- [ ] **‹ ›** move weeks; **Today** returns to this week; **Week/Day** toggle
+  switches between the 7-day grid and a single-day column.
+- [ ] Clicking a day selects it; the **right day panel** (xl+) / **stacked panel**
+  (below xl) shows that day's slots grouped with a status pill and each booking's
+  **initials avatar, name, car, and plate**. **View day** opens the full day
+  activity sheet.
+- [ ] **Create slots** opens the existing modal; **Centers** tab is the existing
+  centers panel; the **Assistance queue** still appears.
+- [ ] No horizontal page overflow; the week grid scrolls inside its own area at
+  narrow widths. Reduced-motion: KPI stagger / reveals are instant, Live-sync
+  pulse is hidden.
+
 ## Motion polish — Homepage parallax · 🚧 on `feat/motion-polish`
 
 **Goal:** the same restrained scroll-depth on the public homepage.
