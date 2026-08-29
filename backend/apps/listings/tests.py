@@ -2591,6 +2591,29 @@ class SalesReportTest(APITestCase):
         )
         self.assertEqual(r.data["kpis"]["total_revenue"], 0.0)
 
+    def _completed_inspection(self, amount, tid):
+        from apps.listings.models import (
+            Transaction,
+            TransactionStatus,
+            TransactionType,
+        )
+
+        return Transaction.objects.create(
+            payer=self.customer, receiver=self.owner,
+            amount=amount, transaction_type=TransactionType.INSPECTION,
+            status=TransactionStatus.COMPLETED, reference=f"SR-INSP-{tid}",
+        )
+
+    def test_inspection_revenue_kpi(self):
+        self._completed_inspection("83000.00", "00010")
+        self._completed_inspection("83000.00", "00011")
+        self.client.force_authenticate(self.staff)
+        r = self.client.get("/api/v1/listings/admin/reports/sales?range=12m")
+        self.assertEqual(r.status_code, status.HTTP_200_OK, r.data)
+        self.assertEqual(r.data["kpis"]["inspection_revenue"], 166000.0)
+        # Its own stream — inspection fees are not counted as sale revenue.
+        self.assertEqual(r.data["kpis"]["total_revenue"], 0.0)
+
     def test_completed_deals_count_as_sales(self):
         # A negotiated sale (deal → transaction) shows in the report alongside
         # request-based purchases.

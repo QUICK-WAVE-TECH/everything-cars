@@ -18,11 +18,13 @@ export type SalesReport = {
     units_sold: number;
     avg_sale_price: number;
     conversion_rate: number;
+    inspection_revenue: number;
     deltas: {
       total_revenue: number | null;
       units_sold: number | null;
       avg_sale_price: number | null;
       conversion_rate: number | null;
+      inspection_revenue: number | null;
     };
   };
   revenue_series: { date: string; purchases: number; rentals: number }[];

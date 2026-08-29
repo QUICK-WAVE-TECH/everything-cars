@@ -5,7 +5,7 @@ from collections import OrderedDict
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework.permissions import IsAuthenticated
@@ -106,6 +106,18 @@ def _summarize(txns):
     }
 
 
+def _inspection_revenue(start, end):
+    """Platform-wide completed inspection-fee revenue for the window. Its own
+    stream — independent of the sale type/branch filters."""
+    agg = Transaction.objects.filter(
+        status=TransactionStatus.COMPLETED,
+        transaction_type=TransactionType.INSPECTION,
+        created_at__date__gte=start,
+        created_at__date__lte=end,
+    ).aggregate(total=Sum("amount"))
+    return agg["total"] or Decimal("0")
+
+
 def _pct_delta(cur, prev):
     if not prev:
         return None
@@ -161,6 +173,9 @@ class SalesReportView(APIView):
         )
         prev_conv = (prev["purchase_units"] / prev_leads * 100) if prev_leads else 0.0
 
+        insp_rev = _inspection_revenue(start, end)
+        prev_insp_rev = _inspection_revenue(prev_start, prev_end)
+
         return Response(
             {
                 "range": {
@@ -173,6 +188,7 @@ class SalesReportView(APIView):
                     "units_sold": cur["purchase_units"],
                     "avg_sale_price": _f(cur["avg_sale_price"]),
                     "conversion_rate": round(conversion, 1),
+                    "inspection_revenue": _f(insp_rev),
                     "deltas": {
                         "total_revenue": _pct_delta(cur["revenue"], prev["revenue"]),
                         "units_sold": _pct_delta(
@@ -182,6 +198,7 @@ class SalesReportView(APIView):
                             cur["avg_sale_price"], prev["avg_sale_price"]
                         ),
                         "conversion_rate": _pct_delta(conversion, prev_conv),
+                        "inspection_revenue": _pct_delta(insp_rev, prev_insp_rev),
                     },
                 },
                 "revenue_series": self._revenue_series(txns, start, end),

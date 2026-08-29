@@ -599,6 +599,33 @@ New `LoadingButton` / `MorphingLabel` primitives in `components/ui/loading-butto
 - [ ] With **OS "reduce motion"** on: the label/spinner **swaps instantly** (no
   crossfade), spinner icon doesn't spin. Everything still works.
 
+## Admin console shell + Reports flagship · 🚧 on `feat/motion-polish`
+
+**Goal:** the reusable admin-console design system (left rail · page header +
+Live sync · KPI strip · charts), proven on the Reports page. Primitives live in
+`src/shared/console/` (`ConsoleLayout`, `ConsoleRail`, `PageHeader`/`LiveSync`,
+`KpiStrip`/`Kpi`) — every other console page will inherit them.
+
+**Manual checklist** (staff → **Reports**)
+
+- [ ] Left rail shows **Reports** eyebrow + **Overview** (active) with Sales /
+  Inventory / Inspections / Finance / Export history marked **Soon** (muted,
+  inert). Below `lg` the rail is a horizontal scroll.
+- [ ] Header: "Reporting · Sales performance" + subtitle + **Export CSV** action.
+- [ ] **KPI strip** (5): Total revenue · Units sold · Average sale price ·
+  Conversion · **Inspection revenue** — each **counts up** and **staggers in**.
+- [ ] **Compare previous period** toggle (top-right): ON shows a
+  "↑/↓ x% vs prior period" row under each KPI (green up / red down); OFF hides
+  them. Inspection revenue's delta is real (sum of completed inspection-fee
+  transactions vs the prior window).
+- [ ] Charts: Revenue over time (large) + a right column with **Revenue target**
+  (bar + %), **Sales mix** (purchases/rentals split bar), **Key insight**
+  ("X generated Y% of revenue"), then Top models / Branch performance / Volume /
+  Revenue mix / Average price. Each card **reveals once** on scroll + lifts on
+  hover.
+- [ ] Range / type / branch filters still drive everything. Reduced-motion:
+  count-up + reveals are instant; Live-sync pulse hidden.
+
 ## Inspection Schedule console (admin) · 🚧 on `feat/motion-polish`
 
 **Goal:** redesigned `/admin/inspections` Schedule — left rail · week grid · day
