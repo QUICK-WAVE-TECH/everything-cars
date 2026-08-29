@@ -487,10 +487,11 @@ function CenterCard({
           type="button"
           onClick={() => onAddSlots(center)}
           disabled={!center.is_active}
-          className="flex h-10 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-(--brc-primary) text-[13px] font-bold text-white shadow-[0_8px_18px_rgba(0,0,139,0.18)] transition-all hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none [font-family:var(--brc-font-ui)]"
+          aria-label="Add slots"
+          className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-(--brc-primary) text-white shadow-[0_8px_18px_rgba(0,0,139,0.18)] transition-all hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
           title={center.is_active ? "Add slots to this center" : "Reactivate the center to add slots"}
         >
-          <CalendarPlusIcon size={15} /> Add slots
+          <CalendarPlusIcon size={16} />
         </button>
         <button
           type="button"
