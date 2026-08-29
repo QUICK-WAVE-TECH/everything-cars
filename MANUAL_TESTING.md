@@ -604,6 +604,34 @@ New `LoadingButton` / `MorphingLabel` primitives in `components/ui/loading-butto
 - [ ] With **OS "reduce motion"** on: the label/spinner **swaps instantly** (no
   crossfade), spinner icon doesn't spin. Everything still works.
 
+## Admin console — Transactions (DataTable + DetailPanel) · 🚧 on `feat/motion-polish`
+
+**Goal:** the console `DataTable` + slide-in `DetailPanel` primitives
+(`src/shared/console/`), proven on the Transactions page.
+
+**Manual checklist** (staff → **Transactions**)
+
+- [ ] Left rail: **Finance** eyebrow + **Transactions** active; Verification /
+  Payouts / Refunds / Reconciliation / Settings marked **Soon**.
+- [ ] Header "Finance Operations · Transactions" + **Live sync** + **Export CSV**
+  (exports the currently-filtered rows).
+- [ ] **KPI strip**: Gross volume · Completed · Pending · Failed · Refunded —
+  count up; refunds/failed tinted. (Aggregated over the loaded window.)
+- [ ] **Table**: Transaction (vehicle + tracking/ref) · Customer · Type · Date ·
+  Method · Amount (refunds shown −red) · Status badge. Rows **stagger in**; hover
+  highlights; columns drop off responsively at narrow widths (h-scroll).
+- [ ] **Search** + **status** + **type** filters narrow the rows and the count
+  line; Export reflects the filter.
+- [ ] **Click a row** → a **detail panel slides in** from the right (spring),
+  dimmed backdrop; shows amount + status, reference, customer, vehicle, type,
+  method, tracking ID, date, and **View related listing** / **Open full record**.
+  Close via **✕**, **Esc**, or backdrop click; the active row stays highlighted.
+- [ ] With **OS "reduce motion"** on: no row stagger, the panel **fades**
+  instead of sliding, KPI count-up is instant.
+
+_Note: KPIs aggregate the loaded window; money-movement/timeline in the panel
+come with a later backend pass (panel links to the full record for now)._
+
 ## Admin console shell + Reports flagship · 🚧 on `feat/motion-polish`
 
 **Goal:** the reusable admin-console design system (left rail · page header +
