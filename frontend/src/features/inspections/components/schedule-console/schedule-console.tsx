@@ -317,9 +317,11 @@ export function ScheduleConsole() {
                   <button
                     type="button"
                     onClick={openCreateSlots}
-                    className="flex h-9 cursor-pointer items-center gap-2 rounded-xl border-none bg-(--brc-primary) px-4 text-[13px] font-bold text-white shadow-[0_8px_20px_rgba(0,0,139,0.2)] transition-all hover:brightness-95 [font-family:var(--brc-font-ui)]"
+                    aria-label="Create slots"
+                    title="Create slots"
+                    className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-xl border-none bg-(--brc-primary) text-white shadow-[0_8px_20px_rgba(0,0,139,0.2)] transition-all hover:brightness-95"
                   >
-                    <PlusIcon size={16} /> Create slots
+                    <PlusIcon size={18} />
                   </button>
                 </div>
               </div>
