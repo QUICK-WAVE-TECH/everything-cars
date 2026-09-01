@@ -21,7 +21,7 @@ import { PageHeader } from "@/shared/console/page-header";
 import { Kpi, KpiStrip } from "@/shared/console/kpi-strip";
 import { DataTable, type Column } from "@/shared/console/data-table";
 import { DetailPanel } from "@/shared/console/detail-panel";
-import { useTransactions } from "@/features/payments/api";
+import { useTransactions, useTransactionSummary } from "@/features/payments/api";
 import type { TransactionListItem } from "@/features/payments/api/type";
 
 const RAIL: RailItem[] = [
@@ -91,9 +91,11 @@ export function TransactionsConsole() {
   const [selected, setSelected] = useState<TransactionListItem | null>(null);
 
   const { data, isLoading, isFetching } = useTransactions({ page_size: 200 });
+  const { data: summary } = useTransactionSummary();
   const all = useMemo(() => data?.results ?? [], [data]);
 
-  const kpis = useMemo(() => {
+  // Window aggregate as a resilient fallback until the global summary lands.
+  const windowKpis = useMemo(() => {
     let gross = 0;
     let refunded = 0;
     let completed = 0;
@@ -110,6 +112,14 @@ export function TransactionsConsole() {
     }
     return { gross, refunded, completed, pending, failed };
   }, [all]);
+
+  const kpis = {
+    gross: summary?.gross_volume ?? windowKpis.gross,
+    completed: summary?.completed ?? windowKpis.completed,
+    pending: summary?.pending ?? windowKpis.pending,
+    failed: summary?.failed ?? windowKpis.failed,
+    refunded: summary?.refunded ?? windowKpis.refunded,
+  };
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();

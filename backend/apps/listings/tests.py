@@ -2701,3 +2701,45 @@ class PublicSoldCarDetailTest(APITestCase):
         )
         res = self.client.get(f"/api/v1/listings/cars/{car.id}")
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class TransactionSummaryTest(APITestCase):
+    """Staff KPI totals over all transactions (not just the paged window)."""
+
+    def setUp(self):
+        self.staff = create_user("txsum-staff@test.com", "owner", is_staff=True)
+        self.owner = create_user("txsum-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.customer = create_user("txsum-cust@test.com", "customer")
+        create_customer_profile(self.customer)
+
+    def _txn(self, amount, status_, ttype, ref):
+        from apps.listings.models import Transaction
+
+        return Transaction.objects.create(
+            payer=self.customer, receiver=self.owner, amount=amount,
+            transaction_type=ttype, status=status_, reference=ref,
+        )
+
+    def test_summary_totals(self):
+        from apps.listings.models import TransactionStatus, TransactionType
+
+        self._txn("5000000.00", TransactionStatus.COMPLETED, TransactionType.PURCHASE, "S1")
+        self._txn("3000000.00", TransactionStatus.COMPLETED, TransactionType.RENTAL, "S2")
+        self._txn("83000.00", TransactionStatus.PENDING, TransactionType.INSPECTION, "S3")
+        self._txn("100000.00", TransactionStatus.FAILED, TransactionType.PURCHASE, "S4")
+        self._txn("50000.00", TransactionStatus.REFUNDED, TransactionType.REFUND, "S5")
+
+        self.client.force_authenticate(self.staff)
+        r = self.client.get("/api/v1/listings/admin/transactions/summary")
+        self.assertEqual(r.status_code, status.HTTP_200_OK, r.data)
+        self.assertEqual(r.data["gross_volume"], 8000000.0)
+        self.assertEqual(r.data["completed"], 2)
+        self.assertEqual(r.data["pending"], 1)
+        self.assertEqual(r.data["failed"], 1)
+        self.assertEqual(r.data["refunded"], 50000.0)
+
+    def test_non_staff_forbidden(self):
+        self.client.force_authenticate(self.owner)
+        r = self.client.get("/api/v1/listings/admin/transactions/summary")
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)

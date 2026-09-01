@@ -28,6 +28,7 @@ from .views import (
     StaffConfirmPaymentView,
     TransactionDetailView,
     TransactionListView,
+    TransactionSummaryView,
 )
 from .reports_views import SalesReportView
 
@@ -81,6 +82,11 @@ urlpatterns = [
         "owner-requests/<uuid:request_id>/action",
         OwnerRequestActionView.as_view(),
         name="owner-request-action",
+    ),
+    path(
+        "admin/transactions/summary",
+        TransactionSummaryView.as_view(),
+        name="transaction-summary",
     ),
     path("transactions", TransactionListView.as_view(), name="transaction"),
     path(

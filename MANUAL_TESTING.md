@@ -616,7 +616,9 @@ New `LoadingButton` / `MorphingLabel` primitives in `components/ui/loading-butto
 - [ ] Header "Finance Operations · Transactions" + **Live sync** + **Export CSV**
   (exports the currently-filtered rows).
 - [ ] **KPI strip**: Gross volume · Completed · Pending · Failed · Refunded —
-  count up; refunds/failed tinted. (Aggregated over the loaded window.)
+  count up; refunds/failed tinted. Now **global totals** (a staff summary
+  endpoint), not just the loaded page; falls back to the window aggregate if the
+  summary is still loading.
 - [ ] **Table**: Transaction (vehicle + tracking/ref) · Customer · Type · Date ·
   Method · Amount (refunds shown −red) · Status badge. Rows **stagger in**; hover
   highlights; columns drop off responsively at narrow widths (h-scroll).

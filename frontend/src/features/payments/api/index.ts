@@ -1,5 +1,6 @@
 export {
   useTransactions,
+  useTransactionSummary,
   useTransactionDetail,
   useSubmitPayment,
   useStaffConfirmPayment,
