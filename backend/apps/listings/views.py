@@ -16,6 +16,7 @@ from django.db.models import (
     OuterRef,
     Prefetch,
     Q,
+    Sum,
 )
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -44,6 +45,8 @@ from .models import (
     RequestStatus,
     RequestStatusEvent,
     Transaction,
+    TransactionStatus,
+    TransactionType,
 )
 from .serializers import (
     BrandSerializer,
@@ -176,11 +179,19 @@ def availability_annotations():
 
 
 def sold_annotation():
-    """True when a Deal on the car completed (the car was genuinely sold).
-    Archived-without-sale means the owner withdrew the listing — those
-    cars must not appear publicly as 'sold'."""
+    """True when the car was genuinely sold — via either a completed offer→Deal
+    or a completed direct buy-request purchase transaction. (Both sale paths
+    count; earlier this only saw Deals, so request-sold cars 404'd publicly.)
+    Archived-without-sale means the owner withdrew the listing — those cars must
+    not appear publicly as 'sold'."""
     return Exists(
         Deal.objects.filter(car_id=OuterRef("id"), status=DealStatus.COMPLETED)
+    ) | Exists(
+        Transaction.objects.filter(
+            request__car_id=OuterRef("id"),
+            transaction_type=TransactionType.PURCHASE,
+            status=TransactionStatus.COMPLETED,
+        )
     )
 
 
@@ -1440,6 +1451,39 @@ class AdminCarStatusView(APIView):
             .get(id=car_id)
         )
         return Response(CarDetailSerializer(car, context={"request": request}).data)
+
+
+class TransactionSummaryView(APIView):
+    """Staff KPI totals for the Transactions console — global, not the paged
+    window. Optional date_from/date_to (YYYY-MM-DD) narrow the window."""
+
+    permission_classes = [IsAuthenticated, IsStaff]
+
+    def get(self, request):
+        qs = Transaction.objects.all()
+        date_from = request.query_params.get("date_from")
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+        date_to = request.query_params.get("date_to")
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+
+        agg = qs.aggregate(
+            gross_volume=Sum("amount", filter=Q(status=TransactionStatus.COMPLETED)),
+            completed=Count("id", filter=Q(status=TransactionStatus.COMPLETED)),
+            pending=Count("id", filter=Q(status=TransactionStatus.PENDING)),
+            failed=Count("id", filter=Q(status=TransactionStatus.FAILED)),
+            refunded=Sum("amount", filter=Q(status=TransactionStatus.REFUNDED)),
+        )
+        return Response(
+            {
+                "gross_volume": float(agg["gross_volume"] or 0),
+                "completed": agg["completed"] or 0,
+                "pending": agg["pending"] or 0,
+                "failed": agg["failed"] or 0,
+                "refunded": float(agg["refunded"] or 0),
+            }
+        )
 
 
 class TransactionListView(APIView):

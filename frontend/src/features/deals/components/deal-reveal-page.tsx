@@ -16,7 +16,7 @@ import {
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import {
   Dialog,
   DialogContent,
@@ -329,14 +329,16 @@ export function DealRevealPage({ dealId }: { dealId: string }) {
             placeholder="What went wrong?"
             className="resize-none rounded-(--brc-radius-md) border border-(--brc-border) bg-white px-3.5 py-2.5 text-sm text-(--brc-text) outline-none [font-family:var(--brc-font-ui)]"
           />
-          <Button
+          <LoadingButton
             type="button"
             onClick={handleDispute}
-            disabled={dispute.isPending}
+            loading={dispute.isPending}
+            size="default"
+            pendingLabel="Submitting…"
             className="h-11 bg-(--brc-primary) font-bold text-white hover:bg-(--brc-primary-hover)"
           >
-            {dispute.isPending ? "Submitting…" : "Submit report"}
-          </Button>
+            Submit report
+          </LoadingButton>
         </DialogContent>
       </Dialog>
     </div>

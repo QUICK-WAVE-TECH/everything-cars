@@ -16,6 +16,7 @@ import {
   type AdminOwner,
 } from "@/features/auth/api/admin-owners";
 import { ApiError } from "@/lib/api-client";
+import { Parallax } from "@/shared/motion/parallax";
 
 const TABS = [
   { key: "false", label: "Pending" },
@@ -147,16 +148,22 @@ export default function AdminOwnersPage() {
   return (
     <div className="mx-auto w-full max-w-[1000px] px-4 py-8 sm:px-6">
       <div className="mb-6">
-        <span className="text-xs font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-          Admin · Owner verification
-        </span>
-        <h1 className="mt-1 text-2xl font-black text-(--brc-text) [font-family:var(--brc-font-display)]">
-          Owners
-        </h1>
-        <p className="mt-1 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
-          Review each owner&apos;s ID and ownership documents, then verify them so
-          they can list cars.
-        </p>
+        <Parallax distance={-8}>
+          <span className="text-xs font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+            Admin · Owner verification
+          </span>
+        </Parallax>
+        <Parallax distance={-4}>
+          <h1 className="mt-1 text-2xl font-black text-(--brc-text) [font-family:var(--brc-font-display)]">
+            Owners
+          </h1>
+        </Parallax>
+        <Parallax distance={-9}>
+          <p className="mt-1 text-sm text-(--brc-text-secondary) [font-family:var(--brc-font-ui)]">
+            Review each owner&apos;s ID and ownership documents, then verify them so
+            they can list cars.
+          </p>
+        </Parallax>
       </div>
 
       <div className="mb-5 flex gap-2">

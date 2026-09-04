@@ -1,6 +1,6 @@
-import Image from "next/image";
 import { Pill } from "@/shared/components/pill";
 import { AuthButton } from "@/features/auth/components/auth-button";
+import { ParallaxImage } from "@/shared/motion/parallax-image";
 
 export function AboutSection() {
   return (
@@ -29,9 +29,12 @@ export function AboutSection() {
           </p>
           <AuthButton iconEnd="arrow" href="/about" style={{ width: "min(100%, 170px)", marginTop: 8 }}>Learn More</AuthButton>
         </div>
-        <div style={{ height: "clamp(280px, 48vw, 452px)", borderRadius: 16, overflow: "hidden", position: "relative" }}>
-          <Image src="/about-car.jpg" alt="About Buy & Rent Cars" fill style={{ objectFit: "cover" }} />
-        </div>
+        <ParallaxImage
+          src="/about-car.jpg"
+          alt="About Buy & Rent Cars"
+          sizes="(max-width: 768px) 100vw, 50vw"
+          style={{ height: "clamp(280px, 48vw, 452px)", borderRadius: 16 }}
+        />
       </div>
     </section>
   );

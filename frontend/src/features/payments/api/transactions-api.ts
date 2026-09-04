@@ -45,6 +45,24 @@ export function useTransactions(params?: TransactionParams) {
   });
 }
 
+export type TransactionSummary = {
+  gross_volume: number;
+  completed: number;
+  pending: number;
+  failed: number;
+  refunded: number;
+};
+
+/** Staff KPI totals over ALL transactions (not just the paged window). */
+export function useTransactionSummary() {
+  return useQuery({
+    queryKey: ["transactions", "summary"],
+    queryFn: () =>
+      apiClient.get<TransactionSummary>("/listings/admin/transactions/summary"),
+    staleTime: 20 * 1000,
+  });
+}
+
 export function useTransactionDetail(id: string) {
   return useQuery({
     queryKey: transactionKeys.detail(id),

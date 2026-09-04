@@ -227,6 +227,7 @@ class InspectionBookingSerializer(serializers.ModelSerializer):
     slot = InspectionSlotSerializer(read_only=True)
     car_title = serializers.CharField(source="car.title", read_only=True)
     car_id = serializers.UUIDField(source="car.id", read_only=True)
+    car_plate = serializers.SerializerMethodField()
     booked_by_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -235,6 +236,7 @@ class InspectionBookingSerializer(serializers.ModelSerializer):
             "id",
             "car_id",
             "car_title",
+            "car_plate",
             "slot",
             "booked_by_name",
             "status",
@@ -246,6 +248,9 @@ class InspectionBookingSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = fields
+
+    def get_car_plate(self, obj):
+        return obj.car.plate_number or ""
 
     def get_booked_by_name(self, obj):
         return f"{obj.booked_by.first_name} {obj.booked_by.last_name}"

@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2Icon } from "lucide-react";
+import { MorphingLabel } from "@/components/ui/loading-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Icon } from "@/features/auth/components/icon";
 import type { IconName } from "@/features/auth/components/icon";
@@ -319,16 +319,16 @@ function TransferTab({ req, onSuccess }: { req: RequestDetail; onSuccess: () => 
             </span>
           )}
           <button type="button" onClick={handleSubmit} disabled={!file || submitPayment.isPending}
+            aria-busy={submitPayment.isPending || undefined}
             className={cn(
               "flex h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-none text-[15.5px] font-bold [font-family:var(--brc-font-ui)]",
               file && !submitPayment.isPending ? "bg-(--brc-primary) text-(--brc-text-on-primary)" : "pointer-events-none bg-(--brc-primary) text-(--brc-text-on-primary) opacity-55",
             )}>
-            {submitPayment.isPending ? (
-              <Loader2Icon size={18} className="animate-spin" />
-            ) : (
-              <Icon name="check" size={18} stroke="currentColor" />
-            )}
-            {submitPayment.isPending ? "Submitting..." : "I Have Made Payment"}
+            <MorphingLabel
+              status={submitPayment.isPending ? "pending" : "idle"}
+              idle={<><Icon name="check" size={18} stroke="currentColor" /> I Have Made Payment</>}
+              pendingLabel="Submitting…"
+            />
           </button>
           <span className="text-center text-xs text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
             Your booking stays reserved while we confirm. Payments are secured & verified by Buy & Rent Cars.

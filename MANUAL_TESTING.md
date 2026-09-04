@@ -494,6 +494,247 @@ centre with a **future** booking (owner booked + it's pending) and, ideally, a
   console / Mailpit.
 - [ ] A **non-staff** user gets 403 on `DELETE /inspections/admin/centers/{id}/`.
 
+## Motion polish — Sales report · 🚧 on `feat/motion-polish`
+
+**Goal:** subtle Motion animations on the admin Sales report (reusable primitives).
+
+**Manual checklist** (staff → `/admin/reports`)
+
+- [ ] KPI cards **rise in sequence** on load, and their numbers **count up** to the
+  value (revenue/avg in ₦, units, conversion %).
+- [ ] The **All / Purchases / Rentals** tabs have a **pill that slides** between
+  them (spring), not a hard swap. Charts/KPIs update as before.
+- [ ] Changing the date range re-runs the count-up on the KPIs.
+- [ ] With **OS "reduce motion"** on, numbers snap and the pill jumps (no
+  animation) — nothing breaks.
+
+## Motion polish — Marketplace & timeline · 🚧 on `feat/motion-polish`
+
+**Goal:** the "alive" polish extended off the report — card hover + entrances.
+
+**Manual checklist**
+
+- [ ] `/services` (public marketplace): as cars load, the grid cards **fade + rise
+  in sequence** (a gentle stagger), not all at once. Same on pagination / filter
+  changes.
+- [ ] Hover a marketplace car card: it **lifts** and the **photo zooms** slightly
+  (smooth ease). Sold / rented cards do **not** lift or zoom.
+- [ ] A car's **status timeline** (owner car detail, staff review) — its entries
+  **rise in one at a time** on open instead of appearing all at once.
+- [ ] With **OS "reduce motion"** on: no stagger, no rise, no zoom — cards and
+  timeline appear instantly. Nothing overlaps or jumps.
+
+## Motion polish — Landing hero, brand strip & dialogs · 🚧 on `feat/motion-polish`
+
+**Goal:** a premium, "alive" front door and softer modals.
+
+**Manual checklist**
+
+- [ ] Homepage `/`: on load the **headline → subtext → search bar rise in** one
+  after another (a short stagger), not all at once.
+- [ ] The hero **photo slowly drifts/zooms** (Ken Burns) and a soft **coloured
+  glow drifts** over it — subtle, never distracting from the text.
+- [ ] Just below the hero, a **"Popular brands" strip scrolls** brand names
+  sideways in a seamless loop, fading out at both edges.
+- [ ] Open any **modal** (e.g. delete a listing, make an offer): it **eases in**
+  (fade + gentle zoom, ~200ms) instead of a hard pop, and eases out on close.
+- [ ] With **OS "reduce motion"** on: hero content appears instantly (no drift,
+  no glow), the brand strip is a **static centred wrap** (no scroll), and modals
+  appear without animation. Nothing breaks.
+
+## Car detail gallery — 3D coverflow · 🚧 on `feat/motion-polish`
+
+**Goal:** a car's photos scroll in the same brand 3D coverflow (embedded
+`bare` variant, whole-photo `contain` fit, no overlay/autoplay).
+
+**Manual checklist** (any car page `/cars/<id>` with 2+ photos)
+
+- [ ] The gallery is a **3D coverflow** of the car's photos — centre photo
+  front, side photos recede/rotate/dim. Photos show **whole** (contained, not
+  cropped).
+- [ ] **‹ ›** arrows, **dots**, **arrow keys**, **swipe**, and **clicking a side
+  photo** all move it. No autoplay (you browse at your own pace); movement is a
+  smooth spring.
+- [ ] Single-photo listings show one static card; the **no-photo** state shows
+  the placeholder.
+- [ ] With **OS "reduce motion"** on: no rotation, instant swaps; arrows/dots
+  still work.
+- [ ] No horizontal overflow inside the gallery column at narrow widths.
+
+## Motion polish — Homepage scroll reveals & testimonials · 🚧 on `feat/motion-polish`
+
+**Goal:** the marketing homepage unfolds as you scroll; quotes switch smoothly.
+
+**Manual checklist** (homepage `/`)
+
+- [ ] Scroll down: **About → Services → Testimonials → FAQ → Loyalty** each
+  **fade + rise** in as it enters the viewport (once — they don't re-animate on
+  scroll back up).
+- [ ] In the **Testimonials** card, click **‹ / ›**: the quote **slides +
+  crossfades** to the next one instead of snapping.
+- [ ] With **OS "reduce motion"** on: sections are just present as you scroll
+  (no rise), and the testimonial swaps instantly. Nothing jumps or overlaps.
+
+## Motion polish — Loading buttons · 🚧 on `feat/motion-polish`
+
+**Goal:** in-flight buttons crossfade a spinner + label instead of a hard swap.
+New `LoadingButton` / `MorphingLabel` primitives in `components/ui/loading-button.tsx`
+(built on our own `Button` + `--brc` tokens — no stone/emerald).
+
+**Manual checklist**
+
+- [ ] **Make an offer** (car page → Make offer → enter amount → Submit offer):
+  while it submits, the label **crossfades** "Submit offer" → spinner
+  "Submitting…" and the button never resizes; double-clicks are ignored.
+- [ ] **Publish a listing** (staff Publishing → review → Publish live → confirm):
+  the confirm button's label crossfades to a spinner while it runs. Same on any
+  other confirm dialog (delete listing, dismiss dispute…).
+- [ ] **Sign in / Sign up / Verify / Reset** submit: the button crossfades to a
+  spinner + label while the request is in flight.
+- [ ] **Payment** — customer "I Have Made Payment" and staff "Confirm Payment"
+  crossfade to a spinner while submitting.
+- [ ] **Owner offer** — "Send counter-offer" crossfades to a spinner (previously
+  it only greyed out).
+- [ ] **Publishing** — the "Send back" dialog submit and **inspection** "Create
+  Slots" crossfade to a spinner.
+- [ ] **Deal dispute** — "Submit report" crossfades to a spinner (previously
+  just text "Submitting…").
+- [ ] The morph **keeps the button's accessible name** (screen reader still
+  reads the label) and it stays disabled while pending.
+- [ ] With **OS "reduce motion"** on: the label/spinner **swaps instantly** (no
+  crossfade), spinner icon doesn't spin. Everything still works.
+
+## Admin console — Transactions (DataTable + DetailPanel) · 🚧 on `feat/motion-polish`
+
+**Goal:** the console `DataTable` + slide-in `DetailPanel` primitives
+(`src/shared/console/`), proven on the Transactions page.
+
+**Manual checklist** (staff → **Transactions**)
+
+- [ ] Left rail: **Finance** eyebrow + **Transactions** active; Verification /
+  Payouts / Refunds / Reconciliation / Settings marked **Soon**.
+- [ ] Header "Finance Operations · Transactions" + **Live sync** + **Export CSV**
+  (exports the currently-filtered rows).
+- [ ] **KPI strip**: Gross volume · Completed · Pending · Failed · Refunded —
+  count up; refunds/failed tinted. Now **global totals** (a staff summary
+  endpoint), not just the loaded page; falls back to the window aggregate if the
+  summary is still loading.
+- [ ] **Table**: Transaction (vehicle + tracking/ref) · Customer · Type · Date ·
+  Method · Amount (refunds shown −red) · Status badge. Rows **stagger in**; hover
+  highlights; columns drop off responsively at narrow widths (h-scroll).
+- [ ] **Search** + **status** + **type** filters narrow the rows and the count
+  line; Export reflects the filter.
+- [ ] **Click a row** → a **detail panel slides in** from the right (spring),
+  dimmed backdrop; shows amount + status, reference, customer, vehicle, type,
+  method, tracking ID, date, and **View related listing** / **Open full record**.
+  Close via **✕**, **Esc**, or backdrop click; the active row stays highlighted.
+- [ ] With **OS "reduce motion"** on: no row stagger, the panel **fades**
+  instead of sliding, KPI count-up is instant.
+
+_Note: KPIs aggregate the loaded window; money-movement/timeline in the panel
+come with a later backend pass (panel links to the full record for now)._
+
+## Admin console shell + Reports flagship · 🚧 on `feat/motion-polish`
+
+**Goal:** the reusable admin-console design system (left rail · page header +
+Live sync · KPI strip · charts), proven on the Reports page. Primitives live in
+`src/shared/console/` (`ConsoleLayout`, `ConsoleRail`, `PageHeader`/`LiveSync`,
+`KpiStrip`/`Kpi`) — every other console page will inherit them.
+
+**Manual checklist** (staff → **Reports**)
+
+- [ ] Left rail shows **Reports** eyebrow + **Overview** (active) with Sales /
+  Inventory / Inspections / Finance / Export history marked **Soon** (muted,
+  inert). Below `lg` the rail is a horizontal scroll.
+- [ ] Header: "Reporting · Sales performance" + subtitle + **Export CSV** action.
+- [ ] **KPI strip** (5): Total revenue · Units sold · Average sale price ·
+  Conversion · **Inspection revenue** — each **counts up** and **staggers in**.
+- [ ] **Compare previous period** toggle (top-right): ON shows a
+  "↑/↓ x% vs prior period" row under each KPI (green up / red down); OFF hides
+  them. Inspection revenue's delta is real (sum of completed inspection-fee
+  transactions vs the prior window).
+- [ ] Charts: Revenue over time (large) + a right column with **Revenue target**
+  (bar + %), **Sales mix** (purchases/rentals split bar), **Key insight**
+  ("X generated Y% of revenue"), then Top models / Branch performance / Volume /
+  Revenue mix / Average price. Each card **reveals once** on scroll + lifts on
+  hover.
+- [ ] Range / type / branch filters still drive everything. Reduced-motion:
+  count-up + reveals are instant; Live-sync pulse hidden.
+
+## Inspection Schedule console (admin) · 🚧 on `feat/motion-polish`
+
+**Goal:** redesigned `/admin/inspections` Schedule — left rail · week grid · day
+panel — matching the approved mockup, wired to real slot/booking data.
+
+**Manual checklist** (staff → **Inspections**)
+
+- [ ] Left rail shows **Schedule / Centers**; switching works. Below `lg` it
+  becomes a segmented control at the top.
+- [ ] Header reads **"Schedule"** with a green **Live sync** dot that pulses
+  while data refetches (background sync), steady otherwise.
+- [ ] **KPI row**: Total slots · Open · Partially booked · Full · Bookings —
+  numbers match the week's slots (Open+Partial+Full = Total). Filtering by
+  **center** or **status** updates the KPIs, grid and day panel together.
+- [ ] **Week grid** (Mon–Sun): each slot shows time, center, `X/Y booked`, and a
+  **capacity bar** (blue open / amber partial / green full). Hovering a slot
+  reveals its deactivate ✕ (with the existing confirm gate). **Today** column is
+  tagged; the **selected** day column is highlighted.
+- [ ] **‹ ›** move weeks; **Today** returns to this week; **Week/Day** toggle
+  switches between the 7-day grid and a single-day column.
+- [ ] Clicking a day selects it; the **right day panel** (xl+) / **stacked panel**
+  (below xl) shows that day's slots grouped with a status pill and each booking's
+  **initials avatar, name, car, and plate**. **View day** opens the full day
+  activity sheet.
+- [ ] **Create slots** opens the existing modal; **Centers** tab is the existing
+  centers panel; the **Assistance queue** still appears.
+- [ ] No horizontal page overflow; the week grid scrolls inside its own area at
+  narrow widths. Reduced-motion: KPI stagger / reveals are instant, Live-sync
+  pulse is hidden.
+
+## Motion polish — Homepage parallax · 🚧 on `feat/motion-polish`
+
+**Goal:** the same restrained scroll-depth on the public homepage.
+
+**Manual checklist** (homepage `/`)
+
+- [ ] **Hero:** as you scroll down, the **background photo lags** (drifts slower)
+  while the **headline/subtext/search bar drift up faster and fade** — a clear
+  sense of depth. No edge/gap ever shows at the top or bottom of the photo.
+- [ ] **About section:** its photo **drifts within its rounded frame** as the
+  section passes through the viewport (never revealing an edge).
+- [ ] **Services / FAQ headings** drift gently as their section scrolls through;
+  the **Testimonials quote card** drifts a little more than its heading beside
+  it (layered depth). Text stays centered and readable throughout.
+- [ ] With **OS "Reduce Motion"** on: the hero photo and About image are static
+  (no drift/fade); the hero still shows its content. Nothing clips or gaps.
+- [ ] No horizontal overflow at 1440 / 1280 / 768 / 390.
+
+## Motion polish — Admin parallax & depth · 🚧 on `feat/motion-polish`
+
+**Goal:** a restrained sense of depth on the admin surfaces — premium, never
+theatrical, and tables/data stay perfectly scannable. New primitives in
+`shared/motion/`: `Parallax`, `StaggerGroup`/`StaggerItem`, `RevealOnce`,
+`StickyToolbar`, and shared tuning in `premium.ts`.
+
+**Manual checklist** (staff account)
+
+- [ ] **Reports** (`/admin/reports`): scroll — the eyebrow + supporting copy
+  drift up a few px while the **title lags slightly** (depth). The **filter bar
+  sticks** below the nav and gains a **soft shadow** once scrolled. KPI cards
+  **stagger in** (~50ms apart) and each **chart panel fades + rises once** as it
+  enters. Hovering a KPI/chart panel lifts its shadow a touch.
+- [ ] **Transactions / Disputes / Owners / Payments / Inspections**: the page
+  **header eyebrow/title/copy** have the same subtle scroll parallax; the main
+  table/section **reveals once** on load.
+- [ ] **Tables never move while scanning** — only the container reveals once;
+  individual rows stay put. Charts keep stable dimensions (no replay on scroll).
+- [ ] Sticky filter bar does **not** cover table headers or overlap the nav.
+- [ ] Resize to 1440 / 1280 / 768 / 390: no horizontal overflow, no clipped
+  text, headers don't overlap the nav, motion is subtle on mobile.
+- [ ] With **OS "Reduce Motion"** on: **no parallax, no stagger, no rise** —
+  everything is present immediately; the sticky bar still works (shadow appears
+  without a transition). All workflows unaffected.
+
 Brands live in the `Brand` table and are seeded by **migrations**, so a fresh
 clone just needs `python manage.py migrate` — no manual step. When we grow the
 bundled list we add a small `reseed_brands` migration, so existing databases

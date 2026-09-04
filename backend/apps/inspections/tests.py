@@ -2640,3 +2640,39 @@ class PendingPublishingQueueTest(APITestCase):
             f"/api/v1/inspections/staff/pending-publishing/{self.car.id}/send-back/",
             {"note": "no"}, format="json")
         assert r.status_code == 400
+
+
+class StaffBookingCarPlateTest(APITestCase):
+    """The staff bookings list exposes the car's plate for the day panel."""
+
+    def setUp(self):
+        self.staff = create_user("staff-plate@test.com", "owner", is_staff=True)
+        self.owner = create_user("owner-plate@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.car = create_car(
+            self.owner,
+            status=CarStatus.INSPECTION_PENDING,
+            plate_number="LAG 123 AB",
+        )
+        self.center = create_center(self.staff)
+        self.slot = create_slot(self.staff, center=self.center)
+        InspectionBooking.objects.create(
+            car=self.car,
+            slot=self.slot,
+            booked_by=self.owner,
+            status=BookingStatus.PENDING,
+        )
+        self.client.force_authenticate(user=self.staff)
+
+    def test_staff_bookings_include_car_plate(self):
+        res = self.client.get("/api/v1/inspections/admin/bookings/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        row = res.data["results"][0]
+        self.assertEqual(row["car_plate"], "LAG 123 AB")
+
+    def test_car_plate_blank_when_absent(self):
+        self.car.plate_number = None
+        self.car.save(update_fields=["plate_number"])
+        res = self.client.get("/api/v1/inspections/admin/bookings/")
+        row = res.data["results"][0]
+        self.assertEqual(row["car_plate"], "")

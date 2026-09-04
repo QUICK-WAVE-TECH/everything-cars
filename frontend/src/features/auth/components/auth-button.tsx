@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type CSSProperties, type ReactNode } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { MorphingLabel } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";
 import { Icon } from "./icon";
 import type { IconName } from "./icon";
@@ -59,17 +60,13 @@ export function AuthButton({
     fontFamily: "var(--brc-font-ui)",
     ...style,
   };
-  const spinner = (
-    <svg className="animate-spin" width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
-      <path d="M12 2a10 10 0 0 1 10 10" />
-    </svg>
-  );
-
-  const content = (
+  // A link never enters a loading state (it navigates), so it keeps the plain
+  // icon + label. The button uses the morphing spinner/label crossfade.
+  const idleContent = (
     <>
-      {loading ? spinner : icon ? <Icon name={icon} size={18} /> : null}
+      {icon ? <Icon name={icon} size={18} /> : null}
       {children}
-      {!loading && iconEnd && <Icon name={iconEnd} size={18} />}
+      {iconEnd ? <Icon name={iconEnd} size={18} /> : null}
     </>
   );
 
@@ -86,7 +83,7 @@ export function AuthButton({
         )}
         style={buttonStyle}
       >
-        {content}
+        {idleContent}
       </Link>
     );
   }
@@ -97,10 +94,15 @@ export function AuthButton({
       variant={shadcnVariantByAuthVariant[variant]}
       onClick={onClick}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={authButtonClasses}
       style={buttonStyle}
     >
-      {content}
+      <MorphingLabel
+        status={loading ? "pending" : "idle"}
+        idle={idleContent}
+        pendingLabel={children}
+      />
     </Button>
   );
 }

@@ -2591,6 +2591,29 @@ class SalesReportTest(APITestCase):
         )
         self.assertEqual(r.data["kpis"]["total_revenue"], 0.0)
 
+    def _completed_inspection(self, amount, tid):
+        from apps.listings.models import (
+            Transaction,
+            TransactionStatus,
+            TransactionType,
+        )
+
+        return Transaction.objects.create(
+            payer=self.customer, receiver=self.owner,
+            amount=amount, transaction_type=TransactionType.INSPECTION,
+            status=TransactionStatus.COMPLETED, reference=f"SR-INSP-{tid}",
+        )
+
+    def test_inspection_revenue_kpi(self):
+        self._completed_inspection("83000.00", "00010")
+        self._completed_inspection("83000.00", "00011")
+        self.client.force_authenticate(self.staff)
+        r = self.client.get("/api/v1/listings/admin/reports/sales?range=12m")
+        self.assertEqual(r.status_code, status.HTTP_200_OK, r.data)
+        self.assertEqual(r.data["kpis"]["inspection_revenue"], 166000.0)
+        # Its own stream — inspection fees are not counted as sale revenue.
+        self.assertEqual(r.data["kpis"]["total_revenue"], 0.0)
+
     def test_completed_deals_count_as_sales(self):
         # A negotiated sale (deal → transaction) shows in the report alongside
         # request-based purchases.
@@ -2630,3 +2653,93 @@ class SalesReportTest(APITestCase):
         self.assertEqual(r.data["kpis"]["units_sold"], 2)
         models = {m["label"] for m in r.data["top_models"]}
         self.assertTrue(any("Lexus" in m or car.model in m for m in models))
+
+
+class PublicSoldCarDetailTest(APITestCase):
+    """A car sold via a direct buy-request purchase (no Deal) and archived is
+    still publicly viewable as 'sold' — not a 404."""
+
+    def setUp(self):
+        self.owner = create_user("psc-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.customer = create_user("psc-cust@test.com", "customer")
+        create_customer_profile(self.customer)
+
+    def test_request_sold_archived_car_is_public_as_sold(self):
+        from apps.listings.models import (
+            Transaction,
+            TransactionStatus,
+            TransactionType,
+        )
+
+        car = create_car(
+            self.owner,
+            listing_type=ListingType.BUY,
+            sale_price="5000000.00",
+            status=CarStatus.PUBLISHED,
+        )
+        req = Request.objects.create(
+            car=car, customer=self.customer, request_type=ListingType.BUY,
+            price_offered="5000000.00", status=RequestStatus.PAID,
+        )
+        Transaction.objects.create(
+            request=req, payer=self.customer, receiver=self.owner,
+            amount="5000000.00", transaction_type=TransactionType.PURCHASE,
+            status=TransactionStatus.COMPLETED, reference="PSC-1",
+        )
+        car.status = CarStatus.ARCHIVED
+        car.save(update_fields=["status"])
+
+        res = self.client.get(f"/api/v1/listings/cars/{car.id}")
+        self.assertEqual(res.status_code, status.HTTP_200_OK, res.data)
+        self.assertEqual(res.data["availability_status"], "sold")
+
+    def test_archived_without_sale_stays_404(self):
+        car = create_car(
+            self.owner, listing_type=ListingType.BUY, sale_price="5000000.00",
+            status=CarStatus.ARCHIVED,
+        )
+        res = self.client.get(f"/api/v1/listings/cars/{car.id}")
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class TransactionSummaryTest(APITestCase):
+    """Staff KPI totals over all transactions (not just the paged window)."""
+
+    def setUp(self):
+        self.staff = create_user("txsum-staff@test.com", "owner", is_staff=True)
+        self.owner = create_user("txsum-owner@test.com", "owner")
+        create_owner_profile(self.owner)
+        self.customer = create_user("txsum-cust@test.com", "customer")
+        create_customer_profile(self.customer)
+
+    def _txn(self, amount, status_, ttype, ref):
+        from apps.listings.models import Transaction
+
+        return Transaction.objects.create(
+            payer=self.customer, receiver=self.owner, amount=amount,
+            transaction_type=ttype, status=status_, reference=ref,
+        )
+
+    def test_summary_totals(self):
+        from apps.listings.models import TransactionStatus, TransactionType
+
+        self._txn("5000000.00", TransactionStatus.COMPLETED, TransactionType.PURCHASE, "S1")
+        self._txn("3000000.00", TransactionStatus.COMPLETED, TransactionType.RENTAL, "S2")
+        self._txn("83000.00", TransactionStatus.PENDING, TransactionType.INSPECTION, "S3")
+        self._txn("100000.00", TransactionStatus.FAILED, TransactionType.PURCHASE, "S4")
+        self._txn("50000.00", TransactionStatus.REFUNDED, TransactionType.REFUND, "S5")
+
+        self.client.force_authenticate(self.staff)
+        r = self.client.get("/api/v1/listings/admin/transactions/summary")
+        self.assertEqual(r.status_code, status.HTTP_200_OK, r.data)
+        self.assertEqual(r.data["gross_volume"], 8000000.0)
+        self.assertEqual(r.data["completed"], 2)
+        self.assertEqual(r.data["pending"], 1)
+        self.assertEqual(r.data["failed"], 1)
+        self.assertEqual(r.data["refunded"], 50000.0)
+
+    def test_non_staff_forbidden(self):
+        self.client.force_authenticate(self.owner)
+        r = self.client.get("/api/v1/listings/admin/transactions/summary")
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)

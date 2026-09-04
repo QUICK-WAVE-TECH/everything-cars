@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import Image from "next/image";
+import { CoverflowCarousel } from "@/shared/components/coverflow-carousel";
 import Link from "next/link";
 import { Icon } from "@/features/auth/components/icon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -69,12 +69,11 @@ function formatDate(dateStr: string): string {
 // ── Main Component ──
 
 export function CarDetailPage({ carId }: { carId: string }) {
-  const { data: car, isLoading } = usePublicCarDetail(carId);
+  const { data: car, isLoading, isError } = usePublicCarDetail(carId);
   // Skip the request entirely on buy listings — reviews are rent-only.
   const { data: reviewsData } = useCarReviews(carId, {
     enabled: car ? car.listing_type === "rent" : false,
   });
-  const [activeImage, setActiveImage] = useState(0);
   const carouselRef = useRef<HTMLDivElement>(null);
 
   const { isAuthenticated, userRole } = useAuthStore();
@@ -121,7 +120,7 @@ export function CarDetailPage({ carId }: { carId: string }) {
   // A car is listed for rent XOR buy, so the listing type IS the mode.
   const effectiveMode: "rent" | "buy" = isBuyListing ? "buy" : "rent";
 
-  if (isLoading || !car) {
+  if (isLoading) {
     return (
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 24px 80px" }}>
         <Skeleton className="mb-8 h-8 w-64" />
@@ -135,6 +134,28 @@ export function CarDetailPage({ carId }: { carId: string }) {
             <Skeleton className="h-40 w-full rounded-xl" />
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // A sold/removed listing is no longer public (404) — show a clear state
+  // instead of an endless skeleton.
+  if (isError || !car) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center [font-family:var(--brc-font-ui)]">
+        <Icon name="car" size={48} stroke="var(--brc-border)" />
+        <h1 className="m-0 text-xl font-extrabold text-(--brc-text) [font-family:var(--brc-font-display)]">
+          This car isn&apos;t available
+        </h1>
+        <p className="m-0 text-sm text-(--brc-text-muted)">
+          It may have been sold or removed from the marketplace.
+        </p>
+        <Link
+          href="/services"
+          className="mt-2 inline-flex h-10 items-center rounded-lg bg-(--brc-primary) px-5 text-sm font-bold text-white no-underline transition-all hover:brightness-95"
+        >
+          Browse other cars
+        </Link>
       </div>
     );
   }
@@ -161,12 +182,6 @@ export function CarDetailPage({ carId }: { carId: string }) {
     ["Location", `${car.state}${car.city ? `, ${car.city}` : ""}`],
   ];
 
-  function prevImage() {
-    setActiveImage((i) => (i === 0 ? sortedImages.length - 1 : i - 1));
-  }
-  function nextImage() {
-    setActiveImage((i) => (i === sortedImages.length - 1 ? 0 : i + 1));
-  }
   void carouselRef; // reserved for "You May Also Like" carousel
 
   return (
@@ -197,38 +212,35 @@ export function CarDetailPage({ carId }: { carId: string }) {
 
       {/* Two-column: Gallery + Info */}
       <div className="car-detail-two-col" style={{ display: "grid", gridTemplateColumns: "minmax(0, 504px) 1fr", gap: 40, alignItems: "start", marginBottom: 56 }}>
-        {/* Gallery */}
+        {/* Gallery — 3D coverflow of the car's photos */}
         <section aria-label="Car gallery" style={{ minWidth: 0 }}>
-          <div className="car-detail-main-image" style={{ position: "relative", height: "clamp(300px, 58vw, 460px)", borderRadius: "var(--brc-radius-lg)", background: "var(--brc-bg-subtle)", overflow: "hidden", border: "1px solid var(--brc-border)" }}>
-            {sortedImages.length > 0 && sortedImages[activeImage] ? (
-              <Image src={sortedImages[activeImage].image} alt={car.title} fill style={{ objectFit: "contain", padding: 24 }} priority />
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-                <Icon name="car" size={64} stroke="var(--brc-border)" />
-              </div>
-            )}
-            {sortedImages.length > 1 && (
-              <>
-                <button onClick={prevImage} aria-label="Previous image" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 40, height: 40, borderRadius: "50%", background: "#fff", border: "1px solid var(--brc-border)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "var(--brc-shadow-md)" }}>
-                  <Icon name="chevleft" size={18} stroke="var(--brc-text)" />
-                </button>
-                <button onClick={nextImage} aria-label="Next image" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", width: 40, height: 40, borderRadius: "50%", background: "#fff", border: "1px solid var(--brc-border)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "var(--brc-shadow-md)" }}>
-                  <Icon name="chevright" size={18} stroke="var(--brc-text)" />
-                </button>
-              </>
-            )}
-          </div>
-          {sortedImages.length > 1 && (
-            <div style={{ display: "flex", gap: 10, marginTop: 12, overflowX: "auto", paddingBottom: 4 }}>
-              {sortedImages.map((img, i) => {
-                if (!img) return null;
-                return (
-                  <button key={img.id} onClick={() => setActiveImage(i)} aria-current={activeImage === i}
-                    style={{ flex: 1, minWidth: 80, maxWidth: 160, height: 90, borderRadius: "var(--brc-radius-md)", border: activeImage === i ? "2px solid var(--brc-primary)" : "2px solid var(--brc-border)", background: "var(--brc-bg-subtle)", overflow: "hidden", cursor: "pointer", padding: 0, position: "relative" }}>
-                    <Image src={img.thumbnail ?? img.image} alt="" fill style={{ objectFit: "contain", padding: 8 }} />
-                  </button>
-                );
-              })}
+          {sortedImages.length > 0 ? (
+            <CoverflowCarousel
+              variant="bare"
+              overlay={false}
+              autoplay={false}
+              imageFit="contain"
+              glass
+              stageHeight="clamp(300px, 44vw, 440px)"
+              cardWidth="clamp(200px, 62%, 320px)"
+              items={sortedImages
+                .filter(Boolean)
+                .map((img) => ({ id: img!.id, img: img!.image, title: car.title }))}
+            />
+          ) : (
+            <div
+              style={{
+                position: "relative",
+                height: "clamp(300px, 58vw, 460px)",
+                borderRadius: "var(--brc-radius-lg)",
+                background: "var(--brc-bg-subtle)",
+                border: "1px solid var(--brc-border)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Icon name="car" size={64} stroke="var(--brc-border)" />
             </div>
           )}
         </section>

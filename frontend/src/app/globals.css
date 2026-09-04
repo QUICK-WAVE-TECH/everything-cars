@@ -167,9 +167,11 @@
   --brc-radius-pill: 100px;
 
   /* Shadows */
-  --brc-shadow-xs: 0 2px 3px rgba(0,0,0,0.03);
-  --brc-shadow-md: 0 8px 24px rgba(0,0,0,0.08);
-  --brc-shadow-lg: 0 20px 48px rgba(0,0,0,0.12);
+  /* Shadows carry a navy tint rather than neutral black — elevation reads as
+     part of the brand instead of a generic drop shadow. */
+  --brc-shadow-xs: 0 2px 3px rgba(10,10,45,0.05);
+  --brc-shadow-md: 0 8px 24px rgba(10,10,45,0.10);
+  --brc-shadow-lg: 0 20px 48px rgba(10,10,45,0.15);
 
   /* Spacing */
   --brc-space-10: 104px;

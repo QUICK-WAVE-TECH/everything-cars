@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Parallax } from "@/shared/motion/parallax";
+import { RevealOnce } from "@/shared/motion/reveal-once";
 import { toast } from "sonner";
 import {
   AlertCircleIcon,
@@ -140,14 +142,18 @@ export function DisputesPage() {
       {/* Page header */}
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div className="flex min-w-0 flex-1 basis-[300px] flex-col gap-3">
-          <h1 className="text-3xl font-extrabold tracking-tight text-(--brc-text) sm:text-[40px]">
-            Deal disputes
-          </h1>
-          <p className="max-w-[560px] text-[15px] leading-relaxed text-(--brc-text-muted)">
-            Buyers who say a sale never happened after the seller marked it
-            completed. Uphold to reverse the deal and relist the car, or dismiss
-            to let the sale stand.
-          </p>
+          <Parallax distance={-4}>
+            <h1 className="text-3xl font-extrabold tracking-tight text-(--brc-text) sm:text-[40px]">
+              Deal disputes
+            </h1>
+          </Parallax>
+          <Parallax distance={-9}>
+            <p className="max-w-[560px] text-[15px] leading-relaxed text-(--brc-text-muted)">
+              Buyers who say a sale never happened after the seller marked it
+              completed. Uphold to reverse the deal and relist the car, or dismiss
+              to let the sale stand.
+            </p>
+          </Parallax>
         </div>
         <div className="flex items-center gap-2.5 rounded-(--brc-radius-lg) bg-(--brc-warning-bg) px-4 py-3 ring-1 ring-(--brc-warning)">
           <AlertCircleIcon className="size-[18px] text-(--brc-accent)" />
@@ -161,7 +167,7 @@ export function DisputesPage() {
       </div>
 
       {/* Section card */}
-      <section className="flex flex-col overflow-hidden rounded-(--brc-radius-lg) bg-(--brc-bg) ring-1 ring-(--brc-border) shadow-(--brc-shadow-xs)">
+      <RevealOnce className="flex flex-col overflow-hidden rounded-(--brc-radius-lg) bg-(--brc-bg) ring-1 ring-(--brc-border) shadow-(--brc-shadow-xs)">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-(--brc-border) p-4">
           <div
@@ -372,7 +378,7 @@ export function DisputesPage() {
             )}
           </>
         )}
-      </section>
+      </RevealOnce>
 
       <DisputeDetailSheet
         deal={selected}

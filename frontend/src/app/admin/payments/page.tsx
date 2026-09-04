@@ -12,6 +12,7 @@ import { Icon } from "@/features/auth/components/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/features/requests/components/status-badge";
 import { cn } from "@/lib/utils";
+import { Parallax } from "@/shared/motion/parallax";
 import {
   useAdminRequestCounts,
   useAdminRequests,
@@ -232,15 +233,21 @@ export default function AdminPaymentsPage() {
       <section className="border-b border-(--brc-border) bg-(--brc-bg)">
         <div className="mx-auto flex max-w-[1320px] flex-wrap items-start justify-between gap-6 px-4 pb-8 pt-10 sm:px-6 lg:px-(--brc-space-10,40px)">
           <div className="max-w-[580px]">
-            <span className="text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-              Moderation · Payment desk
-            </span>
-            <h1 className="mt-3 text-[clamp(28px,5vw,40px)] font-extrabold leading-tight tracking-tight text-(--brc-text) [font-family:var(--brc-font-display)]">
-              Payment Verification
-            </h1>
-            <p className="mt-2.5 text-base leading-relaxed text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
-              Review and confirm customer payments before they&apos;re processed into transactions.
-            </p>
+            <Parallax distance={-8}>
+              <span className="text-[13px] font-bold uppercase tracking-widest text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                Moderation · Payment desk
+              </span>
+            </Parallax>
+            <Parallax distance={-4}>
+              <h1 className="mt-3 text-[clamp(28px,5vw,40px)] font-extrabold leading-tight tracking-tight text-(--brc-text) [font-family:var(--brc-font-display)]">
+                Payment Verification
+              </h1>
+            </Parallax>
+            <Parallax distance={-9}>
+              <p className="mt-2.5 text-base leading-relaxed text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                Review and confirm customer payments before they&apos;re processed into transactions.
+              </p>
+            </Parallax>
           </div>
           <div className="flex flex-col items-end gap-1.5">
             <button

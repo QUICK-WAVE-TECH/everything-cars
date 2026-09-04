@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckIcon, MessageSquareIcon, PencilIcon } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { useCarHistory } from "@/features/inspections/api/inspections-api";
 import type { CarStatusHistoryEntry } from "@/features/inspections/api/types";
@@ -80,6 +81,7 @@ export function CarStatusTimeline({
   );
   const history = entries ?? fetched;
   const isLoading = entries ? loading : isFetching;
+  const reduce = useReducedMotion();
 
   if (isLoading) {
     return (
@@ -114,7 +116,17 @@ export function CarStatusTimeline({
         const isEdit = isAnnotation && changes.length > 0;
 
         return (
-          <li key={entry.id} className="relative flex gap-3 pb-6 last:pb-0">
+          <motion.li
+            key={entry.id}
+            className="relative flex gap-3 pb-6 last:pb-0"
+            initial={reduce ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              duration: 0.45,
+              ease: [0.16, 1, 0.3, 1],
+              delay: Math.min(i, 8) * 0.05,
+            }}
+          >
             {!isLast && (
               <span
                 className="absolute left-4 top-8 h-[calc(100%-1.75rem)] w-px -translate-x-1/2 bg-(--brc-border)"
@@ -186,7 +198,7 @@ export function CarStatusTimeline({
                 </ul>
               )}
             </div>
-          </li>
+          </motion.li>
         );
       })}
     </ol>

@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { PlusIcon, XIcon, Loader2Icon, BuildingIcon } from "lucide-react";
+import { PlusIcon, XIcon, BuildingIcon } from "lucide-react";
+import { MorphingLabel } from "@/components/ui/loading-button";
 import {
   Select,
   SelectContent,
@@ -383,10 +384,10 @@ export function CreateSlotsModal({
             </p>
           </div>
 
-          {/* Capacity + Center */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[120px_1fr]">
+          {/* Capacity + Center — same line */}
+          <div className="grid grid-cols-[150px_1fr] gap-3">
             <div>
-              <label className={labelClass}>Default capacity</label>
+              <label className={cn(labelClass, "whitespace-nowrap")}>Default capacity</label>
               <input
                 type="number"
                 required
@@ -457,10 +458,14 @@ export function CreateSlotsModal({
             type="submit"
             form="create-slots-form"
             disabled={disabled}
+            aria-busy={createSlots.isPending || undefined}
             className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border-none bg-(--brc-primary) px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(0,0,139,0.22)] transition-all hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none [font-family:var(--brc-font-ui)]"
           >
-            {createSlots.isPending && <Loader2Icon size={14} className="animate-spin" />}
-            Create Slots
+            <MorphingLabel
+              status={createSlots.isPending ? "pending" : "idle"}
+              idle="Create Slots"
+              pendingLabel="Creating…"
+            />
           </button>
         </div>
       </DialogContent>
