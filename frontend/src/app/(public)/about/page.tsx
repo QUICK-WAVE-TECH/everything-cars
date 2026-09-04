@@ -4,8 +4,19 @@ import Image from "next/image";
 import { useState } from "react";
 import { PageHero } from "@/shared/components/page-hero";
 import { TextImageRow } from "@/shared/components/text-image-row";
+import { GrainOverlay } from "@/shared/components/grain-overlay";
 import { Pill } from "@/shared/components/pill";
 import { Icon } from "@/features/auth/components/icon";
+import { ParallaxImage } from "@/shared/motion/parallax-image";
+import { RevealOnce } from "@/shared/motion/reveal-once";
+import { StaggerGroup, StaggerItem } from "@/shared/motion/stagger";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const TEAM = [
   { name: "Mr. Daniel Awuya", role: "Chief Technology Officer", initials: "DA", tone: "var(--brc-primary)" },
@@ -38,31 +49,52 @@ const CEO_CONTACT: ContactEntry[] = [
   { icon: "linkedin", text: "linkedin.com/in/arinzeokoh/" },
 ];
 
+/** Squircle, not a circle — rounded squares read less stock than avatar dots. */
 function Avatar({ initials, tone, size }: { initials: string; tone: string; size: number }) {
   return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%", background: tone,
-      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-    }}>
-      <span style={{
-        fontFamily: "var(--brc-font-ui)", fontWeight: 700,
-        fontSize: size * 0.32, color: "#fff", letterSpacing: ".02em",
-      }}>{initials}</span>
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size * 0.3,
+        background: tone,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        boxShadow: "0 18px 34px -18px rgba(0,0,40,0.5)",
+      }}
+    >
+      {/* The member's name follows in text — don't read the initials twice. */}
+      <span
+        aria-hidden="true"
+        style={{
+          fontFamily: "var(--brc-font-display)",
+          fontWeight: 800,
+          fontSize: size * 0.3,
+          color: "#fff",
+          letterSpacing: ".02em",
+        }}
+      >
+        {initials}
+      </span>
     </div>
   );
 }
 
 function TeamMember({ m }: { m: typeof TEAM[number] }) {
   return (
-    <div style={{
-      display: "flex", flexDirection: "column", alignItems: "center",
-      gap: 14, textAlign: "center", cursor: "default",
-      transition: "transform .2s ease",
-    }}>
-      <Avatar initials={m.initials} tone={m.tone} size={132} />
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 16, color: "var(--brc-text)", lineHeight: 1.3 }}>{m.name}</span>
-        <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 14, color: "var(--brc-text-muted)", lineHeight: 1.3 }}>{m.role}</span>
+    <div className="group flex cursor-default flex-col items-center gap-3.5 text-center">
+      <div className="transition-transform duration-200 group-hover:-translate-y-1.5 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
+        <Avatar initials={m.initials} tone={m.tone} size={124} />
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-[16px] font-bold leading-tight text-(--brc-text) [font-family:var(--brc-font-ui)]">
+          {m.name}
+        </span>
+        <span className="text-[13.5px] leading-tight text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+          {m.role}
+        </span>
       </div>
     </div>
   );
@@ -70,113 +102,93 @@ function TeamMember({ m }: { m: typeof TEAM[number] }) {
 
 function LinkedInIcon() {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24">
+    <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8.5 18v-7H6v7zM7.2 9.6a1.4 1.4 0 1 0 0-2.8 1.4 1.4 0 0 0 0 2.8zM18 18v-3.9c0-2.1-1.1-3.1-2.6-3.1-1.2 0-1.8.7-2.1 1.2V11H10.8v7h2.5v-3.8c0-1 .2-2 1.4-2s1.3 1.2 1.3 2.1V18z" fill="#fff" />
     </svg>
   );
 }
 
 function ContactIcon({ entry }: { entry: ContactEntry }) {
-  if (entry.icon === "linkedin") {
-    return <LinkedInIcon />;
-  }
+  if (entry.icon === "linkedin") return <LinkedInIcon />;
   return <Icon name={entry.icon} size={14} stroke="#fff" />;
 }
 
-function FounderProfile({ open, onClose }: { open: boolean; onClose: () => void }) {
-  if (!open) return null;
+/** Uses the shared Dialog so the founder profile inherits the focus trap, Esc
+ * handling and eased entrance the rest of the app has. */
+function FounderProfile({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, background: "rgba(18,18,18,.55)",
-        zIndex: 200, display: "flex", alignItems: "flex-start", justifyContent: "center",
-        padding: "clamp(20px, 6vw, 48px) var(--brc-space-10, 24px)", overflowY: "auto",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "#fff", borderRadius: 16, maxWidth: 1100, width: "100%",
-          padding: "clamp(28px,6vw,56px) clamp(20px,5vw,64px)", boxShadow: "var(--brc-shadow-lg)",
-          position: "relative",
-        }}
-      >
-        <button
-          className="brc-button-motion brc-button-motion-icon"
-          onClick={onClose}
-          style={{
-            position: "absolute", top: 24, right: 24, width: 40, height: 40,
-            borderRadius: "50%", border: "1px solid var(--brc-border)", background: "#fff",
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 20, color: "var(--brc-text)", lineHeight: 1,
-          }}
-        >
-          ✕
-        </button>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
-          gap: "clamp(28px, 6vw, 56px)",
-          alignItems: "start",
-        }}>
-          {/* Left — photo + contact */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
-            <div style={{
-              width: "min(100%, 300px)", aspectRatio: "1", borderRadius: "50%",
-              alignSelf: "center", position: "relative", overflow: "hidden",
-            }}>
-              <Image
-                src="/founder-ceo.jpg"
-                alt="Mr. Arinze Okoh"
-                fill
-                sizes="300px"
-                style={{ objectFit: "cover" }}
-              />
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[88vh] overflow-y-auto overscroll-contain p-6 sm:max-w-[1040px] sm:p-10">
+        <DialogHeader>
+          <DialogTitle className="text-[26px] font-extrabold tracking-tight text-(--brc-text) [font-family:var(--brc-font-display)]">
+            Mr. Arinze Okoh
+          </DialogTitle>
+          <DialogDescription className="text-[15px] text-(--brc-text-muted)">
+            Managing Director / CEO
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[300px_1fr] lg:gap-12">
+          <div className="flex flex-col gap-6">
+            <div className="relative mx-auto aspect-square w-full max-w-[300px] overflow-hidden rounded-[32px]">
+              <Image src="/founder-ceo.jpg" alt="Mr. Arinze Okoh" fill sizes="300px" style={{ objectFit: "cover" }} />
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <ul className="flex list-none flex-col gap-3 p-0">
               {CEO_CONTACT.map((c) => (
-                <div key={c.text} style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                  <span style={{
-                    width: 24, height: 24, borderRadius: 4, background: "var(--brc-accent)",
-                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                  }}>
+                <li key={c.text} className="flex min-w-0 items-center gap-2.5">
+                  <span
+                    aria-hidden="true"
+                    className="flex size-6 shrink-0 items-center justify-center rounded-md"
+                    style={{ background: "var(--brc-accent)" }}
+                  >
                     <ContactIcon entry={c} />
                   </span>
-                  <span style={{
-                    fontFamily: "var(--brc-font-ui)", fontSize: 14,
-                    color: "var(--brc-text-secondary)", overflowWrap: "anywhere",
-                  }}>{c.text}</span>
-                </div>
+                  <span className="text-[14px] text-(--brc-text-secondary) [overflow-wrap:anywhere] [font-family:var(--brc-font-ui)]">
+                    {c.text}
+                  </span>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
-          {/* Right — bio */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ borderBottom: "1px solid var(--brc-border)", paddingBottom: 16, display: "flex", flexDirection: "column", gap: 6 }}>
-              <h2 style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 28, color: "var(--brc-text)", margin: 0 }}>Mr. Arinze Okoh</h2>
-              <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text-muted)" }}>Managing Director / CEO</span>
-            </div>
+
+          <div className="flex max-w-[68ch] flex-col gap-4">
             {CEO_BIO.map((p, i) => (
-              <p key={i} style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, lineHeight: 1.6, color: "var(--brc-text-muted)", margin: 0 }}>{p}</p>
-            ))}
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <p style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, lineHeight: 1.6, color: "var(--brc-text-muted)", margin: 0 }}>
-                Mr. Okoh&apos;s leadership excellence has earned him recognition in several industry circles, including:
+              <p
+                key={i}
+                className="m-0 text-[16px] leading-[1.65] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]"
+                style={{ textWrap: "pretty" }}
+              >
+                {p}
               </p>
-              <ul style={{ margin: 0, paddingLeft: 22, display: "flex", flexDirection: "column", gap: 6 }}>
+            ))}
+            <div className="flex flex-col gap-2">
+              <p className="m-0 text-[16px] leading-[1.65] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                Mr. Okoh&apos;s leadership excellence has earned him recognition in several industry
+                circles, including:
+              </p>
+              <ul className="m-0 flex flex-col gap-1.5 pl-5">
                 {CEO_AWARDS.map((a) => (
-                  <li key={a} style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, lineHeight: 1.5, color: "var(--brc-text-muted)" }}>{a}</li>
+                  <li
+                    key={a}
+                    className="text-[16px] leading-[1.55] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]"
+                  >
+                    {a}
+                  </li>
                 ))}
               </ul>
             </div>
-            <p style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, lineHeight: 1.6, color: "var(--brc-text-muted)", margin: 0 }}>
-              His leadership philosophy centers on integrity, innovation, and impact — values that continue to shape the culture and success of Buy &amp; Rent Cars as a customer-first, purpose-driven organization.
+            <p
+              className="m-0 text-[16px] leading-[1.65] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]"
+              style={{ textWrap: "pretty" }}
+            >
+              His leadership philosophy centers on integrity, innovation, and impact — values that
+              continue to shape the culture and success of Buy &amp; Rent Cars as a customer-first,
+              purpose-driven organization.
             </p>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -185,6 +197,8 @@ export default function AboutPage() {
 
   return (
     <>
+      <GrainOverlay />
+
       <PageHero
         img="/about-hero.jpg"
         title="Who we Are?"
@@ -215,83 +229,96 @@ export default function AboutPage() {
         ]}
       />
 
-      {/* Founders Section */}
-      <section style={{ background: "#fff", padding: "var(--brc-section-y, 104px) var(--brc-space-10, 104px)" }}>
-        <div style={{ maxWidth: 1232, margin: "0 auto", display: "flex", flexDirection: "column", gap: "clamp(48px, 8vw, 72px)" }}>
-          {/* Header row */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
-            gap: "clamp(24px, 6vw, 64px)",
-            alignItems: "center",
-          }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div style={{ alignSelf: "flex-start" }}><Pill>Founders</Pill></div>
-              <h2 style={{
-                fontFamily: "var(--brc-font-ui)", fontWeight: 700,
-                fontSize: "clamp(30px,3.4vw,48px)", lineHeight: 1.2,
-                color: "var(--brc-text)", maxWidth: 460, margin: 0,
-              }}>Guided by Experience, Driven by Vision</h2>
-            </div>
-            <p style={{
-              fontFamily: "var(--brc-font-ui)", fontSize: 16, lineHeight: 1.6,
-              color: "var(--brc-text-muted)", margin: 0,
-            }}>
-              Our leadership team brings together a wealth of industry experience, innovation, and strategic vision. Each member plays a key role in guiding Buy &amp; Rent&apos;s mission, driving sustainable growth, empowering teams, and ensuring every client achieves meaningful and measurable success.
-            </p>
-          </div>
+      {/* Founders */}
+      <section className="relative overflow-hidden bg-white" style={{ padding: "var(--brc-section-y, 104px) var(--brc-space-10, 104px)" }}>
+        {/* Ambient wash so the section isn't a flat white plane */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(52% 44% at 18% 12%, rgba(0,0,139,0.07), transparent 62%), radial-gradient(46% 40% at 88% 82%, rgba(195,101,35,0.07), transparent 66%)",
+          }}
+        />
 
-          {/* CEO + Team grid */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
-            gap: "clamp(40px, 7vw, 56px)",
-            alignItems: "center",
-          }}>
-            {/* Featured CEO */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
-              <div style={{
-                width: "100%", aspectRatio: "1", borderRadius: "50%",
-                maxWidth: 380, position: "relative", overflow: "hidden",
-              }}>
-                <Image
+        <div className="relative mx-auto flex max-w-[1232px] flex-col gap-[clamp(48px,8vw,80px)]">
+          {/* Asymmetric header — heading leads, supporting copy sits lower and right */}
+          <RevealOnce className="grid grid-cols-1 gap-8 lg:gap-16 lg:[grid-template-columns:1.15fr_0.85fr]">
+            <div className="flex flex-col gap-4">
+              <div className="self-start">
+                <Pill>Founders</Pill>
+              </div>
+              <h2
+                className="m-0 max-w-[13ch] text-[clamp(32px,4vw,56px)] font-extrabold leading-[1.08] tracking-[-0.025em] text-(--brc-text) [font-family:var(--brc-font-display)]"
+                style={{ textWrap: "balance" }}
+              >
+                Guided by Experience, Driven by Vision
+              </h2>
+            </div>
+            <p
+              className="m-0 max-w-[58ch] self-end text-[16.5px] leading-[1.65] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]"
+              style={{ textWrap: "pretty" }}
+            >
+              Our leadership team brings together a wealth of industry experience, innovation, and
+              strategic vision. Each member plays a key role in guiding Buy &amp; Rent&apos;s mission,
+              driving sustainable growth, empowering teams, and ensuring every client achieves
+              meaningful and measurable success.
+            </p>
+          </RevealOnce>
+
+          {/* CEO + team — deliberately unequal columns */}
+          <div className="grid grid-cols-1 items-center gap-12 lg:gap-16 lg:[grid-template-columns:0.82fr_1.18fr]">
+            <RevealOnce className="flex flex-col items-center gap-6">
+              <div className="relative w-full max-w-[360px]">
+                <div
+                  aria-hidden="true"
+                  className="absolute -inset-4 hidden rounded-[40px] lg:block"
+                  style={{ background: "linear-gradient(150deg, rgba(0,0,139,0.15), transparent 62%)" }}
+                />
+                <ParallaxImage
                   src="/founder-ceo.jpg"
                   alt="Mr. Arinze Okoh"
-                  fill
-                  sizes="(max-width: 640px) 90vw, 380px"
-                  style={{ objectFit: "cover" }}
+                  sizes="(max-width: 640px) 90vw, 360px"
+                  shift={22}
+                  style={{
+                    aspectRatio: "1",
+                    borderRadius: 34,
+                    boxShadow: "0 34px 64px -30px rgba(0,0,40,0.45)",
+                  }}
                 />
               </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                <span style={{ fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 24, color: "var(--brc-text)" }}>Mr. Arinze Okoh</span>
-                <span style={{ fontFamily: "var(--brc-font-ui)", fontSize: 16, color: "var(--brc-text-muted)" }}>Managing Director / CEO</span>
+              <div className="flex flex-col items-center gap-1.5">
+                <span className="text-[23px] font-extrabold tracking-tight text-(--brc-text) [font-family:var(--brc-font-display)]">
+                  Mr. Arinze Okoh
+                </span>
+                <span className="text-[15.5px] text-(--brc-text-muted) [font-family:var(--brc-font-ui)]">
+                  Managing Director / CEO
+                </span>
                 <button
-                  className="brc-button-motion brc-button-motion-subtle"
+                  type="button"
+                  className="brc-button-motion brc-button-motion-subtle mt-2.5 inline-flex cursor-pointer items-center gap-2 border-none bg-transparent p-0 text-[14px] font-bold text-(--brc-accent) [font-family:var(--brc-font-ui)]"
                   onClick={() => setProfileOpen(true)}
-                  style={{
-                    marginTop: 10, display: "inline-flex", alignItems: "center", gap: 8,
-                    background: "transparent", border: "none", color: "var(--brc-accent)",
-                    fontFamily: "var(--brc-font-ui)", fontWeight: 700, fontSize: 14,
-                    cursor: "pointer", padding: 0,
-                  }}
                 >
-                  Read Full Profile <Icon name="arrow" size={16} stroke="var(--brc-accent)" />
+                  Read Full Profile
+                  <span aria-hidden="true" className="flex">
+                    <Icon name="arrow" size={16} stroke="var(--brc-accent)" />
+                  </span>
                 </button>
               </div>
-            </div>
-            {/* Team grid */}
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))",
-              gap: "clamp(24px, 5vw, 40px)",
-            }}>
-              {TEAM.map((m) => <TeamMember key={m.name} m={m} />)}
-            </div>
+            </RevealOnce>
+
+            <StaggerGroup className="grid grid-cols-2 gap-[clamp(24px,5vw,40px)] sm:grid-cols-3">
+              {TEAM.map((m) => (
+                <StaggerItem key={m.name}>
+                  <TeamMember m={m} />
+                </StaggerItem>
+              ))}
+            </StaggerGroup>
           </div>
         </div>
       </section>
 
-      <FounderProfile open={profileOpen} onClose={() => setProfileOpen(false)} />
+      <FounderProfile open={profileOpen} onOpenChange={setProfileOpen} />
     </>
   );
 }
