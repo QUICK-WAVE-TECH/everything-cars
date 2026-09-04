@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useState } from "react";
 import { PageHero } from "@/shared/components/page-hero";
 import { TextImageRow } from "@/shared/components/text-image-row";
-import { GrainOverlay } from "@/shared/components/grain-overlay";
 import { Pill } from "@/shared/components/pill";
 import { Icon } from "@/features/auth/components/icon";
 import { ParallaxImage } from "@/shared/motion/parallax-image";
@@ -197,8 +196,6 @@ export default function AboutPage() {
 
   return (
     <>
-      <GrainOverlay />
-
       <PageHero
         img="/about-hero.jpg"
         title="Who we Are?"
